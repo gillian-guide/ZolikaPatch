@@ -126,3 +126,8 @@ endif()
 add_executable(zp_pe_check tests/pe_check.cpp)
 add_dependencies(zp_pe_check ${ZP_NAME})
 add_test(NAME zp_pe_check COMMAND zp_pe_check $<TARGET_FILE:${ZP_NAME}>)
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/ZolikaPatch_original.asi.off)
+  add_test(NAME zp_body_proof_selftest
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/verify_bodies.py
+            --selftest --original ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/ZolikaPatch_original.asi.off)
+endif()
