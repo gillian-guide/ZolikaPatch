@@ -110,6 +110,15 @@ set_target_properties(zp_dump PROPERTIES CXX_SCAN_FOR_MODULES ON)
 target_link_libraries(zp_dump PRIVATE zp_modules)
 add_dependencies(zp_dump ${ZP_NAME})
 
+# The empty baseline: with no arm installed the pipeline must change nothing on
+# every supported image. Every later arm is diffed against that.
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/GTAIV.exe)
+  add_test(NAME zp_dump_empty
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_empty_dump.py
+            $<TARGET_FILE:zp_dump> ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs)
+endif()
+
 add_executable(zp_pe_check tests/pe_check.cpp)
 add_dependencies(zp_pe_check ${ZP_NAME})
 add_test(NAME zp_pe_check COMMAND zp_pe_check $<TARGET_FILE:${ZP_NAME}>)
