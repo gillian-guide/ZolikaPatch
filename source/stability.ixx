@@ -61,6 +61,21 @@ namespace
         auto* match = pattern.get(0).get<uint8_t>();
         injector::WriteMemory<uint8_t>(match, 0xC3, true);
     }
+
+    // RemoveAllWeaponsProtection: the 12-byte block the anchor jumps over is
+    // deleted, so the weapon-clearing path it guarded is no longer taken.
+    void InstallRemoveAllWeaponsProtection()
+    {
+        if (!Loader::Enabled("RemoveAllWeaponsProtection"))
+            return;
+
+        auto pattern = find_pattern("E9 ?? ?? ?? ?? 57 8D 8F ?? ?? 00 00");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get(0).get<uint8_t>();
+        injector::MakeNOP(match + 5, 12, true);
+    }
 }
 
 // Defined out of line in this module: the subscription body has to live in the
@@ -72,5 +87,6 @@ export void RegisterStability()
         InstallMPNikoCrashFix();
         InstallSCOSignatureFix();
         InstallTryToSkipAllErrors();
+        InstallRemoveAllWeaponsProtection();
     };
 }
