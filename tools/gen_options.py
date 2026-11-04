@@ -60,10 +60,12 @@ def mask_for(text):
     if text in SHORTHANDS:
         builds = SHORTHANDS[text]
     else:
-        builds = [part.strip() for part in re.split(r"[,/]", text) if part.strip() in BUILDS]
+        builds = [part.strip() for part in re.split(r"[,/]", text)
+                  if part.strip() in BUILDS or part.strip().isdigit()]
     mask = 0
     for name in builds:
-        mask |= 1 << ORDINAL[BUILDS[name]]
+        compact = BUILDS[name] if name in BUILDS else int(name)
+        mask |= 1 << ORDINAL[compact]
     return mask, builds
 
 
@@ -81,10 +83,22 @@ def parse():
         key, shipped, absent, builds = match.groups()
         shipped = shipped.replace("*", "").strip()
         absent = absent.replace("*", "").strip()
+
+        # The one string-valued key: the loader only pre-reads it (the setter is
+        # called when it is present), so it has no numeric default at all.
+        if key == "OverrideGTADatPathTo":
+            mask, names = mask_for(builds)
+            rows.append((key, -1, -1, mask, module, names, "string"))
+            continue
+        # The undocumented alias: absent from the shipped INI, numeric default 0.
+        if key == "Patch7RemoveModChecks":
+            mask, names = mask_for(builds)
+            rows.append((key, -1, int(absent), mask, module, names, "alias"))
+            continue
         if not shipped.isdigit() or not absent.isdigit():
             continue
         mask, names = mask_for(builds) if builds.strip() in SHORTHANDS else mask_for(builds.replace("**", " "))
-        rows.append((key, int(shipped), int(absent), mask, module, names))
+        rows.append((key, int(shipped), int(absent), mask, module, names, "numeric"))
     return rows
 
 
@@ -103,14 +117,14 @@ def render(rows):
     # The first row above is a placeholder for the reader's eye; every real row
     # follows in inventory order.
     lines = lines[:-1]
-    for key, shipped, absent, mask, module, names in rows:
-        lines.append(f"ZP_OPTION({key}, {shipped}, {absent}, 0x{mask:08X}u, {module})")
+    for key, shipped, absent, mask, module, names, kind in rows:
+        lines.append(f"ZP_OPTION({key}, {shipped}, {absent}, 0x{mask:08X}u, {module}, {kind})")
     return "\n".join(lines) + "\n"
 
 
 def main():
     rows = parse()
-    if len(rows) < 90:
+    if len(rows) < 99:
         raise SystemExit(f"only {len(rows)} option rows parsed -- the inventory layout changed")
     text = render(rows)
     if "--check" in sys.argv:

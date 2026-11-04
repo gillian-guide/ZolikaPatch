@@ -24,7 +24,7 @@ export struct Option
 export namespace Catalogue
 {
     inline constexpr Option All[] = {
-#define ZP_OPTION(key, shipped, absent, builds, module) Option{#key, shipped, absent, builds, #module},
+#define ZP_OPTION(key, shipped, absent, builds, module, kind) Option{#key, shipped, absent, builds, #module},
 #include "options.inc"
 #undef ZP_OPTION
     };
