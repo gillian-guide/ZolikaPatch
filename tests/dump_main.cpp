@@ -27,6 +27,7 @@ namespace
         std::vector<uint8_t> bytes;
         std::vector<uint8_t> pristine;
         size_t size{};
+        uintptr_t imageBase{};  // the image's own preferred base, for branch canonicalisation
     };
 
     // Copies the headers and every section to its virtual address, leaving the
@@ -46,6 +47,7 @@ namespace
         const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(raw.data());
         const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(raw.data() + dos->e_lfanew);
         image.size = nt->OptionalHeader.SizeOfImage;
+        image.imageBase = nt->OptionalHeader.ImageBase;
         image.bytes.assign(image.size, 0);
 
         const auto* section = IMAGE_FIRST_SECTION(nt);
@@ -143,14 +145,14 @@ int main(int argc, char** argv)
             Config::Ini() = Feather::Parse(text);
             image.bytes = image.pristine;
             Loader::Run();
-            Bodies::Canonicalise(image.bytes.data(), image.pristine.data(), image.size, reinterpret_cast<uintptr_t>(image.bytes.data()));
+            Bodies::Canonicalise(image.bytes.data(), image.pristine.data(), image.size, reinterpret_cast<uintptr_t>(image.bytes.data()), image.imageBase);
             Dump(image, out, std::string(option.key) + " ");
         }
     }
     else
     {
         Loader::Run();
-            Bodies::Canonicalise(image.bytes.data(), image.pristine.data(), image.size, reinterpret_cast<uintptr_t>(image.bytes.data()));
+            Bodies::Canonicalise(image.bytes.data(), image.pristine.data(), image.size, reinterpret_cast<uintptr_t>(image.bytes.data()), image.imageBase);
         Dump(image, out, "");
         std::printf("%s: %zu byte(s) changed, build %s\n", output.string().c_str(), Changed(image), build.c_str());
     }

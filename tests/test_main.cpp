@@ -300,7 +300,7 @@ namespace
         std::memcpy(image.data() + 1, &displacement, sizeof(displacement));
         pristine[0] = 0x90;  // the pass wrote this byte
 
-        const auto rewritten = Bodies::Canonicalise(image.data(), pristine.data(), image.size(), base);
+        const auto rewritten = Bodies::Canonicalise(image.data(), pristine.data(), image.size(), base, base);
         Check(rewritten == 1, "bodies: the branch to a registered body is canonicalised");
 
         int32_t canonical{};
@@ -313,7 +313,7 @@ namespace
         std::array<uint8_t, 8> samePrinstine{};
         untouched[0] = 0xE9;
         samePrinstine[0] = 0xE9;
-        Check(Bodies::Canonicalise(untouched.data(), samePrinstine.data(), untouched.size(), base) == 0,
+        Check(Bodies::Canonicalise(untouched.data(), samePrinstine.data(), untouched.size(), base, base) == 0,
             "bodies: a branch that was not written is left alone");
     }
 

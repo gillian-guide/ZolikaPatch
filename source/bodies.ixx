@@ -1,4 +1,4 @@
-﻿module;
+module;
 
 #include <common.hxx>
 
@@ -54,7 +54,13 @@ export namespace Bodies
     // Rewrites every E8/E9 the pass wrote whose target is a registered body. A
     // branch the pass did not write is left alone (its byte still equals the
     // pristine one).
-    inline size_t Canonicalise(uint8_t* bytes, const uint8_t* pristine, size_t size, uintptr_t base)
+    // `hostBase` is where the image buffer sits in this process -- what the
+    // injector wrote its displacement against. `imageBase` is the image's own
+    // preferred base, which is the coordinate system a baseline is expressed in.
+    // Matching the target needs the first; emitting the displacement needs the
+    // second, and using one for both is off by hostBase - imageBase.
+    inline size_t Canonicalise(uint8_t* bytes, const uint8_t* pristine, size_t size,
+                               uintptr_t hostBase, uintptr_t imageBase)
     {
         size_t rewritten = 0;
         for (size_t offset = 0; offset + 5 <= size; ++offset)
@@ -65,14 +71,15 @@ export namespace Bodies
 
             int32_t displacement{};
             std::memcpy(&displacement, bytes + offset + 1, sizeof(displacement));
-            const auto site = static_cast<uintptr_t>(base + offset);
+            const auto site = static_cast<uintptr_t>(hostBase + offset);
             const auto target = static_cast<uintptr_t>(static_cast<intptr_t>(site + 5 + displacement));
 
             uint32_t reference{};
             if (!ReferenceFor(target, reference))
                 continue;
 
-            const auto canonical = static_cast<int32_t>(static_cast<intptr_t>(reference) - static_cast<intptr_t>(site + 5));
+            const auto imageSite = static_cast<uintptr_t>(imageBase + offset);
+            const auto canonical = static_cast<int32_t>(static_cast<intptr_t>(reference) - static_cast<intptr_t>(imageSite + 5));
             std::memcpy(bytes + offset + 1, &canonical, sizeof(canonical));
             ++rewritten;
         }
