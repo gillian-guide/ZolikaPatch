@@ -127,8 +127,15 @@ int main(int argc, char** argv)
     {
         for (const auto& option : Catalogue::All)
         {
-            // Only this key is present; every other option reads its own default.
-            Config::Ini() = Feather::Parse("[Options]\n" + std::string(option.key) + "=1\n");
+            // Every key off, this one on -- the arm-isolation oracle's document.
+            // Leaving the others absent would read their defaults, which for
+            // most keys is "on", and every other arm would write into this cell.
+            std::string text = "[Options]\n";
+            for (const auto& other : Catalogue::All)
+                text += std::string(other.key) + "=0\n";
+            text += std::string(option.key) + "=1\n";
+
+            Config::Ini() = Feather::Parse(text);
             image.bytes = image.pristine;
             Loader::Run();
             Dump(image, out, std::string(option.key) + " ");
