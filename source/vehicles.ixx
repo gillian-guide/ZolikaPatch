@@ -72,6 +72,38 @@ namespace
         auto* match = pattern.get(0).get<uint8_t>();
         injector::MakeNOP(match + 33, 6, true);
     }
+    // PipeBombDropIconSupport: the nine-byte check before the anchor is deleted,
+    // so the pipe-bomb drop icon is accepted on the episodic builds.
+    void InstallPipeBombDropIconSupport()
+    {
+        if (!Loader::Enabled("PipeBombDropIconSupport"))
+            return;
+
+        auto pattern = find_pattern("83 7D 18 1C 75 14");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get(0).get<uint8_t>();
+        injector::MakeNOP(match - 9, 9, true);
+    }
+
+    // TeleportProtection: the entry becomes `ret 8`. The original writes exactly
+    // three bytes -- C2 08 over the opcode and 00 over the byte after the
+    // immediate -- and injector::MakeRET is not equivalent: it stores the opcode
+    // through a 4-byte int, which would also zero match+3.
+    void InstallTeleportProtection()
+    {
+        if (!Loader::Enabled("TeleportProtection"))
+            return;
+
+        auto pattern = find_pattern("55 8B EC 83 E4 F8 51 53 8B 5D 08 56 57 6A 08 8D 44 24 10 8B F1 8D 7B 04 50 8B CF C7 44 24 14 00");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get(0).get<uint8_t>();
+        injector::WriteMemory<uint16_t>(injector::raw_ptr(match), 0x08C2u, true);
+        injector::WriteMemory<uint8_t>(injector::raw_ptr(match + 2), 0x00u, true);
+    }
 }
 
 export void RegisterVehicles()
@@ -82,5 +114,7 @@ export void RegisterVehicles()
         InstallReversingLightFix();
         InstallBikeFeetFix();
         InstallBikePhoneAnimsFix();
+        InstallPipeBombDropIconSupport();
+        InstallTeleportProtection();
     };
 }
