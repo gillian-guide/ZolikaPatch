@@ -1,0 +1,8 @@
+build/
+.scratch/
+*.log
+*.user
+.vs/
+*_run.txt
+run.txt
+run.err.txt
