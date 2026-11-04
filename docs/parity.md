@@ -43,8 +43,34 @@ Two of these need care before they are claimed as 1:1:
 Everything below is unimplemented, so "parity" for it is unmeasured rather than
 deviating:
 
-- every install arm (843 bytes on 1.0.8.0, per `compare_dumps.py` against
-  `readable/build/p3-final-dumps3/b9-full.txt`);
+- 76 of the 99 option keys (23 closed: 14 arms; `compare_dumps.py` against
+  `readable/build/p3-final-dumps3/b*-per.txt` is the measure);
 - the 107 hook bodies and their proof;
 - the launcher / DFA / ROM stage order;
-- the 18 per-build dumps and the oracle differential.
+- the 18 full/per-option per-build dump hashes and the oracle differential.
+
+## Transcribing a body
+
+A body-bearing key is only committed when all four parts exist, because each one
+changes either the write set or the fault behaviour:
+
+1. **The body's asm**, transcribed into the owning module's tail section, with
+   the recovered `BodyId` VA in a comment. A naked function in a module interface
+   unit must have internal linkage (`static`); an external-linkage naked function
+   is written to the BMI and every importer fails.
+2. **The published module words** the body reads (recovered data: model hashes,
+   flags, and the resume pointers). The arm publishes them *before* it installs
+   the site — the original reads a site's original bytes for its resume, so
+   publishing after the write is the CPU-spinning self-jump fault.
+3. **The registry entry**: `Bodies::Register(&body, recoveredVa)`, so the dump
+   rewrites the branch displacement to the original's coordinates.
+4. **The proof manifest row**: `name <recovered VA> <candidate VA> <length>`, and
+   `verify_bodies.py` must report PASS for it.
+
+The first body to transcribe is `abi_building_dynamic_shadows` (recovered VA
+`0x10005AF0`, `sub_10005af0`): it reads `[edi]`, compares it against two
+published model hashes, jumps to `resume_b` on a match, otherwise computes
+`([edi+28h] >> 6 & 0xF) - 1` and jumps to `resume_a`. Its arm also writes the
+shadow-size operand byte (`0x104` -> `0x100`), which is the half already
+understood; the key stays open until the body half exists.
+
