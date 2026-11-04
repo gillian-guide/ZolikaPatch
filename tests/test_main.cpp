@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstring>
 
+import bodies;
 import common;
 import config;
 import game;
@@ -281,6 +282,41 @@ namespace
         Check(Catalogue::DefaultText("CarDynamicShadowFix", false) == "0", "catalogue: the absent default is the arm default");
     }
 
+    void TestBodyCanonicalisation()
+    {
+        // A five-byte `jmp` written by a pass, pointing at a body that lives in
+        // this process. The dump has to turn it into the body's recovered VA.
+        std::array<uint8_t, 16> image{};
+        std::array<uint8_t, 16> pristine{};
+        constexpr uintptr_t base = 0x00400000;
+        constexpr uint32_t reference = 0x10001234;
+        static int fakeBody = 0;
+
+        Bodies::Register(reinterpret_cast<uintptr_t>(&fakeBody), reference);
+
+        image[0] = 0xE9;
+        const auto site = static_cast<uintptr_t>(base);
+        const auto displacement = static_cast<int32_t>(reinterpret_cast<uintptr_t>(&fakeBody) - (site + 5));
+        std::memcpy(image.data() + 1, &displacement, sizeof(displacement));
+        pristine[0] = 0x90;  // the pass wrote this byte
+
+        const auto rewritten = Bodies::Canonicalise(image.data(), pristine.data(), image.size(), base);
+        Check(rewritten == 1, "bodies: the branch to a registered body is canonicalised");
+
+        int32_t canonical{};
+        std::memcpy(&canonical, image.data() + 1, sizeof(canonical));
+        Check(static_cast<uint32_t>(site + 5 + canonical) == reference,
+            "bodies: the rewritten displacement names the recovered VA");
+
+        // A branch the pass did not write is left alone.
+        std::array<uint8_t, 8> untouched{};
+        std::array<uint8_t, 8> samePrinstine{};
+        untouched[0] = 0xE9;
+        samePrinstine[0] = 0xE9;
+        Check(Bodies::Canonicalise(untouched.data(), samePrinstine.data(), untouched.size(), base) == 0,
+            "bodies: a branch that was not written is left alone");
+    }
+
     void TestEvents()
     {
         FusionFix::Event<> event;
@@ -315,6 +351,7 @@ int main(int argc, char** argv)
     TestBuilds();
     TestSignatures();
     TestCatalogue();
+    TestBodyCanonicalisation();
     TestEvents();
 
     if (argc > 1)

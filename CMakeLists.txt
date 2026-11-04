@@ -62,6 +62,7 @@ set_target_properties(zp_modules PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_EXTENSIO
 target_sources(zp_modules PUBLIC
   FILE_SET CXX_MODULES FILES
     source/common.ixx
+    source/bodies.ixx
     source/patch.ixx
     source/config.ixx
     source/game.ixx

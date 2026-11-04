@@ -1,6 +1,7 @@
 #include <common.hxx>
 #include <cstdio>
 
+import bodies;
 import common;
 import config;
 import game;
@@ -142,12 +143,14 @@ int main(int argc, char** argv)
             Config::Ini() = Feather::Parse(text);
             image.bytes = image.pristine;
             Loader::Run();
+            Bodies::Canonicalise(image.bytes.data(), image.pristine.data(), image.size, reinterpret_cast<uintptr_t>(image.bytes.data()));
             Dump(image, out, std::string(option.key) + " ");
         }
     }
     else
     {
         Loader::Run();
+            Bodies::Canonicalise(image.bytes.data(), image.pristine.data(), image.size, reinterpret_cast<uintptr_t>(image.bytes.data()));
         Dump(image, out, "");
         std::printf("%s: %zu byte(s) changed, build %s\n", output.string().c_str(), Changed(image), build.c_str());
     }
