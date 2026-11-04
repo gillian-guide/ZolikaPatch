@@ -76,6 +76,45 @@ namespace
         auto* match = pattern.get(0).get<uint8_t>();
         injector::MakeNOP(match + 5, 12, true);
     }
+
+    // HighFPSSpeedupFix: the nine frame-time clamps inside CTimer::Update. One
+    // becomes a short jump (skipping the following test), the other eight are
+    // two-byte NOPs.
+    struct SpeedupSite final
+    {
+        ptrdiff_t offset;
+        bool shortJump;
+    };
+    constexpr SpeedupSite kSpeedupSites[] = {
+        { -7, false },
+        { 3, false },
+        { 224, true },
+        { 231, false },
+        { 367, false },
+        { 377, false },
+        { 607, false },
+        { 614, false },
+        { 764, false },
+    };
+
+    void InstallHighFPSSpeedupFix()
+    {
+        if (!Loader::Enabled("HighFPSSpeedupFix"))
+            return;
+
+        auto pattern = find_pattern("0F 2F C1 76 03 0F 28 C8 F3 0F 10 15");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get(0).get<uint8_t>();
+        for (const auto& site : kSpeedupSites)
+        {
+            if (site.shortJump)
+                injector::WriteMemory<uint8_t>(match + site.offset, 0xEB, true);
+            else
+                injector::MakeNOP(match + site.offset, 2, true);
+        }
+    }
 }
 
 // Defined out of line in this module: the subscription body has to live in the
@@ -88,5 +127,6 @@ export void RegisterStability()
         InstallSCOSignatureFix();
         InstallTryToSkipAllErrors();
         InstallRemoveAllWeaponsProtection();
+        InstallHighFPSSpeedupFix();
     };
 }
