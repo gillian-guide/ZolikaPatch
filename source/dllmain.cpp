@@ -6,6 +6,7 @@ import game;
 import loader;
 import options;
 import stability;
+import vehicles;
 
 extern "C" __declspec(dllexport) void InitializeASI();
 
@@ -43,6 +44,7 @@ namespace
 
         FusionFix::onInitEvent().executeAll();
         RegisterStability();
+        RegisterVehicles();
         Loader::Run();
 
 #ifdef ZP_TRACE
