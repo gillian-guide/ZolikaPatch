@@ -7,6 +7,7 @@ import loader;
 import options;
 import stability;
 import vehicles;
+import useless_checks;
 
 extern "C" __declspec(dllexport) void InitializeASI();
 
@@ -45,6 +46,7 @@ namespace
         FusionFix::onInitEvent().executeAll();
         RegisterStability();
         RegisterVehicles();
+        RegisterUselessChecks();
         Loader::Run();
 
 #ifdef ZP_TRACE
