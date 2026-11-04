@@ -6,6 +6,7 @@ import config;
 import game;
 import loader;
 import options;
+import stability;
 
 // The write-set dump: load a copy of a game image into this process, run the
 // same load pipeline the ASI runs, and print every byte it changed as
@@ -111,7 +112,7 @@ int main(int argc, char** argv)
 
     auto& game = Game::Get();
     game.AttachImage(reinterpret_cast<uintptr_t>(image.bytes.data()), image.size, executable, {});
-    Loader::Current() = ClassifyCompact(build);
+    Loader::Current() = FromId(static_cast<uint32_t>(std::atoi(build.c_str())));
     if (!std::filesystem::exists(ini))
         std::printf("no ini at %s: every option keeps its default\n", ini.string().c_str());
     Config::Ini() = Feather::Load(ini);
@@ -119,6 +120,8 @@ int main(int argc, char** argv)
     std::FILE* out = std::fopen(output.string().c_str(), "wb");
     if (out == nullptr)
         return 1;
+
+    RegisterStability();
 
     if (perOption)
     {

@@ -32,6 +32,14 @@ def main() -> int:
     # Called from the source tree, where ../game_refs is the live game directory.
     game_refs = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else dump.parents[3] / ".." / "game_refs"
     failures = 0
+    # "No arm installed" means every option off, not "no INI": an arm's default is
+    # on for most keys, so the baseline needs an explicit all-off document.
+    table = Path(__file__).resolve().parent.parent / "source" / "options.inc"
+    keys = [line.split("(", 1)[1].split(",", 1)[0]
+            for line in table.read_text(encoding="utf-8").splitlines()
+            if line.startswith("ZP_OPTION(")]
+    ini = dump.parent / "all-off.ini"
+    ini.write_text("[Options]\n" + "".join(f"{key}=0\n" for key in keys), encoding="utf-8")
     for build, image in IMAGES.items():
         exe = game_refs / image
         if not exe.exists():
@@ -39,7 +47,7 @@ def main() -> int:
             continue
         out = dump.parent / f"empty-b{build}.txt"
         subprocess.run(
-            [str(dump), "--exe", str(exe), "--build", str(build), str(out), "no-such.ini"],
+            [str(dump), "--exe", str(exe), "--build", str(build), str(out), str(ini)],
             check=False, capture_output=True)
         rows = [line for line in out.read_text(errors="replace").splitlines() if line.strip()]
         out.unlink(missing_ok=True)

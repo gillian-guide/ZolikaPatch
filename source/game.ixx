@@ -53,6 +53,28 @@ export Build ClassifyCompact(std::string_view compact)
     }
 }
 
+// The build id is the enumeration value and what the per-image dumps are keyed
+// by: the tools take the id, not the product version text.
+export Build FromId(uint32_t id)
+{
+    switch (id)
+    {
+    case 1: return Build::v1000;
+    case 5: return Build::v1040;
+    case 6: return Build::v1004;
+    case 7: return Build::v1060;
+    case 8: return Build::v1070;
+    case 9: return Build::v1080;
+    case 10: return Build::v1100;
+    case 11: return Build::v1110;
+    case 12: return Build::v1120;
+    case 13: return Build::v1130;
+    case 15: return Build::v1061;
+    case 18: return Build::v12043;
+    default: return Build::unknown;
+    }
+}
+
 export Build Classify(const Game::Version& version)
 {
     return ClassifyCompact(CompactVersion(version));
