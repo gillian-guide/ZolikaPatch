@@ -104,6 +104,20 @@ namespace
         injector::WriteMemory<uint16_t>(injector::raw_ptr(match), 0x08C2u, true);
         injector::WriteMemory<uint8_t>(injector::raw_ptr(match + 2), 0x00u, true);
     }
+    // IncreaseVehicleStructLimit: the struct count the allocator is asked for
+    // becomes 100 instead of the original constant.
+    void InstallIncreaseVehicleStructLimit()
+    {
+        if (!Loader::Enabled("IncreaseVehicleStructLimit"))
+            return;
+
+        auto pattern = find_pattern("68 ?? ?? ?? ?? 6A 32 8B C8");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get(0).get<uint8_t>();
+        injector::WriteMemory<uint8_t>(match + 6, 100, true);
+    }
 }
 
 export void RegisterVehicles()
@@ -116,5 +130,6 @@ export void RegisterVehicles()
         InstallBikePhoneAnimsFix();
         InstallPipeBombDropIconSupport();
         InstallTeleportProtection();
+        InstallIncreaseVehicleStructLimit();
     };
 }
