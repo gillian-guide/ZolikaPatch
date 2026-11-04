@@ -8,6 +8,7 @@ import options;
 import stability;
 import vehicles;
 import useless_checks;
+import graphics;
 
 extern "C" __declspec(dllexport) void InitializeASI();
 
@@ -47,6 +48,7 @@ namespace
         RegisterStability();
         RegisterVehicles();
         RegisterUselessChecks();
+        RegisterGraphics();
         Loader::Run();
 
 #ifdef ZP_TRACE
