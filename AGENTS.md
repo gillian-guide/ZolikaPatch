@@ -6,10 +6,11 @@ and EFLC. The oracle is `../game_refs/ZolikaPatch_original.asi.off`; the old
 
 ## Current state
 
-Foundation only: build, event tiers, log, image context, signature scanning,
-the original's INI grammar and build classification, plus the offline contract
-suite. No feature arm is installed yet; the arm pipeline and the feature modules
-come next, in the order recorded in `../.agents/rewrite/04-migration.md`.
+Foundation and catalogue: build, event tiers, log, image context, signature
+scanning, the original's INI grammar, build classification, the recovered option
+catalogue (97 of the inventory's 99 keys serialised) and the three-tier arm
+pipeline. No feature arm is installed yet; the arms and the write-set dump come
+next, in the order recorded in `../.agents/rewrite/04-migration.md`.
 
 ## Rules
 
