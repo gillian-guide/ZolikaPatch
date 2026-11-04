@@ -105,6 +105,11 @@ add_dependencies(zp_tests ${ZP_NAME})
 add_test(NAME zp_tests COMMAND zp_tests $<TARGET_FILE:${ZP_NAME}>)
 set_tests_properties(zp_tests PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
+add_executable(zp_dump tests/dump_main.cpp)
+set_target_properties(zp_dump PROPERTIES CXX_SCAN_FOR_MODULES ON)
+target_link_libraries(zp_dump PRIVATE zp_modules)
+add_dependencies(zp_dump ${ZP_NAME})
+
 add_executable(zp_pe_check tests/pe_check.cpp)
 add_dependencies(zp_pe_check ${ZP_NAME})
 add_test(NAME zp_pe_check COMMAND zp_pe_check $<TARGET_FILE:${ZP_NAME}>)
