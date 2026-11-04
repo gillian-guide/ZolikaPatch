@@ -5,6 +5,7 @@
 import common;
 import config;
 import game;
+import options;
 import patch;
 
 // The offline suite. No game files: the INI grammar, the build classification,
@@ -266,6 +267,20 @@ namespace
         Check(found.get_first() == GetModuleHandleW(nullptr), "signature: ... at the image's DOS header");
     }
 
+    void TestCatalogue()
+    {
+        Check(Catalogue::Count() >= 97, "catalogue: the recovered keys are present", std::to_string(Catalogue::Count()));
+        const auto* carShadow = Catalogue::Find("CarDynamicShadowFix");
+        Check(carShadow != nullptr && carShadow->shipped == 1 && carShadow->absent == 0,
+            "catalogue: shipped and absent defaults are both recorded");
+        Check(Catalogue::Find("NoSuchKey") == nullptr, "catalogue: an unknown key is not in the catalogue");
+        Check(!Catalogue::AppliesTo("BenchmarkFix", Build::v1080), "catalogue: BenchmarkFix does not apply to 1.0.8.0");
+        Check(Catalogue::AppliesTo("BenchmarkFix", Build::v1070), "catalogue: ... and does apply to 1.0.7.0");
+        Check(Catalogue::AppliesTo("MiscFixes", Build::v1080), "catalogue: an all-builds key applies to 1.0.8.0");
+        Check(!Catalogue::AppliesTo("MiscFixes", Build::unknown), "catalogue: an unknown build applies nothing");
+        Check(Catalogue::DefaultText("CarDynamicShadowFix", false) == "0", "catalogue: the absent default is the arm default");
+    }
+
     void TestEvents()
     {
         FusionFix::Event<> event;
@@ -299,6 +314,7 @@ int main(int argc, char** argv)
     TestMissingFile();
     TestBuilds();
     TestSignatures();
+    TestCatalogue();
     TestEvents();
 
     if (argc > 1)

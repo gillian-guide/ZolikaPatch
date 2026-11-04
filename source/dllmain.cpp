@@ -3,6 +3,8 @@
 import common;
 import config;
 import game;
+import loader;
+import options;
 
 extern "C" __declspec(dllexport) void InitializeASI();
 
@@ -28,7 +30,8 @@ namespace
 #endif
 
         const bool read = Config::Load();
-        const auto build = Classify(game.FileVersion());
+        Loader::Current() = Classify(game.FileVersion());
+        const auto build = Loader::Current();
 
 #ifdef ZP_TRACE
         Log::Print("game: {} {} (image {:#010x}+{:#x})", game.ExecutablePath().string(),
@@ -38,9 +41,10 @@ namespace
 #endif
 
         FusionFix::onInitEvent().executeAll();
+        Loader::Run();
 
 #ifdef ZP_TRACE
-        Log::Print("arms: 0");
+        Log::Print("options: {}", Catalogue::Count());
 #endif
     }
 

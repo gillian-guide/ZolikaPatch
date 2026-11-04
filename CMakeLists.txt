@@ -64,7 +64,9 @@ target_sources(zp_modules PUBLIC
     source/common.ixx
     source/patch.ixx
     source/config.ixx
-    source/game.ixx)
+    source/game.ixx
+    source/options.ixx
+    source/loader.ixx)
 target_include_directories(zp_modules PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/source
   ${CMAKE_CURRENT_SOURCE_DIR}/external/injector/include
