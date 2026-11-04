@@ -1,4 +1,4 @@
-﻿module;
+module;
 
 #include <common.hxx>
 
@@ -43,6 +43,35 @@ namespace
         auto* match = pattern.get(0).get<uint8_t>();
         injector::WriteMemory<uint8_t>(match + 8, 0x60, true);
     }
+
+    // BikeFeetFix: the 12-byte rider-foot block is deleted, so the chopper foot
+    // position is left to the game's own (correct) path.
+    void InstallBikeFeetFix()
+    {
+        if (!Loader::Enabled("BikeFeetFix"))
+            return;
+
+        auto pattern = find_pattern("39 82 54 13 00 00 0F 85 94 04 00 00");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get(0).get<uint8_t>();
+        injector::MakeNOP(match + 12, 12, true);
+    }
+
+    // BikePhoneAnimsFix: the six-byte phone-animation branch is deleted.
+    void InstallBikePhoneAnimsFix()
+    {
+        if (!Loader::Enabled("BikePhoneAnimsFix"))
+            return;
+
+        auto pattern = find_pattern("80 BE 18 02 00 00 00 0F 85 36 01 00 00 80 BE");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get(0).get<uint8_t>();
+        injector::MakeNOP(match + 33, 6, true);
+    }
 }
 
 export void RegisterVehicles()
@@ -51,5 +80,7 @@ export void RegisterVehicles()
     {
         InstallInfiniteCarBottomDistance();
         InstallReversingLightFix();
+        InstallBikeFeetFix();
+        InstallBikePhoneAnimsFix();
     };
 }
