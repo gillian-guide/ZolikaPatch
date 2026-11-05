@@ -1,4 +1,4 @@
-# Transcribed bodies: name, recovered VA, candidate VA (from ZolikaPatch.map), and
-# the instruction budget. verify_bodies.py proves the streams are the same
-# instruction-for-instruction, with absolute operands compared as slots.
-building_dynamic_shadows 10005590 10016ED0 24
+﻿# Transcribed bodies: name, recovered VA, the symbol the candidate defines, and the
+# instruction budget. verify_bodies.py resolves the symbol in ZolikaPatch.map, so a
+# relink cannot invalidate a row.
+building_dynamic_shadows 10005590 ?BuildingsDynamicShadowsShim@@YAXXZ 24

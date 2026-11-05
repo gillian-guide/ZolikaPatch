@@ -98,9 +98,13 @@ def summarise(instruction):
     return f"{instruction.mnemonic} {' '.join(parts)}".strip()
 
 
-def compare(original: bytes, candidate: bytes, rows):
+def compare(original: bytes, candidate: bytes, rows, symbols):
     results = []
-    for name, reference_va, candidate_va, limit in rows:
+    for name, reference_va, symbol, limit in rows:
+        candidate_va = symbols.get(symbol)
+        if candidate_va is None:
+            results.append((name, "MISSING", f"symbol {symbol} is not in the map"))
+            continue
         wanted = disassemble(original, reference_va, limit)
         have = disassemble(candidate, candidate_va, limit)
         if not wanted or not have:
@@ -125,9 +129,28 @@ def read_manifest(path: Path):
         line = line.strip().lstrip('\ufeff')
         if not line or line.startswith("#"):
             continue
-        name, reference_va, candidate_va, limit = line.split()
-        rows.append((name, int(reference_va, 16), int(candidate_va, 16), int(limit)))
+        name, reference_va, symbol, limit = line.split()
+        rows.append((name, int(reference_va, 16), symbol, int(limit)))
     return rows
+
+
+def read_map(path: Path):
+    """symbol -> VA from the linker map. A candidate address is a link result, so it
+    is looked up at test time instead of written down: a relink moves every body,
+    and a stale literal would read the middle of a different function."""
+    symbols = {}
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        parts = line.split()
+        for index, token in enumerate(parts[:-1]):
+            if not token.startswith("?"):
+                continue
+            candidate = parts[index + 1]
+            if len(candidate) == 8:
+                try:
+                    symbols[token] = int(candidate, 16)
+                except ValueError:
+                    continue
+    return symbols
 
 
 def report(results) -> int:
@@ -143,6 +166,7 @@ def main() -> int:
     parser.add_argument("--original")
     parser.add_argument("--candidate")
     parser.add_argument("--bodies")
+    parser.add_argument("--map")
     parser.add_argument("--selftest", action="store_true")
     args = parser.parse_args()
 
@@ -151,19 +175,19 @@ def main() -> int:
             raise SystemExit("--selftest needs --original")
         original = Path(args.original).read_bytes()
         rows = [("selftest-body", IMAGE_BASE + 0x5590, IMAGE_BASE + 0x5590, 24)]
-        first = report(compare(original, original, rows))
+        first = report(compare(original, original, rows, {IMAGE_BASE + 0x5590: IMAGE_BASE + 0x5590}))
         corrupt = bytearray(original)
         offset = image_offset(original, IMAGE_BASE + 0x5590)
         corrupt[offset] ^= 0xFF  # the opcode, not a constant: a constant alone is not an instruction difference
-        second = report(compare(original, bytes(corrupt), rows))
+        second = report(compare(original, bytes(corrupt), rows, {IMAGE_BASE + 0x5590: IMAGE_BASE + 0x5590}))
         print("selftest: identical PASS, one corrupted byte FAIL"
               if first == 0 and second == 1 else "selftest: BROKEN")
         return 0 if first == 0 and second == 1 else 2
 
-    if not (args.original and args.candidate and args.bodies):
+    if not (args.original and args.candidate and args.bodies and args.map):
         raise SystemExit(__doc__)
     return report(compare(Path(args.original).read_bytes(), Path(args.candidate).read_bytes(),
-                          read_manifest(Path(args.bodies))))
+                          read_manifest(Path(args.bodies)), read_map(Path(args.map))))
 
 
 if __name__ == "__main__":

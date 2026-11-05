@@ -146,6 +146,7 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/verify_bodies.py
             --original ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/ZolikaPatch_original.asi.off
             --candidate $<TARGET_FILE:${ZP_NAME}>
-            --bodies ${CMAKE_CURRENT_SOURCE_DIR}/tests/bodies.tsv)
+            --bodies ${CMAKE_CURRENT_SOURCE_DIR}/tests/bodies.tsv
+            --map $<TARGET_FILE_DIR:${ZP_NAME}>/${ZP_NAME}.map)
   set_tests_properties(zp_body_proof PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
