@@ -59,14 +59,20 @@ export namespace Bodies
     // preferred base, which is the coordinate system a baseline is expressed in.
     // Matching the target needs the first; emitting the displacement needs the
     // second, and using one for both is off by hostBase - imageBase.
+    // `pristine` is no longer consulted for the skip: a site that was already an
+    // E9/E8 in the image (a hook installed over an existing branch, which is what
+    // BlackscreenFix and CrashMsgFix do) writes the same opcode it found, so
+    // "the byte changed" would miss exactly those sites. A branch whose target is
+    // a registered body is ours whether or not the opcode byte differs.
     inline size_t Canonicalise(uint8_t* bytes, const uint8_t* pristine, size_t size,
                                uintptr_t hostBase, uintptr_t imageBase)
     {
+        (void)pristine;
         size_t rewritten = 0;
         for (size_t offset = 0; offset + 5 <= size; ++offset)
         {
             const uint8_t opcode = bytes[offset];
-            if ((opcode != 0xE8 && opcode != 0xE9) || pristine[offset] == opcode)
+            if (opcode != 0xE8 && opcode != 0xE9)
                 continue;
 
             int32_t displacement{};

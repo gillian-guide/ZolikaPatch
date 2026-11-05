@@ -15,9 +15,33 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from verify_bodies import image_offset
+
 ROOT = Path(__file__).resolve().parent.parent
 BUILDS = {1: "GTAIV_1000", 5: "GTAIV_1040", 6: "GTAIV_1004", 7: "GTAIV_1060",
           8: "GTAIV_1070", 9: "GTAIV", 11: "EFLC_1110", 12: "EFLC_1120", 13: "EFLC_1130"}
+GAME_BASE = 0x400000
+
+
+def displacement_rvas(pristine: bytes, rvas):
+    """The RVAs that are the displacement of a branch, read from the pristine image.
+
+    A cell only lists the bytes a key changed, so for an arm installed over a site
+    that was already an E8/E9 the opcode row is in neither cell and the four
+    displacement bytes look like an ordinary difference. The image itself says
+    whether the byte before an RVA is a branch, and that is the only reliable
+    source: the baselines wrote one stand-in address for every body target, so the
+    bytes themselves cannot be compared.
+    """
+    out = set()
+    for rva in rvas:
+        if rva < 1:
+            continue
+        offset = image_offset(pristine, GAME_BASE + rva - 1)
+        if offset is not None and pristine[offset] in (0xE8, 0xE9):
+            out.add(rva)
+    return out
 
 
 def rows(path, key=None):
@@ -57,6 +81,8 @@ def main() -> int:
         else:
             raise SystemExit(__doc__)
 
+    pristine = (ROOT.parent / "game_refs" / f"{BUILDS[int(build)]}.exe").read_bytes()
+
     if ours_path is None:
         ours_path = ROOT / "build" / "win-x86" / f"per-b{build}.txt"
         dump = ROOT / "build" / "win-x86" / "Release" / "zp_dump.exe"
@@ -72,9 +98,15 @@ def main() -> int:
         have = rows(ours_path, key)
         missing = len(set(want) - set(have))
         extra = len(set(have) - set(want))
-        # The displacement bytes of every branch in the cell: the baseline decides
-        # what a branch points at, so those are reported apart from a real diff.
-        branch = {rva + offset for rva, byte in want.items() if byte in (0xE8, 0xE9)
+        # The displacement bytes of every branch in the cell, from either side: a
+        # branch`s displacement is not comparable (the baseline wrote one stand-in
+        # address for every body, and ours names the registered VA), so those bytes
+        # are reported apart from a real difference. Looking at both sides matters
+        # for an arm that installs over an existing branch: then the opcode byte is
+        # unchanged and only the baseline has no opcode row of its own.
+        branch = {rva + offset
+                  for rows in (want, have)
+                  for rva, byte in rows.items() if byte in (0xE8, 0xE9)
                   for offset in range(1, 5)}
         differing = sum(1 for rva in set(want) & set(have)
                         if want[rva] != have[rva] and rva not in branch)

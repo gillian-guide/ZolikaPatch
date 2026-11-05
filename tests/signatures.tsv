@@ -7,6 +7,15 @@ TryToSkipAllErrors	0x456680	81 EC 40 08 00 00	6
 RemoveAllWeaponsProtection	0x6E8622	E9 ? ? ? ? 57 8D 8F	8
 HighFPSSpeedupFix	0x7CBFE9	0F 2F C1 76 ? 0F 28 C8 F3 0F 10 15	12
 InfiniteCarBottomDistance	0x8FB180	0F 2F D0 76 ? 0F 28 C2 EB ? 0F 2F CD	13
+CarDecalsFix	0xAF7F50	8B 44 24 08 8B 48 28 81 E1 C0 03 00 00 81 F9 80 00 00 00	17
+CollisionDeadlockFix	0x4E6250	55 8B EC 83 E4 F8 51 8B 45 0C 0F B7 48 66	14
+CarPartsShadowFix	0x40C9FF	85 DB 7E 41 55 EB 0A	7
+CarPartsShadowFix	0x95A437	83 F8 04 C6 44 24 0E 00 75 0F	10
+CarDynamicShadowFix	0x95ADCF	56 6A 02 53 53 57 E8 ? ? ? ? 56 6A 02 6A 04 6A 05 57 E8	18
+CarDynamicShadowFix	0x8F7420	50 68 04 01 00 00 6A 02 6A 00 E8	11
+CarDynamicShadowFix	0x95A418	83 E0 0F 83 F8 03 75 17 F6 86 6C 02 00 00 04	14
+CarDynamicShadowFix	0x8F719F	0F 84 9E 00 00 00 80 7D 28	9
+CarDynamicShadowFix	0x8F73EA	51 68 04 05 00 00 6A 02 6A 00 E8	11
 ReversingLightFix	0x8F8840	11 01 00 00 8B 16 8B 42 64 8B CE FF D0 F3 0F 10	16
 BikeFeetFix	0xBCB919	39 82 ? ? ? ? 0F 85 ? ? ? ? 39 05	14
 BikePhoneAnimsFix	0xB67F01	80 BE ? ? ? ? ? 0F 85 ? ? ? ? 80 BE ? ? ? ? ? 0F 84 ? ? ? ? 83 3D	28
@@ -15,3 +24,6 @@ TeleportProtection	0x6E7BE0	55 8B EC 83 E4 F8 51 53 8B 5D ? 56 57 6A 08	15
 IncreaseVehicleStructLimit	0xA4A2AB	68 34 EE DA 00	5
 BuildingDynamicShadows	0x958955	8B 47 ? C1 E8 06 83 E0 0F 83 C0 FF	12
 AimProjectileCrashFix	0xA32620	8B 44 24 ? 89 41 ? 8B 44 24 ? 89 41	13
+FreezeGunFix	0xB8C463	2B C2 D1 F8 39 3C C6	7
+GroupHackFix	0x968AD0	33 C0 83 C1 04 8D 50	7
+PathNodeCrashFix	0xA6D270	8B 04 B1 0F B7 D0	6
