@@ -87,50 +87,24 @@ namespace
             changed += image.bytes[rva] != image.pristine[rva] ? 1 : 0;
         return changed;
     }
-    // A published pointer is an address in *this* process, so it cannot equal the
-    // original's. The baselines record one placeholder for every published module
-    // address (0xD0000000); the dump writes that placeholder instead, which keeps
-    // the mod's own code publishing the real address and puts the baseline's
-    // convention where it belongs - in the tool.
-    void CanonicalisePublishedPointers(Image& image)
+    // A published pointer is a *host* address, so it cannot equal the original's.
+    // The baselines record one placeholder for every published module address
+    // (0xD0000000), and only the arm knows which words those are: a scan for
+    // "four bytes that look like an address in this process" cannot tell a pointer
+    // from a displacement plus its neighbouring code, and rewriting the wrong
+    // window silently destroys a site (it ate RemoveRGSCLoginRequirement's E9 and
+    // then seven other keys' bytes). So the arms register their slots and the dump
+    // rewrites exactly those.
+    void CanonicalisePublishedPointers(Image& image, uintptr_t hostBase)
     {
         static constexpr uint32_t kBaselinePlaceholder = 0xD0000000u;
 
-        const auto module = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
-        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(module);
-        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(module + dos->e_lfanew);
-        const auto limit = module + nt->OptionalHeader.SizeOfImage;
-
-        // A branch we installed owns its opcode and its four displacement bytes:
-        // they are not a pointer, even when the displacement plus the padding before
-        // the site happens to form a value inside this process's image range (which
-        // it does whenever ASLR lands the tool near the displacement). A published
-        // pointer slot can never overlap an installed branch, so excluding those
-        // bytes is sound - and without it the placeholder wiped the E9 opcode of
-        // RemoveRGSCLoginRequirement.
-        std::vector<uint8_t> branch(image.size, 0);
-        for (size_t rva = 0; rva < image.size; ++rva)
+        for (const auto slot : Bodies::Published())
         {
-            if (image.bytes[rva] != image.pristine[rva] &&
-                (image.bytes[rva] == 0xE8 || image.bytes[rva] == 0xE9))
-            {
-                const auto end = std::min<size_t>(image.size, rva + 5);
-                std::fill(branch.begin() + rva, branch.begin() + end, 1);
-            }
-        }
-
-        for (size_t rva = 0; rva + sizeof(uint32_t) <= image.size; ++rva)
-        {
-            if (std::memcmp(image.bytes.data() + rva, image.pristine.data() + rva, sizeof(uint32_t)) == 0)
-                continue;
-            if (branch[rva] || branch[rva + 1] || branch[rva + 2] || branch[rva + 3])
+            if (slot < hostBase || slot + sizeof(uint32_t) > hostBase + image.size)
                 continue;
 
-            uint32_t value{};
-            std::memcpy(&value, image.bytes.data() + rva, sizeof(value));
-            if (value < module || value >= limit)
-                continue;
-
+            const auto rva = static_cast<size_t>(slot - hostBase);
             std::memcpy(image.bytes.data() + rva, &kBaselinePlaceholder, sizeof(kBaselinePlaceholder));
         }
     }
@@ -205,7 +179,7 @@ int main(int argc, char** argv)
             image.bytes = image.pristine;
             Loader::Run();
             Bodies::Canonicalise(image.bytes.data(), image.pristine.data(), image.size, reinterpret_cast<uintptr_t>(image.bytes.data()), image.imageBase);
-            CanonicalisePublishedPointers(image);
+            CanonicalisePublishedPointers(image, reinterpret_cast<uintptr_t>(image.bytes.data()));
             Dump(image, out, std::string(option.key) + " ");
         }
     }
@@ -213,7 +187,7 @@ int main(int argc, char** argv)
     {
         Loader::Run();
         Bodies::Canonicalise(image.bytes.data(), image.pristine.data(), image.size, reinterpret_cast<uintptr_t>(image.bytes.data()), image.imageBase);
-        CanonicalisePublishedPointers(image);
+        CanonicalisePublishedPointers(image, reinterpret_cast<uintptr_t>(image.bytes.data()));
         Dump(image, out, "");
         std::printf("%s: %zu byte(s) changed, build %s\n", output.string().c_str(), Changed(image), build.c_str());
     }

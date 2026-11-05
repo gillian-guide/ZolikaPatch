@@ -33,6 +33,27 @@ export namespace Bodies
         Registry().push_back({ address, reference });
     }
 
+    // The 4-byte slots an arm writes a module address into. The offline tools have
+    // to record the original's placeholder for those words instead of a host
+    // address, and only the arm knows which words they are: a scan for "looks like
+    // an address in this process" cannot tell a published pointer from four bytes of
+    // code that happen to form one.
+    inline std::vector<uintptr_t>& PublishedRegistry()
+    {
+        static std::vector<uintptr_t> slots;
+        return slots;
+    }
+
+    inline void RegisterPublished(uintptr_t slot)
+    {
+        PublishedRegistry().push_back(slot);
+    }
+
+    inline std::span<const uintptr_t> Published()
+    {
+        return PublishedRegistry();
+    }
+
     inline std::span<const Entry> All()
     {
         return Registry();
