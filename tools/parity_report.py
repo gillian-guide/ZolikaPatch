@@ -96,20 +96,22 @@ def main() -> int:
     for key in keys():
         want = rows(baseline_path, key)
         have = rows(ours_path, key)
-        missing = len(set(want) - set(have))
-        extra = len(set(have) - set(want))
-        # The displacement bytes of every branch in the cell, from either side: a
-        # branch`s displacement is not comparable (the baseline wrote one stand-in
-        # address for every body, and ours names the registered VA), so those bytes
-        # are reported apart from a real difference. Looking at both sides matters
-        # for an arm that installs over an existing branch: then the opcode byte is
-        # unchanged and only the baseline has no opcode row of its own.
+        # A branch's displacement is not comparable: the baselines wrote one
+        # stand-in address for every body target, and ours names the registered VA.
+        # Three sources decide which RVAs are displacements: an E8/E9 opcode in
+        # either cell (the ordinary case), and the pristine image, which is the only
+        # source for an arm installed over a site that was already a branch - then
+        # no cell carries the opcode row at all.
         branch = {rva + offset
-                  for rows in (want, have)
-                  for rva, byte in rows.items() if byte in (0xE8, 0xE9)
+                  for side in (want, have)
+                  for rva, byte in side.items() if byte in (0xE8, 0xE9)
                   for offset in range(1, 5)}
-        differing = sum(1 for rva in set(want) & set(have)
-                        if want[rva] != have[rva] and rva not in branch)
+        branch |= displacement_rvas(pristine, set(want) | set(have))
+
+        missing = len((set(want) - set(have)) - branch)
+        extra = len((set(have) - set(want)) - branch)
+        differing = sum(1 for rva in (set(want) & set(have)) - branch
+                        if want[rva] != have[rva])
         if not want and not have:
             closed += 1
             continue
