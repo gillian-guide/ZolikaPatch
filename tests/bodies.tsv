@@ -1,4 +1,5 @@
 ﻿# Transcribed bodies: name, recovered VA, the symbol the candidate defines, and the
 # instruction budget. verify_bodies.py resolves the symbol in ZolikaPatch.map, so a
 # relink cannot invalidate a row.
-building_dynamic_shadows 10005590 ?BuildingsDynamicShadowsShim@@YAXXZ 24
+aim_projectile_crash_fix 10005590 ?AimProjectileShim@?A0x06fbc149@@YAXXZ 24
+building_dynamic_shadows 10005AF0 ?BuildingsDynamicShadowsShim@@YAXXZ 24

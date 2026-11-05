@@ -112,7 +112,7 @@ namespace
 
         auto pattern = Pattern("8B 44 24 08 89 41 20 8B 44 24 0C 89 41 24 F7 D8");
         if (pattern.size() > 0)
-            injector::MakeJMP(MatchAddress(pattern, 0), BuildingsDynamicShadowsShimAddress(), true);
+            injector::MakeJMP(MatchAddress(pattern, 0), AimProjectileShimAddress(), true);
     }
 }
 

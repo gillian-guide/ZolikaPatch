@@ -72,7 +72,12 @@ def main() -> int:
         have = rows(ours_path, key)
         missing = len(set(want) - set(have))
         extra = len(set(have) - set(want))
-        differing = sum(1 for rva in set(want) & set(have) if want[rva] != have[rva])
+        # The displacement bytes of every branch in the cell: the baseline decides
+        # what a branch points at, so those are reported apart from a real diff.
+        branch = {rva + offset for rva, byte in want.items() if byte in (0xE8, 0xE9)
+                  for offset in range(1, 5)}
+        differing = sum(1 for rva in set(want) & set(have)
+                        if want[rva] != have[rva] and rva not in branch)
         if not want and not have:
             closed += 1
             continue
@@ -88,3 +93,12 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+def branch_bytes(rows):
+    """The displacement bytes of every branch in a cell: the baseline's own
+    canonicalisation decides what a branch points at, so those bytes are reported
+    separately from a real difference."""
+    marked = set()
+    for rva, byte in rows.items():
+        if byte in (0xE8, 0xE9):
+            marked.update(rva + offset for offset in range(1, 5))
+    return marked

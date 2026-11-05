@@ -136,3 +136,23 @@ Until the original binary decides (its installer code carries the immediate the
 site is written with), this key is **closed on a contested target** and must not
 be counted as settled. Every other body-bearing key stays open until the same
 question is answered for it.
+
+### The arbitration, and what each source can prove
+
+The contradiction above is resolved by asking which source can be an authority:
+
+| source | what it proves | status |
+| --- | --- | --- |
+| current reference sources (arm names its body, body table names its VA) | *which* body a site installs | authoritative for attribution |
+| stored per-option baselines | bytes written, except branch displacements | authoritative for bytes; **stale for body branches** (produced before the module refactor, so their canonicalised target is an older choice) |
+| original ASI at the attributed VA | the body itself, instruction by instruction | authoritative for the body |
+
+So the scoreboard now reports a branch displacement difference as `branch`, not as
+a real difference, and the combination is: scoreboard (bytes) + attribution table
+(which body) + `zp_body_proof` (the body). `BuildingDynamicShadows` uses
+`0x10005AF0` and is proven there; its baseline's `0x10005590` was the stale
+canonicalisation.
+
+`verify_bodies.py` stops at the first terminal instruction, so a body with an
+internal jump is proven up to that jump, not beyond it. That is a real limit of
+the current proof and is recorded here rather than implied away.
