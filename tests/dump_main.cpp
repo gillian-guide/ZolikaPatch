@@ -13,6 +13,7 @@ import vehicles;
 import useless_checks;
 import graphics;
 import launcher;
+import loading;
 import audio;
 import misc;
 
@@ -86,6 +87,33 @@ namespace
             changed += image.bytes[rva] != image.pristine[rva] ? 1 : 0;
         return changed;
     }
+    // A published pointer is an address in *this* process, so it cannot equal the
+    // original's. The baselines record one placeholder for every published module
+    // address (0xD0000000); the dump writes that placeholder instead, which keeps
+    // the mod's own code publishing the real address and puts the baseline's
+    // convention where it belongs - in the tool.
+    void CanonicalisePublishedPointers(Image& image)
+    {
+        static constexpr uint32_t kBaselinePlaceholder = 0xD0000000u;
+
+        const auto module = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(module);
+        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(module + dos->e_lfanew);
+        const auto limit = module + nt->OptionalHeader.SizeOfImage;
+
+        for (size_t rva = 0; rva + sizeof(uint32_t) <= image.size; ++rva)
+        {
+            if (std::memcmp(image.bytes.data() + rva, image.pristine.data() + rva, sizeof(uint32_t)) == 0)
+                continue;
+
+            uint32_t value{};
+            std::memcpy(&value, image.bytes.data() + rva, sizeof(value));
+            if (value < module || value >= limit)
+                continue;
+
+            std::memcpy(image.bytes.data() + rva, &kBaselinePlaceholder, sizeof(kBaselinePlaceholder));
+        }
+    }
 }
 
 int main(int argc, char** argv)
@@ -137,6 +165,7 @@ int main(int argc, char** argv)
     RegisterUselessChecks();
     RegisterGraphics();
     RegisterLauncher();
+    RegisterLoading();
     RegisterAudio();
     RegisterMisc();
 
@@ -156,13 +185,15 @@ int main(int argc, char** argv)
             image.bytes = image.pristine;
             Loader::Run();
             Bodies::Canonicalise(image.bytes.data(), image.pristine.data(), image.size, reinterpret_cast<uintptr_t>(image.bytes.data()), image.imageBase);
+            CanonicalisePublishedPointers(image);
             Dump(image, out, std::string(option.key) + " ");
         }
     }
     else
     {
         Loader::Run();
-            Bodies::Canonicalise(image.bytes.data(), image.pristine.data(), image.size, reinterpret_cast<uintptr_t>(image.bytes.data()), image.imageBase);
+        Bodies::Canonicalise(image.bytes.data(), image.pristine.data(), image.size, reinterpret_cast<uintptr_t>(image.bytes.data()), image.imageBase);
+        CanonicalisePublishedPointers(image);
         Dump(image, out, "");
         std::printf("%s: %zu byte(s) changed, build %s\n", output.string().c_str(), Changed(image), build.c_str());
     }
