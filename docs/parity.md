@@ -84,3 +84,19 @@ the instruction-level proof.
 `verify_bodies.py` stops at the first terminal instruction, so a body with an
 internal jump is proven up to that jump, not through it. That is a real limit, not
 an implied pass.
+## Known proof gap (next tool fix)
+
+`verify_bodies.py` stops at the first terminal instruction and counts `jmp` as
+terminal, so:
+
+- a body whose *entry* is a jump (`super_lod_shim`, original first byte `EB 06`) is
+  proven as one instruction;
+- a body with a `ret` in the middle has its tail after that `ret` unproven
+  (`shader_streaming_find_hpe` 30 of 36, `find_v` 30 of 36, `filter_hpe` 13 of 16).
+
+Those full streams were checked out of band (a linear sweep that also compares
+instruction lengths) and are equal: 14 / 21 / 36 / 36 / 16 / 9. The fix is to sweep
+linearly for the exact instruction count instead of stopping at a terminator, which
+also means every `tests/bodies.tsv` budget becomes the body's true count rather than
+a cap. Until that is in, treat a PASS whose count is below the row's budget as
+partial - the row's budget is the number to compare against.
