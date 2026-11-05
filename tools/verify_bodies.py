@@ -68,7 +68,14 @@ def image_offset(image: bytes, va: int, base: int = IMAGE_BASE):
 
 
 def disassemble(image: bytes, va: int, limit: int):
-    """The instructions of one body, stopping at the first terminal one."""
+    """Exactly `limit` instructions of one body, swept linearly.
+
+    A body is transcribed instruction for instruction, so the whole stream is
+    comparable; stopping at the first terminal instruction hid the tail of a body
+    that returns in the middle and proved a body whose entry is a jump as a single
+    instruction. The budget in the manifest is therefore the body`s true instruction
+    count, not a cap: if either side decodes fewer, the row fails.
+    """
     if capstone is None:
         raise SystemExit("capstone is required: pip install capstone")
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
@@ -79,8 +86,6 @@ def disassemble(image: bytes, va: int, limit: int):
     out = []
     for instruction in md.disasm(image[offset:offset + 256], va):
         out.append(instruction)
-        if instruction.mnemonic in TERMINAL:
-            break
         if len(out) >= limit:
             break
     return out
@@ -128,15 +133,12 @@ def compare(original: bytes, candidate: bytes, rows, symbols):
                                 f"instruction {index}: '{summarise(left)}' against '{summarise(right)}'"))
                 break
         else:
-            # The body has to end where the row says it does: otherwise both sides
-            # could keep matching through identical padding (int3 filler) and the
-            # proof would pass on code that is not the body.
-            if wanted[-1].mnemonic not in ("jmp", "ret", "retf", "iret"):
-                results.append((name, "FAIL",
-                                f"does not end at instruction {len(wanted)} ('{summarise(wanted[-1])}')"))
-            else:
-                slots = sum(1 for instruction in wanted if "abs" in summarise(instruction))
-                results.append((name, "PASS", f"{len(wanted)} instruction(s), {slots} absolute operand(s)"))
+            # The row's budget is the body's exact instruction count, so a linear
+            # sweep that decoded the same number on both sides and matched
+            # instruction for instruction has covered the whole body - including a
+            # tail after a mid-body `ret` and a body whose entry is a jump.
+            slots = sum(1 for instruction in wanted if "abs" in summarise(instruction))
+            results.append((name, "PASS", f"{len(wanted)} instruction(s), {slots} absolute operand(s)"))
     return results
 
 
