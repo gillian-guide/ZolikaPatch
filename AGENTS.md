@@ -28,6 +28,16 @@ a full-cell difference to keys) and `tools/compare_dumps.py`.
   is a bug. Every preserved fault is recorded in `docs/parity.md`.
 - **Recovered data may be reused** (signatures, byte rows, offsets, hashes, RVA
   tables) with a provenance comment. Every executable line is written fresh.
+- **Where the material comes from.** The bodies, body VAs and pattern strings are
+  already recovered: `../readable/source/*.ixx` has the arms and their recovered
+  signatures, `../readable/source/hook_bodies.cpp` has every body as naked asm with
+  its original VA in an `@exact 0x100…` comment and the `BodyId` table around line
+  4860, and `../ZolikaPatch_reconstruction/` carries the same material in another
+  layout. Read those, rewrite them here, and prove them against
+  `../game_refs/ZolikaPatch_original.asi.off` with `tools/verify_bodies.py`. Do not
+  re-disassemble a body that already exists there; use the IDA databases only to
+  settle a question the references cannot answer or to confirm that a signature is
+  unique.
 - **Nothing is copied out of `../readable/`** — not source, not module layout,
   not names, not tables. Read it to learn what must be reproduced.
 - **Startup is synchronous in `DllMain`**, as the original's was: the signatures
