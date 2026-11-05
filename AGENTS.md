@@ -6,11 +6,20 @@ and EFLC. The oracle is `../game_refs/ZolikaPatch_original.asi.off`; the old
 
 ## Current state
 
-Foundation and catalogue: build, event tiers, log, image context, signature
-scanning, the original's INI grammar, build classification, the recovered option
-catalogue (97 of the inventory's 99 keys serialised) and the three-tier arm
-pipeline. No feature arm is installed yet; the arms and the write-set dump come
-next, in the order recorded in `../.agents/rewrite/04-migration.md`.
+Eleven feature modules are in place (stability, vehicles, graphics, useless_checks,
+launcher, audio, misc, options, loader, pattern, shared) and 61 of the 99 catalogue
+keys are closed on 1.0.8.0, with 34 hook bodies transcribed and proven
+instruction-for-instruction against the original ASI. The shipped-INI cell now shows
+zero differing and zero extra bytes: everything the tree writes agrees with the
+baseline, and what remains is unimplemented, not wrong.
+
+The harness that produces that evidence: `zp_tests` (contract suite),
+`zp_dump_empty` (nine images, every option off), `zp_pe_check`, `zp_body_proof`
+(whole-body instruction comparison, symbol resolved from the linker map) with its
+self-test, `zp_launcher_slots`, and the drift guards for the generated catalogue and
+INI. The measurement tools are `tools/parity_report.py` (per-key scoreboard),
+`tools/dump_matrix.py` (9 builds x full/per-option), `tools/full_diff.py` (attributes
+a full-cell difference to keys) and `tools/compare_dumps.py`.
 
 ## Rules
 
