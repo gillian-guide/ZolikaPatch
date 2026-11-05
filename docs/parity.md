@@ -1,158 +1,86 @@
 # Parity
 
-What has to match the original ZolikaPatch 7.65 ASI, and the faults that are
-reproduced on purpose. A guard that turns one of these into a non-fault is a
-fidelity bug, not a fix.
+What has to match the original ZolikaPatch 7.65 ASI, and the faults reproduced on
+purpose. A guard that turns one of these into a non-fault is a fidelity bug, not a
+fix.
 
-## Contracts already pinned by tests
+## Contracts pinned by tests
 
 | contract | evidence |
 | --- | --- |
 | INI grammar (feather-ini-parser 1.41): 255-byte line buffer, first-line BOM drops the file, `#`/`//` comments only, strtok-on-`=` keys that keep a trailing space, values that keep their spaces, empty values not stored, last duplicate wins, a re-opened section starts empty, case-sensitive sections and keys | `zp_tests`, `TestConfigGrammar` |
 | Read boundary is `std::stoi` on the stored text with the arm's default | `zp_tests`, `TestConfigGrammar` |
-| Build classification: the four version fields concatenated (`1.0.7.0` -> 1070, `1.2.0.43` -> 12043) and the original's switch; an unsupported executable is `unknown` and applies nothing | `zp_tests`, `TestBuilds`, `TestCatalogue` |
-| Option catalogue: 99 keys with the shipped value, the absent-key default the arm passes, and the build mask indexed by the original's build id | `source/options.inc` (generated), `zp_tests` |
+| Build classification: the four version fields concatenated (`1.0.7.0` -> 1070, `1.2.0.43` -> 12043) and the original's switch; an unsupported executable is `unknown` and applies nothing | `zp_tests`, `TestBuilds` |
+| Option catalogue: 99 keys with the shipped value, the absent-key default and the build mask | `source/options.inc` (generated), `zp_tests` |
 | With no arm installed the pipeline changes nothing on any supported image | `zp_dump_empty` (9 images) |
+| The generated catalogue and INI cannot drift from their sources | `zp_catalogue_drift`, `zp_ini_drift` |
 
 ## Preserved faults
 
 | fault | condition | site |
 | --- | --- | --- |
-| `std::invalid_argument` escapes the loader | an `[Options]` value that is not numeric (`Key=abc`, or `Key= ` with only spaces) | `Config::Integer` -> `std::stoi`, uncaught, exactly as the original's `std::stoi(ini.get(...))` |
-| `std::out_of_range` escapes the loader | a numeric value outside `int` (`Key=99999999999`) | same |
-| the whole INI is dropped | the file's first line starts with a UTF-8 BOM (0xEF) | `Feather::Parse`, the parser returns from its loop |
-| null section dereference | a key line before the first `[section]` line | `Feather::Parse`, `(*current)[key] = value` with `current == nullptr` |
+| `std::invalid_argument` escapes the loader | a non-numeric `[Options]` value (`Key=abc`, or `Key= ` of spaces only) | `Config::Integer` -> `std::stoi`, uncaught |
+| `std::out_of_range` escapes the loader | a numeric value outside `int` | same |
+| the whole INI is dropped | the first line starts with a UTF-8 BOM | `Feather::Parse` |
+| null section dereference | a key line before the first `[section]` line | `Feather::Parse` |
 | a line longer than 255 bytes is split | the parser's 255-byte line buffer | `Feather::Parse` |
 
-Two of these need care before they are claimed as 1:1:
+Two of these remain assumptions, not measurements: feather 1.41's non-advancing
+`getline` on a long line (the original very likely spins; this tree continues), and
+CRLF folding (the original reads in text mode). The shipped INI's longest line is
+192 bytes, so the first is unreachable from it.
 
-- **Long lines.** feather 1.41 sets `failbit` when `istream::getline` fills the
-  buffer and does not clear it, so its `while (!file.eof())` loop cannot advance:
-  the original very likely spins rather than splitting the line. This tree
-  continues with the rest of the line, which is the behaviour a caller can
-  observe as "the file was read further". Not yet verified against the binary;
-  the shipped INI's longest line is 192 bytes, so the path is unreachable from
-  the shipped file. Verify with the oracle before this row is closed.
-- **CRLF folding.** The original reads in text mode, so the CRT folds CRLF to LF
-  before the parser sees the line; this tree folds it explicitly in
-  `Feather::Load`. Behaviour is the same for values (`stoi` stops at a stray
-  `\r`), but the equivalence is an assumption, not a measurement.
+## Status
 
-## Not reproduced yet
+Measured on 1.0.8.0 with `tools/parity_report.py 9`:
 
-Everything below is unimplemented, so "parity" for it is unmeasured rather than
-deviating:
+- **44 of 99 option keys closed**;
+- **22 hook bodies transcribed, registered and proven** (`zp_body_proof`); the rest
+  of the original's bodies are still to transcribe;
+- launcher: `LaunchWithPlayGTAIV` implemented and its slots verified per build
+  (`zp_launcher_slots`); SkipLauncher, DFA and ROM are not started;
+- the 18 full/per-option per-build dump hashes and the oracle differential are not
+  yet produced.
 
-- 76 of the 99 option keys (23 closed: 14 arms; `compare_dumps.py` against
-  `readable/build/p3-final-dumps3/b*-per.txt` is the measure);
-- the 107 hook bodies and their proof;
-- the launcher / DFA / ROM stage order;
-- the 18 full/per-option per-build dump hashes and the oracle differential.
+Blocked on the original's shared helper library: `sub_10003E50` (the
+"hash:"/quote config resolver), `dword_10159C0C` (a game function resolved at
+startup), `sub_10004C70` (the 1,343-byte steer consumer) and the model-name/log
+helpers. `BadPlayerModelCrashFix` and `PlayerAsPedComponentsFix` need those, as do
+`GarageModelFix`, `NoLiveryLimit`, the steer/engine/plane trio and `FreezeCarFix`.
+
+`ForceCarHeadlightShadows` cannot match while its baseline cell carries the
+reference dump's `0xD0000000` placeholder for a published float pointer; closing it
+needs that canonicalisation in `tests/dump_main.cpp`.
 
 ## Transcribing a body
 
-A body-bearing key is only committed when all four parts exist, because each one
-changes either the write set or the fault behaviour:
+A body-bearing key is committed only when all four parts exist:
 
-1. **The body's asm**, transcribed into the owning module's tail section, with
-   the recovered `BodyId` VA in a comment. A naked function in a module interface
-   unit must have internal linkage (`static`); an external-linkage naked function
-   is written to the BMI and every importer fails.
-2. **The published module words** the body reads (recovered data: model hashes,
-   flags, and the resume pointers). The arm publishes them *before* it installs
-   the site — the original reads a site's original bytes for its resume, so
-   publishing after the write is the CPU-spinning self-jump fault.
-3. **The registry entry**: `Bodies::Register(&body, recoveredVa)`, so the dump
-   rewrites the branch displacement to the original's coordinates.
-4. **The proof manifest row**: `name <recovered VA> <candidate VA> <length>`, and
-   `verify_bodies.py` must report PASS for it.
+1. **The body's asm**, transcribed into the owning module's tail, with the recovered
+   VA in a comment. A naked function in a module interface unit must be `static` at
+   module scope: in a namespace, or with external linkage, MSVC rejects it.
+2. **The published module words** the body reads, written *before* the site is
+   installed: the original reads a site's original bytes for its resume, so
+   publishing after the write resumes into the jump itself.
+3. **The registry entry** `Bodies::Register(&body, recoveredVa)`, so the dump can
+   express the branch in the original's coordinates.
+4. **The proof row** in `tests/bodies.tsv` — name, recovered VA, symbol resolved from
+   the linker map, instruction budget — and `zp_body_proof` must PASS.
 
-The first body transcribed is the BuildingDynamicShadows shim (`sub_10005590`,
-recovered VA `0x10005590` — decoded from the baseline's own branch at RVA
-`0x558955`, *not* the similarly named helper at `0x10005AF0`): it reads `[edi]`,
-matches it against two published model hashes, jumps to the second resume on a
-match, otherwise computes `([edi+28h] >> 6 & 0xF) - 1` and jumps to the first.
-Its candidate address is `0x100169C0` in the `/MAP` build, and the write-set half
-of the key is closed (`parity_report` 1.0.8.0).
+## What the scoreboard can and cannot compare
 
-### Branch targets cannot be attributed from the stored baselines
+`parity_report.py` compares a key's changed bytes against the stored baseline and
+excludes **branch displacement bytes**: those baselines wrote one stand-in body
+address for every arm, so the four bytes of a displacement are meaningless there.
+The set of displacement RVAs is derived from the pristine game image (an `E8`/`E9`
+opcode one to four bytes before the RVA), which is the only source that works for an
+arm installed over a site that was already a branch.
 
-The per-option baselines under `readable/build/p3-final-dumps3/` cannot say *which
-body* a key jumps to, and an arm must never be written from them:
-
-- a cell lists the bytes that key wrote, so a five-byte branch appears as five
-  contiguous rows — but presence of five rows is not proof they are one branch,
-  and a decoder that assumes it invents targets;
-- more importantly, those dumps are the *reconstruction's*, and its dump
-  canonicalises body branches to a reference VA. Several unrelated keys therefore
-  appear to branch to the same address (`0x10005590` shows up for `MouseFix`,
-  `CarDecalsFix`, `EmissiveLerpFix` and others), which cannot be true for a mod
-  with roughly one body per key. The canonicalisation has collapsed distinct
-  bodies onto one value.
-
-Target attribution has to come from the original: decode the branch the original
-ASi writes at that site, or take it from the original's own body table. The
-write-set scoreboard is not a guard here either — if an arm registers the wrong
-reference VA, canonicalisation reproduces the expected bytes anyway, and the key
-closes on a wrong target. That is exactly the false green the instruction-level
-proof caught for `BuildingDynamicShadows`.
-
-
-`verify_bodies.py` compares bytes, so it proves a body that has no
-module-relative operand. This shim has four: the two published hashes and the two
-resumes, which live at *our* module's addresses, not the original ASI's. Their
-bytes therefore differ by construction, and byte equality can never hold for it.
-
-Bodies of that shape need the next step in the proof: disassemble both sides and
-compare instruction mnemonics with operands canonicalised (the absolute operands
-compared as *slots*, not as addresses), which is what the old tree's proof did
-before it reported PASS/INFO/FAIL per body. Until that exists, a body-bearing key
-is closed on **write-set parity only**, and its instruction-level proof is
-recorded as pending here rather than claimed.
-
-
-
-### The attribution table, and a contradiction it exposed
-
-`tests/body_targets.tsv` is generated from the reference sources by
-`tools/gen_body_targets.py`: each arm names the body it jumps to
-(`MakeJMP(match, &abi_xxx)`), and the body table maps that symbol to the original
-ASI VA. 81 rows over 50 keys, guarded by `zp_body_targets_drift`.
-
-It disagrees with the stored baseline on one key already implemented:
-
-| key | reference arm names | baseline branch decodes to |
-| --- | --- | --- |
-| `AimProjectileCrashFix` | `0x10005590` | `0x10005590` |
-| `BuildingDynamicShadows` | `0x10005AF0` | `0x10005590` |
-
-`BuildingDynamicShadows`' current arm follows the baseline (it registers
-`0x10005590`, the eleven-instruction setter) and therefore closes its key � but the
-reference source says that site jumps to `0x10005AF0`, the eighteen-instruction
-model-hash shim. Both cannot be right, and the baseline's bytes are exactly what
-its canonicalisation produced, so it cannot arbitrate.
-
-Until the original binary decides (its installer code carries the immediate the
-site is written with), this key is **closed on a contested target** and must not
-be counted as settled. Every other body-bearing key stays open until the same
-question is answered for it.
-
-### The arbitration, and what each source can prove
-
-The contradiction above is resolved by asking which source can be an authority:
-
-| source | what it proves | status |
-| --- | --- | --- |
-| current reference sources (arm names its body, body table names its VA) | *which* body a site installs | authoritative for attribution |
-| stored per-option baselines | bytes written, except branch displacements | authoritative for bytes; **stale for body branches** (produced before the module refactor, so their canonicalised target is an older choice) |
-| original ASI at the attributed VA | the body itself, instruction by instruction | authoritative for the body |
-
-So the scoreboard now reports a branch displacement difference as `branch`, not as
-a real difference, and the combination is: scoreboard (bytes) + attribution table
-(which body) + `zp_body_proof` (the body). `BuildingDynamicShadows` uses
-`0x10005AF0` and is proven there; its baseline's `0x10005590` was the stale
-canonicalisation.
+Because of that exclusion the scoreboard proves bytes but not body identity: an arm
+that registers the wrong reference VA still matches. Body identity comes from
+`tests/body_targets.tsv` (the arm names its body, the table names its VA) and from
+the instruction-level proof.
 
 `verify_bodies.py` stops at the first terminal instruction, so a body with an
-internal jump is proven up to that jump, not beyond it. That is a real limit of
-the current proof and is recorded here rather than implied away.
+internal jump is proven up to that jump, not through it. That is a real limit, not
+an implied pass.
