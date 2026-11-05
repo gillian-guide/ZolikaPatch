@@ -8,7 +8,7 @@ import bytes;
 import common;
 import game;
 import loader;
-import pattern;
+import patch;
 
 // LaunchWithPlayGTAIV: the two launch slots carry `LaunchGTAIV.exe\0`; the mod
 // rewrites both to `PlayGTAIV.exe\0e\0` so the game relaunches through the DRM
@@ -42,7 +42,7 @@ namespace
                 { Build::v1000, Build::v1040, Build::v1060, Build::v1070, Build::v1080 }))
             return;
 
-        auto pattern = Pattern(kLauncherSlot);
+        auto pattern = find_pattern(kLauncherSlot);
         for (size_t index = 0; index < pattern.size(); ++index)
         {
             auto* slot = pattern.get(index).get<std::byte>();
