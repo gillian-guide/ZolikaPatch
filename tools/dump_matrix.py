@@ -31,6 +31,10 @@ def rows(path, key=None):
     return found
 
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from parity_report import displacement_rvas
+
+
 def keys():
     table = ROOT / "source" / "options.inc"
     return [line.split("(", 1)[1].split(",", 1)[0]
@@ -67,7 +71,13 @@ def main() -> int:
         ours_full = rows(out)
         want_full = rows(baseline / f"b{build}-full.txt")
         agreed = len(set(want_full) & set(ours_full))
-        differing = sum(1 for rva in set(want_full) & set(ours_full) if want_full[rva] != ours_full[rva])
+        # Branch displacements are not comparable: the baselines wrote one stand-in
+        # body address for every arm, so those bytes are counted apart from a real
+        # difference (the scoreboard does the same, per key).
+        pristine = exe.read_bytes()
+        branch = displacement_rvas(pristine, set(want_full) | set(ours_full))
+        differing = sum(1 for rva in (set(want_full) & set(ours_full)) - branch
+                        if want_full[rva] != ours_full[rva])
 
         subprocess.run([str(dump), "--per-option", "--exe", str(exe), "--build", str(build), str(out),
                         str(ini)], check=True, capture_output=True)
