@@ -153,7 +153,8 @@ def main() -> int:
         rows = [("selftest-body", IMAGE_BASE + 0x5590, IMAGE_BASE + 0x5590, 24)]
         first = report(compare(original, original, rows))
         corrupt = bytearray(original)
-        corrupt[0x5590] = (corrupt[0x5590] + 1) & 0xFF
+        offset = image_offset(original, IMAGE_BASE + 0x5590)
+        corrupt[offset] ^= 0xFF  # the opcode, not a constant: a constant alone is not an instruction difference
         second = report(compare(original, bytes(corrupt), rows))
         print("selftest: identical PASS, one corrupted byte FAIL"
               if first == 0 and second == 1 else "selftest: BROKEN")
