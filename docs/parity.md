@@ -67,10 +67,26 @@ changes either the write set or the fault behaviour:
 4. **The proof manifest row**: `name <recovered VA> <candidate VA> <length>`, and
    `verify_bodies.py` must report PASS for it.
 
-The first body to transcribe is `abi_building_dynamic_shadows` (recovered VA
-`0x10005AF0`, `sub_10005af0`): it reads `[edi]`, compares it against two
-published model hashes, jumps to `resume_b` on a match, otherwise computes
-`([edi+28h] >> 6 & 0xF) - 1` and jumps to `resume_a`. Its arm also writes the
-shadow-size operand byte (`0x104` -> `0x100`), which is the half already
-understood; the key stays open until the body half exists.
+The first body transcribed is the BuildingDynamicShadows shim (`sub_10005590`,
+recovered VA `0x10005590` — decoded from the baseline's own branch at RVA
+`0x558955`, *not* the similarly named helper at `0x10005AF0`): it reads `[edi]`,
+matches it against two published model hashes, jumps to the second resume on a
+match, otherwise computes `([edi+28h] >> 6 & 0xF) - 1` and jumps to the first.
+Its candidate address is `0x100169C0` in the `/MAP` build, and the write-set half
+of the key is closed (`parity_report` 1.0.8.0).
+
+### What the byte-level proof can and cannot cover
+
+`verify_bodies.py` compares bytes, so it proves a body that has no
+module-relative operand. This shim has four: the two published hashes and the two
+resumes, which live at *our* module's addresses, not the original ASI's. Their
+bytes therefore differ by construction, and byte equality can never hold for it.
+
+Bodies of that shape need the next step in the proof: disassemble both sides and
+compare instruction mnemonics with operands canonicalised (the absolute operands
+compared as *slots*, not as addresses), which is what the old tree's proof did
+before it reported PASS/INFO/FAIL per body. Until that exists, a body-bearing key
+is closed on **write-set parity only**, and its instruction-level proof is
+recorded as pending here rather than claimed.
+
 
