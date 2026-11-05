@@ -7,6 +7,7 @@ export module graphics;
 import bodies;
 import bytes;
 import common;
+import game;
 import loader;
 import patch;
 
@@ -165,8 +166,312 @@ export void* EmissiveLerpShimAddress()
     return reinterpret_cast<void*>(&EmissiveLerpShim);
 }
 
+// The SuperLODFix pair's published state: the two resumes the shim tails into
+// (dword_101580AC and dword_101580B0) and the lookup the model helper calls
+// (dword_101580B4). The original keeps them in .bss beside its code; the
+// transcribed asm names the slots directly, so they carry C linkage.
+extern "C"
+{
+    uint32_t zpatch_super_lod_fail = 0;    // dword_101580AC
+    uint32_t zpatch_super_lod_ok = 0;      // dword_101580B0
+    uint32_t zpatch_super_lod_lookup = 0;  // dword_101580B4
+}
+
+// sub_100469A0, recovered VA 0x100469A0: the model test the shim calls with the
+// ESI argument still on the stack. It resolves the constant 0xAE4B15D6 through
+// the published lookup and compares the object's signed word at +0x2E with the
+// answer. The frame is the body's own /GS frame: the cookie word and the cookie
+// check are the module's, exactly as a compiled function of this module has
+// them, and both are absolute/slot operands in the proof.
+static __declspec(naked) void SuperLodModel()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        sub esp, 8
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, ebp
+        mov DWORD PTR [ebp - 4], eax
+        lea eax, [ebp - 8]
+        push eax
+        push 0AE4B15D6h
+        call DWORD PTR [zpatch_super_lod_lookup]
+        mov eax, DWORD PTR [ebp + 8]
+        add esp, 8
+        mov ecx, DWORD PTR [ebp - 4]
+        movsx eax, WORD PTR [eax + 2Eh]
+        cmp eax, DWORD PTR [ebp - 8]
+        setz al
+        xor ecx, ebp
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
+// sub_100469E0, recovered VA 0x100469E0: the body the SuperLODFix arm installs at
+// the `test byte [eax+72h], 10h` / `jz` pair. EAX is the object and ESI the model
+// the test reads. A model that resolves to the published hash continues at the
+// site's continuation (ok); otherwise the object's 0x10 flag decides, and the
+// `jz` it would have taken is the site's branch target (fail).
+static __declspec(naked) void SuperLodShim()
+{
+    __asm
+    {
+        jmp slod_main
+    slod_fail:
+        jmp DWORD PTR [zpatch_super_lod_fail]
+    slod_main:
+        push eax
+        push ecx
+        push esi
+        call SuperLodModel
+        add esp, 4
+        pop ecx
+        test al, al
+        pop eax
+        jnz slod_ok
+        test byte ptr [eax + 72h], 10h
+        jz slod_fail
+    slod_ok:
+        jmp DWORD PTR [zpatch_super_lod_ok]
+    }
+}
+
 namespace
 {
+    // sub_100459E0, recovered VA 0x100459E0: the HPE filter the shader finder calls
+    // with the shader-name object. A name whose kind byte is 'h', or is 'p'
+    // followed by 'e', is rejected (0); everything else is accepted (2).
+    __declspec(naked) void ShaderStreamingFilterHpe()
+    {
+        __asm
+        {
+            push ebp
+            mov ebp, esp
+            mov eax, DWORD PTR [ebp + 0Ch]
+            mov cl, BYTE PTR [eax + 4]
+            cmp cl, 68h
+            jz hpe_reject
+            cmp cl, 70h
+            jnz hpe_accept
+            cmp BYTE PTR [eax + 5], 65h
+            jz hpe_reject
+        hpe_accept:
+            mov eax, 2
+            pop ebp
+            ret
+        hpe_reject:
+            xor eax, eax
+            pop ebp
+            ret
+        }
+    }
+
+    // sub_10045A10, recovered VA 0x10045A10: the V filter, the same shape for the
+    // single kind byte 'v'.
+    __declspec(naked) void ShaderStreamingFilterV()
+    {
+        __asm
+        {
+            push ebp
+            mov ebp, esp
+            mov ecx, DWORD PTR [ebp + 0Ch]
+            xor edx, edx
+            mov eax, 2
+            cmp BYTE PTR [ecx + 4], 76h
+            cmovz eax, edx
+            pop ebp
+            ret
+        }
+    }
+}
+
+// sub_10045A30, recovered VA 0x10045A30: the replacement for the
+// `LookupShader("gta_ped")` call (the arm's second write then jumps over the
+// following ped-name lookups). It walks the shader group's array (count at +0Ch,
+// array at +8), asks each shader's virtual +0x10 for its name object and takes
+// the first one the HPE filter accepts, or returns null. `ret 4` because the
+// caller pushed two arguments.
+static __declspec(naked) void ShaderStreamingFindHpe()
+{
+    __asm
+    {
+        push ebx
+        push esi
+        push edi
+        mov edi, ecx
+        xor esi, esi
+        cmp WORD PTR [edi + 0Ch], si
+        jbe hpe_none
+        mov ebx, DWORD PTR [esp + 10h]
+    hpe_loop:
+        mov eax, DWORD PTR [edi + 8]
+        mov ecx, DWORD PTR [eax + esi * 4]
+        test ecx, ecx
+        jz hpe_advance
+        mov edx, DWORD PTR [ecx]
+        mov eax, DWORD PTR [edx + 10h]
+        call eax
+        push eax
+        push ebx
+        call ShaderStreamingFilterHpe
+        add esp, 8
+        test eax, eax
+        jz hpe_found
+    hpe_advance:
+        movzx ecx, WORD PTR [edi + 0Ch]
+        add esi, 1
+        cmp esi, ecx
+        jl hpe_loop
+    hpe_none:
+        pop edi
+        pop esi
+        xor eax, eax
+        pop ebx
+        ret 4
+    hpe_found:
+        mov edx, DWORD PTR [edi + 8]
+        mov eax, DWORD PTR [edx + esi * 4]
+        pop edi
+        pop esi
+        pop ebx
+        ret 4
+    }
+}
+
+// sub_10045A80, recovered VA 0x10045A80: the same walk for the V filter, the
+// replacement for the `LookupShader("gta_vehicle_default")` call (the arm's fourth
+// write then jumps to the end of the shader chain).
+static __declspec(naked) void ShaderStreamingFindV()
+{
+    __asm
+    {
+        push ebx
+        push esi
+        push edi
+        mov edi, ecx
+        xor esi, esi
+        cmp WORD PTR [edi + 0Ch], si
+        jbe v_none
+        mov ebx, DWORD PTR [esp + 10h]
+    v_loop:
+        mov eax, DWORD PTR [edi + 8]
+        mov ecx, DWORD PTR [eax + esi * 4]
+        test ecx, ecx
+        jz v_advance
+        mov edx, DWORD PTR [ecx]
+        mov eax, DWORD PTR [edx + 10h]
+        call eax
+        push eax
+        push ebx
+        call ShaderStreamingFilterV
+        add esp, 8
+        test eax, eax
+        jz v_found
+    v_advance:
+        movzx ecx, WORD PTR [edi + 0Ch]
+        add esi, 1
+        cmp esi, ecx
+        jl v_loop
+    v_none:
+        pop edi
+        pop esi
+        xor eax, eax
+        pop ebx
+        ret 4
+    v_found:
+        mov edx, DWORD PTR [edi + 8]
+        mov eax, DWORD PTR [edx + esi * 4]
+        pop edi
+        pop esi
+        pop ebx
+        ret 4
+    }
+}
+
+namespace
+{
+    // BuildingAlphaFix: two copies of the `test [esi+24h], 40000000h` alpha gate.
+    // The first one's `jz` (0F 84 rel32, six bytes) becomes a five-byte `jmp` to
+    // the same target, so the alpha path is entered unconditionally; the second
+    // one's `jnz` and the five bytes of the test it follows are filled with NOPs,
+    // so that copy never skips the path either. The targets are the sites' own
+    // operands, read before the opcode is overwritten.
+    void InstallBuildingAlphaFix()
+    {
+        if (!Loader::Enabled("BuildingAlphaFix"))
+            return;
+
+        auto pattern = find_pattern("F7 46 24 00 00 00 40 0F 84");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            const auto displacement = *reinterpret_cast<const int32_t*>(match + 9);
+            injector::MakeJMP(match + 7, match + 13 + displacement, true);
+        }
+
+        pattern = find_pattern("F7 46 24 00 00 00 40 0F 85");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(0), 13, true);
+    }
+
+    // RemoveBoundingBoxCulling: the `jnz` that skips the bounding-box path when the
+    // object is not a building becomes an unconditional `jmp` to that same target,
+    // i.e. the path is always skipped.
+    void InstallRemoveBoundingBoxCulling()
+    {
+        if (!Loader::Enabled("RemoveBoundingBoxCulling"))
+            return;
+
+        auto pattern = find_pattern("3C 01 57 0F 85");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get_first<std::byte>(0);
+        const auto displacement = *reinterpret_cast<const int32_t*>(match + 5);
+        injector::MakeJMP(match + 3, match + 9 + displacement, true);
+    }
+
+    // RemoveStaticCarShadows: the `jbe` (+0x5B) that guards the static car-shadow
+    // draw becomes a short `jmp` over it, so the shadow is never drawn.
+    void InstallRemoveStaticCarShadows()
+    {
+        if (!Loader::Enabled("RemoveStaticCarShadows"))
+            return;
+
+        auto pattern = find_pattern("F3 0F 11 4C 24 0C 76 5B D9 45 14");
+        if (!pattern.empty())
+            injector::WriteMemory<std::byte>(pattern.get_first(6), Bytes::ShortJmp, true);
+    }
+
+    // ForceShadowsOnObjects: the `jz` (+7) that would skip the shadow flag on an
+    // object with the 0x100000 bit set becomes a short `jmp` over it, so the flag
+    // is always set.
+    void InstallForceShadowsOnObjects()
+    {
+        if (!Loader::Enabled("ForceShadowsOnObjects"))
+            return;
+
+        auto pattern = find_pattern("F7 47 40 00 10 00 00 74 07 81 4E 24 00 00");
+        if (!pattern.empty())
+            injector::WriteMemory<std::byte>(pattern.get_first(7), Bytes::ShortJmp, true);
+    }
+
+    // ForceDynamicShadowsEverywhere: the short `jz` that skips the dynamic-shadow
+    // path becomes two NOPs, so the path always runs.
+    void InstallForceDynamicShadowsEverywhere()
+    {
+        if (!Loader::Enabled("ForceDynamicShadowsEverywhere"))
+            return;
+
+        auto pattern = find_pattern("F7 46 4C 00 80 00 00 74");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(7), 2, true);
+    }
+
     // BuildingDynamicShadows: the shadow-size operand at the call site becomes zero
     // (0x104 -> 0x100) and the second site jumps into the shim. The published words
     // go in first: both resumes come from the site's original bytes, so publishing
@@ -219,11 +524,91 @@ namespace
 
         injector::MakeJMP(match - 24, EmissiveLerpShimAddress(), true);
     }
+
+    // The per-build set InstallSuperLODFix publishes: the site's two continuations
+    // and the hash lookup the model helper calls, each a game RVA from the
+    // recovered handler's own base + RVA pairs (the suffix is the build).
+    struct SuperLodTargets
+    {
+        Build build;
+        uint32_t fail;
+        uint32_t ok;
+        uint32_t lookup;
+    };
+    constexpr SuperLodTargets kSuperLodTargets[] = {
+        { Build::v1070, 0x4A3D37u, 0x4A3CEFu, 0x58AAE0u },
+        { Build::v1080, 0x540E67u, 0x540E1Fu, 0x4DD2D0u },
+    };
+
+    // SuperLODFix: the two-byte pair `test byte [eax+72h], 10h` / `jz` that decides
+    // whether the detailed LOD is used is replaced by the model-hash test. The fail
+    // path is the `jz` target, the ok path the instruction after the six-byte pair,
+    // and the lookup is the game's hash function. All three are published before the
+    // site is written.
+    void InstallSuperLODFix()
+    {
+        if (!Loader::Enabled("SuperLODFix"))
+            return;
+
+        auto pattern = find_pattern("F6 40 ? ? 74 ? 85 ED 0F 85 ? ? ? ? 55 6A ? E8 ? ? ? ? 8B F8");
+        if (pattern.empty())
+            return;
+
+        const auto base = Game::Get().ImageBase();
+        for (const SuperLodTargets& targets : kSuperLodTargets)
+        {
+            if (targets.build != Loader::Current())
+                continue;
+            zpatch_super_lod_fail = static_cast<uint32_t>(base + targets.fail);
+            zpatch_super_lod_ok = static_cast<uint32_t>(base + targets.ok);
+            zpatch_super_lod_lookup = static_cast<uint32_t>(base + targets.lookup);
+        }
+
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SuperLodModel), 0x100469A0u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SuperLodShim), 0x100469E0u);
+        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(&SuperLodShim), true);
+    }
+
+    // ImprovedShaderStreaming: the name-by-name LookupShader walks become one call
+    // each into a shader-array walk with a kind filter, and the rest of the old
+    // chain is jumped over. The original's handler sub_10045AD0 writes the four
+    // sites at match + 0x55 (E8 body A), + 0x62 (E9, displacement 0x8E), + 0xFD
+    // (E8 body B) and + 0x10A (E9, displacement 0x377); the displacement it writes
+    // is the constant but it encodes exactly the two targets below, so the jumps
+    // are computed rather than hardcoded. The finders are the bodies the calls
+    // name; the filters are only called by the finders, so they appear in the body
+    // manifest rather than as branch targets.
+    void InstallImprovedShaderStreaming()
+    {
+        if (!Loader::Enabled("ImprovedShaderStreaming"))
+            return;
+
+        auto pattern = find_pattern(
+            "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get_first<std::byte>(0);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&ShaderStreamingFindHpe), 0x10045A30u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&ShaderStreamingFindV), 0x10045A80u);
+
+        injector::MakeCALL(match + 85, reinterpret_cast<void*>(&ShaderStreamingFindHpe), true);
+        injector::MakeJMP(match + 98, match + 245, true);
+        injector::MakeCALL(match + 253, reinterpret_cast<void*>(&ShaderStreamingFindV), true);
+        injector::MakeJMP(match + 266, match + 1158, true);
+    }
 }
 
 // Registered like every other arm: the install tier owns the gate.
 export void RegisterGraphics()
 {
+    Loader::InstallEvent() += [] { InstallBuildingAlphaFix(); };
     Loader::InstallEvent() += [] { InstallBuildingDynamicShadows(); };
     Loader::InstallEvent() += [] { InstallEmissiveLerpFix(); };
+    Loader::InstallEvent() += [] { InstallForceDynamicShadowsEverywhere(); };
+    Loader::InstallEvent() += [] { InstallForceShadowsOnObjects(); };
+    Loader::InstallEvent() += [] { InstallImprovedShaderStreaming(); };
+    Loader::InstallEvent() += [] { InstallRemoveBoundingBoxCulling(); };
+    Loader::InstallEvent() += [] { InstallRemoveStaticCarShadows(); };
+    Loader::InstallEvent() += [] { InstallSuperLODFix(); };
 }

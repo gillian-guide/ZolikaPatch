@@ -24,3 +24,9 @@ episode_switch_shim_c 1001B0C0 ?EpisodeSwitchShimC@@YAXXZ 16
 wanted_level_shim 10050490 ?WantedLevelShim@@YAXXZ 16
 smpa60_shim 10046750 ?Smpa60Shim@@YAXXZ 16
 smpa60_tail_shim 10046780 ?Smpa60TailShim@@YAXXZ 12
+super_lod_shim 100469E0 ?SuperLodShim@@YAXXZ 20
+super_lod_model 100469A0 ?SuperLodModel@@YAXXZ 26
+shader_streaming_find_hpe 10045A30 ?ShaderStreamingFindHpe@@YAXXZ 40
+shader_streaming_find_v 10045A80 ?ShaderStreamingFindV@@YAXXZ 40
+shader_streaming_filter_hpe 100459E0 ?ShaderStreamingFilterHpe@?A0x06fbc149@@YAXXZ 16
+shader_streaming_filter_v 10045A10 ?ShaderStreamingFilterV@?A0x06fbc149@@YAXXZ 12
