@@ -57,8 +57,19 @@ namespace
     }
 }
 
+// The shared shim's address, for the other key whose site jumps here
+// (AimProjectileCrashFix). The body lives in this module because a naked
+// definition is only accepted here; the registry entry is made on first use.
+export void* BuildingsDynamicShadowsShimAddress();
+
 // Registered like every other arm: the install tier owns the gate.
 export void RegisterGraphics()
 {
     Loader::InstallEvent() += [] { InstallBuildingDynamicShadows(); };
+}
+
+void* BuildingsDynamicShadowsShimAddress()
+{
+    Bodies::Register(reinterpret_cast<uintptr_t>(&BuildingsDynamicShadowsShim), 0x10005590u);
+    return reinterpret_cast<void*>(&BuildingsDynamicShadowsShim);
 }

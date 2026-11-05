@@ -6,6 +6,7 @@ export module stability;
 
 import bytes;
 import common;
+import graphics;
 import loader;
 import pattern;
 
@@ -100,6 +101,19 @@ namespace
                 injector::MakeNOP(MatchAddress(pattern, site.offset), 2, true);
         }
     }
+
+    // AimProjectileCrashFix: the site jumps into the shim shared with
+    // BuildingDynamicShadows (recovered VA 0x10005590), which stores the caller's
+    // dwords into the object and derives the flag.
+    void InstallAimProjectileCrashFix()
+    {
+        if (!Loader::Enabled("AimProjectileCrashFix"))
+            return;
+
+        auto pattern = Pattern("8B 44 24 08 89 41 20 8B 44 24 0C 89 41 24 F7 D8");
+        if (pattern.size() > 0)
+            injector::MakeJMP(MatchAddress(pattern, 0), BuildingsDynamicShadowsShimAddress(), true);
+    }
 }
 
 // Registered like every other arm: the install tier owns the gate.
@@ -112,5 +126,6 @@ export void RegisterStability()
         InstallTryToSkipAllErrors();
         InstallRemoveAllWeaponsProtection();
         InstallHighFPSSpeedupFix();
+        InstallAimProjectileCrashFix();
     };
 }
