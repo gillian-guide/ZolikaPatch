@@ -4,6 +4,7 @@ module;
 
 export module stability;
 
+import bytes;
 import common;
 import loader;
 import pattern;
@@ -23,7 +24,7 @@ namespace
 
         auto pattern = Pattern("74 2B 57 E8 ?? ?? ?? ?? 8B BE A8 0E 00 00");
         if (pattern.size() > 0)
-            injector::WriteMemory<uint8_t>(MatchAddress(pattern, 0), 0xEB, true);
+            injector::WriteMemory<std::byte>(MatchAddress(pattern, 0), Bytes::ShortJmp, true);
     }
 
     // SCOSignatureFix: the instruction 32 bytes before the anchor becomes a short
@@ -35,7 +36,7 @@ namespace
 
         auto pattern = Pattern("8B 6C 24 1C 66 89 6E 14 64 8B 0D 2C 00 00 00 8B");
         if (pattern.size() > 0)
-            injector::WriteMemory<uint8_t>(MatchAddress(pattern, -32), 0xEB, true);
+            injector::WriteMemory<std::byte>(MatchAddress(pattern, -32), Bytes::ShortJmp, true);
     }
 
     // TryToSkipAllErrors: the error handler returns immediately instead of
@@ -47,7 +48,7 @@ namespace
 
         auto pattern = Pattern("81 EC 40 08 00 00 53 55 8B AC 24 4C 08 00 00");
         if (pattern.size() > 0)
-            injector::WriteMemory<uint8_t>(MatchAddress(pattern, 0), 0xC3, true);
+            injector::WriteMemory<std::byte>(MatchAddress(pattern, 0), Bytes::Ret, true);
     }
 
     // RemoveAllWeaponsProtection: the 12-byte block the anchor jumps over is
@@ -94,7 +95,7 @@ namespace
         for (const auto& site : kSpeedupSites)
         {
             if (site.shortJump)
-                injector::WriteMemory<uint8_t>(MatchAddress(pattern, site.offset), 0xEB, true);
+                injector::WriteMemory<std::byte>(MatchAddress(pattern, site.offset), Bytes::ShortJmp, true);
             else
                 injector::MakeNOP(MatchAddress(pattern, site.offset), 2, true);
         }

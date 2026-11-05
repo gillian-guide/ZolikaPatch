@@ -4,6 +4,7 @@ module;
 
 export module vehicles;
 
+import bytes;
 import common;
 import loader;
 import pattern;
@@ -25,8 +26,8 @@ namespace
         if (pattern.size() > 0)
         {
             auto* site = MatchAddress(pattern, 3);
-            injector::WriteMemory<uint8_t>(site, 0xEB, true);
-            injector::WriteMemory<uint8_t>(site + 1, 0x2A, true);
+            injector::WriteMemory<std::byte>(site, Bytes::ShortJmp, true);
+            injector::WriteMemory<std::byte>(site + 1, Bytes::JumpOverClamp, true);
         }
     }
 
@@ -39,7 +40,7 @@ namespace
 
         auto pattern = Pattern("11 01 00 00 8B 16 8B 42 64 8B CE FF D0 F3 0F 10");
         if (pattern.size() > 0)
-            injector::WriteMemory<uint8_t>(MatchAddress(pattern, 8), 0x60, true);
+            injector::WriteMemory<std::byte>(MatchAddress(pattern, 8), Bytes::Pushad, true);
     }
 
     // BikeFeetFix: the 12-byte rider-foot block is deleted, so the chopper foot
@@ -90,8 +91,8 @@ namespace
         if (pattern.size() > 0)
         {
             auto* match = MatchAddress(pattern, 0);
-            injector::WriteMemory<uint16_t>(injector::raw_ptr(match), 0x08C2u, true);
-            injector::WriteMemory<uint8_t>(injector::raw_ptr(match + 2), 0x00u, true);
+            injector::WriteMemory<std::byte>(injector::raw_ptr(match), Bytes::RetImm16, true);
+            injector::WriteMemory<std::byte>(injector::raw_ptr(match + 2), Bytes::RetImm16High, true);
         }
     }
 
