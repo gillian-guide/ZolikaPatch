@@ -57,6 +57,12 @@ def image_offset(image: bytes, va: int):
         raw_pointer = int.from_bytes(image[entry + 20:entry + 24], "little")
         size = virtual_size or raw_size
         if virtual_address <= rva < virtual_address + size:
+            # A section's tail can be uninitialised (.bss): those bytes are not in
+            # the file at all, they are zero in the loaded image. Mapping them to
+            # raw_pointer + ... would read whatever section happens to follow, which
+            # is how an earlier read of a scratch slot returned code bytes.
+            if rva - virtual_address >= raw_size:
+                return None
             return raw_pointer + (rva - virtual_address)
     return None
 

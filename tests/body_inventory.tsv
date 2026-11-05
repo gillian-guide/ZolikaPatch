@@ -1,17 +1,19 @@
-﻿# Body inventory for the next transcriptions: recovered VA, the arm that installs
+# Body inventory for the next transcriptions: recovered VA, the arm that installs
 # it, and how many absolute operands it reads (each one is a published slot the
 # arm must set before it installs). Measured with tools/verify_bodies.py and the
 # reference sources; not a proof, a work list.
 #
 # name                          recovered VA  arm key                        slots
 emissive_lerp_shim                 1001AF60  emissive_lerp_fix                    5#
-# EmissiveLerpFix - BLOCKED on operand semantics, do not transcribe yet.
-# The shim at 0x1001AF60 reads/writes five absolute operands (0x10159CC0,
 # 0x10159CC4, 0x10159CC8, 0x10159CCC) and calls 0x1001AF20. Reading those
 # addresses out of the original file gives bytes that decode as code, not as a
-# scratch block (d8 30 17 31 ba 31 da 31 19 32 bc 32 dc 32 1b 33 at 0x10159CC0),
-# so either the operand addresses are not data (a store into code, which would be
 # the original's own fault) or the body was read from a different section layout
-# than the file has. Both readings change what has to be published, and a wrong
-# guess produces a body that faults on the first call - so the key stays open
 # until the operands are re-derived from the disassembly rather than assumed.
+#
+# EmissiveLerpFix - operands RESOLVED (2026-11-05). The five absolute operands are
+# .bss scratch, not code: the IDB reads 0x10159CC0 as sixteen zero bytes, and
+# image_offset used to map a .bss address into whatever section followed, which is
+# why the same address appeared to hold code in the file. With that fixed (a bss
+# address now maps to "not in the file"), the shim is a normal transcription: two
+# scratch dwords, a float scale, a resume, and a call to the paired body at
+# 0x1001AF20.
