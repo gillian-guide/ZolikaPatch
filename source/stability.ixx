@@ -6,7 +6,7 @@ export module stability;
 
 import common;
 import loader;
-import patch;
+import pattern;
 
 // Crash fixes. One arm per key, each anchored to its own recovered signature.
 // Registration is explicit: the driver calls Register(), so the arm cannot be
@@ -21,15 +21,9 @@ namespace
         if (!Loader::Enabled("MPNikoCrashFix"))
             return;
 
-        auto pattern = find_pattern("74 2B 57 E8 ?? ?? ?? ?? 8B BE A8 0E 00 00");
-        if (pattern.empty())
-        {
-            std::fprintf(stderr, "MPNikoCrashFix: signature not found\n");
-            return;
-        }
-
-        auto* match = pattern.get(0).get<uint8_t>();
-        injector::WriteMemory<uint8_t>(match, 0xEB, true);
+        auto pattern = Pattern("74 2B 57 E8 ?? ?? ?? ?? 8B BE A8 0E 00 00");
+        if (pattern.size() > 0)
+            injector::WriteMemory<uint8_t>(MatchAddress(pattern, 0), 0xEB, true);
     }
 
     // SCOSignatureFix: the instruction 32 bytes before the anchor becomes a short
@@ -39,12 +33,9 @@ namespace
         if (!Loader::Enabled("SCOSignatureFix"))
             return;
 
-        auto pattern = find_pattern("8B 6C 24 1C 66 89 6E 14 64 8B 0D 2C 00 00 00 8B");
-        if (pattern.empty())
-            return;
-
-        auto* match = pattern.get(0).get<uint8_t>();
-        injector::WriteMemory<uint8_t>(match - 32, 0xEB, true);
+        auto pattern = Pattern("8B 6C 24 1C 66 89 6E 14 64 8B 0D 2C 00 00 00 8B");
+        if (pattern.size() > 0)
+            injector::WriteMemory<uint8_t>(MatchAddress(pattern, -32), 0xEB, true);
     }
 
     // TryToSkipAllErrors: the error handler returns immediately instead of
@@ -54,12 +45,9 @@ namespace
         if (!Loader::Enabled("TryToSkipAllErrors"))
             return;
 
-        auto pattern = find_pattern("81 EC 40 08 00 00 53 55 8B AC 24 4C 08 00 00");
-        if (pattern.empty())
-            return;
-
-        auto* match = pattern.get(0).get<uint8_t>();
-        injector::WriteMemory<uint8_t>(match, 0xC3, true);
+        auto pattern = Pattern("81 EC 40 08 00 00 53 55 8B AC 24 4C 08 00 00");
+        if (pattern.size() > 0)
+            injector::WriteMemory<uint8_t>(MatchAddress(pattern, 0), 0xC3, true);
     }
 
     // RemoveAllWeaponsProtection: the 12-byte block the anchor jumps over is
@@ -69,12 +57,9 @@ namespace
         if (!Loader::Enabled("RemoveAllWeaponsProtection"))
             return;
 
-        auto pattern = find_pattern("E9 ?? ?? ?? ?? 57 8D 8F ?? ?? 00 00");
-        if (pattern.empty())
-            return;
-
-        auto* match = pattern.get(0).get<uint8_t>();
-        injector::MakeNOP(match + 5, 12, true);
+        auto pattern = Pattern("E9 ?? ?? ?? ?? 57 8D 8F ?? ?? 00 00");
+        if (pattern.size() > 0)
+            injector::MakeNOP(MatchAddress(pattern, 5), 12, true);
     }
 
     // HighFPSSpeedupFix: the nine frame-time clamps inside CTimer::Update. One
@@ -102,23 +87,21 @@ namespace
         if (!Loader::Enabled("HighFPSSpeedupFix"))
             return;
 
-        auto pattern = find_pattern("0F 2F C1 76 03 0F 28 C8 F3 0F 10 15");
+        auto pattern = Pattern("0F 2F C1 76 03 0F 28 C8 F3 0F 10 15");
         if (pattern.empty())
             return;
 
-        auto* match = pattern.get(0).get<uint8_t>();
         for (const auto& site : kSpeedupSites)
         {
             if (site.shortJump)
-                injector::WriteMemory<uint8_t>(match + site.offset, 0xEB, true);
+                injector::WriteMemory<uint8_t>(MatchAddress(pattern, site.offset), 0xEB, true);
             else
-                injector::MakeNOP(match + site.offset, 2, true);
+                injector::MakeNOP(MatchAddress(pattern, site.offset), 2, true);
         }
     }
 }
 
-// Defined out of line in this module: the subscription body has to live in the
-// module's own object, where the arm it refers to is visible.
+// Registered like every other arm: the install tier owns the gate.
 export void RegisterStability()
 {
     Loader::InstallEvent() += []

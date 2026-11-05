@@ -7,6 +7,7 @@ export module graphics;
 import bodies;
 import common;
 import loader;
+import pattern;
 import patch;
 
 // The two published model hashes and the two resumes the shim reads. C linkage:
@@ -57,29 +58,29 @@ namespace
         if (!Loader::Enabled("BuildingDynamicShadows"))
             return;
 
-        auto site = find_pattern("8B 47 28 C1 E8 06 83 E0 0F 83 C0");
+        auto site = Pattern("8B 47 28 C1 E8 06 83 E0 0F 83 C0");
         if (!site.empty())
         {
-            auto* match = site.get(0).get<uint8_t>();
+            auto* match = MatchAddress(site, 0);
             zpatch_bds_resume_a = match + 15;
             zpatch_bds_resume_b = match + 112;
         }
 
         // The hash slots take the same field of the first and of the second match.
-        auto hashes = find_pattern("8B 46 28 83 4E 24 05 25 7F FC FF FF 83 C8 40 89 46 28 C7 06");
+        auto hashes = Pattern("8B 46 28 83 4E 24 05 25 7F FC FF FF 83 C8 40 89 46 28 C7 06");
         if (hashes.size() > 0)
-            zpatch_bds_hash_a = *hashes.get(0).get<uint32_t>(20);
+            zpatch_bds_hash_a = *MatchAddress<uint32_t>(hashes, 20);
         if (hashes.size() > 1)
             zpatch_bds_hash_b = *hashes.get(1).get<uint32_t>(20);
 
-        auto operand = find_pattern("50 68 04 01 00 00 6A 02 6A 00 E8");
+        auto operand = Pattern("50 68 04 01 00 00 6A 02 6A 00 E8");
         if (!operand.empty())
-            injector::WriteMemory<uint8_t>(operand.get(0).get<uint8_t>(2), 0, true);
+            injector::WriteMemory<uint8_t>(MatchAddress(operand, 2), 0, true);
 
         if (!site.empty() && zpatch_bds_resume_a != nullptr && zpatch_bds_resume_b != nullptr)
         {
             Bodies::Register(reinterpret_cast<uintptr_t>(&BuildingDynamicShadowsShim), 0x10005590u);
-            injector::MakeJMP(site.get(0).get<uint8_t>(),
+            injector::MakeJMP(MatchAddress(site, 0),
                 reinterpret_cast<void*>(&BuildingDynamicShadowsShim), true);
         }
     }

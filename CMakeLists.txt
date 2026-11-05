@@ -62,6 +62,7 @@ set_target_properties(zp_modules PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_EXTENSIO
 target_sources(zp_modules PUBLIC
   FILE_SET CXX_MODULES FILES
     source/common.ixx
+    source/pattern.ixx
     source/bodies.ixx
     source/patch.ixx
     source/config.ixx
@@ -91,8 +92,15 @@ set_target_properties(${ZP_NAME} PROPERTIES
   PREFIX ""
   SUFFIX ".asi")
 target_link_libraries(${ZP_NAME} PRIVATE zp_modules)
+# A linker map is a development aid: the transcribed bodies are proved against
+# the original ASI at the addresses it records, so the map is what gives a body
+# its candidate VA. It is not shipped and changes no byte of the image.
+option(ZP_LINK_MAP "Emit a linker map for the ASI" ON)
 target_link_options(${ZP_NAME} PRIVATE
   /MACHINE:X86 /SUBSYSTEM:WINDOWS /BASE:0x10000000 /INCREMENTAL:NO)
+if(ZP_LINK_MAP)
+  target_link_options(${ZP_NAME} PRIVATE /MAP)
+endif()
 # The trace build writes the diagnostic log the parity tools read; the shipped
 # ASI is silent, exactly like the original.
 option(ZP_TRACE "Write ZolikaPatch.trace.log" OFF)
