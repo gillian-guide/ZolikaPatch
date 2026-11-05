@@ -34,19 +34,33 @@ CRLF folding (the original reads in text mode). The shipped INI's longest line i
 
 Measured on 1.0.8.0 with `tools/parity_report.py 9`:
 
-- **44 of 99 option keys closed**;
-- **22 hook bodies transcribed, registered and proven** (`zp_body_proof`); the rest
-  of the original's bodies are still to transcribe;
+- **52 of 99 option keys closed**;
+- **31 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+  linear sweep of each body's exact instruction count); the rest of the original's
+  bodies are still to transcribe;
 - launcher: `LaunchWithPlayGTAIV` implemented and its slots verified per build
   (`zp_launcher_slots`); SkipLauncher, DFA and ROM are not started;
 - the 18 full/per-option per-build dump hashes and the oracle differential are not
   yet produced.
 
-Blocked on the original's shared helper library: `sub_10003E50` (the
-"hash:"/quote config resolver), `dword_10159C0C` (a game function resolved at
-startup), `sub_10004C70` (the 1,343-byte steer consumer) and the model-name/log
-helpers. `BadPlayerModelCrashFix` and `PlayerAsPedComponentsFix` need those, as do
-`GarageModelFix`, `NoLiveryLimit`, the steer/engine/plane trio and `FreezeCarFix`.
+Transcribed and available for the arms that need it (`source/shared.ixx`):
+`sub_10003E50` (the `hash:`/quote config-value resolver, 67 instructions) and the
+1.0.8.0 `CModelInfoStore::getModelByKey` lookup (`dword_10159C0C`, resolved with the
+original's own pattern). `AllowHashesForIDE` needs exactly that resolver (its site is
+the game's hash function at `0x45CF50`).
+
+Still blocked:
+
+- `BadPlayerModelCrashFix` needs the ASI's **native-call layer**, not the shared
+  helpers: `sub_1005B3F0`/`sub_1005B150`, `sub_100038E0` (an SEH frame around a call
+  through `dword_1015BDE0`), `sub_1005DE40`/`80`, plus the GTAC.dll branch
+  (`sub_1005B290`, `sub_1005B530`, the sprintf chain) and the original's own
+  38,455-entry model-name table at `0x100DE770`;
+- `GarageModelFix`, `NoLiveryLimit`, the steer/engine/plane trio and `FreezeCarFix`
+  need `sub_10004C70` (the 1,343-byte steer consumer) and, for `FreezeCarFix`, the
+  1,421-byte probe;
+- `HighQualityReflections` (~200 instructions) and `CutsceneFixes` (~100, with only
+  one real baseline byte) are over the transcription budget by design.
 
 `ForceCarHeadlightShadows` cannot match while its baseline cell carries the
 reference dump's `0xD0000000` placeholder for a published float pointer; closing it
