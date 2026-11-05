@@ -45,7 +45,7 @@ def main() -> int:
     # The full cell is the write set of the shipped INI, so it has to be the same
     # document the baseline was produced from. Per-option cells rebuild themselves
     # (every key off, one key on) and ignore this file.
-    parser.add_argument("--ini", default=str(ROOT.parent / "readable" / "ZolikaPatch.ini"))
+    parser.add_argument("--ini", default=str(ROOT / "ZolikaPatch.ini"))
     args = parser.parse_args()
 
     baseline = Path(args.baseline)
