@@ -151,3 +151,8 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs
             --map $<TARGET_FILE_DIR:${ZP_NAME}>/${ZP_NAME}.map)
   set_tests_properties(zp_body_proof PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/EFLC_1110.exe)
+  add_test(NAME zp_launcher_slots
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/verify_launcher_slots.py
+            ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs)
+endif()
