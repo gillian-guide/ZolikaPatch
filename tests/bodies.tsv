@@ -16,3 +16,11 @@ path_node_shim 1003D7B0 ?PathNodeShim@@YAXXZ 16
 blackscreen_shim 10036EE0 ?BlackscreenShim@@YAXXZ 16
 crash_msg_shim 10036F00 ?CrashMsgShim@@YAXXZ 20
 plane_crash_shim 1003D870 ?PlaneCrashShim@@YAXXZ 16
+episode_switch_store_shim 1001B040 ?EpisodeSwitchStoreShim@@YAXXZ 20
+episode_switch_shim_b 1001B060 ?EpisodeSwitchShimB@@YAXXZ 20
+episode_switch_sum 1001B080 ?EpisodeSwitchSum@@YAXXZ 12
+episode_switch_vcall 1001B0A0 ?EpisodeSwitchVcall@@YAXXZ 16
+episode_switch_shim_c 1001B0C0 ?EpisodeSwitchShimC@@YAXXZ 16
+wanted_level_shim 10050490 ?WantedLevelShim@@YAXXZ 16
+smpa60_shim 10046750 ?Smpa60Shim@@YAXXZ 16
+smpa60_tail_shim 10046780 ?Smpa60TailShim@@YAXXZ 12

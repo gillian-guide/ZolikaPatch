@@ -38,6 +38,51 @@ extern "C"
     uint32_t zpatch_episode_switch_resume_a = 0;  // dword_10159BBC
     uint32_t zpatch_episode_switch_resume_b = 0;  // dword_10159BB4
     uint32_t zpatch_episode_switch_resume_c = 0;  // dword_10159BB8
+    uint32_t zpatch_smpa60_resume_a = 0;          // dword_10159C70
+    uint32_t zpatch_smpa60_resume_b = 0;          // dword_10159C68
+    uint32_t zpatch_smpa60_resume_c = 0;          // dword_10159C6C
+}
+
+// tramp_SMPA60Fix, recovered VA 0x10046750: the streaming load's argument setup,
+// replayed around the sentinel that says the loader slot is unused. Naked and
+// internal: an external-linkage naked function is written to the module and every
+// importer fails.
+static __declspec(naked) void Smpa60Shim()
+{
+    __asm
+    {
+        cmp ecx, 0DDDDDDDDh
+        jz smpa60_shim_tail
+        mov ecx, DWORD PTR [eax + 70h]
+        add eax, 40h
+        push eax
+        push ecx
+        lea edx, [ecx + 10h]
+        push edx
+        push ecx
+        push ecx
+        jmp DWORD PTR [zpatch_smpa60_resume_b]
+    smpa60_shim_tail:
+        jmp DWORD PTR [zpatch_smpa60_resume_a]
+    }
+}
+
+// sub_10046780, recovered VA 0x10046780: the block's link fixup, which is skipped
+// when the next block is absent or is the 0xCDCDCDCD fill. Naked and internal.
+static __declspec(naked) void Smpa60TailShim()
+{
+    __asm
+    {
+        mov ecx, DWORD PTR [eax + 14h]
+        test ecx, ecx
+        jz smpa60_tail_resume
+        cmp ecx, 0CDCDCDCDh
+        jz smpa60_tail_resume
+        mov edx, DWORD PTR [eax + 10h]
+        mov DWORD PTR [ecx + 10h], edx
+    smpa60_tail_resume:
+        jmp DWORD PTR [zpatch_smpa60_resume_c]
+    }
 }
 
 // abi_wanted_level_shim, recovered VA 0x10050490: the wanted-level update is
@@ -527,6 +572,39 @@ namespace
         injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(&EpisodeSwitchVcall), true);
     }
 
+    // SMPA60Fix: two bodies and three resumed states. The tail shim's resume is the
+    // primary anchor's +136 and the `jz` at the anchor's -38 becomes an unconditional
+    // short jump; the second anchor is the streaming loop's loader call, whose
+    // sentinel path and normal path use the other two resumes. Everything is
+    // published before the first write.
+    void InstallSMPA60Fix()
+    {
+        if (!Loader::Enabled("SMPA60Fix"))
+            return;
+
+        auto pattern = find_pattern("01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C");
+        if (pattern.empty())
+            return;
+
+        auto* primary = pattern.get_first<std::byte>(0);
+        zpatch_smpa60_resume_c = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(primary) + 136);
+
+        pattern = find_pattern("8B 48 70 83 C0 40 50 51 8D 51 10");
+        if (pattern.empty())
+            return;
+
+        auto* shim = pattern.get_first<std::byte>(0);
+        zpatch_smpa60_resume_a = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(shim) + 28);
+        zpatch_smpa60_resume_b = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(shim) + 14);
+
+        Bodies::Register(reinterpret_cast<uintptr_t>(&Smpa60TailShim), 0x10046780u);
+        injector::MakeJMP(primary + 123, reinterpret_cast<void*>(&Smpa60TailShim), true);
+        injector::WriteMemory<std::byte>(primary - 38, Bytes::ShortJmp, true);
+
+        Bodies::Register(reinterpret_cast<uintptr_t>(&Smpa60Shim), 0x10046750u);
+        injector::MakeJMP(shim, reinterpret_cast<void*>(&Smpa60Shim), true);
+    }
+
     // SCOSignatureFix: the instruction 32 bytes before the anchor becomes a short
     // jump, so the signature check that follows is skipped.
     void InstallSCOSignatureFix()
@@ -629,6 +707,7 @@ export void RegisterStability()
         InstallPlaneCrashFix();
         InstallWantedLevelCrashFix();
         InstallEpisodeSwitchFreezeFix();
+        InstallSMPA60Fix();
         InstallSCOSignatureFix();
         InstallTryToSkipAllErrors();
         InstallRemoveAllWeaponsProtection();
