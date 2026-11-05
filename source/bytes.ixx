@@ -14,6 +14,7 @@ export namespace Bytes
     inline constexpr std::byte Nop{ 0x90 };
     inline constexpr std::byte ShortJmp{ 0xEB };
     inline constexpr std::byte Ret{ 0xC3 };
+    inline constexpr std::byte MovEax{ 0xB8 };    // mov eax, imm32 (5 bytes)
     inline constexpr std::byte Slot60{ 0x60 };  // a vtable/member displacement of 0x60
     inline constexpr std::byte Zero{ 0x00 };
     inline constexpr std::byte RetImm16{ 0xC2 };      // ret imm16, low byte of the immediate follows

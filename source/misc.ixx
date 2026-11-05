@@ -18,7 +18,7 @@ import patch;
 // `mov eax, imm32`: the MiscFixes token-activation row writes it. bytes.ixx does
 // not carry it, and that module is outside this task's edit scope, so the opcode
 // is named here.
-inline constexpr std::byte kMovEax{ 0xB8 };
+// The opcode comes from bytes.ixx; this table only records which row writes it.
 
 namespace
 {
@@ -57,7 +57,7 @@ namespace
         // token activation [v1006 - v1007]: `jmp +0xC9`
         { "8B 54 24 04 52 A3", MiscFixWrite::shortJump, 0, Bytes::ShortJmp, 0xC9 },
         // token activation [v1006 - v1007]: mov eax,1
-        { "83 F8 01 75 30 A3", MiscFixWrite::movEax, 0, kMovEax, 1 },
+        { "83 F8 01 75 30 A3", MiscFixWrite::movEax, 0, Bytes::MovEax, 1 },
         // skip first-time play ask [v1006 - v1008]: `jmp +0x0D`
         { "C7 05 ? ? ? ? 03 00 00 00 33 C0 5E 59 C3 C7", MiscFixWrite::shortJump, 0,
           Bytes::ShortJmp, 0x0D },
