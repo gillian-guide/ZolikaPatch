@@ -26,6 +26,9 @@ import sys
 from pathlib import Path
 
 IMAGE_BASE = 0x10000000
+# A `ret` ends a body; a `jmp` does not, because these bodies jump within
+# themselves (the special-path tail), and a linear sweep covers both sides the same
+# way, so an internal jump is compared like any other instruction.
 TERMINAL = {"jmp", "ret", "retf", "iret"}
 
 try:
@@ -119,7 +122,14 @@ def compare(original: bytes, candidate: bytes, rows, symbols):
                                 f"instruction {index}: '{summarise(left)}' against '{summarise(right)}'"))
                 break
         else:
-            results.append((name, "PASS", f"{len(wanted)} instruction(s)"))
+            # The body has to end where the row says it does: otherwise both sides
+            # could keep matching through identical padding (int3 filler) and the
+            # proof would pass on code that is not the body.
+            if wanted[-1].mnemonic not in ("jmp", "ret", "retf", "iret"):
+                results.append((name, "FAIL",
+                                f"does not end at instruction {len(wanted)} ('{summarise(wanted[-1])}')"))
+            else:
+                results.append((name, "PASS", f"{len(wanted)} instruction(s)"))
     return results
 
 
