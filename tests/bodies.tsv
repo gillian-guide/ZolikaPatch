@@ -1,0 +1,4 @@
+﻿# Transcribed bodies: name, recovered VA, candidate VA (from ZolikaPatch.map), and
+# the instruction budget. verify_bodies.py proves the streams are the same
+# instruction-for-instruction, with absolute operands compared as slots.
+building_dynamic_shadows 10005590 10016990 24
