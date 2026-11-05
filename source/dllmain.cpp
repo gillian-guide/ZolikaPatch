@@ -11,6 +11,7 @@ import vehicles;
 import useless_checks;
 import graphics;
 import launcher;
+import loading;
 import audio;
 import misc;
 
@@ -55,6 +56,7 @@ namespace
         RegisterUselessChecks();
         RegisterGraphics();
         RegisterLauncher();
+        RegisterLoading();
         RegisterAudio();
         RegisterMisc();
         Loader::Run();

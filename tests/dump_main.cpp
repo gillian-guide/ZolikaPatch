@@ -105,6 +105,14 @@ namespace
                 continue;
 
             const auto rva = static_cast<size_t>(slot - hostBase);
+            // The registry is process-global, so a slot registered by an earlier
+            // cell is still listed here. Only a slot this run actually wrote is a
+            // published pointer in this cell: the loop restores the image from the
+            // pristine copy before every arm, so an untouched slot still reads its
+            // original bytes and must be left alone.
+            if (std::memcmp(image.bytes.data() + rva, image.pristine.data() + rva, sizeof(uint32_t)) == 0)
+                continue;
+
             std::memcpy(image.bytes.data() + rva, &kBaselinePlaceholder, sizeof(kBaselinePlaceholder));
         }
     }

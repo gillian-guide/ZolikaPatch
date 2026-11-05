@@ -75,6 +75,7 @@ target_sources(zp_modules PUBLIC
     source/useless_checks.ixx
     source/graphics.ixx
     source/launcher.ixx
+    source/loading.ixx
     source/audio.ixx
     source/misc.ixx)
 target_include_directories(zp_modules PUBLIC

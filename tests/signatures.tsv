@@ -97,3 +97,20 @@ Patch6and7RemoveModChecks.1070.f	0x4039F4	74 ? 8B 4D ? 57 6A ? 51 E8 ? ? ? ? 80 
 Patch6and7RemoveModChecks.1070.g	0x4042C7	C6 05 ? ? ? ? ? 74 ? 8B 40 ? 56 6A ? 6A ? 50 83 CE ? E8	22
 PedModelsInCutscenesFix	0xA23820	56 8B F1 E8 ? ? ? ? 85 C0 74 0E 66 8B 40 2E	16
 PedModelsInCutscenesFix.lookup	0x8DD2D0	8B 44 24 04 89 44 24 04 66 A1 ? ? ? ? 66 85 C0 76 3E	19
+# loading module (source/loading.ixx): each pattern confirmed with find_bytes against the
+# 1.0.8.0 IDB, exactly one hit at the recorded VA except StartupTimeFix (three sites).
+# LocalSettingsPath's fallback epilogue, VSyncFix's two anchors, BenchmarkFix's anchor and
+# SkipMenu's two alternates are recovered from their handlers but absent from this image;
+# their keys are build-gated to builds without an IDB here (no site VA to record).
+FastLoading	0xCB1D21	6A 0A E8 ? ? ? ? 83 C7 0A 83 C4 04 81 FF E8 03 00 00 75 02 33 FF	23
+NoLoadingSleep	0x401854	68 88 13 00 00 FF 15	7
+LocalSettingsPath	0x61E770	53 8B 5C 24 08 56 6A 00 6A 00	10
+LocalSettingsPath.wide	0x856ED8	7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D6 5F 5E 5B C3	18
+RemoveGFWLUpdatePopup	0x7CBF70	2B C1 1B D6 89 44 24 0C 89 54 24 10 DF 6C 24 0C D8 0D ? ? ? ? D9 5C 24 08	26
+RemoveRGSCLoginRequirement	0x898460	8B 44 24 ? 85 C0 74 ? F3 0F 7E 05 ? ? ? ? 66 0F D6 00	20
+StartupTimeFix	0x477A42	68 00 C2 EC 80 68	6
+OverrideGTADatPath	0x493948	68 ? ? ? ? E8 ? ? ? ? 83 C4 04 E8 ? ? ? ? E8 ? ? ? ? E8	24
+SkipIntro	0x4A347E	89 91 ? ? ? ? 8D 44 24 ? 68 ? ? ? ? 50	16
+SkipMenu	0x47D240	83 F8 03 75 ? A1 ? ? ? ? 80 88 ? ? ? ? ? 84 DB 74 0A 6A 00 E8 ? ? ? ? 83 C4 04 5F 5E	33
+SavegameFix.a	0x61EDB5	75 ? 83 C1 01 83 C0 01 83 F9 04	10
+SavegameFix.b	0x61EBA1	8D 4C 24 18 51 6A 00 6A 0C 57	10
