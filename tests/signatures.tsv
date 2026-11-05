@@ -56,8 +56,25 @@ BuildingAlphaFix.a	0x9594BD	F7 46 24 00 00 00 40 0F 84	9
 BuildingAlphaFix.b	0x959CD3	F7 46 24 00 00 00 40 0F 85	9
 RemoveBoundingBoxCulling	0x957460	3C 01 57 0F 85	5
 RemoveStaticCarShadows	0x8F7011	F3 0F 11 4C 24 0C 76 5B D9 45 14	14
+# RemoveStaticCutsceneCarShadows is the cutscene copy of the row above: the store's
+# source register differs (44 here, 4C in game) and the `jbe`/`jmp` operand is the
+# same, so the arm writes `EB` at +6 exactly as it does there.
+RemoveStaticCutsceneCarShadows	0xA24A63	F3 0F 11 44 24 0C 76 5B D9 45 14	14
 ForceShadowsOnObjects	0x905E12	F7 47 40 00 10 00 00 74 07 81 4E 24 00 00	14
 ForceDynamicShadowsEverywhere	0xA700CA	F7 46 4C 00 80 00 00 74	8
+# BorderlessWindowed: one `FF 15` call is one site, and the 1.0.8.0 image has two -
+# the Unicode window proc's and the ANSI one's. One scan with a two-hit count feeds
+# both (index 0 -> 0x10005890, index 1 -> 0x10005900).
+BorderlessWindowed.a	0x5BB10E	FF 15 ? ? ? ? 5F 5E 5D 5B 83 C4 10 C2 10 00	16
+BorderlessWindowed.b	0x5BB563	FF 15 ? ? ? ? 5F 5E 5D 5B 83 C4 10 C2 10 00	16
+# NoImpostorHeightCutoff: one pattern, two sites, both NOPped (the original's block
+# writes hits[0] and hits[1]). On 1.0.0.0 the pattern matches once and the original
+# writes through an uninitialised vector entry; that fault is reproduced.
+NoImpostorHeightCutoff.a	0xCA058D	76 0B F3 0F 11 8C 24 88 00 00 00 EB 09	13
+NoImpostorHeightCutoff.b	0xCA118E	76 0B F3 0F 11 8C 24 88 00 00 00 EB 09	13
+# NoLODLightHeightCutoff: a single site; the original's finder returns one match and
+# skips cleanly when it is missing.
+NoLODLightHeightCutoff	0xC9FA70	76 08 F3 0F 11 4C 24 1C EB 06 F3 0F 11 44 24 1C 89 5C 24 64	20
 SuperLODFix	0x940E19	F6 40 ?? ?? 74 ?? 85 ED 0F 85 ?? ?? ?? ?? 55 6A ?? E8 ?? ?? ?? ?? 8B F8	24
 ImprovedShaderStreaming	0xCB21F1	33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24	31
 AllowHashesForIDE	0x45CF50	8B 4C 24 08 56 8B 74 24 08 80 3E 22	12

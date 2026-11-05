@@ -4,6 +4,8 @@
 # row is a whole-body proof; a short decode on either side fails the row.
 value_resolver 10003E50 ?ValueResolverBody@@YAXXZ 67
 aim_projectile_crash_fix 10005590 ?AimProjectileShim@@YAXXZ 11
+borderless_window_w 10005890 ?BorderlessWindowBodyW@@YAXXZ 39
+borderless_window_a 10005900 ?BorderlessWindowBodyA@@YAXXZ 39
 building_dynamic_shadows 10005AF0 ?BuildingsDynamicShadowsShim@@YAXXZ 11
 emissive_lerp_shim 1001AF60 ?EmissiveLerpShim@@YAXXZ 10
 emissive_lerp_helper 1001AF20 ?EmissiveLerpHelper@@YAXXZ 13

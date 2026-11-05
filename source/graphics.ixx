@@ -356,6 +356,133 @@ static __declspec(naked) void ShaderStreamingFindV()
     }
 }
 
+// BorderlessWindowed's two window-proc shims: 0x10005890 for the Unicode window
+// proc and 0x10005900 for the ANSI one. The original's handler (0x10005970) scans
+// one pattern for the two `call [DefWindowProc]` sites, VirtualProtects six bytes
+// of each site and fills them with 0x90, then writes `E8 <body>` over the first
+// five, so the sixth stays a NOP; the shim's `ret 0x10` consumes the discarded
+// call's four argument slots exactly like the call it replaced, and the game's own
+// `pop edi/esi/ebp/ebx; add esp,10h; ret 10h` still unwinds.
+//
+// Each shim applies its style fixup once, guarded by the original's own done flag
+// (0x101A8445 for the Unicode shim, 0x101A8444 for the ANSI one): SetWindowPos to
+// HWND_NOTOPMOST, GWL_STYLE &= 0xFF30FFFF, GWL_EXSTYLE &= ~WS_EX_TOPMOST. The five
+// USER32 exports the original calls through its own import slots (0x10063264
+// SetWindowPos, 0x10063268 SetWindowLongA, 0x1006326C GetWindowLongA, 0x10063258
+// DefWindowProcW, 0x10063274 DefWindowProcA) are resolved into the module words
+// below by the arm, before the site is written: this module links no USER32, so
+// the transcribed `call dword ptr [slot]` operands stay absolute.
+extern "C"
+{
+    uint32_t zpatch_borderless_set_window_pos = 0;     // 0x10063264
+    uint32_t zpatch_borderless_set_window_long = 0;    // 0x10063268
+    uint32_t zpatch_borderless_get_window_long = 0;    // 0x1006326C
+    uint32_t zpatch_borderless_def_window_proc_w = 0;  // 0x10063258
+    uint32_t zpatch_borderless_def_window_proc_a = 0;  // 0x10063274
+    uint8_t zpatch_borderless_w_done = 0;              // 0x101A8445
+    uint8_t zpatch_borderless_a_done = 0;              // 0x101A8444
+}
+
+// 0x10005890: the Unicode window proc's shim. EBP+8 is the window handle, EBP+0C
+// the message, and EBP+10/EBP+14 its two arguments; EBX carries the handle into
+// every call because the style fixup and the tail call both need it.
+static __declspec(naked) void BorderlessWindowBodyW()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        cmp BYTE PTR [zpatch_borderless_w_done], 0
+        push ebx
+        mov ebx, DWORD PTR [ebp + 8]
+        jne bw_defer
+        push 3
+        push 0
+        push 0
+        push 0
+        push 0
+        push -2
+        push ebx
+        call DWORD PTR [zpatch_borderless_set_window_pos]
+        push -16
+        push ebx
+        call DWORD PTR [zpatch_borderless_get_window_long]
+        and eax, 0FF30FFFFh
+        push eax
+        push -16
+        push ebx
+        call DWORD PTR [zpatch_borderless_set_window_long]
+        push -20
+        push ebx
+        call DWORD PTR [zpatch_borderless_get_window_long]
+        and eax, -9
+        push eax
+        push -20
+        push ebx
+        call DWORD PTR [zpatch_borderless_set_window_long]
+        mov BYTE PTR [zpatch_borderless_w_done], 1
+    bw_defer:
+        push DWORD PTR [ebp + 20]
+        push DWORD PTR [ebp + 16]
+        push DWORD PTR [ebp + 12]
+        push ebx
+        call DWORD PTR [zpatch_borderless_def_window_proc_w]
+        pop ebx
+        pop ebp
+        ret 16
+    }
+}
+
+// 0x10005900: the same shim for the ANSI window proc - its own done flag and its
+// own DefWindowProc. The original has two bodies rather than one parameterised
+// body, and the two sites are what select them.
+static __declspec(naked) void BorderlessWindowBodyA()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        cmp BYTE PTR [zpatch_borderless_a_done], 0
+        push ebx
+        mov ebx, DWORD PTR [ebp + 8]
+        jne ba_defer
+        push 3
+        push 0
+        push 0
+        push 0
+        push 0
+        push -2
+        push ebx
+        call DWORD PTR [zpatch_borderless_set_window_pos]
+        push -16
+        push ebx
+        call DWORD PTR [zpatch_borderless_get_window_long]
+        and eax, 0FF30FFFFh
+        push eax
+        push -16
+        push ebx
+        call DWORD PTR [zpatch_borderless_set_window_long]
+        push -20
+        push ebx
+        call DWORD PTR [zpatch_borderless_get_window_long]
+        and eax, -9
+        push eax
+        push -20
+        push ebx
+        call DWORD PTR [zpatch_borderless_set_window_long]
+        mov BYTE PTR [zpatch_borderless_a_done], 1
+    ba_defer:
+        push DWORD PTR [ebp + 20]
+        push DWORD PTR [ebp + 16]
+        push DWORD PTR [ebp + 12]
+        push ebx
+        call DWORD PTR [zpatch_borderless_def_window_proc_a]
+        pop ebx
+        pop ebp
+        ret 16
+    }
+}
+
 namespace
 {
     // BuildingAlphaFix: two copies of the `test [esi+24h], 40000000h` alpha gate.
@@ -382,6 +509,77 @@ namespace
             injector::MakeNOP(pattern.get_first(0), 13, true);
     }
 
+    // The original's FusionFix probe (sub_10003E20), the gate loading.ixx applies
+    // to SkipIntro/SkipMenu: a loaded GTAIV.EFLC.FusionFix.asi whose two signature
+    // dwords are not the known build owns these fixes, and the original then
+    // leaves BorderlessWindowed's sites alone. A loaded module probes the dwords
+    // unconditionally, as the original does. This is the same probe, kept local
+    // because loading.ixx's copy is not exported; one shared home for it is a
+    // pending cleanup, not a behaviour question.
+    bool FusionFixGateClosed()
+    {
+        const HMODULE module = GetModuleHandleW(L"GTAIV.EFLC.FusionFix.asi");
+        if (module == nullptr)
+            return false;
+
+        const auto* image = reinterpret_cast<const std::byte*>(module);
+        uint32_t first{};
+        uint32_t second{};
+        std::memcpy(&first, image + 0x20D3, sizeof(first));
+        std::memcpy(&second, image + 0x20D7, sizeof(second));
+        return first != 0xC7C47589u || second != 0x00002446u;
+    }
+
+    // BorderlessWindowed: the two `call [DefWindowProc]` sites take a call to the
+    // matching shim and the sixth byte of the six-byte indirect call becomes a NOP.
+    //
+    // The call is written as its two pieces rather than through injector::MakeCALL:
+    // MakeCALL first reads the branch's current destination, and for this site's
+    // `FF 15 <disp32>` form that read dereferences the slot's absolute address
+    // (0x00D6B460 on 1.0.8.0), which the offline dump's heap copy does not map. The
+    // original reads nothing here either - its handler writes the E8 and then the
+    // displacement (0x100059FA .. 0x10005A2D) - so the write set is the same, and
+    // NOPping byte 5 afterwards cannot corrupt an earlier read.
+    void WriteCallNoRead(std::byte* at, void* target)
+    {
+        const auto displacement = static_cast<uint32_t>(
+            reinterpret_cast<uintptr_t>(target) - (reinterpret_cast<uintptr_t>(at) + 5));
+        injector::WriteMemory<std::byte>(at, Bytes::Call, true);
+        injector::WriteMemory<uint32_t>(at + 1, displacement, true);
+    }
+
+    void InstallBorderlessWindowed()
+    {
+        if (!Loader::Enabled("BorderlessWindowed") || FusionFixGateClosed())
+            return;
+
+        auto pattern = find_pattern<2>("FF 15 ? ? ? ? 5F 5E 5D 5B 83 C4 10 C2 10 00");
+        if (pattern.empty())
+            return;
+
+        const HMODULE user32 = LoadLibraryA("user32.dll");
+        const auto resolve = [user32](const char* name) -> uint32_t
+        {
+            return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(GetProcAddress(user32, name)));
+        };
+        zpatch_borderless_set_window_pos = resolve("SetWindowPos");
+        zpatch_borderless_set_window_long = resolve("SetWindowLongA");
+        zpatch_borderless_get_window_long = resolve("GetWindowLongA");
+        zpatch_borderless_def_window_proc_w = resolve("DefWindowProcW");
+        zpatch_borderless_def_window_proc_a = resolve("DefWindowProcA");
+
+        Bodies::Register(reinterpret_cast<uintptr_t>(&BorderlessWindowBodyW), 0x10005890u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&BorderlessWindowBodyA), 0x10005900u);
+
+        auto* first = pattern.get(0).get<std::byte>(0);
+        WriteCallNoRead(first, reinterpret_cast<void*>(&BorderlessWindowBodyW));
+        injector::MakeNOP(first + 5, 1, true);
+
+        auto* second = pattern.get(1).get<std::byte>(0);
+        WriteCallNoRead(second, reinterpret_cast<void*>(&BorderlessWindowBodyA));
+        injector::MakeNOP(second + 5, 1, true);
+    }
+
     // RemoveBoundingBoxCulling: the `jnz` that skips the bounding-box path when the
     // object is not a building becomes an unconditional `jmp` to that same target,
     // i.e. the path is always skipped.
@@ -397,6 +595,53 @@ namespace
         auto* match = pattern.get_first<std::byte>(0);
         const auto displacement = *reinterpret_cast<const int32_t*>(match + 5);
         injector::MakeJMP(match + 3, match + 9 + displacement, true);
+    }
+
+    // NoImpostorHeightCutoff: both copies of the two-byte `76 0B` branch that skips
+    // the impostor's height cutoff become 0x9090. The original's block (0x10053689
+    // in the loader) scans the pattern once for two hits and then writes hits[0]
+    // and hits[1] with no bounds check - on 1.0.0.0 the pattern matches once, so it
+    // VirtualProtects and writes through an uninitialised vector entry. That fault
+    // is preserved: there is deliberately no `pattern.size() > 1` here.
+    void InstallNoImpostorHeightCutoff()
+    {
+        if (!Loader::Enabled("NoImpostorHeightCutoff"))
+            return;
+
+        auto pattern = find_pattern<2>("76 0B F3 0F 11 8C 24 88 00 00 00 EB 09");
+        if (pattern.empty())
+            return;
+
+        injector::MakeNOP(pattern.get(0).get<std::byte>(0), 2, true);
+        injector::MakeNOP(pattern.get(1).get<std::byte>(0), 2, true);
+    }
+
+    // NoLODLightHeightCutoff: the two-byte `76 08` branch that skips the distant
+    // lights' height cutoff becomes 0x9090. The original's block (0x100538CA) has
+    // its finder return a single match and skips cleanly when there is none, so
+    // the empty test is the original's own guard, not a fault-avoidance one.
+    void InstallNoLODLightHeightCutoff()
+    {
+        if (!Loader::Enabled("NoLODLightHeightCutoff"))
+            return;
+
+        auto pattern = find_pattern("76 08 F3 0F 11 4C 24 1C EB 06 F3 0F 11 44 24 1C 89 5C 24 64");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(0), 2, true);
+    }
+
+    // RemoveStaticCutsceneCarShadows: the cutscene copy of RemoveStaticCarShadows.
+    // Its `jbe` (+0x5B) that guards the static car-shadow draw becomes a short
+    // `jmp` over it, so the shadow is never drawn; only the store's source register
+    // differs (44 here, 4C in game). The original's handler is sub_10038860.
+    void InstallRemoveStaticCutsceneCarShadows()
+    {
+        if (!Loader::Enabled("RemoveStaticCutsceneCarShadows"))
+            return;
+
+        auto pattern = find_pattern("F3 0F 11 44 24 0C 76 5B D9 45 14");
+        if (!pattern.empty())
+            injector::WriteMemory<std::byte>(pattern.get_first(6), Bytes::ShortJmp, true);
     }
 
     // RemoveStaticCarShadows: the `jbe` (+0x5B) that guards the static car-shadow
@@ -609,13 +854,17 @@ export void RegisterGraphics()
         PublishEmissiveLerpFix();
         PublishSuperLODFix();
     };
+    Loader::InstallEvent() += [] { InstallBorderlessWindowed(); };
     Loader::InstallEvent() += [] { InstallBuildingAlphaFix(); };
     Loader::InstallEvent() += [] { InstallBuildingDynamicShadows(); };
     Loader::InstallEvent() += [] { InstallEmissiveLerpFix(); };
     Loader::InstallEvent() += [] { InstallForceDynamicShadowsEverywhere(); };
     Loader::InstallEvent() += [] { InstallForceShadowsOnObjects(); };
     Loader::InstallEvent() += [] { InstallImprovedShaderStreaming(); };
+    Loader::InstallEvent() += [] { InstallNoImpostorHeightCutoff(); };
+    Loader::InstallEvent() += [] { InstallNoLODLightHeightCutoff(); };
     Loader::InstallEvent() += [] { InstallRemoveBoundingBoxCulling(); };
     Loader::InstallEvent() += [] { InstallRemoveStaticCarShadows(); };
+    Loader::InstallEvent() += [] { InstallRemoveStaticCutsceneCarShadows(); };
     Loader::InstallEvent() += [] { InstallSuperLODFix(); };
 }

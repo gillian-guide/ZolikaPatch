@@ -34,8 +34,8 @@ CRLF folding (the original reads in text mode). The shipped INI's longest line i
 
 Measured on 1.0.8.0 with `tools/parity_report.py 9`:
 
-- **70 of 99 option keys closed**;
-- **47 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **74 of 99 option keys closed**;
+- **49 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe;
 - launcher: `LaunchWithPlayGTAIV` implemented and its slots verified per build
@@ -121,3 +121,19 @@ called, so on 1.0.0.0/1.0.4.0 the baseline lacks the six-byte NOP fill this tree
 writes from the recovered `@noE` row. `CarDynamicShadowFix` therefore reports six
 extra bytes on 1.0.4.0; it is a baseline omission, not a difference in the bytes
 both sides write.
+
+## A preserved fault that the tools cannot measure
+
+`NoImpostorHeightCutoff` reproduces the original's fault on 1.0.0.0: the pattern
+matches once and the original writes `hits[1]` through an uninitialised vector
+entry (`mov eax,[ebp-0x6C]; mov esi,[eax+4]` at `0x100536F1`, write `66 89 06`). The
+arm keeps that shape - no `pattern.size() > 1` guard - so on 1.0.0.0 the dump writes
+the first pair (which is exactly what the stored baseline's single pair records) and
+then faults `0xC0000005`, as the original does.
+
+Consequence: `parity_report.py 1` and `dump_matrix.py` fault at that arm on
+1.0.0.0, so the 1.0.0.0 cell of the 18-cell matrix cannot be measured for keys that
+run after it. That is the fault being faithful, not the tree being broken; the
+reference tree guards it, which is why its baseline carries only the first pair.
+Guarding it here to make a tool happy would be the fault-avoidance divergence the
+policy forbids.

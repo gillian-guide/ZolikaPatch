@@ -12,6 +12,7 @@ import common;
 export namespace Bytes
 {
     inline constexpr std::byte Nop{ 0x90 };
+    inline constexpr std::byte Call{ 0xE8 };       // call rel32, for a site whose old form must not be read
     inline constexpr std::byte ShortJmp{ 0xEB };
     inline constexpr std::byte Ret{ 0xC3 };
     inline constexpr std::byte MovEax{ 0xB8 };    // mov eax, imm32 (5 bytes)
