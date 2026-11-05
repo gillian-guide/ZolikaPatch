@@ -34,8 +34,8 @@ CRLF folding (the original reads in text mode). The shipped INI's longest line i
 
 Measured on 1.0.8.0 with `tools/parity_report.py 9`:
 
-- **52 of 99 option keys closed**;
-- **31 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **61 of 99 option keys closed**;
+- **34 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe;
 - launcher: `LaunchWithPlayGTAIV` implemented and its slots verified per build
