@@ -101,9 +101,29 @@ namespace
         const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(module + dos->e_lfanew);
         const auto limit = module + nt->OptionalHeader.SizeOfImage;
 
+        // A branch we installed owns its opcode and its four displacement bytes:
+        // they are not a pointer, even when the displacement plus the padding before
+        // the site happens to form a value inside this process's image range (which
+        // it does whenever ASLR lands the tool near the displacement). A published
+        // pointer slot can never overlap an installed branch, so excluding those
+        // bytes is sound - and without it the placeholder wiped the E9 opcode of
+        // RemoveRGSCLoginRequirement.
+        std::vector<uint8_t> branch(image.size, 0);
+        for (size_t rva = 0; rva < image.size; ++rva)
+        {
+            if (image.bytes[rva] != image.pristine[rva] &&
+                (image.bytes[rva] == 0xE8 || image.bytes[rva] == 0xE9))
+            {
+                const auto end = std::min<size_t>(image.size, rva + 5);
+                std::fill(branch.begin() + rva, branch.begin() + end, 1);
+            }
+        }
+
         for (size_t rva = 0; rva + sizeof(uint32_t) <= image.size; ++rva)
         {
             if (std::memcmp(image.bytes.data() + rva, image.pristine.data() + rva, sizeof(uint32_t)) == 0)
+                continue;
+            if (branch[rva] || branch[rva + 1] || branch[rva + 2] || branch[rva + 3])
                 continue;
 
             uint32_t value{};
