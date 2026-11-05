@@ -14,6 +14,10 @@ import patch;
 // Registration is explicit: the driver calls Register(), so the arm cannot be
 // dropped by the linker and the order the arms subscribe in is readable in one
 // place.
+//
+// The signatures are forged from the game database (IDA, 1.0.8.0) at each arm's
+// scan anchor and are unique in that image; the offsets below are measured from
+// the anchor, which is why they did not change when the strings did.
 namespace
 {
     // MPNikoCrashFix: a `jz` in the player-model check becomes an unconditional
@@ -23,7 +27,7 @@ namespace
         if (!Loader::Enabled("MPNikoCrashFix"))
             return;
 
-        auto pattern = find_pattern("74 2B 57 E8 ?? ?? ?? ?? 8B BE A8 0E 00 00");
+        auto pattern = find_pattern("74 ? 57 E8 ? ? ? ? 8B BE ? ? ? ? 85 FF 74 ? 8B CF E8 ? ? ? ? 57 E8 ? ? ? ? 83 C4 04 C7 86 ? ? ? ? ? ? ? ? 5F 8B 86 ? ? ? ? 85 C0 74 ? 8D 48");
         if (!pattern.empty())
             injector::WriteMemory<std::byte>(pattern.get_first(0), Bytes::ShortJmp, true);
     }
@@ -35,7 +39,7 @@ namespace
         if (!Loader::Enabled("SCOSignatureFix"))
             return;
 
-        auto pattern = find_pattern("8B 6C 24 1C 66 89 6E 14 64 8B 0D 2C 00 00 00 8B");
+        auto pattern = find_pattern("8B 6C 24 ? 66 89 6E");
         if (!pattern.empty())
             injector::WriteMemory<std::byte>(pattern.get_first(-32), Bytes::ShortJmp, true);
     }
@@ -47,7 +51,7 @@ namespace
         if (!Loader::Enabled("TryToSkipAllErrors"))
             return;
 
-        auto pattern = find_pattern("81 EC 40 08 00 00 53 55 8B AC 24 4C 08 00 00");
+        auto pattern = find_pattern("81 EC 40 08 00 00");
         if (!pattern.empty())
             injector::WriteMemory<std::byte>(pattern.get_first(0), Bytes::Ret, true);
     }
@@ -59,7 +63,7 @@ namespace
         if (!Loader::Enabled("RemoveAllWeaponsProtection"))
             return;
 
-        auto pattern = find_pattern("E9 ?? ?? ?? ?? 57 8D 8F ?? ?? 00 00");
+        auto pattern = find_pattern("E9 ? ? ? ? 57 8D 8F");
         if (!pattern.empty())
             injector::MakeNOP(pattern.get_first(5), 12, true);
     }
@@ -89,7 +93,7 @@ namespace
         if (!Loader::Enabled("HighFPSSpeedupFix"))
             return;
 
-        auto pattern = find_pattern("0F 2F C1 76 03 0F 28 C8 F3 0F 10 15");
+        auto pattern = find_pattern("0F 2F C1 76 ? 0F 28 C8 F3 0F 10 15");
         if (pattern.empty())
             return;
 
@@ -110,7 +114,7 @@ namespace
         if (!Loader::Enabled("AimProjectileCrashFix"))
             return;
 
-        auto pattern = find_pattern("8B 44 24 08 89 41 20 8B 44 24 0C 89 41 24 F7 D8");
+        auto pattern = find_pattern("8B 44 24 ? 89 41 ? 8B 44 24 ? 89 41");
         if (!pattern.empty())
             injector::MakeJMP(pattern.get_first(0), AimProjectileShimAddress(), true);
     }

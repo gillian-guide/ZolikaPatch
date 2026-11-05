@@ -4,3 +4,5 @@
 # instruction listed (a jmp or a ret), so matching cannot continue into padding.
 aim_projectile_crash_fix 10005590 ?AimProjectileShim@?A0x06fbc149@@YAXXZ 64
 building_dynamic_shadows 10005AF0 ?BuildingsDynamicShadowsShim@@YAXXZ 64
+emissive_lerp_shim 1001AF60 ?EmissiveLerpShim@@YAXXZ 16
+emissive_lerp_helper 1001AF20 ?EmissiveLerpHelper@@YAXXZ 16

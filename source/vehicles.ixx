@@ -11,6 +11,10 @@ import patch;
 
 // Vehicle fixes. Every arm anchors to its own recovered signature; the write forms
 // here are in-place bytes, jump rewrites and NOP runs, none of them need a body.
+//
+// The signatures are forged from the game database (IDA, 1.0.8.0) at each arm's
+// scan anchor and are unique in that image; the offsets are measured from the
+// anchor, which is why they did not change when the strings did.
 namespace
 {
     // InfiniteCarBottomDistance: the `ja` of the bottom-distance clamp becomes an
@@ -21,7 +25,7 @@ namespace
         if (!Loader::Enabled("InfiniteCarBottomDistance"))
             return;
 
-        auto pattern = find_pattern("0F 2F D0 76 25 0F 28 C2");
+        auto pattern = find_pattern("0F 2F D0 76 ? 0F 28 C2 EB ? 0F 2F CD");
         if (pattern.empty())
             return;
 
@@ -30,8 +34,8 @@ namespace
         injector::WriteMemory<std::byte>(site + 1, Bytes::JumpOverClamp, true);
     }
 
-    // ReversingLightFix: the `push 0x64` eight bytes into the anchor becomes
-    // `pushad`, so the reversing light path preserves the registers it clobbers.
+    // ReversingLightFix: the slot displacement of `mov eax,[edx+64h]` becomes 0x60,
+    // so the reversing-light path reads the neighbouring member.
     void InstallReversingLightFix()
     {
         if (!Loader::Enabled("ReversingLightFix"))
@@ -39,7 +43,7 @@ namespace
 
         auto pattern = find_pattern("11 01 00 00 8B 16 8B 42 64 8B CE FF D0 F3 0F 10");
         if (!pattern.empty())
-            injector::WriteMemory<std::byte>(pattern.get_first(8), Bytes::Pushad, true);
+            injector::WriteMemory<std::byte>(pattern.get_first(8), Bytes::Slot60, true);
     }
 
     // BikeFeetFix: the 12-byte rider-foot block is deleted, so the chopper foot
@@ -49,7 +53,7 @@ namespace
         if (!Loader::Enabled("BikeFeetFix"))
             return;
 
-        auto pattern = find_pattern("39 82 54 13 00 00 0F 85 94 04 00 00");
+        auto pattern = find_pattern("39 82 ? ? ? ? 0F 85 ? ? ? ? 39 05");
         if (!pattern.empty())
             injector::MakeNOP(pattern.get_first(12), 12, true);
     }
@@ -60,7 +64,7 @@ namespace
         if (!Loader::Enabled("BikePhoneAnimsFix"))
             return;
 
-        auto pattern = find_pattern("80 BE 18 02 00 00 00 0F 85 36 01 00 00 80 BE");
+        auto pattern = find_pattern("80 BE ? ? ? ? ? 0F 85 ? ? ? ? 80 BE ? ? ? ? ? 0F 84 ? ? ? ? 83 3D");
         if (!pattern.empty())
             injector::MakeNOP(pattern.get_first(33), 6, true);
     }
@@ -72,7 +76,7 @@ namespace
         if (!Loader::Enabled("PipeBombDropIconSupport"))
             return;
 
-        auto pattern = find_pattern("83 7D 18 1C 75 14");
+        auto pattern = find_pattern("83 7D ? ? 75 ? 8B 15");
         if (!pattern.empty())
             injector::MakeNOP(pattern.get_first(-9), 9, true);
     }
@@ -86,7 +90,7 @@ namespace
         if (!Loader::Enabled("TeleportProtection"))
             return;
 
-        auto pattern = find_pattern("55 8B EC 83 E4 F8 51 53 8B 5D 08 56 57 6A 08 8D 44 24 10 8B F1 8D 7B 04 50 8B CF C7 44 24 14 00");
+        auto pattern = find_pattern("55 8B EC 83 E4 F8 51 53 8B 5D ? 56 57 6A 08");
         if (pattern.empty())
             return;
 
@@ -97,13 +101,14 @@ namespace
     }
 
     // IncreaseVehicleStructLimit: the struct count the allocator is asked for becomes
-    // 100 instead of the original constant.
+    // 100 instead of the original constant. The signature keeps the absolute address
+    // of the structure name, so it is specific to 1.0.8.0.
     void InstallIncreaseVehicleStructLimit()
     {
         if (!Loader::Enabled("IncreaseVehicleStructLimit"))
             return;
 
-        auto pattern = find_pattern("68 ?? ?? ?? ?? 6A 32 8B C8");
+        auto pattern = find_pattern("68 34 EE DA 00");
         if (!pattern.empty())
             injector::WriteMemory<std::byte>(pattern.get_first(6), std::byte{ 100 }, true);
     }
