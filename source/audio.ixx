@@ -36,10 +36,13 @@ extern "C"
     // module units; a second definition would be a second scan).
     extern uintptr_t zpatch_model_lookup;
 
-    // The shared resolver's address. The PedModels body has to reach sub_10003E50
-    // with the original's direct `call`, and that body is internal to shared.ixx
-    // (a naked function with external linkage in a module interface unit fails
-    // every importer, C2488), so the call lands on a thunk that tail-jumps here.
+    // The shared resolver's address, for the thunk below. The original's body calls
+    // sub_10003E50 with one direct `E8`; ours cannot name it: the resolver is
+    // `static` in shared.ixx (internal linkage), and C2488 forbids giving a naked
+    // function external linkage in a module interface unit, so no importer can use
+    // it as a link-time call target. The body calls this module's one-instruction
+    // thunk instead, which jumps through this slot -- the single deviation from the
+    // original's instruction stream in this body (docs/parity.md).
     uintptr_t zpatch_audio_value_resolver = 0;
 
     // The "player" model name the PedModels body pushes (original 0x1013A038). A
@@ -74,9 +77,11 @@ static __declspec(naked) void BetterMPSyncBody()
     }
 }
 
-// A three-instruction thunk onto the shared resolver: `jmp` through the published
-// slot pushes nothing, so the resolver sees the same stack and flags the
-// original's `call sub_10003E50` gives it, and its `ret` returns to the body.
+// A one-instruction thunk onto the shared resolver (`jmp DWORD PTR [slot]`, six
+// bytes): the `jmp` pushes nothing, so the resolver sees the same stack and flags
+// the original's `call sub_10003E50` gives it, and its `ret` returns to the body.
+// The slot's declaration above records why the call cannot name the resolver
+// directly.
 static __declspec(naked) void ValueResolverThunk()
 {
     __asm
@@ -219,7 +224,7 @@ namespace
         const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(game.ImageBase());
         const auto* headers =
             reinterpret_cast<const IMAGE_NT_HEADERS*>(game.ImageBase() + dos->e_lfanew);
-        const auto threshold = *pattern.get(0).get<uint32_t>(-38);
+        const auto threshold = *pattern.get_first<uint32_t>(-38);
         injector::WriteMemory<uint32_t>(
             game.ImageBase() + (threshold - headers->OptionalHeader.ImageBase), 0u, true);
     }

@@ -3,8 +3,8 @@
 # ZolikaPatch.map and sweeps that many instructions linearly on both sides, so a
 # row is a whole-body proof; a short decode on either side fails the row.
 value_resolver 10003E50 ?ValueResolverBody@@YAXXZ 67
-aim_projectile_crash_fix 10005590 ?AimProjectileShim@?A0x06fbc149@@YAXXZ 11
-building_dynamic_shadows 10005AF0 ?BuildingsDynamicShadowsShim@@YAXXZ 17
+aim_projectile_crash_fix 10005590 ?AimProjectileShim@@YAXXZ 11
+building_dynamic_shadows 10005AF0 ?BuildingsDynamicShadowsShim@@YAXXZ 11
 emissive_lerp_shim 1001AF60 ?EmissiveLerpShim@@YAXXZ 10
 emissive_lerp_helper 1001AF20 ?EmissiveLerpHelper@@YAXXZ 13
 blackscreen_shim 10036EE0 ?BlackscreenShim@@YAXXZ 8
@@ -25,14 +25,15 @@ smpa60_shim 10046750 ?Smpa60Shim@@YAXXZ 12
 smpa60_tail_shim 10046780 ?Smpa60TailShim@@YAXXZ 8
 car_decals_selector 1001B2E0 ?CarDecalsSelectorShim@@YAXXZ 13
 car_parts_shadow 10006880 ?CarPartsShadowShim@@YAXXZ 13
-car_dynamic_shadow 100068A0 ?CarDynamicShadowShim@@YAXXZ 27
-collision_deadlock_walk 10005D80 ?CollisionDeadlockShim@@YAXXZ 60
+car_dynamic_shadow 100068A0 ?CarDynamicShadowShim@@YAXXZ 26
+car_dynamic_shadow_b 100068D0 ?CarDynamicShadowShimB@@YAXXZ 27
+collision_deadlock_walk 10005D80 ?CollisionDeadlockShim@@YAXXZ 56
 super_lod_shim 100469E0 ?SuperLodShim@@YAXXZ 14
 super_lod_model 100469A0 ?SuperLodModel@@YAXXZ 21
 shader_streaming_find_hpe 10045A30 ?ShaderStreamingFindHpe@@YAXXZ 36
 shader_streaming_find_v 10045A80 ?ShaderStreamingFindV@@YAXXZ 36
-shader_streaming_filter_hpe 100459E0 ?ShaderStreamingFilterHpe@?A0x06fbc149@@YAXXZ 16
-shader_streaming_filter_v 10045A10 ?ShaderStreamingFilterV@?A0x06fbc149@@YAXXZ 9
+shader_streaming_filter_hpe 100459E0 ?ShaderStreamingFilterHpe@@YAXXZ 16
+shader_streaming_filter_v 10045A10 ?ShaderStreamingFilterV@@YAXXZ 9
 combined_radio_freeze_fix 10005ED0 ?CombinedRadioFreezeFixBody@@YAXXZ 2
 better_mp_sync 100057F0 ?BetterMPSyncBody@@YAXXZ 2
 ped_models_in_cutscenes 10050870 ?PedModelsInCutscenesCheckBody@@YAXXZ 26
@@ -42,7 +43,7 @@ gfwl_stub 100054E0 ?GfwlStubBody@@YAXXZ 8
 rgsc_login_removed 10038550 ?RgscLoginRemovedBody@@YAXXZ 2
 benchmark_a 10005650 ?BenchmarkBodyA@@YAXXZ 12
 benchmark_b 10005670 ?BenchmarkBodyB@@YAXXZ 12
-skip_intro 10045C30 ?SkipIntroBody@@YAXXZ 6
+skip_intro 10045C30 ?SkipIntroBody@@YAXXZ 5
 skip_menu 10046610 ?SkipMenuBody@@YAXXZ 12
 savegame_fix_null 10038570 ?SavegameNullBody@@YAXXZ 2
 savegame_fix_close 10045580 ?SavegameCloseBody@@YAXXZ 7

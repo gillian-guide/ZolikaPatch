@@ -22,8 +22,8 @@ import patch;
 // because the helper reaches the resolver with a direct `call` (E8, the shape the
 // original has) and MSVC rejects an external-linkage naked function in a module
 // interface unit: a body that names the resolver has to live in the resolver's
-// unit. They are exported by address, the way graphics hosts AimProjectileShim for
-// stability's arm.
+// unit. They are exported by address; the arm that installs them lives in
+// stability.ixx, where the key does.
 
 // The published state, in C linkage because the transcribed code names the slots
 // directly (the original keeps them in its own .bss beside its bodies).

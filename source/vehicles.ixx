@@ -11,24 +11,19 @@ import loader;
 import patch;
 
 // The car-parts shadow bodies' published operands: C linkage because the
-// transcribed asm names them directly.
-//   zpatch_carparts_resume_if / _else  dword_1015BDC8 / dword_1015BDC0, plus the
-//                                      site's two resume addresses (match+2 and
-//                                      match+0x45 of the "85 DB 7E 41 55 EB 0A"
-//                                      anchor);
-//   zpatch_carparts_resume_2          dword_1015BDCC, the second detour's resume;
-//   zpatch_carparts_shadow_fn         dword_1015B5B8, the call target it reads.
+// transcribed asm names them directly. Each slot is the original's own .bss word;
+// the two resume_if/else words hold the site's resume addresses (match+2 and
+// match+0x45 of the "85 DB 7E 41 55 EB 0A" anchor).
 extern "C"
 {
-    uint32_t zpatch_carparts_resume_if = 0;
-    uint32_t zpatch_carparts_resume_else = 0;
-    uint32_t zpatch_carparts_resume_2 = 0;
-    uint32_t zpatch_carparts_shadow_fn = 0;
+    uint32_t zpatch_carparts_resume_if = 0;    // dword_1015BDC8
+    uint32_t zpatch_carparts_resume_else = 0;  // dword_1015BDC0
+    uint32_t zpatch_carparts_resume_2 = 0;     // dword_1015BDCC
+    uint32_t zpatch_carparts_shadow_fn = 0;    // dword_1015B5B8
 
-    // dword_1015BDD4 / dword_1015BDD8: the node-walk test the collision body calls
-    // and the deadlock counter it compares.
-    uint32_t zpatch_collision_should_walk = 0;
-    uint32_t zpatch_collision_iterations = 0;
+    // The collision body's node-walk test and the deadlock counter it compares.
+    uint32_t zpatch_collision_should_walk = 0;  // dword_1015BDD4
+    uint32_t zpatch_collision_iterations = 0;   // dword_1015BDD8
 }
 
 // abi_collision_deadlock_walk, recovered VA 0x10005D80: the whole node-walk of
@@ -167,6 +162,44 @@ static __declspec(naked) void CarDynamicShadowShim()
     }
 }
 
+// abi_carparts_shadow_2b, recovered VA 0x100068D0: CarDynamicShadowFix's second
+// shadow-submission body, the old builds' variant of CarDynamicShadowShim. It makes
+// the same double call through the published target and pops the same 20 argument
+// bytes, but the first submission pushes 2/0/0 instead of 2/ebx/ebx.
+static __declspec(naked) void CarDynamicShadowShimB()
+{
+    __asm
+    {
+        push esi
+        nop
+        push 2
+        nop
+        push 0
+        nop
+        push 0
+        nop
+        push edi
+        nop
+        call DWORD PTR [zpatch_carparts_shadow_fn]
+        nop
+        push esi
+        nop
+        push 0
+        nop
+        push 0
+        nop
+        push 0
+        nop
+        push edi
+        nop
+        call DWORD PTR [zpatch_carparts_shadow_fn]
+        nop
+        add esp, 0x14
+        nop
+        jmp DWORD PTR [zpatch_carparts_resume_2]
+    }
+}
+
 // abi_car_decals_fix, recovered VA 0x1001B2E0: the fixed twin of the game's decal
 // selector (sub_AF7F50), written as a whole function because the fix removes the
 // episodic-build test in the middle of it. Everything else is the original's.
@@ -203,6 +236,20 @@ static __declspec(naked) void CarDecalsSelectorShim()
 // anchor, which is why they did not change when the strings did.
 namespace
 {
+    // One recovered sub-gate: is the current build's id a bit of `mask`? The
+    // catalogue's own mask is the arm's gate; a few recovered rows carry a narrower
+    // one of their own, which is what this reads.
+    bool CurrentBuildInMask(uint32_t mask)
+    {
+        return (mask & (1u << static_cast<uint32_t>(Loader::Current()))) != 0;
+    }
+
+    // CarDynamicShadowFix@noE's own gate: the recovered table gives the row the
+    // mask 0x22 (build ids 1000 and 1040), the builds where the installer's pattern
+    // E is absent. 1.0.0.4 has pattern E, so it keeps the E path and is not in the
+    // mask even though pattern C matches there too.
+    constexpr uint32_t kCarDynamicShadowNoEBuilds = 0x22u;
+
     // CarDecalsFix: the decal selector's entry is replaced by its fixed twin, which
     // drops the episodic-build test between the mask compare and the member read.
     void InstallCarDecalsFix()
@@ -218,10 +265,9 @@ namespace
         injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(&CarDecalsSelectorShim), true);
     }
 
-    // CollisionDeadlockFix: the node walk is replaced by its capped twin. The walk
-    // test it calls is the site's own call target (the disp32 at match+91), so it
-    // is published before the entry is overwritten.
-    void InstallCollisionDeadlockFix()
+    // CollisionDeadlockFix's published walk test: the site's own call target (the
+    // disp32 at match+91), read before the install overwrites the entry.
+    void PublishCollisionDeadlockFix()
     {
         if (!Loader::Enabled("CollisionDeadlockFix"))
             return;
@@ -232,18 +278,30 @@ namespace
 
         auto* match = pattern.get_first<std::byte>(0);
         const auto displacement = *reinterpret_cast<const int32_t*>(match + 91);
-        zpatch_collision_should_walk = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 95) + displacement);
+        zpatch_collision_should_walk =
+            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 95) + displacement);
+    }
 
+    // CollisionDeadlockFix: the node walk is replaced by its capped twin.
+    void InstallCollisionDeadlockFix()
+    {
+        if (!Loader::Enabled("CollisionDeadlockFix"))
+            return;
+
+        auto pattern = find_pattern("55 8B EC 83 E4 F8 51 8B 45 0C 0F B7 48 66");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get_first<std::byte>(0);
         Bodies::Register(reinterpret_cast<uintptr_t>(&CollisionDeadlockShim), 0x10005D80u);
         injector::MakeJMP(match, reinterpret_cast<void*>(&CollisionDeadlockShim), true);
     }
 
-    // CarPartsShadowFix shares the detour with CarDynamicShadowFix: the original
-    // gates the rewrite on either key and only the standalone forcing writes below
-    // are CarPartsShadowFix's own. The two resumes are the site's own bytes -- the
-    // `jle` it would have run (match+2) and the loop exit that `jle` jumps to
-    // (match+0x45) -- so they are published before the jump overwrites them.
-    void InstallCarPartsShadowFix()
+    // CarPartsShadowFix's published resumes: the site's own bytes -- the `jle` it
+    // would have run (match+2) and the loop exit that `jle` jumps to (match+0x45).
+    // The shared detour is installed under either key, so the publish uses the same
+    // combined gate.
+    void PublishCarPartsShadowFix()
     {
         if (!Loader::Enabled("CarPartsShadowFix") && !Loader::Enabled("CarDynamicShadowFix"))
             return;
@@ -254,7 +312,23 @@ namespace
 
         auto* match = pattern.get_first<std::byte>(0);
         zpatch_carparts_resume_if = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 2));
-        zpatch_carparts_resume_else = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 0x45));
+        zpatch_carparts_resume_else =
+            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 0x45));
+    }
+
+    // CarPartsShadowFix shares the detour with CarDynamicShadowFix: the original
+    // gates the rewrite on either key and only the standalone forcing writes below
+    // are CarPartsShadowFix's own.
+    void InstallCarPartsShadowFix()
+    {
+        if (!Loader::Enabled("CarPartsShadowFix") && !Loader::Enabled("CarDynamicShadowFix"))
+            return;
+
+        auto pattern = find_pattern("85 DB 7E 41 55 EB 0A");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get_first<std::byte>(0);
 
         Bodies::Register(reinterpret_cast<uintptr_t>(&CarPartsShadowShim), 0x10006880u);
         injector::MakeJMP(match - 6, reinterpret_cast<void*>(&CarPartsShadowShim), true);
@@ -263,17 +337,24 @@ namespace
             return;
 
         // The standalone arm forces the shadow path on its own: the `jnz` that would
-        // skip it becomes a short jump. The original's second standalone site
-        // (`83 FA 04 75 0C`) does not exist on 1.0.8.0.
+        // skip it becomes a short jump. The recovered standalone handler scans two
+        // variants: the `83 F8 04` site (1.0.6.0 and later) and the `83 FA 04 75 0C`
+        // site (the older builds). Each scan is a clean skip on the builds that do
+        // not carry it.
         pattern = find_pattern("83 F8 04 C6 44 24 0E 00 75 0F");
         if (!pattern.empty())
             injector::WriteMemory<std::byte>(pattern.get_first(8), Bytes::ShortJmp, true);
+
+        pattern = find_pattern("83 FA 04 75 0C");
+        if (!pattern.empty())
+            injector::WriteMemory<std::byte>(pattern.get_first(3), Bytes::ShortJmp, true);
     }
 
-    // CarDynamicShadowFix: the shadow call site is detached so the shadow is drawn
-    // twice with the remaining arguments. The called function and the resume are
-    // the site's own operands, published before the jump.
-    void InstallCarDynamicShadowFix()
+    // CarDynamicShadowFix's published call target and resume, from whichever body
+    // variant the build carries: pattern A's `call` sits at match+6, so its resume is
+    // match+0xB and the displacement is at match+7; pattern B's `call` sits at
+    // match+8, so its resume is match+0xD and the displacement is at match+9.
+    void PublishCarDynamicShadowFix()
     {
         if (!Loader::Enabled("CarDynamicShadowFix"))
             return;
@@ -283,12 +364,63 @@ namespace
         {
             auto* match = pattern.get_first<std::byte>(0);
             const auto resume = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 11));
-            const auto displacement = *reinterpret_cast<const int32_t*>(match + 7);
-            zpatch_carparts_shadow_fn = resume + displacement;
+            zpatch_carparts_shadow_fn = resume + *reinterpret_cast<const int32_t*>(match + 7);
             zpatch_carparts_resume_2 = resume;
+            return;
+        }
 
+        pattern = find_pattern("56 6A 02 6A 00 6A 00 57 E8 ? ? ? ? 56 6A 02 6A 04 6A 05 57 E8");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            const auto resume = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 13));
+            zpatch_carparts_shadow_fn = resume + *reinterpret_cast<const int32_t*>(match + 9);
+            zpatch_carparts_resume_2 = resume;
+        }
+    }
+
+    // CarDynamicShadowFix: the shadow call site is detached so the shadow is drawn
+    // twice with the remaining arguments. Two recovered body variants exist: pattern
+    // A (1.0.6.0 and later) and pattern B (the older builds); the key's own build
+    // mask covers both, and the signatures are the gate. The same installer's C and
+    // E branches are the old builds' two extra writes: a range check rewritten as an
+    // unconditional jump, and the six-byte NOP fill where pattern E is absent.
+    void InstallCarDynamicShadowFix()
+    {
+        if (!Loader::Enabled("CarDynamicShadowFix"))
+            return;
+
+        auto pattern = find_pattern("56 6A 02 53 53 57 E8 ? ? ? ? 56 6A 02 6A 04 6A 05 57 E8");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
             Bodies::Register(reinterpret_cast<uintptr_t>(&CarDynamicShadowShim), 0x100068A0u);
             injector::MakeJMP(match, reinterpret_cast<void*>(&CarDynamicShadowShim), true);
+        }
+
+        // Pattern B is the old-build variant of the same call site.
+        pattern = find_pattern("56 6A 02 6A 00 6A 00 57 E8 ? ? ? ? 56 6A 02 6A 04 6A 05 57 E8");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            Bodies::Register(reinterpret_cast<uintptr_t>(&CarDynamicShadowShimB), 0x100068D0u);
+            injector::MakeJMP(match, reinterpret_cast<void*>(&CarDynamicShadowShimB), true);
+        }
+
+        // Pattern C: the double range check (`>= 0x14` / `>= 6`) is skipped by
+        // turning the second test's `jnz` into a jump over it. The row exists only on
+        // the older builds, which is also where the @noE fill below belongs.
+        pattern = find_pattern("83 F8 14 7D 05 83 F8 06 7D 14");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            injector::MakeJMP(match + 3, match + 0x1E, true);
+
+            // CarDynamicShadowFix@noE: with pattern E absent (the recovered gate is
+            // build ids 1000 and 1040) the installer NOP-fills six bytes after the C
+            // anchor. 1.0.0.4 has pattern E, so it is not in the mask.
+            if (CurrentBuildInMask(kCarDynamicShadowNoEBuilds))
+                injector::MakeNOP(match + 62, 6, true);
         }
 
         // The shadow's record size is forced to 0x100 from 0x104, and the branch that
@@ -417,9 +549,16 @@ namespace
     }
 }
 
-// Registered like every other arm: the install tier owns the gate.
+// Registered like every other arm: the publish tier reads every site the install
+// tier is about to overwrite, and the install tier owns the gate and the writes.
 export void RegisterVehicles()
 {
+    Loader::PublishEvent() += []
+    {
+        PublishCollisionDeadlockFix();
+        PublishCarPartsShadowFix();
+        PublishCarDynamicShadowFix();
+    };
     Loader::InstallEvent() += []
     {
         InstallCarDecalsFix();

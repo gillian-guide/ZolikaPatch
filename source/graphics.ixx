@@ -15,10 +15,10 @@ import patch;
 // the transcribed asm names them directly.
 extern "C"
 {
-    uint32_t zpatch_bds_hash_a = 0;
-    uint32_t zpatch_bds_hash_b = 0;
-    void* zpatch_bds_resume_a = nullptr;
-    void* zpatch_bds_resume_b = nullptr;
+    uint32_t zpatch_bds_hash_a = 0;              // dword_10159C1C
+    uint32_t zpatch_bds_hash_b = 0;              // dword_10159C24
+    void* zpatch_bds_resume_a = nullptr;         // dword_10159C20
+    void* zpatch_bds_resume_b = nullptr;         // dword_10159C28
 }
 
 // abi_building_dynamic_shadows, recovered VA 0x10005AF0 (sub_10005af0). It reads
@@ -43,40 +43,6 @@ static __declspec(naked) void BuildingsDynamicShadowsShim()
     bds_special:
         jmp DWORD PTR [zpatch_bds_resume_b]
     }
-}
-
-namespace
-{
-    // abi_aim_projectile_crash_fix, recovered VA 0x10005590 (sub_10005590): a
-    // __thiscall that stores the caller's two dwords into the object in ECX, derives
-    // a flag from the second and returns with `ret 12`. AimProjectileCrashFix jumps
-    // here; the body is hosted in this module because a naked definition is only
-    // accepted here, and it is handed out through the accessor below.
-    __declspec(naked) void AimProjectileShim()
-    {
-        __asm
-        {
-            cmp ecx, 0
-            je aim_done
-            mov eax, DWORD PTR [esp + 8]
-            mov DWORD PTR [ecx + 0x20], eax
-            mov eax, DWORD PTR [esp + 0xc]
-            mov DWORD PTR [ecx + 0x24], eax
-            neg eax
-            sbb eax, eax
-            and eax, DWORD PTR [esp + 4]
-            mov DWORD PTR [ecx + 0x1c], eax
-        aim_done:
-            ret 12
-        }
-    }
-}
-
-// The aim shim's address, registered at its recovered VA on first use.
-export void* AimProjectileShimAddress()
-{
-    Bodies::Register(reinterpret_cast<uintptr_t>(&AimProjectileShim), 0x10005590u);
-    return reinterpret_cast<void*>(&AimProjectileShim);
 }
 
 // The EmissiveLerpFix pair's published state. The original keeps it in four .bss
@@ -240,52 +206,50 @@ static __declspec(naked) void SuperLodShim()
     }
 }
 
-namespace
+// sub_100459E0, recovered VA 0x100459E0: the HPE filter the shader finder calls
+// with the shader-name object. The finder takes the entry whose filter result is 0,
+// so 0 means "this is the name kind we want": the kind byte 'h', or 'p' followed by
+// 'e'. Every other name returns 2, which the finder reads as "keep looking".
+static __declspec(naked) void ShaderStreamingFilterHpe()
 {
-    // sub_100459E0, recovered VA 0x100459E0: the HPE filter the shader finder calls
-    // with the shader-name object. A name whose kind byte is 'h', or is 'p'
-    // followed by 'e', is rejected (0); everything else is accepted (2).
-    __declspec(naked) void ShaderStreamingFilterHpe()
+    __asm
     {
-        __asm
-        {
-            push ebp
-            mov ebp, esp
-            mov eax, DWORD PTR [ebp + 0Ch]
-            mov cl, BYTE PTR [eax + 4]
-            cmp cl, 68h
-            jz hpe_reject
-            cmp cl, 70h
-            jnz hpe_accept
-            cmp BYTE PTR [eax + 5], 65h
-            jz hpe_reject
-        hpe_accept:
-            mov eax, 2
-            pop ebp
-            ret
-        hpe_reject:
-            xor eax, eax
-            pop ebp
-            ret
-        }
+        push ebp
+        mov ebp, esp
+        mov eax, DWORD PTR [ebp + 0Ch]
+        mov cl, BYTE PTR [eax + 4]
+        cmp cl, 68h
+        jz hpe_match
+        cmp cl, 70h
+        jnz hpe_skip
+        cmp BYTE PTR [eax + 5], 65h
+        jz hpe_match
+    hpe_skip:
+        mov eax, 2
+        pop ebp
+        ret
+    hpe_match:
+        xor eax, eax
+        pop ebp
+        ret
     }
+}
 
-    // sub_10045A10, recovered VA 0x10045A10: the V filter, the same shape for the
-    // single kind byte 'v'.
-    __declspec(naked) void ShaderStreamingFilterV()
+// sub_10045A10, recovered VA 0x10045A10: the V filter, the same 0-for-match /
+// 2-for-skip contract for the single kind byte 'v'.
+static __declspec(naked) void ShaderStreamingFilterV()
+{
+    __asm
     {
-        __asm
-        {
-            push ebp
-            mov ebp, esp
-            mov ecx, DWORD PTR [ebp + 0Ch]
-            xor edx, edx
-            mov eax, 2
-            cmp BYTE PTR [ecx + 4], 76h
-            cmovz eax, edx
-            pop ebp
-            ret
-        }
+        push ebp
+        mov ebp, esp
+        mov ecx, DWORD PTR [ebp + 0Ch]
+        xor edx, edx
+        mov eax, 2
+        cmp BYTE PTR [ecx + 4], 76h
+        cmovz eax, edx
+        pop ebp
+        ret
     }
 }
 
@@ -293,8 +257,8 @@ namespace
 // `LookupShader("gta_ped")` call (the arm's second write then jumps over the
 // following ped-name lookups). It walks the shader group's array (count at +0Ch,
 // array at +8), asks each shader's virtual +0x10 for its name object and takes
-// the first one the HPE filter accepts, or returns null. `ret 4` because the
-// caller pushed two arguments.
+// the first one the HPE filter reports as the wanted kind (a 0 result; 2 means
+// keep looking), or returns null. `ret 4` because the caller pushed two arguments.
 static __declspec(naked) void ShaderStreamingFindHpe()
 {
     __asm
@@ -472,10 +436,34 @@ namespace
             injector::MakeNOP(pattern.get_first(7), 2, true);
     }
 
+    // BuildingDynamicShadows' published state: both resumes come from the site's
+    // original bytes (match+15 and match+112) and the two hash slots take the same
+    // field of the first and of the second scan hit.
+    void PublishBuildingDynamicShadows()
+    {
+        if (!Loader::Enabled("BuildingDynamicShadows"))
+            return;
+
+        auto pattern = find_pattern("8B 47 ? C1 E8 06 83 E0 0F 83 C0 FF");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get_first<std::byte>(0);
+        zpatch_bds_resume_a = match + 15;
+        zpatch_bds_resume_b = match + 112;
+
+        // Two hits, one per model hash the shim compares against, so the scan has to
+        // ask for both: the scanner's count is a hint that stops the scan, and the
+        // default one hit would leave the second slot at zero.
+        pattern = find_pattern<2>("8B 46 28 83 4E 24 05 25 7F FC FF FF 83 C8 40 89 46 28 C7 06");
+        if (!pattern.empty())
+            zpatch_bds_hash_a = *pattern.get(0).get<uint32_t>(20);
+        if (pattern.size() > 1)
+            zpatch_bds_hash_b = *pattern.get(1).get<uint32_t>(20);
+    }
+
     // BuildingDynamicShadows: the shadow-size operand at the call site becomes zero
-    // (0x104 -> 0x100) and the second site jumps into the shim. The published words
-    // go in first: both resumes come from the site's original bytes, so publishing
-    // after the write would resume into the jump itself.
+    // (0x104 -> 0x100) and the second site jumps into the shim.
     void InstallBuildingDynamicShadows()
     {
         if (!Loader::Enabled("BuildingDynamicShadows"))
@@ -489,26 +477,30 @@ namespace
         if (pattern.empty())
             return;
 
-        auto* match = pattern.get_first<std::byte>(0);
-        zpatch_bds_resume_a = match + 15;
-        zpatch_bds_resume_b = match + 112;
-
-        // The hash slots take the same field of the first and of the second match.
-        pattern = find_pattern("8B 46 28 83 4E 24 05 25 7F FC FF FF 83 C8 40 89 46 28 C7 06");
-        if (!pattern.empty())
-            zpatch_bds_hash_a = *pattern.get(0).get<uint32_t>(20);
-        if (pattern.size() > 1)
-            zpatch_bds_hash_b = *pattern.get(1).get<uint32_t>(20);
-
         Bodies::Register(reinterpret_cast<uintptr_t>(&BuildingsDynamicShadowsShim), 0x10005AF0u);
-        injector::MakeJMP(match, reinterpret_cast<void*>(&BuildingsDynamicShadowsShim), true);
+        injector::MakeJMP(pattern.get_first(0),
+            reinterpret_cast<void*>(&BuildingsDynamicShadowsShim), true);
     }
 
-    // EmissiveLerpFix: the original handler sub_1001AFA0 scans this signature, then
-    // publishes match - 12 as the resume and match - 16 as the float slot before it
-    // writes the E9 at match - 24. Both published values are addresses, not values
-    // read out of the game (see EmissiveLerpShim); the order is kept because the
-    // original publishes before it patches.
+    // EmissiveLerpFix's published state: match - 12 as the resume and match - 16 as
+    // the float slot. Both published values are addresses, not values read out of
+    // the game (see EmissiveLerpShim).
+    void PublishEmissiveLerpFix()
+    {
+        if (!Loader::Enabled("EmissiveLerpFix"))
+            return;
+
+        auto pattern = find_pattern("F3 0F 58 C1 F3 0F 2A C8 F3 0F 58 C1");
+        if (pattern.empty())
+            return;
+
+        const auto match = reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0));
+        zpatch_emissive_scale = static_cast<uint32_t>(match - 16);
+        zpatch_emissive_resume = static_cast<uint32_t>(match - 12);
+    }
+
+    // EmissiveLerpFix: the original handler sub_1001AFA0 scans the signature and
+    // writes the E9 at match - 24.
     void InstallEmissiveLerpFix()
     {
         if (!Loader::Enabled("EmissiveLerpFix"))
@@ -518,11 +510,7 @@ namespace
         if (pattern.empty())
             return;
 
-        auto* match = pattern.get_first<std::byte>(0);
-        zpatch_emissive_scale = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match - 16));
-        zpatch_emissive_resume = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match - 12));
-
-        injector::MakeJMP(match - 24, EmissiveLerpShimAddress(), true);
+        injector::MakeJMP(pattern.get_first(-24), EmissiveLerpShimAddress(), true);
     }
 
     // The per-build set InstallSuperLODFix publishes: the site's two continuations
@@ -540,12 +528,10 @@ namespace
         { Build::v1080, 0x540E67u, 0x540E1Fu, 0x4DD2D0u },
     };
 
-    // SuperLODFix: the two-byte pair `test byte [eax+72h], 10h` / `jz` that decides
-    // whether the detailed LOD is used is replaced by the model-hash test. The fail
-    // path is the `jz` target, the ok path the instruction after the six-byte pair,
-    // and the lookup is the game's hash function. All three are published before the
-    // site is written.
-    void InstallSuperLODFix()
+    // SuperLODFix's published state: the site's two continuations and the hash lookup
+    // the model helper calls, each a game RVA from the recovered handler's own base +
+    // RVA pairs (the suffix is the build).
+    void PublishSuperLODFix()
     {
         if (!Loader::Enabled("SuperLODFix"))
             return;
@@ -563,6 +549,20 @@ namespace
             zpatch_super_lod_ok = static_cast<uint32_t>(base + targets.ok);
             zpatch_super_lod_lookup = static_cast<uint32_t>(base + targets.lookup);
         }
+    }
+
+    // SuperLODFix: the two-byte pair `test byte [eax+72h], 10h` / `jz` that decides
+    // whether the detailed LOD is used is replaced by the model-hash test. The fail
+    // path is the `jz` target, the ok path the instruction after the six-byte pair,
+    // and the lookup is the game's hash function.
+    void InstallSuperLODFix()
+    {
+        if (!Loader::Enabled("SuperLODFix"))
+            return;
+
+        auto pattern = find_pattern("F6 40 ? ? 74 ? 85 ED 0F 85 ? ? ? ? 55 6A ? E8 ? ? ? ? 8B F8");
+        if (pattern.empty())
+            return;
 
         Bodies::Register(reinterpret_cast<uintptr_t>(&SuperLodModel), 0x100469A0u);
         Bodies::Register(reinterpret_cast<uintptr_t>(&SuperLodShim), 0x100469E0u);
@@ -599,9 +599,16 @@ namespace
     }
 }
 
-// Registered like every other arm: the install tier owns the gate.
+// Registered like every other arm: the publish tier reads every site the install
+// tier is about to overwrite, and the install tier owns the gate and the writes.
 export void RegisterGraphics()
 {
+    Loader::PublishEvent() += []
+    {
+        PublishBuildingDynamicShadows();
+        PublishEmissiveLerpFix();
+        PublishSuperLODFix();
+    };
     Loader::InstallEvent() += [] { InstallBuildingAlphaFix(); };
     Loader::InstallEvent() += [] { InstallBuildingDynamicShadows(); };
     Loader::InstallEvent() += [] { InstallEmissiveLerpFix(); };

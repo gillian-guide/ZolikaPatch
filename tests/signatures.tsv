@@ -16,6 +16,12 @@ CarDynamicShadowFix	0x8F7420	50 68 04 01 00 00 6A 02 6A 00 E8	11
 CarDynamicShadowFix	0x95A418	83 E0 0F 83 F8 03 75 17 F6 86 6C 02 00 00 04	14
 CarDynamicShadowFix	0x8F719F	0F 84 9E 00 00 00 80 7D 28	9
 CarDynamicShadowFix	0x8F73EA	51 68 04 05 00 00 6A 02 6A 00 E8	11
+# CarDynamicShadowFix's old-build pieces are absent from the 1.0.8.0 IDB, so there is
+# no site VA to record for them: the pattern-B body anchor
+# (56 6A 02 6A 00 6A 00 57 E8 ...), the pattern-C `83 F8 14 7D 05 83 F8 06 7D 14`
+# rewrite at +3, and the @noE six-byte NOP fill at +62 (its own recovered gate, build
+# ids 1000 and 1040). CarPartsShadowFix's second standalone site
+# (`83 FA 04 75 0C`, +3) is the same kind of old-build variant.
 ReversingLightFix	0x8F8840	11 01 00 00 8B 16 8B 42 64 8B CE FF D0 F3 0F 10	16
 BikeFeetFix	0xBCB919	39 82 ? ? ? ? 0F 85 ? ? ? ? 39 05	14
 BikePhoneAnimsFix	0xB67F01	80 BE ? ? ? ? ? 0F 85 ? ? ? ? 80 BE ? ? ? ? ? 0F 84 ? ? ? ? 83 3D	28

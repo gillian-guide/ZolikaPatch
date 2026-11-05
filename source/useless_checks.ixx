@@ -4,6 +4,7 @@ module;
 
 export module useless_checks;
 
+import bytes;
 import common;
 import game;
 import loader;
@@ -37,17 +38,14 @@ namespace
     static_assert(std::size(kUselessSingles8) == 2u);
     static_assert(std::size(kUselessSingles5) == 2u);
 
-    constexpr uint8_t kNop = 0x90;
-    constexpr std::array<uint8_t, 5> kMovAl1 = { 0xB0, 0x01, kNop, kNop, kNop };
-    constexpr std::array<uint8_t, 5> kXorAlAl = { 0x32, 0xC0, kNop, kNop, kNop };
-
-    // The singles come first, and a NOP run uses MakeNOP while every other single
+    // The five-byte patterns the build tables write live in bytes.ixx with every
+    // other recovered opcode byte; a NOP run uses MakeNOP while every other single
     // is a single byte store.
     void SweepSingles(uintptr_t base, std::span<const UselessCheckSingle> rows)
     {
         for (const auto& row : rows)
         {
-            if (row.byte == kNop)
+            if (row.byte == std::to_integer<uint8_t>(Bytes::Nop))
                 injector::MakeNOP(base + row.rva, row.length, true);
             else
                 injector::WriteMemory<uint8_t>(base + row.rva, row.byte, true);
@@ -57,21 +55,25 @@ namespace
     // One protected five-byte write per site.
     void SweepNop5(uintptr_t base, std::span<const uint32_t> rows)
     {
-        constexpr std::array<uint8_t, 5> kNop5 = { kNop, kNop, kNop, kNop, kNop };
         for (const auto rva : rows)
         {
-            injector::WriteMemoryRaw(base + rva, const_cast<uint8_t*>(kNop5.data()), kNop5.size(), true);
+            injector::WriteMemoryRaw(base + rva,
+                const_cast<uint8_t*>(
+                    reinterpret_cast<const uint8_t*>(Bytes::FiveNops.data())),
+                Bytes::FiveNops.size(), true);
         }
     }
 
     // The 45/56 tables protect each byte separately: this must not collapse into
     // one five-byte write, or the write set differs.
-    void SweepBytes(uintptr_t base, std::span<const uint32_t> rows, std::span<const uint8_t> bytes)
+    void SweepBytes(uintptr_t base, std::span<const uint32_t> rows,
+        std::span<const std::byte> bytes)
     {
         for (const auto rva : rows)
         {
             for (size_t index = 0; index < bytes.size(); ++index)
-                injector::WriteMemory<uint8_t>(base + rva + index, bytes[index], true);
+                injector::WriteMemory<uint8_t>(
+                    base + rva + index, std::to_integer<uint8_t>(bytes[index]), true);
         }
     }
 
@@ -81,13 +83,13 @@ namespace
         std::span<const UselessCheckSingle> singles;
         std::span<const uint32_t> nop5;
         std::span<const uint32_t> first;
-        std::span<const uint8_t> firstPattern;
+        std::span<const std::byte> firstPattern;
         std::span<const uint32_t> second;
-        std::span<const uint8_t> secondPattern;
+        std::span<const std::byte> secondPattern;
     };
 
     constexpr BuildSweep kSweeps[] = {
-        { Build::v1080, kUselessSingles9, kUselessBuild9Nop5, kUselessBuild9MovAl1, kMovAl1, kUselessBuild9XorAlAl, kXorAlAl },
+        { Build::v1080, kUselessSingles9, kUselessBuild9Nop5, kUselessBuild9MovAl1, Bytes::MovAl1, kUselessBuild9XorAlAl, Bytes::XorAlAl },
         { Build::v1070, kUselessSingles8, kUselessBuild8Nop5, {}, {}, {}, {} },
         { Build::v1040, kUselessSingles5, kUselessBuild5Nop5, {}, {}, {}, {} },
     };

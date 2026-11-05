@@ -35,7 +35,7 @@ CRLF folding (the original reads in text mode). The shipped INI's longest line i
 Measured on 1.0.8.0 with `tools/parity_report.py 9`:
 
 - **70 of 99 option keys closed**;
-- **46 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **47 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe;
 - launcher: `LaunchWithPlayGTAIV` implemented and its slots verified per build
@@ -95,22 +95,29 @@ that registers the wrong reference VA still matches. Body identity comes from
 `tests/body_targets.tsv` (the arm names its body, the table names its VA) and from
 the instruction-level proof.
 
-`verify_bodies.py` stops at the first terminal instruction, so a body with an
-internal jump is proven up to that jump, not through it. That is a real limit, not
-an implied pass.
-## Known proof gap (next tool fix)
+`verify_bodies.py` sweeps each body linearly for exactly the row's instruction
+count, so the manifest budget is the body's true length, not a cap: the budget is
+the count to the first `int3` in the original. A row that is short would silently
+truncate the proof on both sides, and a row that is long reads into padding (and
+fails if either side decodes fewer instructions), which is why the number is part
+of the evidence rather than a hint.
 
-`verify_bodies.py` stops at the first terminal instruction and counts `jmp` as
-terminal, so:
+Body identity is instruction-level except for a call's target: the proof compares
+a `call` as an immediate, not as the function it names. Four implemented bodies
+call our equivalent helper instead of the original's compiled target:
 
-- a body whose *entry* is a jump (`super_lod_shim`, original first byte `EB 06`) is
-  proven as one instruction;
-- a body with a `ret` in the middle has its tail after that `ret` unproven
-  (`shader_streaming_find_hpe` 30 of 36, `find_v` 30 of 36, `filter_hpe` 13 of 16).
+- `ped_models_in_cutscenes` calls audio's `ValueResolverThunk`, a
+  one-instruction `jmp` through the published resolver slot, because the resolver
+  (`ValueResolverBody`) is `static` in `shared.ixx` and an external-linkage naked
+  function in a module interface unit is rejected (C2488), so an importer cannot
+  emit the original's direct `E8` to it;
+- `local_settings_detour` and `local_settings_fallback_detour` call our
+  `LocalSettingsStep`, a reimplementation of the original's compiled helper;
+- `savegame_fix_copy` calls `SavegameCopyBlock`, which forwards to `std::memcpy`.
 
-Those full streams were checked out of band (a linear sweep that also compares
-instruction lengths) and are equal: 14 / 21 / 36 / 36 / 16 / 9. The fix is to sweep
-linearly for the exact instruction count instead of stopping at a terminator, which
-also means every `tests/bodies.tsv` budget becomes the body's true count rather than
-a cap. Until that is in, treat a PASS whose count is below the row's budget as
-partial - the row's budget is the number to compare against.
+The stored baselines have one gap of their own: they were produced by the
+reference tree, whose `ApplyCarDynamicShadowFixNoE` pass is defined but never
+called, so on 1.0.0.0/1.0.4.0 the baseline lacks the six-byte NOP fill this tree
+writes from the recovered `@noE` row. `CarDynamicShadowFix` therefore reports six
+extra bytes on 1.0.4.0; it is a baseline omission, not a difference in the bytes
+both sides write.
