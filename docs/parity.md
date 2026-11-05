@@ -75,7 +75,28 @@ match, otherwise computes `([edi+28h] >> 6 & 0xF) - 1` and jumps to the first.
 Its candidate address is `0x100169C0` in the `/MAP` build, and the write-set half
 of the key is closed (`parity_report` 1.0.8.0).
 
-### What the byte-level proof can and cannot cover
+### Branch targets cannot be attributed from the stored baselines
+
+The per-option baselines under `readable/build/p3-final-dumps3/` cannot say *which
+body* a key jumps to, and an arm must never be written from them:
+
+- a cell lists the bytes that key wrote, so a five-byte branch appears as five
+  contiguous rows — but presence of five rows is not proof they are one branch,
+  and a decoder that assumes it invents targets;
+- more importantly, those dumps are the *reconstruction's*, and its dump
+  canonicalises body branches to a reference VA. Several unrelated keys therefore
+  appear to branch to the same address (`0x10005590` shows up for `MouseFix`,
+  `CarDecalsFix`, `EmissiveLerpFix` and others), which cannot be true for a mod
+  with roughly one body per key. The canonicalisation has collapsed distinct
+  bodies onto one value.
+
+Target attribution has to come from the original: decode the branch the original
+ASi writes at that site, or take it from the original's own body table. The
+write-set scoreboard is not a guard here either — if an arm registers the wrong
+reference VA, canonicalisation reproduces the expected bytes anyway, and the key
+closes on a wrong target. That is exactly the false green the instruction-level
+proof caught for `BuildingDynamicShadows`.
+
 
 `verify_bodies.py` compares bytes, so it proves a body that has no
 module-relative operand. This shim has four: the two published hashes and the two
