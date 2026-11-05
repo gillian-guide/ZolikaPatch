@@ -1,34 +1,16 @@
-# Body inventory for the next transcriptions: recovered VA, the arm that installs
-# it, and how many absolute operands it reads (each one is a published slot the
-# arm must set before it installs). Measured with tools/verify_bodies.py and the
-# reference sources; not a proof, a work list.
+﻿# Bodies still to transcribe: recovered VA, the arm that installs it, and how many
+# absolute operands it reads (each is a published slot the arm must set before it
+# installs). Measured with tools/verify_bodies.py and the IDA database.
 #
-# name                          recovered VA  arm key                        slots
-emissive_lerp_shim                 1001AF60  emissive_lerp_fix                    5#
-# 0x10159CC4, 0x10159CC8, 0x10159CCC) and calls 0x1001AF20. Reading those
-# addresses out of the original file gives bytes that decode as code, not as a
-# the original's own fault) or the body was read from a different section layout
-# until the operands are re-derived from the disassembly rather than assumed.
+# Done: aim_projectile_crash_fix 0x10005590 (11 insns, 0 slots)
+#       building_dynamic_shadows  0x10005AF0 (17 insns, 3 slots)
+#       emissive_lerp_shim        0x1001AF60 (10 insns, 6 slots)
+#       emissive_lerp_helper      0x1001AF20 (13 insns, 5 slots)
 #
-# EmissiveLerpFix - operands RESOLVED (2026-11-05). The five absolute operands are
-# .bss scratch, not code: the IDB reads 0x10159CC0 as sixteen zero bytes, and
-# image_offset used to map a .bss address into whatever section followed, which is
-# why the same address appeared to hold code in the file. With that fixed (a bss
-# address now maps to "not in the file"), the shim is a normal transcription: two
-# scratch dwords, a float scale, a resume, and a call to the paired body at
-# 0x1001AF20.
-#
-# EmissiveLerpFix - operands resolved as addresses, but the *semantics* are not.
-# IDB (session a4757382) gives the pair in full:
-#   sub_1001AF60 (11 insns): save ECX/EDX to 0x10159CC0/0x10159CCC, pusha, call
-#     sub_1001AF20, popa, reload ECX/EDX, cvtsi2ss xmm0,edx,
-#     mulss xmm0,[0x10159CC4], jmp [0x10159CC8]
-#   sub_1001AF20 (13 insns): pure scratch arithmetic on 0x10159CC0/0x10159CCC
-#     with constants 0xC, 0xFFFFFE6B, 0x2ED, then retn
-# Both 0x10159CC0 and 0x10159CC4 read as zero in the loaded image (.bss).
-# The reference publish sets its two globals from the site: const = match-16,
-# resume = match-12, i.e. *addresses*, while the shim's mulss/jmp consume absolute
-# addresses directly. Direct-vs-pointer is exactly the difference between reading
-# the game's float and reading a pointer as a float, so the transcription has to
-# settle it from the original's bytes around the mulss (an explicit [reg] load
-# would mean pointer) before any body is written.
+# EmissiveLerpFix semantics (settled from the IDB, kept here so it is not
+# re-derived): the installer writes the ADDRESS match-16 into 0x10159CC4 and
+# match-12 into 0x10159CC8. The shim reads 0x10159CC4 as float bits (absolute
+# operand, no dereference) and jumps through 0x10159CC8. The multiply is inert -
+# the helper zeroes the saved EDX that the shim reloads - so the pair's effect is
+# to force 60*hours+minutes into 12 (06:45..19:18) or 0, which snaps the emissive
+# day/night factor to ~1.0 or ~0.0.

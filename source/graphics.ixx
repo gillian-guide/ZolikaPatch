@@ -176,11 +176,11 @@ namespace
         if (!Loader::Enabled("BuildingDynamicShadows"))
             return;
 
-        auto pattern = find_pattern("50 68 04 01 00 00 6A 02 6A 00 E8");
+        auto pattern = find_pattern("50 68 04 01 00 00 6A 02");
         if (!pattern.empty())
             injector::WriteMemory<std::byte>(pattern.get_first(2), Bytes::Zero, true);
 
-        pattern = find_pattern("8B 47 28 C1 E8 06 83 E0 0F 83 C0");
+        pattern = find_pattern("8B 47 ? C1 E8 06 83 E0 0F 83 C0 FF");
         if (pattern.empty())
             return;
 
