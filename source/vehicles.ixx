@@ -92,7 +92,8 @@ namespace
         {
             auto* match = MatchAddress(pattern, 0);
             injector::WriteMemory<std::byte>(injector::raw_ptr(match), Bytes::RetImm16, true);
-            injector::WriteMemory<std::byte>(injector::raw_ptr(match + 2), Bytes::RetImm16High, true);
+            injector::WriteMemory<std::byte>(injector::raw_ptr(match + 1), Bytes::RetImm16High, true);
+            injector::WriteMemory<std::byte>(injector::raw_ptr(match + 2), Bytes::Zero, true);
         }
     }
 
