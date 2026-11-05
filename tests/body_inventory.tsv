@@ -17,3 +17,18 @@ emissive_lerp_shim                 1001AF60  emissive_lerp_fix                  
 # address now maps to "not in the file"), the shim is a normal transcription: two
 # scratch dwords, a float scale, a resume, and a call to the paired body at
 # 0x1001AF20.
+#
+# EmissiveLerpFix - operands resolved as addresses, but the *semantics* are not.
+# IDB (session a4757382) gives the pair in full:
+#   sub_1001AF60 (11 insns): save ECX/EDX to 0x10159CC0/0x10159CCC, pusha, call
+#     sub_1001AF20, popa, reload ECX/EDX, cvtsi2ss xmm0,edx,
+#     mulss xmm0,[0x10159CC4], jmp [0x10159CC8]
+#   sub_1001AF20 (13 insns): pure scratch arithmetic on 0x10159CC0/0x10159CCC
+#     with constants 0xC, 0xFFFFFE6B, 0x2ED, then retn
+# Both 0x10159CC0 and 0x10159CC4 read as zero in the loaded image (.bss).
+# The reference publish sets its two globals from the site: const = match-16,
+# resume = match-12, i.e. *addresses*, while the shim's mulss/jmp consume absolute
+# addresses directly. Direct-vs-pointer is exactly the difference between reading
+# the game's float and reading a pointer as a float, so the transcription has to
+# settle it from the original's bytes around the mulss (an explicit [reg] load
+# would mean pointer) before any body is written.
