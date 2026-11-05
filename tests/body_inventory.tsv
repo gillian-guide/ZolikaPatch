@@ -4,4 +4,14 @@
 # reference sources; not a proof, a work list.
 #
 # name                          recovered VA  arm key                        slots
-emissive_lerp_shim                 1001AF60  emissive_lerp_fix                    5
+emissive_lerp_shim                 1001AF60  emissive_lerp_fix                    5#
+# EmissiveLerpFix - BLOCKED on operand semantics, do not transcribe yet.
+# The shim at 0x1001AF60 reads/writes five absolute operands (0x10159CC0,
+# 0x10159CC4, 0x10159CC8, 0x10159CCC) and calls 0x1001AF20. Reading those
+# addresses out of the original file gives bytes that decode as code, not as a
+# scratch block (d8 30 17 31 ba 31 da 31 19 32 bc 32 dc 32 1b 33 at 0x10159CC0),
+# so either the operand addresses are not data (a store into code, which would be
+# the original's own fault) or the body was read from a different section layout
+# than the file has. Both readings change what has to be published, and a wrong
+# guess produces a body that faults on the first call - so the key stays open
+# until the operands are re-derived from the disassembly rather than assumed.
