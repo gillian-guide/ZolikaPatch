@@ -32,7 +32,7 @@ def rows(path, key=None):
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from parity_report import displacement_rvas
+from parity_report import branch_bytes
 
 
 def keys():
@@ -75,7 +75,7 @@ def main() -> int:
         # body address for every arm, so those bytes are counted apart from a real
         # difference (the scoreboard does the same, per key).
         pristine = exe.read_bytes()
-        branch = displacement_rvas(pristine, set(want_full) | set(ours_full))
+        branch = branch_bytes(want_full, ours_full, pristine)
         differing = sum(1 for rva in (set(want_full) & set(ours_full)) - branch
                         if want_full[rva] != ours_full[rva])
 

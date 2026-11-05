@@ -50,6 +50,24 @@ def displacement_rvas(pristine: bytes, rvas):
     return out
 
 
+def branch_bytes(want, have, pristine):
+    """Every RVA that is a branch displacement, from both sources that can tell.
+
+    A displacement is four bytes after an `E8`/`E9`. That opcode is visible in a
+    cell when the arm changed it, and in the pristine image when the site was
+    already a branch - but a site the mod itself patched hides it from the pristine
+    image (the original byte there is the instruction the arm overwrote), so the two
+    sources are needed together, not either alone.
+    """
+    marked = set()
+    for side in (want, have):
+        for rva, byte in side.items():
+            if byte in (0xE8, 0xE9):
+                marked.update(rva + offset for offset in range(1, 5))
+    marked |= displacement_rvas(pristine, set(want) | set(have))
+    return marked
+
+
 def rows(path, key=None):
     out = {}
     for line in Path(path).read_text(encoding="utf-8", errors="replace").splitlines():
@@ -108,11 +126,7 @@ def main() -> int:
         # either cell (the ordinary case), and the pristine image, which is the only
         # source for an arm installed over a site that was already a branch - then
         # no cell carries the opcode row at all.
-        branch = {rva + offset
-                  for side in (want, have)
-                  for rva, byte in side.items() if byte in (0xE8, 0xE9)
-                  for offset in range(1, 5)}
-        branch |= displacement_rvas(pristine, set(want) | set(have))
+        branch = branch_bytes(want, have, pristine)
 
         missing = len((set(want) - set(have)) - branch)
         extra = len((set(have) - set(want)) - branch)
@@ -133,12 +147,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-def branch_bytes(rows):
-    """The displacement bytes of every branch in a cell: the baseline's own
-    canonicalisation decides what a branch points at, so those bytes are reported
-    separately from a real difference."""
-    marked = set()
-    for rva, byte in rows.items():
-        if byte in (0xE8, 0xE9):
-            marked.update(rva + offset for offset in range(1, 5))
-    return marked
