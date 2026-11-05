@@ -155,6 +155,8 @@ if(Python3_Interpreter_FOUND)
   # The generated artefacts must not drift from their sources.
   add_test(NAME zp_catalogue_drift
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/gen_options.py --check)
+  add_test(NAME zp_body_targets_drift
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/gen_body_targets.py --check)
   add_test(NAME zp_ini_drift
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/gen_ini.py --check)
 endif()

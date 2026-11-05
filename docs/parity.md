@@ -111,3 +111,28 @@ is closed on **write-set parity only**, and its instruction-level proof is
 recorded as pending here rather than claimed.
 
 
+
+### The attribution table, and a contradiction it exposed
+
+`tests/body_targets.tsv` is generated from the reference sources by
+`tools/gen_body_targets.py`: each arm names the body it jumps to
+(`MakeJMP(match, &abi_xxx)`), and the body table maps that symbol to the original
+ASI VA. 81 rows over 50 keys, guarded by `zp_body_targets_drift`.
+
+It disagrees with the stored baseline on one key already implemented:
+
+| key | reference arm names | baseline branch decodes to |
+| --- | --- | --- |
+| `AimProjectileCrashFix` | `0x10005590` | `0x10005590` |
+| `BuildingDynamicShadows` | `0x10005AF0` | `0x10005590` |
+
+`BuildingDynamicShadows`' current arm follows the baseline (it registers
+`0x10005590`, the eleven-instruction setter) and therefore closes its key — but the
+reference source says that site jumps to `0x10005AF0`, the eighteen-instruction
+model-hash shim. Both cannot be right, and the baseline's bytes are exactly what
+its canonicalisation produced, so it cannot arbitrate.
+
+Until the original binary decides (its installer code carries the immediate the
+site is written with), this key is **closed on a contested target** and must not
+be counted as settled. Every other body-bearing key stays open until the same
+question is answered for it.
