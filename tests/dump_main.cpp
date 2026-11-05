@@ -11,6 +11,7 @@ import stability;
 import vehicles;
 import useless_checks;
 import graphics;
+import launcher;
 
 // The write-set dump: load a copy of a game image into this process, run the
 // same load pipeline the ASI runs, and print every byte it changed as
@@ -131,6 +132,7 @@ int main(int argc, char** argv)
     RegisterVehicles();
     RegisterUselessChecks();
     RegisterGraphics();
+    RegisterLauncher();
 
     if (perOption)
     {
