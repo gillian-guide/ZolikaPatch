@@ -7,10 +7,10 @@ aim_projectile_crash_fix 10005590 ?AimProjectileShim@?A0x06fbc149@@YAXXZ 11
 building_dynamic_shadows 10005AF0 ?BuildingsDynamicShadowsShim@@YAXXZ 17
 emissive_lerp_shim 1001AF60 ?EmissiveLerpShim@@YAXXZ 10
 emissive_lerp_helper 1001AF20 ?EmissiveLerpHelper@@YAXXZ 13
-blackscreen_shim 10036EE0 ?BlackscreenShim@@YAXXZ 7
+blackscreen_shim 10036EE0 ?BlackscreenShim@@YAXXZ 8
 crash_msg_shim 10036F00 ?CrashMsgShim@@YAXXZ 14
-freeze_gun_shim 10036EB0 ?FreezeGunShim@@YAXXZ 11
-group_hack_shim 10036E90 ?GroupHackShim@@YAXXZ 7
+freeze_gun_shim 10036EB0 ?FreezeGunShim@@YAXXZ 14
+group_hack_shim 10036E90 ?GroupHackShim@@YAXXZ 8
 path_node_shim 1003D7B0 ?PathNodeShim@@YAXXZ 6
 plane_crash_shim 1003D870 ?PlaneCrashShim@@YAXXZ 7
 player_ped_helper 1003D930 ?PlayerPedHelperBody@@YAXXZ 28
