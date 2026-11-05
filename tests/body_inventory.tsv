@@ -1,0 +1,7 @@
+﻿# Body inventory for the next transcriptions: recovered VA, the arm that installs
+# it, and how many absolute operands it reads (each one is a published slot the
+# arm must set before it installs). Measured with tools/verify_bodies.py and the
+# reference sources; not a proof, a work list.
+#
+# name                          recovered VA  arm key                        slots
+emissive_lerp_shim                 1001AF60  emissive_lerp_fix                    5

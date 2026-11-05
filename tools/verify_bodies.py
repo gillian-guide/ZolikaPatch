@@ -129,7 +129,8 @@ def compare(original: bytes, candidate: bytes, rows, symbols):
                 results.append((name, "FAIL",
                                 f"does not end at instruction {len(wanted)} ('{summarise(wanted[-1])}')"))
             else:
-                results.append((name, "PASS", f"{len(wanted)} instruction(s)"))
+                slots = sum(1 for instruction in wanted if "abs" in summarise(instruction))
+                results.append((name, "PASS", f"{len(wanted)} instruction(s), {slots} absolute operand(s)"))
     return results
 
 
