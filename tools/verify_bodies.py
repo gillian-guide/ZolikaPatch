@@ -37,7 +37,7 @@ except ImportError:  # pragma: no cover - reported, not raised
     capstone = None
 
 
-def image_offset(image: bytes, va: int):
+def image_offset(image: bytes, va: int, base: int = IMAGE_BASE):
     """The file offset of a VA, through the PE section table: a linked address is an
     RVA, and a section's raw pointer is what locates it in the file."""
     if len(image) < 0x40 or image[:2] != b"MZ":
@@ -48,7 +48,7 @@ def image_offset(image: bytes, va: int):
     sections = int.from_bytes(image[span + 6:span + 8], "little")
     optional_size = int.from_bytes(image[span + 20:span + 22], "little")
     table = span + 24 + optional_size
-    rva = va - IMAGE_BASE
+    rva = va - base
     for index in range(sections):
         entry = table + index * 40
         virtual_size = int.from_bytes(image[entry + 8:entry + 12], "little")

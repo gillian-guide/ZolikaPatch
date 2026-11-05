@@ -13,3 +13,6 @@ emissive_lerp_helper 1001AF20 ?EmissiveLerpHelper@@YAXXZ 16
 freeze_gun_shim 10036EB0 ?FreezeGunShim@@YAXXZ 16
 group_hack_shim 10036E90 ?GroupHackShim@@YAXXZ 16
 path_node_shim 1003D7B0 ?PathNodeShim@@YAXXZ 16
+blackscreen_shim 10036EE0 ?BlackscreenShim@@YAXXZ 16
+crash_msg_shim 10036F00 ?CrashMsgShim@@YAXXZ 20
+plane_crash_shim 1003D870 ?PlaneCrashShim@@YAXXZ 16

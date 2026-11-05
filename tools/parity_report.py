@@ -36,11 +36,17 @@ def displacement_rvas(pristine: bytes, rvas):
     """
     out = set()
     for rva in rvas:
-        if rva < 1:
-            continue
-        offset = image_offset(pristine, GAME_BASE + rva - 1)
-        if offset is not None and pristine[offset] in (0xE8, 0xE9):
-            out.add(rva)
+        # A displacement is four bytes long, so the opcode that owns it sits one to
+        # four bytes before the RVA in question: checking only the immediately
+        # preceding byte classified one byte of each branch and left the rest
+        # looking like real differences.
+        for back in range(1, 5):
+            if rva - back < 1:
+                continue
+            offset = image_offset(pristine, GAME_BASE + rva - back, GAME_BASE)
+            if offset is not None and pristine[offset] in (0xE8, 0xE9):
+                out.add(rva)
+                break
     return out
 
 
