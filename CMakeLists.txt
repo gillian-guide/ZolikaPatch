@@ -74,7 +74,9 @@ target_sources(zp_modules PUBLIC
     source/vehicles.ixx
     source/useless_checks.ixx
     source/graphics.ixx
-    source/launcher.ixx)
+    source/launcher.ixx
+    source/audio.ixx
+    source/misc.ixx)
 target_include_directories(zp_modules PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/source
   ${CMAKE_CURRENT_SOURCE_DIR}/external/injector/include

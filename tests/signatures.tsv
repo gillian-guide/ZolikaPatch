@@ -54,3 +54,46 @@ ForceShadowsOnObjects	0x905E12	F7 47 40 00 10 00 00 74 07 81 4E 24 00 00	14
 ForceDynamicShadowsEverywhere	0xA700CA	F7 46 4C 00 80 00 00 74	8
 SuperLODFix	0x940E19	F6 40 ?? ?? 74 ?? 85 ED 0F 85 ?? ?? ?? ?? 55 6A ?? E8 ?? ?? ?? ?? 8B F8	24
 ImprovedShaderStreaming	0xCB21F1	33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24	31
+AllowHashesForIDE	0x45CF50	8B 4C 24 08 56 8B 74 24 08 80 3E 22	12
+CombinedRadioFreezeFix	0x895F59	E8 ? ? ? ? 8B 35 ? ? ? ? 3B F0	13
+BetterMPSync	0x6D9356	8B 90 E8 00 00 00 55 8B CE FF	10
+IncreasePtrNodes	0x8DDADE	6A 08 ? ? ? ? ? 68 80 38 01 00	12
+IncreasePtrNodes	0x8DDB1E	6A 10 ? ? ? ? ? 68 80 3E 00 00	12
+IncreasePtrNodes	0xBA47BE	6A 14 ? ? ? ? ? 68 80 3E 00 00	12
+NoPhysicsSleep	0x4F1110	0F 00 00 00 C7 41 14 14 00 00 00 C7 41 1C 00 00	16
+DoNotPauseOnMinimize	0x5B68A6	6A 0A 56 50 FF D2 A1	7
+DoNotPauseOnMinimize	0x40338A	75 ? 8B 0D ? ? ? ? 51 FF 15 ? ? ? ? 85 C0 75 ? 8B 15	21
+EpisodicWeaponSupport.a	0x4AB7C7	75 5B 83 3D ? ? ? ? 00 75	10
+EpisodicWeaponSupport.b	0xAAE8E2	83 3D ? ? ? ? 02 0F 85 8C 01 00 00	13
+EpisodicWeaponSupport.c	0x9D25D5	83 3D ? ? ? ? 02 0F 8C D5 00	11
+EpisodicWeaponSupport.d	0x4A6F1E	83 3D ? ? ? ? 02 75 20 8B CD E8	12
+EpisodicWeaponSupport.e	0xA61409	83 3D ? ? ? ? 02 75 50	9
+EpisodicWeaponSupport.f	0x9900A6	83 3D ? ? ? ? 02 7C 21 8B 44 24 0C	13
+EpisodicWeaponSupport.g	0x4A9D3A	83 3D ? ? ? ? 02 7C 32 8B 41	11
+EpisodicWeaponSupport.h	0x997768	83 3D ? ? ? ? 02 7C 7D 8B 4C 24 0C	13
+PoliceEpisodicWeaponSupport	0x49F18C	39 2D ? ? ? ? 75 3E	8
+TBoGTHeliHeightLimit	0x8F0071	83 3D ? ? ? ? 02 7C 0A F3 0F	11
+MiscFixes.a	0x490141	83 C4 ? 3B 46 20	6
+MiscFixes.b	0x48FE63	75 28 6A 00 6A 00 68 ? ? ? ? E8 ? ? ? ? 83 C4 0C	19
+MiscFixes.c	0x85C509	C7 05 ? ? ? ? 03 00 00 00 33 C0 5E 59 C3 C7	16
+MiscFixes.d	0x89842F	FF 15 ? ? ? ? 85 C0 75 07 A0	11
+MiscFixes.e	0x8972B0	81 EC ? ? ? ? A1 ? ? ? ? 33 C4 89 84 24 ? ? ? ? 53 ? 6A 3C 33 DB 8D 44 24 ? 53 50 E8	33
+MiscFixes.f	0x490628	74 05 E8 ? ? ? ? 6A 05 E8 ? ? ? ? 83 C4 04 B9	18
+# Patch6and7RemoveModChecks: the only two gated builds are 1.0.6.0 and 1.0.7.0, so these
+# rows are the site VAs in THOSE images (base 0x400000); the only IDB available is 1.0.8.0.
+# Each signature was confirmed to have exactly one hit on its build.
+Patch6and7RemoveModChecks.1060.a	0x4038AC	01 00 00 00 51 89 5C 24 ? E8 ? ? ? ? 85 C0 75 ? 39 44 24 ? 74	23
+Patch6and7RemoveModChecks.1060.b	0x40392E	74 ? 8B 45 ? 53 6A ? 50 E8 ? ? ? ? 57 E8 ? ? ? ? 83 C4 ? 68	24
+Patch6and7RemoveModChecks.1060.c	0x40397E	01 00 00 00 75 ? 8B 4E ? 8D 44 24 ? 50 6A ? 51 89 7C ? ? E8	22
+Patch6and7RemoveModChecks.1060.d	0x403982	75 ? 8B 4E ? 8D 44 24 ? 50 6A ? 51 89 7C 24 ? E8	18
+Patch6and7RemoveModChecks.1060.e	0x403A14	74 ? 8B 4D ? 57 6A ? 51 E8 ? ? ? ? 80 3D ? ? ? ? ? 0F	22
+Patch6and7RemoveModChecks.1060.f	0x4042E7	C6 05 ? ? ? ? ? 74 ? 8B 40 ? 56 6A ? 6A ? 50 83 CE ? E8	22
+Patch6and7RemoveModChecks.1070.a	0x40388C	01 00 00 00 51 89 5C 24 ? E8 ? ? ? ? 85 C0 75 ? 39 44 24 ? 74	23
+Patch6and7RemoveModChecks.1070.b	0x40389C	75 ? 39 44 24 ? 74 ? 8A C3 5F 5E 5D 5B 83 C4 ? C3 8D 54 24 ? 52 8D	24
+Patch6and7RemoveModChecks.1070.c	0x40390E	74 ? 8B 45 ? 53 6A ? 50 E8 ? ? ? ? 57 E8 ? ? ? ? ? ? ? 68	24
+Patch6and7RemoveModChecks.1070.d	0x40395E	01 00 00 00 75 ? 8B 4E ? 8D 44 24 ? 50 6A ? 51 89 7C ? ? E8	22
+Patch6and7RemoveModChecks.1070.e	0x403962	75 ? 8B 4E ? 8D 44 24 ? 50 6A ? 51 89 7C 24 ? E8	18
+Patch6and7RemoveModChecks.1070.f	0x4039F4	74 ? 8B 4D ? 57 6A ? 51 E8 ? ? ? ? 80 3D ? ? ? ? ? 0F	22
+Patch6and7RemoveModChecks.1070.g	0x4042C7	C6 05 ? ? ? ? ? 74 ? 8B 40 ? 56 6A ? 6A ? 50 83 CE ? E8	22
+PedModelsInCutscenesFix	0xA23820	56 8B F1 E8 ? ? ? ? 85 C0 74 0E 66 8B 40 2E	16
+PedModelsInCutscenesFix.lookup	0x8DD2D0	8B 44 24 04 89 44 24 04 66 A1 ? ? ? ? 66 85 C0 76 3E	19

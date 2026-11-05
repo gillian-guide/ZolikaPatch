@@ -11,6 +11,8 @@ import vehicles;
 import useless_checks;
 import graphics;
 import launcher;
+import audio;
+import misc;
 
 extern "C" __declspec(dllexport) void InitializeASI();
 
@@ -53,6 +55,8 @@ namespace
         RegisterUselessChecks();
         RegisterGraphics();
         RegisterLauncher();
+        RegisterAudio();
+        RegisterMisc();
         Loader::Run();
 
 #ifdef ZP_TRACE
