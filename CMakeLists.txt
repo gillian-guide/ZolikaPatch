@@ -140,4 +140,12 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs
   add_test(NAME zp_body_proof_selftest
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/verify_bodies.py
             --selftest --original ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/ZolikaPatch_original.asi.off)
+  # The transcribed bodies, one manifest row each: instruction-for-instruction
+  # against the original ASI, with absolute operands compared as slots.
+  add_test(NAME zp_body_proof
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/verify_bodies.py
+            --original ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/ZolikaPatch_original.asi.off
+            --candidate $<TARGET_FILE:${ZP_NAME}>
+            --bodies ${CMAKE_CURRENT_SOURCE_DIR}/tests/bodies.tsv)
+  set_tests_properties(zp_body_proof PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
