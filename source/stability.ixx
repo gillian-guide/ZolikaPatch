@@ -10,6 +10,7 @@ import common;
 import graphics;
 import loader;
 import patch;
+import shared;
 
 // Crash fixes. One arm per key, each anchored to its own recovered signature.
 // Registration is explicit: the driver calls Register(), so the arm cannot be
@@ -605,6 +606,44 @@ namespace
         injector::MakeJMP(shim, reinterpret_cast<void*>(&Smpa60Shim), true);
     }
 
+    // PlayerAsPedComponentsFix: the anchor's +5 is the `movzx edx,[eax+219h]` whose
+    // result becomes CPedVariationMgr::SetVariation's `bool` argument; the site
+    // becomes a jump into the shared shim (recovered VA 0x1003D9A0, hosted in
+    // shared.ixx), which pushes the computed "this is the player model" flag and the
+    // `push ecx` at the anchor's +13 instead. The resume is the anchor's +14 (the
+    // `add ecx,80h` after those two pushes), published before the write.
+    void InstallPlayerAsPedComponentsFix()
+    {
+        if (!Loader::Enabled("PlayerAsPedComponentsFix"))
+            return;
+
+        auto pattern = find_pattern("8B 54 24 10 52 0F B6 90 19 02 00 00");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get_first<std::byte>(0);
+        Shared::PublishPlayerPedComponentsResume(
+            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match) + 14));
+
+        injector::MakeJMP(match + 5,
+            reinterpret_cast<void*>(Shared::PlayerPedComponentsShim()), true);
+    }
+
+    // BadPlayerModelCrashFix is deliberately not installed: it cannot be reproduced
+    // faithfully without the original's script-native library. Its trampoline
+    // (0x10037BA0, 16 instructions) is a plain transcription, but its helper
+    // sub_10037AC0 (65 instructions) reads the game's ped model array through
+    // dword_1015AD78 and, on the path that matters - the object is not a ped class -
+    // calls the native wrappers sub_1005B3F0 (46) and sub_1005B150 (44). Those build
+    // a 0xA0-byte native context (sub_100038C0 (5); sub_100038E0 (59), an SEH frame
+    // around a call through the game pointer dword_1015BDE0) and invoke it through
+    // sub_1005DE40/80 (21 each), and the path also calls the game function
+    // dword_10159C74. The GTAC.dll branch needs more of the same (sub_1005B290 (61),
+    // sub_1005B530 (45), the sub_10001280 sprintf chain) plus sub_10003F00 (21),
+    // which hashes against the original's own 38,455-entry model-name table at
+    // 0x100DE770. That library is a workstream of its own; approximating it would be
+    // a stub, so the key stays open (docs/parity.md).
+
     // SCOSignatureFix: the instruction 32 bytes before the anchor becomes a short
     // jump, so the signature check that follows is skipped.
     void InstallSCOSignatureFix()
@@ -705,6 +744,7 @@ export void RegisterStability()
         InstallGroupHackFix();
         InstallPathNodeCrashFix();
         InstallPlaneCrashFix();
+        InstallPlayerAsPedComponentsFix();
         InstallWantedLevelCrashFix();
         InstallEpisodeSwitchFreezeFix();
         InstallSMPA60Fix();

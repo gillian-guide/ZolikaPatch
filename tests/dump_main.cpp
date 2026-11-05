@@ -7,6 +7,7 @@ import config;
 import game;
 import loader;
 import options;
+import shared;
 import stability;
 import vehicles;
 import useless_checks;
@@ -128,6 +129,7 @@ int main(int argc, char** argv)
     if (out == nullptr)
         return 1;
 
+    Shared::Register();
     RegisterStability();
     RegisterVehicles();
     RegisterUselessChecks();

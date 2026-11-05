@@ -69,6 +69,7 @@ target_sources(zp_modules PUBLIC
     source/game.ixx
     source/options.ixx
     source/loader.ixx
+    source/shared.ixx
     source/stability.ixx
     source/vehicles.ixx
     source/useless_checks.ixx

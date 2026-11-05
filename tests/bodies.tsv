@@ -2,6 +2,7 @@
 # body's exact instruction count. verify_bodies.py resolves the symbol in
 # ZolikaPatch.map and sweeps that many instructions linearly on both sides, so a
 # row is a whole-body proof; a short decode on either side fails the row.
+value_resolver 10003E50 ?ValueResolverBody@@YAXXZ 67
 aim_projectile_crash_fix 10005590 ?AimProjectileShim@?A0x06fbc149@@YAXXZ 11
 building_dynamic_shadows 10005AF0 ?BuildingsDynamicShadowsShim@@YAXXZ 17
 emissive_lerp_shim 1001AF60 ?EmissiveLerpShim@@YAXXZ 10
@@ -12,6 +13,8 @@ freeze_gun_shim 10036EB0 ?FreezeGunShim@@YAXXZ 11
 group_hack_shim 10036E90 ?GroupHackShim@@YAXXZ 7
 path_node_shim 1003D7B0 ?PathNodeShim@@YAXXZ 6
 plane_crash_shim 1003D870 ?PlaneCrashShim@@YAXXZ 7
+player_ped_helper 1003D930 ?PlayerPedHelperBody@@YAXXZ 28
+player_ped_components_shim 1003D9A0 ?PlayerPedComponentsShimBody@@YAXXZ 7
 wanted_level_shim 10050490 ?WantedLevelShim@@YAXXZ 9
 episode_switch_store_shim 1001B040 ?EpisodeSwitchStoreShim@@YAXXZ 12
 episode_switch_shim_b 1001B060 ?EpisodeSwitchShimB@@YAXXZ 13

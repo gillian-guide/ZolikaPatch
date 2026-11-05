@@ -30,6 +30,14 @@ PathNodeCrashFix	0xA6D270	8B 04 B1 0F B7 D0	6
 BlackscreenFix	0x6C6EF8	75 ? 8B 48 ? 8B 40 ? 51 8B 0D	12
 CrashMsgFix	0xB11BAE	68 6A 10 4E 31	5
 PlaneCrashFix	0x9E0D08	83 C4 04 88 58 26 8B 16 8B 82 F4 00 00 00	14
+# PlayerAsPedComponentsFix: the arm's site (the 7-byte `movzx edx,[eax+219h]` inside
+# SET_CHAR_COMPONENT_VARIATION, installed at +5) and the model-index lookup the
+# shared library resolves with the same pattern the original scans for.
+PlayerAsPedComponentsFix	0xB40804	8B 54 24 10 52 0F B6 90 19 02 00 00	12
+PlayerAsPedComponentsFix.lookup	0x8DD2D0	8B 44 24 04 89 44 24 04 66 A1 ? ? ? ? 66 85 C0 76 3E	19
+# BadPlayerModelCrashFix: recovered signature; no arm is installed (blocked on the
+# original's native-call library, see docs/parity.md).
+BadPlayerModelCrashFix	0x7CF803	83 E4 F0 83 EC 54 0F 57 C0 53 8B 5D 0C	13
 WantedLevelCrashFix	0x9B26C9	8B 01 8B 90 ? ? ? ? FF D2 84 C0 0F 84 ? ? ? ? 8B 83	17
 EpisodeSwitchFreezeFix.a	0x45EC46	89 43 ? 8B 10 8B 52 ? 57 8D 4C 24 ? 51 8B C8 FF D2 83 F8 FF	20
 EpisodeSwitchFreezeFix.b	0x4605F6	8B 4B ? 3B 4B ? 7D	7

@@ -5,6 +5,7 @@ import config;
 import game;
 import loader;
 import options;
+import shared;
 import stability;
 import vehicles;
 import useless_checks;
@@ -46,6 +47,7 @@ namespace
 #endif
 
         FusionFix::onInitEvent().executeAll();
+        Shared::Register();
         RegisterStability();
         RegisterVehicles();
         RegisterUselessChecks();
