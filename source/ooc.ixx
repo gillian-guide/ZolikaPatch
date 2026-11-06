@@ -40,19 +40,21 @@ import patch;
 //   0x1004B150  the decoder's opcode step.                transcribed, proved
 //   0x1004B570  the decode driver + Adler-32.             transcribed, proved
 //   0x1004B750  the init: decode, register, build the archive, publish the size.
-//   0x1004ACE0  the in-memory archive builder.  rebuilt, no proof row
+//   0x1004ACE0  the in-memory archive builder.            transcribed, proved
 //   0x1004C350  the wrapper the second `E8` is retargeted to.  transcribed, proved
 //   0x1004C3C0  the branch body the `E9` jumps to.             transcribed, proved
 //
-// The decoder pair is transcribed instruction for instruction from the original's
-// own stream: an interpreter with sixteen exits and no register contract beyond
-// "ECX in, EAX out", no exception frame, no TLS guard and no indexed absolute
-// operand, so it is provable whole (`tests/bodies.tsv`). The remaining rebuilds are
-// compiler output for a plain C function: the archive builder is a memset plus a
-// sequence of memcpys, the init is C++ container plumbing and the handler is the
-// original's own loader-shaped scan/publish/write code. They are rebuilt in C++
-// with the original's arithmetic, bounds and call order, so their behaviour is the
-// same and there is nothing instruction-level to compare.
+// The decoder pair and the archive builder are transcribed instruction for
+// instruction from the original's own streams: the decoder is an interpreter with
+// sixteen exits and no register contract beyond "ECX in, EAX out", and the builder
+// is one /GS frame with EBP-relative locals and direct `E8`s. Neither has an
+// exception frame, a TLS static-init guard or an indexed absolute operand, so both
+// are provable whole (`tests/bodies.tsv`). The builder's twelve internal helpers
+// (0x1004AB70..0x10056500) are transcribed beside it, so its call graph is
+// transcriptions down to the CRT boundaries. The remaining rebuilds are the init
+// (C++ container plumbing, class B) and the handler (the original's own
+// loader-shaped scan/publish/write code, EH4 + `std::string`), rebuilt in C++ with
+// the original's arithmetic, bounds and call order.
 
 // The recovered resource, verbatim. source/ooc_finale2.inc carries the pinned
 // image SHA-256, the source VA and length, the extraction recipe and the decoded
@@ -80,6 +82,12 @@ extern "C"
     uint32_t zpatch_ooc_cursor = 0;
     uint32_t zpatch_ooc_end = 0;
     uint32_t zpatch_ooc_lower = 0;
+
+    // dword_10159C78: the archive builder's write cursor. The transcribed
+    // builder sets it to zero, moves it to 0x800 for the payload region and
+    // advances it on every append (0x1004ABD0), and the rebuilt init reads it back
+    // after the call for the archive's byte count exactly as sub_1004B750 does.
+    uint32_t zpatch_ooc_offset = 0;
 }
 
 // The two halves of the mount string the wrapper formats: "me" + "mor" + "y" +
@@ -104,13 +112,9 @@ namespace
     // sub_1004B750's malloc argument and sub_1004B570's output bound
     // (dword_10196374 = begin + 0x2BD50): the decoded table's exact size.
     constexpr size_t kOocTableSize = 0x2BD50;  // 179,536
-    // The archive's granularity: the payload starts at 0x800 and every entry is
-    // padded to it (sub_1004ACE0, sub_1004ABB0).
-    constexpr size_t kOocPageSize = 0x800;
-    // The name the one fake-pak entry carries, and the archive's own magic -- the
-    // value the branch body compares the script resource against.
+    // The name the one fake-pak entry carries (the archive's granularity, 0x800,
+    // and its magic, 0x86723DFF, are the transcribed builder's own literals).
     constexpr char kOocName[] = "finale2.sco";
-    constexpr uint32_t kOocArchiveMagic = 0x86723DFFu;
 }
 
 // The decode pair's one call, the CRT's memcpy. The inline assembler refuses
@@ -802,200 +806,792 @@ namespace
     };
     static_assert(sizeof(OocPakEntry) == 44, "the original's fake-pak entry is 44 bytes");
 
+    // The original's fake-pak vector, at a fixed address because the transcribed
+    // builder names its storage the way the original does: `mov [ebp-60h], offset
+    // Block` and `mov ecx, offset Block`, with the vector's begin/end read as
+    // `[Block]` / `[Block+4]`. It is a real `std::vector` so the C++ side of the
+    // module (the rebuilt init's push_back, the self-check) keeps using the
+    // container's own growth, and its three pointers are the original's three
+    // pointers at 0x1016E43C/40/44. C linkage gives the object the short `_name`
+    // symbol the proof and the operand map resolve; the layout is the same either
+    // way, and `OocPakTable()` is the only C++ path to it.
+    extern "C"
+    {
+        std::vector<OocPakEntry> zpatch_ooc_pak;
+    }
+
     std::vector<OocPakEntry>& OocPakTable()
     {
-        static std::vector<OocPakEntry> entries;
-        return entries;
+        return zpatch_ooc_pak;
     }
+}
 
-    // The archive's 20-byte header and its 16-byte per-entry record
-    // (sub_1004AB70, sub_1004AB80, sub_1004ABB0, sub_1004AB90 and the stores
-    // sub_1004ACE0 makes into them).
-    struct OocHeader
-    {
-        uint32_t magic;
-        uint32_t version;
-        uint32_t entries;
-        uint32_t names;
-        uint16_t page;
-        uint16_t opcode;
-    };
-    static_assert(sizeof(OocHeader) == 20, "the archive header is 20 bytes");
+// The archive's 20-byte header and its 16-byte per-entry record are built on
+// the builder's own stack (`[ebp-28h]` and `[ebp-14h]`) by the two original
+// helpers below; their field order is the stores the transcription keeps:
+//
+//   header  +0x00 magic 0x86723DFF   +0x04 version 3   +0x08 entry count
+//           +0x0C name bytes        +0x10 page 0x10   +0x12 opcode 0xE9
+//   record  +0x00 stored size       +0x04 stored offset
+//           +0x08 index (1-based first page)  +0x0C pages | pad (0x2000 flag)
+//
+// The chunks the builder stamps are what OocInitialise and the self-check
+// measure: the header's two words at +0x10 are the `16`/`0xE9` pair.
 
-    struct OocRecord
-    {
-        uint32_t stored_size;
-        uint32_t stored_offset;
-        uint32_t index;
-        uint16_t pages;
-        uint16_t padding;  // low 11 bits the pad length, bit 0x20 the offset flag
-    };
-    static_assert(sizeof(OocRecord) == 16, "the archive record is 16 bytes");
+// The three CRT boundaries the builder crosses. The original calls a thunk to the
+// CRT's scalar `operator new` (0x100603F1), `memset` (0x10060D6E) and `free`
+// (0x1005FE89); the inline assembler cannot name the first two, and a direct call
+// would not keep the original's argument order, so each site calls one of these
+// cdecl forwarders instead -- one `E8`, the same arguments and the same routine.
+static void* __cdecl OocAllocate(unsigned int size)
+{
+    return ::operator new(size);
+}
 
-    // sub_1004ABB0: the pages a payload occupies, rounding up.
-    uint32_t OocPageCountFor(uint32_t size)
+static void __cdecl OocZeroBlock(void* destination, int value, unsigned int count)
+{
+    std::memset(destination, value, count);
+}
+
+static void __cdecl OocFreeBlock(void* block)
+{
+    std::free(block);
+}
+
+// 0x1005CD50, the destroy loop the vector's clear runs over its elements
+// (`std::_Destroy_range` for the fake-pak entry). It is the one callee of the
+// transcribed set that stays rebuilt: it is the CRT's std::string destructor
+// loop, and its free path reads the string's internal capacity and, past
+// 0x1000, the allocator's block header, before calling `_invalid_parameter_
+// noinfo_noreturn` -- image-internal CRT state this module cannot name. The
+// loop below performs the same stores on the same 44-byte stride, and frees a
+// heap-allocated name the way the original does. Every entry this module ever
+// registers keeps its name in the inline buffer (capacity 0x0F), so the free
+// branch is unreachable from the tree's own data, exactly as it is in the
+// original for the single "finale2.sco" entry.
+static void __cdecl OocDestroyEntries(void* first, void* last)
+{
+    auto* entry = static_cast<uint8_t*>(first);
+    const auto* end = static_cast<const uint8_t*>(last);
+    while (entry != end)
     {
-        return size / static_cast<uint32_t>(kOocPageSize) +
-               (size % static_cast<uint32_t>(kOocPageSize) != 0u ? 1u : 0u);
+        const auto capacity = *reinterpret_cast<uint32_t*>(entry + 0x14);
+        if (capacity >= 0x10u)
+            std::free(*reinterpret_cast<void**>(entry));
+        *reinterpret_cast<uint32_t*>(entry + 0x10) = 0;
+        *reinterpret_cast<uint32_t*>(entry + 0x14) = 0x0Fu;
+        *entry = 0;
+        entry += 0x2C;
     }
+}
 
-    // sub_1004B750's push_back: the name's fields, the payload's size at +0x18 and
-    // the table at +0x28. The three offsets the builder recomputes stay zero.
-    void OocRegister(uint8_t* table)
+// The adapter between 0x10056500's call shape (first in ECX, last in EDX, the
+// allocator pushed as a third argument the original ignores) and the cdecl
+// helper above. The caller cleans the pushed word, as the original's
+// `add esp, 4` does, so this adapter leaves it alone.
+static __declspec(naked) void OocDestroyEntriesBody()
+{
+    __asm
     {
-        OocPakEntry entry{};
-        std::memcpy(entry.name, kOocName, sizeof(kOocName));
-        entry.name_size = static_cast<uint32_t>(sizeof(kOocName) - 1);
-        entry.name_capacity = static_cast<uint32_t>(sizeof(entry.name) - 1);
-        entry.file_size = static_cast<uint32_t>(kOocTableSize);
-        entry.data = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(table));
-        OocPakTable().push_back(entry);
+        push ebp
+        mov ebp, esp
+        push edx
+        push ecx
+        call OocDestroyEntries
+        add esp, 8
+        pop ebp
+        ret
     }
+}
 
-    // sub_1004ACE0: the in-memory archive. Header, one record per entry, the names,
-    // then at 0x800 the payloads with each entry's zero padding to the next page.
-    // The builder consumes the payload it was handed (the original frees each
-    // entry's block inside the payload loop) and returns a malloc'd archive the
-    // caller owns and never frees -- the original leaks it on every call, because
-    // the init it runs from re-runs every time.
-    uint8_t* OocBuildArchive(uint32_t& final_offset)
+// The transcribed bodies. They are file-scope `static` rather than members of the
+// anonymous namespace above for one reason: a proof row names a body's symbol in
+// the linker map, and MSVC decorates an anonymous-namespace function with a
+// generated `?A0x…` scope this file's edits would churn. A file-scope `static`
+// keeps the plain `?Ooc…@@YAXXZ` name the other transcribed bodies have, and it
+// still cannot be exported (a naked function with external linkage in a module
+// interface unit is written to the BMI and every importer fails with C2488).
+
+// 0x1004AB70 (5 instructions, 16 bytes): zero the 20-byte header -- one SSE
+// 16-byte store and the dword at +0x10.
+static __declspec(naked) void OocZeroHeaderBody()
+{
+    __asm
     {
-        auto& entries = OocPakTable();
-
-        // The original's classification of what to store: a payload of 16 bytes or
-        // less, or one that does not start with the compressed-resource dword
-        // 0x05435352 ("RSC" + 5), is stored whole at offset 0. This resource starts
-        // with "scr" + 0x0E, so it takes that branch.
-        for (auto& entry : entries)
-        {
-            if (entry.file_size <= 0x10u)
-            {
-                entry.stored_offset = 0;
-                entry.stored_size = entry.file_size;
-                continue;
-            }
-            const auto* words = reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(entry.data));
-            if (words[0] == 0x05435352u)
-            {
-                entry.stored_offset = words[1];
-                entry.stored_size = words[2];
-            }
-            else
-            {
-                entry.stored_offset = 0;
-                entry.stored_size = entry.file_size;
-            }
-        }
-
-        uint32_t pages = 0;
-        uint32_t names = 0;
-        for (const auto& entry : entries)
-        {
-            pages += OocPageCountFor(entry.file_size);
-            names += static_cast<uint32_t>(std::strlen(entry.name) + 1);
-        }
-        const uint32_t total = pages * static_cast<uint32_t>(kOocPageSize) +
-                               static_cast<uint32_t>(kOocPageSize);
-
-        // No null check, like the original's: a failed allocation faults in the
-        // memset below.
-        auto* archive = static_cast<uint8_t*>(std::malloc(total));
-        std::memset(archive, 0, total);
-
-        uint32_t offset = 0;
-        const auto append = [&](const void* source, size_t bytes)
-        {
-            std::memcpy(archive + offset, source, bytes);
-            offset += static_cast<uint32_t>(bytes);
-        };
-
-        // The header's last two words are the original's fixed 16 and 0xE9.
-        const OocHeader header{ kOocArchiveMagic, 3u, static_cast<uint32_t>(entries.size()),
-                                names + 16u * static_cast<uint32_t>(entries.size()), 0x10u, 0xE9u };
-        append(&header, sizeof(header));
-
-        // The record's index field is the entry's first page, 1-based: the original
-        // accumulates each entry's page count into `v9` and stores `v9 + 1`, not the
-        // entry's ordinal.
-        uint32_t pages_before = 0;
-        for (auto& entry : entries)
-        {
-            OocRecord record{};
-            record.stored_size = entry.stored_size;
-            record.stored_offset = entry.stored_offset;
-            record.index = pages_before + 1u;
-            record.pages = static_cast<uint16_t>(OocPageCountFor(entry.file_size));
-            const uint32_t remainder = entry.file_size % static_cast<uint32_t>(kOocPageSize);
-            if (remainder != 0u)
-            {
-                entry.padding = static_cast<uint32_t>(kOocPageSize) - remainder;
-                record.padding = static_cast<uint16_t>(entry.padding);
-                if (entry.stored_offset != 0u)
-                    record.padding = static_cast<uint16_t>(record.padding | 0x2000u);
-            }
-            append(&record, sizeof(record));
-            pages_before += record.pages;
-        }
-
-        for (const auto& entry : entries)
-            append(entry.name, std::strlen(entry.name) + 1);
-
-        // The payload region starts at the first page, whatever the header and the
-        // names took (the original resets its offset dword here).
-        offset = static_cast<uint32_t>(kOocPageSize);
-        for (auto& entry : entries)
-        {
-            append(reinterpret_cast<const void*>(static_cast<uintptr_t>(entry.data)), entry.file_size);
-            std::free(reinterpret_cast<void*>(static_cast<uintptr_t>(entry.data)));
-            entry.data = 0;
-            if (entry.padding != 0u)
-            {
-                auto* zeros = static_cast<uint8_t*>(std::malloc(entry.padding));
-                std::memset(zeros, 0, entry.padding);
-                append(zeros, entry.padding);
-                std::free(zeros);
-            }
-        }
-
-        final_offset = offset;
-        return archive;
+        xorps xmm0, xmm0
+        mov eax, ecx
+        movups XMMWORD PTR [ecx], xmm0
+        mov DWORD PTR [ecx + 10h], 0
+        ret
     }
+}
 
-    // sub_1004B750: decode, register the entry, build the archive, publish the byte
-    // count the mount string carries and return the archive. Its one-shot guard
-    // dword_10159C00 is read and never written anywhere in the original, so every
-    // call re-runs all of this and leaks the previous archive: kept 1:1.
-    uint32_t OocInitialise()
+// 0x1004AB80 (4 instructions, 9 bytes): zero the 16-byte record.
+static __declspec(naked) void OocZeroRecordBody()
+{
+    __asm
     {
-        // Unchecked, like the original: the decode writes through the block whether
-        // or not the allocation succeeded.
-        auto* table = static_cast<uint8_t*>(std::malloc(kOocTableSize));
-        static_cast<void>(OocDecodeBody(table));  // the original discards the answer
-        OocRegister(table);
-        uint32_t final_offset = 0;
-        uint8_t* archive = OocBuildArchive(final_offset);
-        OocPakTable().clear();  // dword_1016E440 = dword_1016E43C
-        zpatch_ooc_state = final_offset;
-        return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(archive));
+        xorps xmm0, xmm0
+        mov eax, ecx
+        movups XMMWORD PTR [ecx], xmm0
+        ret
     }
+}
 
-    // sub_10001280, recovered VA 0x10001280: the bounded formatter, transcribed once
-    // in source/stability.ixx and proved there instruction for instruction
-    // (docs/rebuilt.md). A module interface cannot export a naked function, so this
-    // six-byte forwarder is what the wrapper's `call` names: the original's call is
-    // an immediate too, and the forwarder enters the body with the stack and the
-    // registers untouched.
-    static __declspec(naked) void OocFormat()
+// 0x1004AB90 (9 instructions, 27 bytes): merge the pad length into the
+// record's +0x0C word, keeping the top five bits (the stored-offset flag).
+// `ret 4`: the pad length is a stack argument the callee pops.
+static __declspec(naked) void OocSetRecordPadBody()
+{
+    __asm
     {
-        __asm
-        {
-            jmp DWORD PTR [zpatch_format_entry]
-        }
+        push ebp
+        mov ebp, esp
+        mov ax, WORD PTR [ecx + 0Eh]
+        mov edx, 0F800h
+        and ax, dx
+        or ax, WORD PTR [ebp + 8]
+        mov WORD PTR [ecx + 0Eh], ax
+        pop ebp
+        ret 4
     }
+}
 
-    // fnv1a over a recovered block, for the self-check below only: it is the
-    // fingerprint the recovered data's own header records.
-    uint32_t OocFnv1a(const uint8_t* data, size_t size)
+// 0x1004ABB0 (6 instructions, 18 bytes): `size / 0x800`, rounded up.
+static __declspec(naked) void OocPageCountBody()
+{
+    __asm
+    {
+        mov eax, ecx
+        shr eax, 0Bh
+        test ecx, 7FFh
+        lea ecx, [eax + 1]
+        cmovnz eax, ecx
+        ret
+    }
+}
+
+// 0x1004ABD0 (20 instructions, 45 bytes): copy one chunk into the archive at
+// the write cursor and advance the cursor. ECX is the source, EDX the element
+// size, and the two stack words the count and the archive's base. The CRT
+// memcpy is the module's `OocCopyBlock` (the inline assembler refuses a direct
+// `call memcpy`); the shape -- three pushes, `add esp, 0Ch` -- is the
+// original's.
+static __declspec(naked) void OocAppendBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        mov eax, DWORD PTR [ebp + 0Ch]
+        push esi
+        mov esi, DWORD PTR [zpatch_ooc_offset]
+        add eax, esi
+        push edi
+        mov edi, edx
+        imul edi, DWORD PTR [ebp + 8]
+        push edi
+        push ecx
+        push eax
+        call OocCopyBlock
+        add esp, 0Ch
+        add esi, edi
+        mov DWORD PTR [zpatch_ooc_offset], esi
+        pop edi
+        pop esi
+        pop ebp
+        ret
+    }
+}
+
+// 0x1004AC00 (28 instructions, 59 bytes): the total bytes the names occupy,
+// each with its NUL. The name's first dword is the std::string's buffer
+// pointer when the capacity is at least 0x10, and the inline buffer otherwise.
+static __declspec(naked) void OocNameBytesBody()
+{
+    __asm
+    {
+        mov edx, DWORD PTR [zpatch_ooc_pak]
+        push ebx
+        mov ebx, DWORD PTR [zpatch_ooc_pak + 4]
+        push esi
+        xor esi, esi
+        cmp edx, ebx
+        je ooc_name_bytes_done
+        push edi
+    ooc_name_bytes_loop:
+        cmp DWORD PTR [edx + 14h], 10h
+        mov eax, edx
+        jb ooc_name_bytes_short
+        mov eax, DWORD PTR [edx]
+    ooc_name_bytes_short:
+        lea edi, [eax + 1]
+    ooc_name_bytes_scan:
+        mov cl, BYTE PTR [eax]
+        inc eax
+        test cl, cl
+        jne ooc_name_bytes_scan
+        sub eax, edi
+        inc esi
+        add edx, 2Ch
+        add esi, eax
+        cmp edx, ebx
+        jne ooc_name_bytes_loop
+        pop edi
+    ooc_name_bytes_done:
+        mov eax, esi
+        pop esi
+        pop ebx
+        ret
+    }
+}
+
+// 0x1004AC40 (23 instructions, 66 bytes): the archive's payload pages -- the
+// same round-up as 0x1004ABB0, summed over every entry. The original's 11-byte
+// loop padding (`66 66 66 0F 1F 84 00 00 00 00 00`) is emitted as bytes: the
+// inline assembler's `nop` is one byte, and the instructions after it sit at
+// the same relative offsets on both sides.
+static __declspec(naked) void OocPageTotalBody()
+{
+    __asm
+    {
+        mov ecx, DWORD PTR [zpatch_ooc_pak]
+        push ebx
+        mov ebx, DWORD PTR [zpatch_ooc_pak + 4]
+        push edi
+        xor edi, edi
+        cmp ecx, ebx
+        je ooc_page_total_done
+        push esi
+        _emit 066h
+        _emit 066h
+        _emit 066h
+        _emit 00Fh
+        _emit 01Fh
+        _emit 084h
+        _emit 000h
+        _emit 000h
+        _emit 000h
+        _emit 000h
+        _emit 000h
+    ooc_page_total_loop:
+        mov esi, DWORD PTR [ecx + 18h]
+        shr esi, 0Bh
+        test DWORD PTR [ecx + 18h], 7FFh
+        lea edx, [esi + 1]
+        cmovne esi, edx
+        add ecx, 2Ch
+        add edi, esi
+        cmp ecx, ebx
+        jne ooc_page_total_loop
+        pop esi
+    ooc_page_total_done:
+        mov eax, edi
+        pop edi
+        pop ebx
+        ret
+    }
+}
+
+// 0x100564F0 (2 instructions, 3 bytes): the vector's begin pointer.
+static __declspec(naked) void OocVectorBeginBody()
+{
+    __asm
+    {
+        mov eax, DWORD PTR [ecx]
+        ret
+    }
+}
+
+// 0x100564E0 (2 instructions, 4 bytes): the vector's end pointer.
+static __declspec(naked) void OocVectorEndBody()
+{
+    __asm
+    {
+        mov eax, DWORD PTR [ecx + 4]
+        ret
+    }
+}
+
+// 0x100564C0 (9 instructions, 23 bytes): the vector's element count -- the
+// byte distance divided by the 44-byte stride through the exact reciprocal
+// multiply the compiler emitted.
+static __declspec(naked) void OocVectorSizeBody()
+{
+    __asm
+    {
+        mov edx, DWORD PTR [ecx + 4]
+        mov eax, 2E8BA2E9h
+        sub edx, DWORD PTR [ecx]
+        imul edx
+        sar edx, 3
+        mov eax, edx
+        shr eax, 1Fh
+        add eax, edx
+        ret
+    }
+}
+
+// 0x10057710 (6 instructions, 12 bytes): the entry's name as a C string --
+// the std::string's heap buffer when the capacity is at least 0x10, the inline
+// buffer otherwise.
+static __declspec(naked) void OocEntryNameBody()
+{
+    __asm
+    {
+        cmp DWORD PTR [ecx + 14h], 10h
+        jb ooc_entry_name_short
+        mov eax, DWORD PTR [ecx]
+        ret
+    ooc_entry_name_short:
+        mov eax, ecx
+        ret
+    }
+}
+
+// 0x10056500 (11 instructions, 24 bytes): the vector's clear -- destroy the
+// elements, then set end to begin. The destroy loop is 0x1005CD50 above.
+static __declspec(naked) void OocVectorClearBody()
+{
+    __asm
+    {
+        push esi
+        mov esi, ecx
+        push ecx
+        mov edx, DWORD PTR [esi + 4]
+        mov ecx, DWORD PTR [esi]
+        call OocDestroyEntriesBody
+        mov eax, DWORD PTR [esi]
+        add esp, 4
+        mov DWORD PTR [esi + 4], eax
+        pop esi
+        ret
+    }
+}
+
+// sub_1004B750's push_back: the name's fields, the payload's size at +0x18 and
+// the table at +0x28. The three offsets the builder recomputes stay zero.
+static void OocRegister(uint8_t* table)
+{
+    OocPakEntry entry{};
+    std::memcpy(entry.name, kOocName, sizeof(kOocName));
+    entry.name_size = static_cast<uint32_t>(sizeof(kOocName) - 1);
+    entry.name_capacity = static_cast<uint32_t>(sizeof(entry.name) - 1);
+    entry.file_size = static_cast<uint32_t>(kOocTableSize);
+    entry.data = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(table));
+    OocPakTable().push_back(entry);
+}
+
+// sub_1004ACE0, recovered VA 0x1004ACE0 (314 instructions, 1,121 bytes): the
+// in-memory archive. Header, one 16-byte record per entry, the names, then at
+// 0x800 the payloads with each entry's zero padding to the next page. The
+// builder consumes the payload it was handed (the original frees each entry's
+// block inside the payload loop) and returns an archive the caller owns and
+// never frees -- the original leaks it on every call, because the init it runs
+// from re-runs every time. The write cursor is the original's own global
+// (dword_10159C78): the caller reads it back for the archive's byte count,
+// exactly as sub_1004B750 does after its `call sub_1004ACE0`.
+//
+// Transcribed instruction for instruction. The stream has no exception frame
+// and no TLS static-init guard: it is one /GS frame (the cookie slots are
+// ordinary absolute operands), direct `E8` calls, and EBP-relative locals. Its
+// twelve internal callees are the twelve bodies above, all transcribed, so the
+// class-D objection that kept this rebuilt -- "every call lands in another
+// rebuild" -- is gone; only the CRT boundaries remain (operator new, memset,
+// memcpy, free) through the forwarders above, plus the CRT's string-destroy
+// loop 0x1005CD50, which is documented at OocDestroyEntries.
+//
+// Two details are the original's and not the transcription's invention:
+// - the `imul ecx, eax, 0` at 0x1004AD55 is the compiler's zero-offset multiply
+//   (the first payload dword), not dead code: it shapes the `cmp [edx+ecx]`.
+// - the record's index is the running page count plus one, and its +0x0C word
+//   carries the pad length with bit 0x2000 set when the stored offset is
+//   non-zero; `OocSetRecordPadBody` is the merge, and the `+0x20` store on the
+//   entry itself is what the payload loop then sees.
+//
+// Naked and internal: an external-linkage naked function is written to the
+// module and every importer fails (C2488).
+static __declspec(naked) void* OocBuildArchiveBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        sub esp, 0A8h
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, ebp
+        mov DWORD PTR [ebp - 4], eax
+        push esi
+        mov DWORD PTR [zpatch_ooc_offset], 0
+        mov DWORD PTR [ebp - 60h], OFFSET zpatch_ooc_pak
+        mov ecx, DWORD PTR [ebp - 60h]
+        call OocVectorBeginBody
+        mov DWORD PTR [ebp - 48h], eax
+        mov ecx, DWORD PTR [ebp - 60h]
+        call OocVectorEndBody
+        mov DWORD PTR [ebp - 84h], eax
+        jmp ooc_build_class_loop
+    ooc_build_advance:
+        mov eax, DWORD PTR [ebp - 48h]
+        add eax, 2Ch
+        mov DWORD PTR [ebp - 48h], eax
+    ooc_build_class_loop:
+        mov ecx, DWORD PTR [ebp - 48h]
+        cmp ecx, DWORD PTR [ebp - 84h]
+        je ooc_build_count
+        mov edx, DWORD PTR [ebp - 48h]
+        mov DWORD PTR [ebp - 2Ch], edx
+        mov eax, DWORD PTR [ebp - 2Ch]
+        mov ecx, DWORD PTR [eax + 28h]
+        mov DWORD PTR [ebp - 58h], ecx
+        mov edx, DWORD PTR [ebp - 2Ch]
+        cmp DWORD PTR [edx + 18h], 10h
+        jbe ooc_build_small
+        mov eax, 1
+        imul ecx, eax, 0
+        mov edx, DWORD PTR [ebp - 58h]
+        cmp DWORD PTR [edx + ecx], 5435352h
+        jne ooc_build_plain
+        mov eax, 1
+        shl eax, 2
+        mov ecx, DWORD PTR [ebp - 2Ch]
+        mov edx, DWORD PTR [ebp - 58h]
+        mov eax, DWORD PTR [edx + eax]
+        mov DWORD PTR [ecx + 1Ch], eax
+        mov ecx, 1
+        shl ecx, 3
+        mov edx, DWORD PTR [ebp - 2Ch]
+        mov eax, DWORD PTR [ebp - 58h]
+        mov ecx, DWORD PTR [eax + ecx]
+        mov DWORD PTR [edx + 20h], ecx
+        jmp ooc_build_class_done
+    ooc_build_plain:
+        mov edx, DWORD PTR [ebp - 2Ch]
+        mov DWORD PTR [edx + 1Ch], 0
+        mov eax, DWORD PTR [ebp - 2Ch]
+        mov ecx, DWORD PTR [ebp - 2Ch]
+        mov edx, DWORD PTR [ecx + 18h]
+        mov DWORD PTR [eax + 20h], edx
+    ooc_build_class_done:
+        jmp ooc_build_advance_jump
+    ooc_build_small:
+        mov eax, DWORD PTR [ebp - 2Ch]
+        mov DWORD PTR [eax + 1Ch], 0
+        mov ecx, DWORD PTR [ebp - 2Ch]
+        mov edx, DWORD PTR [ebp - 2Ch]
+        mov eax, DWORD PTR [edx + 18h]
+        mov DWORD PTR [ecx + 20h], eax
+    ooc_build_advance_jump:
+        jmp ooc_build_advance
+
+    ooc_build_count:
+        mov ecx, OFFSET zpatch_ooc_pak
+        call OocVectorSizeBody
+        mov DWORD PTR [ebp - 68h], eax
+        call OocPageTotalBody
+        shl eax, 0Bh
+        add eax, 800h
+        mov DWORD PTR [ebp - 64h], eax
+        mov ecx, DWORD PTR [ebp - 64h]
+        push ecx
+        call OocAllocate
+        add esp, 4
+        mov DWORD PTR [ebp - 88h], eax
+        mov edx, DWORD PTR [ebp - 88h]
+        mov DWORD PTR [ebp - 38h], edx
+        mov eax, DWORD PTR [ebp - 64h]
+        push eax
+        push 0
+        mov ecx, DWORD PTR [ebp - 38h]
+        push ecx
+        call OocZeroBlock
+        add esp, 0Ch
+        lea ecx, [ebp - 28h]
+        call OocZeroHeaderBody
+        mov DWORD PTR [ebp - 28h], 86720000h
+        mov edx, DWORD PTR [ebp - 28h]
+        add edx, 3DFFh
+        mov DWORD PTR [ebp - 28h], edx
+        mov DWORD PTR [ebp - 24h], 3
+        mov eax, DWORD PTR [ebp - 68h]
+        mov DWORD PTR [ebp - 20h], eax
+        mov esi, DWORD PTR [ebp - 68h]
+        shl esi, 4
+        call OocNameBytesBody
+        add esi, eax
+        mov DWORD PTR [ebp - 1Ch], esi
+        mov ecx, 10h
+        mov WORD PTR [ebp - 18h], cx
+        mov edx, 0E9h
+        mov WORD PTR [ebp - 16h], dx
+        mov eax, DWORD PTR [ebp - 38h]
+        push eax
+        push 1
+        mov edx, 14h
+        lea ecx, [ebp - 28h]
+        call OocAppendBody
+        add esp, 8
+        mov DWORD PTR [ebp - 5Ch], 0
+        mov DWORD PTR [ebp - 7Ch], OFFSET zpatch_ooc_pak
+        mov ecx, DWORD PTR [ebp - 7Ch]
+        call OocVectorBeginBody
+        mov DWORD PTR [ebp - 4Ch], eax
+        mov ecx, DWORD PTR [ebp - 7Ch]
+        call OocVectorEndBody
+        mov DWORD PTR [ebp - 8Ch], eax
+        jmp ooc_build_record_loop
+    ooc_build_record_advance:
+        mov ecx, DWORD PTR [ebp - 4Ch]
+        add ecx, 2Ch
+        mov DWORD PTR [ebp - 4Ch], ecx
+    ooc_build_record_loop:
+        mov edx, DWORD PTR [ebp - 4Ch]
+        cmp edx, DWORD PTR [ebp - 8Ch]
+        je ooc_build_names
+        mov eax, DWORD PTR [ebp - 4Ch]
+        mov DWORD PTR [ebp - 30h], eax
+        lea ecx, [ebp - 14h]
+        call OocZeroRecordBody
+        mov ecx, DWORD PTR [ebp - 30h]
+        mov edx, DWORD PTR [ecx + 20h]
+        mov DWORD PTR [ebp - 14h], edx
+        mov eax, DWORD PTR [ebp - 30h]
+        mov ecx, DWORD PTR [eax + 1Ch]
+        mov DWORD PTR [ebp - 10h], ecx
+        mov edx, DWORD PTR [ebp - 5Ch]
+        add edx, 1
+        mov DWORD PTR [ebp - 0Ch], edx
+        mov eax, DWORD PTR [ebp - 30h]
+        mov ecx, DWORD PTR [eax + 18h]
+        call OocPageCountBody
+        mov WORD PTR [ebp - 8], ax
+        mov ecx, DWORD PTR [ebp - 30h]
+        mov eax, DWORD PTR [ecx + 18h]
+        xor edx, edx
+        mov ecx, 800h
+        div ecx
+        test edx, edx
+        je ooc_build_record_emit
+        mov edx, DWORD PTR [ebp - 30h]
+        mov eax, DWORD PTR [edx + 18h]
+        xor edx, edx
+        mov ecx, 800h
+        div ecx
+        mov eax, 800h
+        sub eax, edx
+        mov ecx, DWORD PTR [ebp - 30h]
+        mov DWORD PTR [ecx + 24h], eax
+        mov edx, DWORD PTR [ebp - 30h]
+        mov eax, DWORD PTR [edx + 24h]
+        push eax
+        lea ecx, [ebp - 14h]
+        call OocSetRecordPadBody
+        lea ecx, [ebp - 6]
+        mov DWORD PTR [ebp - 80h], ecx
+        cmp DWORD PTR [ebp - 10h], 0
+        je ooc_build_record_emit
+        mov edx, 1
+        shl edx, 0
+        mov eax, DWORD PTR [ebp - 80h]
+        movzx ecx, BYTE PTR [eax + edx]
+        add ecx, 20h
+        mov edx, 1
+        shl edx, 0
+        mov eax, DWORD PTR [ebp - 80h]
+        mov BYTE PTR [eax + edx], cl
+    ooc_build_record_emit:
+        mov ecx, DWORD PTR [ebp - 38h]
+        push ecx
+        push 1
+        mov edx, 10h
+        lea ecx, [ebp - 14h]
+        call OocAppendBody
+        add esp, 8
+        movzx edx, WORD PTR [ebp - 8]
+        add edx, DWORD PTR [ebp - 5Ch]
+        mov DWORD PTR [ebp - 5Ch], edx
+        jmp ooc_build_record_advance
+
+    ooc_build_names:
+        mov DWORD PTR [ebp - 6Ch], OFFSET zpatch_ooc_pak
+        mov ecx, DWORD PTR [ebp - 6Ch]
+        call OocVectorBeginBody
+        mov DWORD PTR [ebp - 50h], eax
+        mov ecx, DWORD PTR [ebp - 6Ch]
+        call OocVectorEndBody
+        mov DWORD PTR [ebp - 90h], eax
+        jmp ooc_build_name_loop
+    ooc_build_name_advance:
+        mov eax, DWORD PTR [ebp - 50h]
+        add eax, 2Ch
+        mov DWORD PTR [ebp - 50h], eax
+    ooc_build_name_loop:
+        mov ecx, DWORD PTR [ebp - 50h]
+        cmp ecx, DWORD PTR [ebp - 90h]
+        je ooc_build_payloads
+        mov edx, DWORD PTR [ebp - 50h]
+        mov DWORD PTR [ebp - 70h], edx
+        mov ecx, DWORD PTR [ebp - 70h]
+        call OocEntryNameBody
+        mov DWORD PTR [ebp - 40h], eax
+        mov eax, DWORD PTR [ebp - 40h]
+        add eax, 1
+        mov DWORD PTR [ebp - 94h], eax
+    ooc_build_name_count:
+        mov ecx, DWORD PTR [ebp - 40h]
+        mov dl, BYTE PTR [ecx]
+        mov BYTE PTR [ebp - 39h], dl
+        add DWORD PTR [ebp - 40h], 1
+        cmp BYTE PTR [ebp - 39h], 0
+        jne ooc_build_name_count
+        mov eax, DWORD PTR [ebp - 40h]
+        sub eax, DWORD PTR [ebp - 94h]
+        mov DWORD PTR [ebp - 98h], eax
+        mov ecx, DWORD PTR [ebp - 38h]
+        push ecx
+        mov edx, DWORD PTR [ebp - 98h]
+        add edx, 1
+        push edx
+        mov ecx, DWORD PTR [ebp - 70h]
+        call OocEntryNameBody
+        mov edx, 1
+        mov ecx, eax
+        call OocAppendBody
+        add esp, 8
+        jmp ooc_build_name_advance
+
+    ooc_build_payloads:
+        mov DWORD PTR [zpatch_ooc_offset], 800h
+        mov DWORD PTR [ebp - 74h], OFFSET zpatch_ooc_pak
+        mov ecx, DWORD PTR [ebp - 74h]
+        call OocVectorBeginBody
+        mov DWORD PTR [ebp - 54h], eax
+        mov ecx, DWORD PTR [ebp - 74h]
+        call OocVectorEndBody
+        mov DWORD PTR [ebp - 9Ch], eax
+        jmp ooc_build_payload_loop
+    ooc_build_payload_advance:
+        mov eax, DWORD PTR [ebp - 54h]
+        add eax, 2Ch
+        mov DWORD PTR [ebp - 54h], eax
+    ooc_build_payload_loop:
+        mov ecx, DWORD PTR [ebp - 54h]
+        cmp ecx, DWORD PTR [ebp - 9Ch]
+        je ooc_build_done
+        mov edx, DWORD PTR [ebp - 54h]
+        mov DWORD PTR [ebp - 34h], edx
+        mov eax, DWORD PTR [ebp - 38h]
+        push eax
+        mov ecx, DWORD PTR [ebp - 34h]
+        mov edx, DWORD PTR [ecx + 18h]
+        push edx
+        mov edx, 1
+        mov eax, DWORD PTR [ebp - 34h]
+        mov ecx, DWORD PTR [eax + 28h]
+        call OocAppendBody
+        add esp, 8
+        mov ecx, DWORD PTR [ebp - 34h]
+        mov edx, DWORD PTR [ecx + 28h]
+        mov DWORD PTR [ebp - 0A0h], edx
+        mov eax, DWORD PTR [ebp - 0A0h]
+        push eax
+        call OocFreeBlock
+        add esp, 4
+        mov ecx, DWORD PTR [ebp - 34h]
+        cmp DWORD PTR [ecx + 24h], 0
+        je ooc_build_payload_next
+        mov edx, DWORD PTR [ebp - 34h]
+        mov eax, DWORD PTR [edx + 24h]
+        push eax
+        call OocAllocate
+        add esp, 4
+        mov DWORD PTR [ebp - 0A4h], eax
+        mov ecx, DWORD PTR [ebp - 0A4h]
+        mov DWORD PTR [ebp - 44h], ecx
+        mov edx, DWORD PTR [ebp - 34h]
+        mov eax, DWORD PTR [edx + 24h]
+        push eax
+        push 0
+        mov ecx, DWORD PTR [ebp - 44h]
+        push ecx
+        call OocZeroBlock
+        add esp, 0Ch
+        mov edx, DWORD PTR [ebp - 38h]
+        push edx
+        mov eax, DWORD PTR [ebp - 34h]
+        mov ecx, DWORD PTR [eax + 24h]
+        push ecx
+        mov edx, 1
+        mov ecx, DWORD PTR [ebp - 44h]
+        call OocAppendBody
+        add esp, 8
+        mov edx, DWORD PTR [ebp - 44h]
+        mov DWORD PTR [ebp - 78h], edx
+        mov eax, DWORD PTR [ebp - 78h]
+        push eax
+        call OocFreeBlock
+        add esp, 4
+        cmp DWORD PTR [ebp - 78h], 0
+        jne ooc_build_pad_ok
+        mov DWORD PTR [ebp - 0A8h], 0
+        jmp ooc_build_payload_next
+    ooc_build_pad_ok:
+        mov DWORD PTR [ebp - 44h], 8123h
+        mov ecx, DWORD PTR [ebp - 44h]
+        mov DWORD PTR [ebp - 0A8h], ecx
+    ooc_build_payload_next:
+        jmp ooc_build_payload_advance
+
+    ooc_build_done:
+        mov ecx, OFFSET zpatch_ooc_pak
+        call OocVectorClearBody
+        mov eax, DWORD PTR [ebp - 38h]
+        pop esi
+        mov ecx, DWORD PTR [ebp - 4]
+        xor ecx, ebp
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
+// sub_1004B750: decode, register the entry, build the archive, publish the byte
+// count the mount string carries and return the archive. Its one-shot guard
+// dword_10159C00 is read and never written anywhere in the original, so every
+// call re-runs all of this and leaks the previous archive: kept 1:1.
+static uint32_t OocInitialise()
+{
+    // Unchecked, like the original: the decode writes through the block whether
+    // or not the allocation succeeded.
+    auto* table = static_cast<uint8_t*>(std::malloc(kOocTableSize));
+    static_cast<void>(OocDecodeBody(table));  // the original discards the answer
+    OocRegister(table);
+    // The builder clears the vector itself (its last call), and its final write
+    // cursor is the archive's byte count: the original's `mov ecx,
+    // dword_10159C78 / mov dword_10159BFC, ecx` after the call.
+    uint8_t* archive = static_cast<uint8_t*>(OocBuildArchiveBody());
+    zpatch_ooc_state = zpatch_ooc_offset;
+    return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(archive));
+}
+
+// sub_10001280, recovered VA 0x10001280: the bounded formatter, transcribed once
+// in source/stability.ixx and proved there instruction for instruction
+// (docs/rebuilt.md). A module interface cannot export a naked function, so this
+// six-byte forwarder is what the wrapper's `call` names: the original's call is
+// an immediate too, and the forwarder enters the body with the stack and the
+// registers untouched.
+static __declspec(naked) void OocFormat()
+{
+    __asm
+    {
+        jmp DWORD PTR [zpatch_format_entry]
+    }
+}
+
+// fnv1a over a recovered block, for the self-check below only: it is the
+// fingerprint the recovered data's own header records.
+    static uint32_t OocFnv1a(const uint8_t* data, size_t size)
     {
         uint32_t hash = 2166136261u;
         for (size_t index = 0; index < size; ++index)
@@ -1005,7 +1601,6 @@ namespace
         }
         return hash;
     }
-}
 
 // The offline proof of the three rebuilt transforms: decode the recovered
 // resource, register the table, build the archive, and compare each result with
@@ -1030,9 +1625,8 @@ export const char* OocSelfCheck()
     }
     const uint32_t table_hash = OocFnv1a(table, kOocTableSize);
     OocRegister(table);
-    uint32_t final_offset = 0;
-    uint8_t* archive = OocBuildArchive(final_offset);
-    OocPakTable().clear();
+    uint8_t* archive = static_cast<uint8_t*>(OocBuildArchiveBody());
+    const uint32_t final_offset = zpatch_ooc_offset;
 
     const char* failure = nullptr;
     if (table_hash != 0xC883859Fu)

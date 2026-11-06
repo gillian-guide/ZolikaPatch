@@ -4,7 +4,7 @@ Every other piece of this module is **transcribed**: a body is written instructi
 instruction from the original ASI, and `tools/verify_bodies.py` decodes the same
 instruction count on both sides and compares mnemonic, registers, memory shape and
 immediate *class*. That proof is what `tests/bodies.tsv` is for, and it currently
-covers **138 bodies**. A transcribed body whose original stream reads a table through
+covers **151 bodies**. A transcribed body whose original stream reads a table through
 an indexed absolute operand is provable too, because the tree registers the table and
 the comparator compares its *contents*: §1 and §2b describe that, and the model-name
 lookup (`0x10003F00`) is the first piece transcribed that way. §2c is the largest: the
@@ -69,8 +69,12 @@ So the blockers are mechanical, and there are exactly four kinds in this tree:
   module cannot name.
 - **D · call graph of rebuilds.** The body itself is comparable, but every function it
   calls is a rebuild, so a transcription would prove the branch shape and none of the
-  behaviour. This is why the OOC archive builder and the NewFiles updates are still
-  rebuilt: their callees are class A–C.
+  behaviour. This is why the NewFiles updates are still rebuilt: their callees are
+  class C. It is **not** a permanent reason: the OOC archive builder was filed here for
+  its twelve helper callees, and this pass transcribed the twelve helpers with it
+  (§2h), so the piece is proven whole. What is left in the class is the NewFiles pair
+  and the NewMemorySystem arena methods, whose callers cannot be transcribed without
+  the container internals they call (§3).
 
 Two things that are **not** blockers, and used to be treated as one:
 
@@ -197,8 +201,8 @@ six rows §2a adds bring the current total to 206). That check lives in
    `tools/verify_bodies.py`). This is the check that caught the first DLC
    transcription's mis-attached label (§2); it passes for the 125 rows of that pass
    (154 internal targets), for the 131 rows of §2a (206), for the 132 rows of §2b
-   (208), for the 133 rows of §2c (228), for the 135 rows of §2b–§2d (249) and for
-   today's 138 rows (292).
+   (208), for the 133 rows of §2c (228), for the 135 rows of §2b–§2d (249), for the
+   138 rows of §2b–§2g (292) and for today's 151 rows (321).
 
 **What remains unproven even for these six.** The bodies now execute only on the
 game's own calls, and no offline harness can make the game call them:
@@ -285,12 +289,12 @@ and stays a rebuild.
    and the DFA install rows still write the same five bytes at the same sites (the
    branch targets canonicalise to the original's VAs).
 
-**What stays rebuilt in these two areas, and why.** The OOC archive builder
-(`0x1004ACE0`, class D: twelve helper callees), the init (`0x1004B750`, EH + C++
-containers), the key's handler (`0x1004C3F0`, EH4 + a 16 KB string builder) and the
-DFA close-handle body (`0x10004790`, EH4) — every one of them for a reason this file
-lists. The OOC pair's behaviour stays pinned by the selftest; the wrapper and the
-branch body were already transcribed.
+**What stays rebuilt in these two areas, and why.** The init (`0x1004B750`, EH +
+C++ containers), the key's handler (`0x1004C3F0`, EH4 + a 16 KB string builder) and
+the DFA close-handle body (`0x10004790`, EH4) — every one of them for a reason this
+file lists. The OOC archive builder that this paragraph used to name is transcribed
+with its twelve helpers in §2h; the OOC pair's behaviour stays pinned by the selftest,
+and the wrapper and the branch body were already transcribed.
 
 **What remains unproven for these six.** The decoder pair is now behaviourally proven
 offline (item 5), which is more than any other body here; the DFA forwarders are only
@@ -939,6 +943,119 @@ that fills all 512 slots with resolvable names, which then makes the original (a
 now this tree) hash-lookup a code address and continue; no shipped or sample INI comes
 near it. `docs/parity.md` carries the play item.
 
+### 2h. This pass: the OOC archive builder, and the twelve helpers that made it class D
+
+Class D's largest entry is gone, and it is gone for the reason the class exists: the
+builder's twelve callees were the only thing keeping it rebuilt, so the twelve were
+transcribed with it. `0x1004ACE0` is what turns the registered fake-pak entry into the
+in-memory archive the mount string points at — a 20-byte header, one 16-byte record
+per entry, the names, then at `0x800` the payloads each padded to the next page — and
+it is now the original's 314 instructions.
+
+| piece | recovered VA | size | insns | row | byte-identical | differs only in |
+|---|---|---:|---:|---|---:|---|
+| archive builder | `0x1004ACE0` | `0x461` | 314 | `ooc_archive_build` | 275/314 | 3 absolute operands + 30 `call` immediates + 6 `mov …, offset Block` immediates |
+| zero the 20-byte header | `0x1004AB70` | `0x10` | 5 | `ooc_pak_zero_header` | 5/5 | — |
+| zero the 16-byte record | `0x1004AB80` | `0x9` | 4 | `ooc_pak_zero_record` | 4/4 | — |
+| merge the record's pad word | `0x1004AB90` | `0x1B` | 9 | `ooc_pak_set_pad` | 9/9 | — |
+| pages for one size | `0x1004ABB0` | `0x12` | 6 | `ooc_pak_page_count` | 6/6 | — |
+| append a chunk | `0x1004ABD0` | `0x2D` | 20 | `ooc_pak_append` | 17/20 | 2 absolute operands + 1 `call` immediate |
+| name bytes | `0x1004AC00` | `0x3B` | 28 | `ooc_pak_name_bytes` | 26/28 | 2 absolute operands |
+| payload pages | `0x1004AC40` | `0x42` | 23 | `ooc_pak_page_total` | 21/23 | 2 absolute operands |
+| vector begin | `0x100564F0` | `0x3` | 2 | `ooc_vector_begin` | 2/2 | — |
+| vector end | `0x100564E0` | `0x4` | 2 | `ooc_vector_end` | 2/2 | — |
+| vector size | `0x100564C0` | `0x17` | 9 | `ooc_vector_size` | 9/9 | — |
+| vector clear | `0x10056500` | `0x18` | 11 | `ooc_vector_clear` | 10/11 | 1 `call` immediate |
+| entry name (std::string c_str) | `0x10057710` | `0xC` | 6 | `ooc_entry_name` | 6/6 | — |
+
+13 bodies, 439 instructions, 1,427 bytes, 392 byte-identical (89.3 %); the 47
+differences are 9 absolute operands, 32 `call` immediates and 6 `offset Block`
+immediates. Every body's byte size is the original's exactly (`0x461` for the builder),
+so every instruction sits at the same relative offset, and there is no `other`
+difference (no mnemonic, register, frame offset, size or branch form changed) and no
+branch difference.
+
+**What the twelve are.** They are the builder's own private helpers and nothing else
+calls them: `0x1004AB70`/`0x1004AB80` zero the stack header/record with one SSE
+16-byte store, `0x1004AB90` merges the pad length into the record's `+0x0C` word,
+`0x1004ABB0` is the `/0x800` round-up (the compiler's `cmovne`), `0x1004ABD0` is the
+append — `memcpy(archive + cursor, src, edx * count)` and advance the cursor at
+`dword_10159C78` — `0x1004AC00` sums the name bytes, `0x1004AC40` sums the payload
+pages, `0x100564F0`/`0x100564E0`/`0x100564C0`/`0x10056500` are the vector's
+begin/end/size/clear, and `0x10057710` is the entry's `std::string::c_str` (the
+capacity test at `+0x14`). All of them are plain streams: no exception frame, no TLS
+guard, no indexed absolute operand.
+
+**The builder's stream.** One /GS frame (`[__security_cookie]` at entry and
+`__security_check_cookie` at exit — ordinary instructions, §1), EBP-relative locals,
+and thirty direct `E8`s. Two details are the original's and were kept: the
+`imul ecx, eax, 0` at `0x1004AD55` is the compiler's zero-offset multiply that shapes
+the following `cmp [edx+ecx], 0x05435352` (it is not dead code), and the record's
+index is the running page count plus one with the pad word carrying bit `0x2000` when
+the stored offset is non-zero.
+
+**The one new module slot.** `dword_10159C78` is the builder's write cursor, so it is
+`zpatch_ooc_offset` here. The transcribed builder zeroes it, moves it to `0x800` for
+the payload region and advances it on every append; `OocInitialise` reads it back after
+the call for the archive's byte count, which is exactly what `sub_1004B750` does
+(`mov ecx, dword_10159C78 / mov dword_10159BFC, ecx`). The vector itself is
+`zpatch_ooc_pak`: a real `std::vector<OocPakEntry>` whose first three words are the
+original's three pointers at `0x1016E43C/40/44`, declared `extern "C"` so the
+transcribed bodies name one short `_name` symbol.
+
+**How this pass was verified**
+
+1. **Proof rows.** The thirteen PASS lines are
+   `PASS ooc_archive_build (314 instruction(s), 3 absolute operand(s))`,
+   `PASS ooc_pak_append (20, 2)`, `PASS ooc_pak_name_bytes (28, 2)`,
+   `PASS ooc_pak_page_total (23, 2)`, `PASS ooc_pak_zero_header (5, 0)`,
+   `PASS ooc_pak_zero_record (4, 0)`, `PASS ooc_pak_set_pad (9, 0)`,
+   `PASS ooc_pak_page_count (6, 0)`, `PASS ooc_vector_begin (2, 0)`,
+   `PASS ooc_vector_end (2, 0)`, `PASS ooc_vector_size (9, 0)`,
+   `PASS ooc_vector_clear (11, 0)` and `PASS ooc_entry_name (6, 0)`, and
+   `python tools/verify_bodies.py …` → `151 body(ies), 0 failure(s)`.
+2. **Byte comparison** (`.scratch/ooc_builder/compare.py`): 392 of 439 instructions
+   byte-identical, every body the original's exact byte size, `slot 47, branch 0,
+   other 0`.
+3. **The operand map.** `.scratch/steer/operand_map.py builder` resolves every
+   absolute operand and call immediate through the linker map against a declared
+   pairing: **19 distinct operands, 0 declared but unused, 0 mismatch(es)**. That is
+   what says `call 0x100564F0` became the vector's *begin* and not its end, that
+   `mov ecx, 0x1016E43C` became `_zpatch_ooc_pak` and not the cursor beside it, and
+   that the two `operator new`/`free`/`memset` sites reach the CRT through the
+   forwarders. Four expected `/OPT:ICF` folds show up and are harmless, because each
+   pair is the same bytes with the same behaviour: `?OocVectorBeginBody` folds into
+   `Game::Module()`'s `mov eax,[ecx]; ret`, `?OocFreeBlock` into `operator delete`,
+   `?OocAllocate` into `loading.ixx`'s `DlcAlloc` (both `::operator new`) and
+   `?OocZeroBlock` into `audio.ixx`'s `AudioZeroBlock` (both `memset`).
+4. **The behaviour is pinned offline.** `zp_dump --ooc-selftest` → `ooc selftest:
+   PASS`: the transcribed builder produces the recovered 182,272-byte archive with
+   `fnv1a 0xB5AF7B10` and the header's `16`/`0xE9` words, from the decoded table whose
+   `fnv1a` is `0xC883859F`. That is a behavioural proof of the whole builder, not only
+   a shape proof — the strongest evidence any piece in this file has.
+5. **The branch targets.** `151 row(s), 321 internal branch target(s), 0 failure(s)`.
+6. **The surrounding behaviour is unchanged.** `ctest --preset release` is 12/12,
+   `python tools/parity_report.py 9` is `98 key(s) closed, 0 open, 1
+   oracle-verified`, and `OutOfCommissionFix`'s two arm writes are the same bytes as
+   before (the builder is not an install site at all).
+
+**What stays rebuilt, and why.** One callee of the clear: `0x1005CD50`, the
+`std::_Destroy_range` loop `0x10056500` calls. It is the CRT's `std::string`
+destructor loop — it reads the string's capacity, and past `0x1000` the allocator's
+block header, before calling `_invalid_parameter_noinfo_noreturn` — so it is
+image-internal CRT state this module cannot name, and it is the one place the class-D
+argument still holds. `OocDestroyEntries` performs the same stores on the same 44-byte
+stride for the entry layout this module uses (an inline 16-byte name buffer, capacity
+`0x0F`), and the free branch is unreachable from the tree's own data in both trees:
+the only entry ever registered is `"finale2.sco"`, eleven bytes.
+
+**What remains unproven.** The builder only runs when the game calls the wrapper at
+`0xB70733`, so the offline proof is of code, operands and the archive bytes; the mount
+string and the device register are seen in play (`docs/parity.md`). The vector's
+element layout is a model — the 44-byte struct keeps the original's field offsets,
+including the `std::string` header the destroy loop touches — and its `push_back` is
+the rebuilt init's, not a transcribed one.
+
 ---
 
 ## 3. Every piece that is still rebuilt
@@ -976,7 +1093,7 @@ unregistered indexed absolute keeps the literal comparison.
 | audio install body | `0x10050AD0` | `0xF9` | 75 | EH4 (`push __except_handler4`, scope `0x10154384`, funclet `0x100619C1`) + the CRT clock/seed block through `fs:[2Ch]` and `TlsIndex` | resolve the `6A 06 68 ? ? ? ? 8D 8C` site once and write `rand() % 5 + 1` into its `push` immediate, gated on the transcribed `0x10050A50` gate | `RestoreDeathMusic`'s cell is closed; the gate and the three native wrappers around it are transcribed and proven | **the one recorded 1:1 divergence in that key**: the original's guard compares `dword_101A84C0` with the CRT per-thread word and may skip the whole block on a fresh process; the rebuild always writes. Recorded in `parity.md` §RestoreDeathMusic |
 | save converter | `0x10051B30` | `0x489` | 337 | EH registration (`fs:[0]`) + three `_Init_thread_header/footer` TLS guards + CRT file API (`fopen_s`, `fread`, `fclose`, `operator new`, `free`) + `std::string` (IDA's per-function total is 363: 337 plus the out-of-line funclet/abort blocks) | open the save, check `SAVE` at +0xC, walk eighteen chunks with `fread(9)` / `operator new(size-9)` / `fread(payload)` / `free`, remember chunks 9/13/16 (`0x4C45`/`0x1741`/`0x0E77`), then patch the three sites (`0x872185`, `0x7D8C50`, `0x8DA090`) | the file walk was replayed offline against the two real saves in `game_refs/saves/…` (`SGTA400`/`SGTA401`: `SAVE` at +0xC, 18 `BLOCK` chunks, sizes `0x3AB1`/`0x1729`/`0x0CC7`); the three sites' writes are what the key's cell measures | **high**: a corrupt save already faults (preserved), and the chunk-size conditions decide whether the new-format hooks are installed. A wrong condition converts a save wrongly instead of failing |
 | save prepare | `0x10051FD0` | `0x202` | 157 | same EH/TLS + `std::string` construction + the game's save-directory call | ask the game for the save directory, build `"<dir>\\<save name>"` as a `std::string`, call the converter | the directory call site is one of the key's six recovered scans; the *string* shape is not measured offline | moderate: a wrong path means the converter opens nothing (silent no-convert) or the wrong file |
-| OOC init (decode → register → build) | `0x1004B750` | `0xBFF` | 991 | EH (`fs:[0]`) + C++ container helpers (`0x10058620`, `0x1005CF20`) + `operator new` | decode the pinned resource, register it as the single fake-pak entry in the module's own table (`0x1016E43C`), then build the 182,272-byte archive | **proven end to end offline**: `zp_dump --ooc-selftest` checks the stream's Adler-32 trailer, the decoded table's `fnv1a 0xC883859F`, the archive's 182,272 bytes and `fnv1a 0xB5AF7B10`, and the header's `16`/`0xE9` words → PASS | low for the transform (fingerprints), **high** for when it runs: the original re-runs it on every call and leaks the previous archive; the rebuild keeps that |
+| OOC init (decode → register → build) | `0x1004B750` | `0xBFF` | 991 | EH (`fs:[0]`) + C++ container helpers (`0x10058620`, `0x1005CF20`) + `operator new` | decode the pinned resource, register it as the single fake-pak entry in the module's own table (`0x1016E43C`), then call the transcribed builder (§2h) for the 182,272-byte archive and read its write cursor back as the byte count | **proven end to end offline**: `zp_dump --ooc-selftest` checks the stream's Adler-32 trailer, the decoded table's `fnv1a 0xC883859F`, the archive's 182,272 bytes and `fnv1a 0xB5AF7B10`, and the header's `16`/`0xE9` words → PASS | low for the transform (fingerprints), **high** for when it runs: the original re-runs it on every call and leaks the previous archive; the rebuild keeps that |
 | OOC handler (the key's arm) | `0x1004C3F0` | `0x3FB7` | 4185 (IDA's total 4199) | EH4 + a 16 KB C++ string builder (digit loops, `strtol`, `toupper`) | scan the branch anchor, publish four words, `VirtualProtect` and write the `E9`; scan the wrapper anchor, publish the mount/original call targets and write the `E8` | the arm's four published words and two writes are what the key's cell measures; both written bodies (`0x1004C3C0` 7, `0x1004C350` 41) are transcribed and proven | low: the handler only publishes and writes; a wrong word would show as a wrong mount target |
 
 ### Class C — TLS static-init guard
@@ -998,9 +1115,17 @@ the registrar alone would prove nothing about the service.
 
 | piece | VA | bytes | insns | what it calls | why that keeps it rebuilt | residual risk |
 |---|---|---:|---:|---|---|---|
-| OOC archive builder | `0x1004ACE0` | `0x461` | 314 | 12 internal helpers (`0x1004AB70`…, `0x10056500`) that are themselves rebuilds | class D: proving the caller of 12 rebuilds proves nothing behavioural | low: the archive is fingerprinted (`fnv1a 0xB5AF7B10`) |
 | NewFiles updates (2) | `0x10051890`, `0x100518D0` | `0x3F`, `0x45` | 30, 30 | the three class-C scans above + the transcribed resolver `0x10003E50` | their own stream is transcribable, but three of four callees are class C and two of the four need `__fastcall` entry shims (`ECX` = object/list, stack = hash/name) whose register contract would itself be unproven — that is the register-contract bug class, not a proof. §4 item 1 | moderate: it decides whether a new-format file is registered at all |
-| NMS arena methods | `0x10038360` (alloc), `0x10038430` (free), `0x100385A0` (contains) | `0xC2`, `0x10E`, `0x7D` | 69, 91, 40 | CRT allocator helpers `0x1005C610`/`0x1005C5A0`, `memset`, `operator delete` | class D: the vtable's other eleven methods are transcribed, but these three are thin wrappers over CRT allocator internals the module cannot name | low: the vtable methods that matter are transcribed; these three are allocator plumbing whose failure mode is an allocation fault, which the game shows immediately |
+| NMS arena methods | `0x10038360` (alloc), `0x10038430` (free), `0x100385A0` (contains) | `0xC2`, `0x10E`, `0x7D` | 69, 91, 40 | the original's `std::_Hash` pair `0x1005C610` (emplace) / `0x1005C5A0` (find), `memset`, `operator delete`, and the map's own fields | the three streams are plain — no EH frame, no TLS guard — but their callees are not the builder's kind of helper. `0x1005C610` **has an exception frame** (`push -1; push SEH_1005C610; … mov fs:[0], eax` at `0x1005C613`-`0x1005C632`, the frame's funclet at `SEH_1005C610`), so it is class B and stays rebuilt. `0x1005C5A0` is the `std::_Hash::find` over four map-internal globals (`dword_101A8424`, `dword_101A8418`, `dword_101A8410`), and the free body **inlines** the erase unlink over the same globals (`mov ecx, dword_101A8424` at `0x100384CC`, `mov eax, dword_101A8418` at `0x100384D2`, `and ecx, esi / lea ecx, [eax+ecx*8]` after it), so its own stream reads container internals a module's `std::unordered_set` does not expose. Transcribing the three callers would prove the arithmetic and leave the registry a rebuild — the class-D position this pass removed for the builder, without a way to remove it here | low: the vtable's other eleven methods are transcribed; these three are allocator plumbing whose failure mode is an allocation fault, which the game shows immediately |
+
+The NMS methods are the class's *honest* remainder: their own streams are exactly as
+transcribable as the builder's, but the registry they call is a `std::_Hash` the
+original inlines into them, not a set of private helpers. A transcription of
+`0x10038360` would have to call this module's `std::unordered_set::insert` through an
+entry shim, and a transcription of `0x10038430` would have to read our set's internals
+at the original's offsets — an unchecked layout assumption, not a proof. The rebuild's
+reproduction (the alignment scheme, the `[pointer-4]` distance, the `0xCD` fill, the
+lock) is unchanged, and `zp_tests`' NewMemorySystem coverage still exercises it.
 
 ---
 
@@ -1010,8 +1135,12 @@ the registrar alone would prove nothing about the service.
    entry shims in front of `NewfilesCallObject`/`NewfilesCallAdd`; once those exist the
    two bodies are a straight transcription. Their call graph stays class C, so the doc
    entry above changes from "blocked" to "proven caller, rebuilt callees".
-2. **NMS arena methods** (`0x10038360`/`0x10038430`/`0x100385A0`). Transcribable in
-   shape; only worth it together with the CRT allocator helpers they call.
+2. **NMS arena methods** (`0x10038360`/`0x10038430`/`0x100385A0`). Not transcribable
+   without the container: `0x1005C610` carries an EH frame (class B), and `0x10038430`
+   inlines the `std::_Hash` erase unlink over the original's map globals. A future pass
+   could transcribe `0x10038360`/`0x100385A0` against a shim and leave `0x10038430` a
+   rebuild, but that proves the alignment arithmetic only, and the free path would then
+   be the one method whose stream is not the original's.
 3. **The comparator, and how far to extend it.** The global relaxation is still
    **not** made, deliberately: treating every indexed absolute displacement as a slot
    would stop the proof distinguishing `[esi*4+0x1015A538]` from `[esi*4+0x10159D38]`,
@@ -1043,7 +1172,7 @@ the registrar alone would prove nothing about the service.
    it is `tools/verify_bodies.py::internal_branch_mismatch`, it runs on every row, and
    it is what §2a's six transcriptions were proved with. `.scratch/branch_targets.py`
    stays as the independent reference implementation (it skips the `table` rows); the
-   two agree at `138 row(s), 265 internal branch target(s), 0 failure(s)`.
+   two agree at `151 row(s), 321 internal branch target(s), 0 failure(s)`.
 
 ---
 
@@ -1084,10 +1213,13 @@ deliberately after any change to the modules above.
    Exercise: enable it, load a save, note the in-game clock and the mission timer.
    What to look for: the clock running at the right rate (a wrong slot = a fast or
    frozen timer).
-6. **`0x10001280` + the two forwarders** (now transcribed). Exercise: the livery list
-   on a car with `NoLiveryLimit`, then the OOC fix (a save past the last mission), then
-   a DLC start. What to look for: correct `"%s_sign_%d"` livery names, a correct
-   `memory:$…` mount string (no truncated path), and correct `\Episode<n>\` probes.
+6. **`0x10001280` + the two forwarders, then the OOC archive builder** (all now
+   transcribed, §2h for the builder). Exercise: the livery list on a car with
+   `NoLiveryLimit`, then the OOC fix (a save past the last mission), then a DLC start.
+   What to look for: correct `"%s_sign_%d"` livery names, a correct `memory:$…` mount
+   string (no truncated path), the episode ending mounted from the archive (the
+   archive itself is byte-pinned; the mount string and the device register are what
+   play tests), and correct `\Episode<n>\` probes.
 7. **`0x10003FA0`/`0x10044310`/`0x1001AD20`, the misc and vehicle checkers** (class A,
    now transcribed: §2e, §2f and §2g; the two siren checks `0x10005F70`/`0x10006260`
    are §2d). Exercise: `CopSirensFlag` (police cars get their flags; the transcribed
@@ -1111,7 +1243,7 @@ deliberately after any change to the modules above.
 
 ## 6. Where the numbers live
 
-- `tests/bodies.tsv` — the 138 proof rows; a row's count is the body's exact
+- `tests/bodies.tsv` — the 151 proof rows; a row's count is the body's exact
   instruction count, so it cannot silently shrink. Its `table` rows are the offline
   projection of the arms' `Bodies::RegisterTable` calls (recovered VA, candidate
   symbol, registered length), one per table a transcribed body reads; a symbol may be
@@ -1152,13 +1284,18 @@ deliberately after any change to the modules above.
   table displacements (all three shapes: indexed, base-plus-displacement, and a
   displacement anywhere inside a registered range) and reports a branch whose target
   offset differs. `steer`, `sirens_a`, `sirens`, `ide`, `popup`, `cone` select the body.
-- `.scratch/steer/operand_map.py` — §2c item 3 through §2g item 3: every absolute
+- `.scratch/steer/operand_map.py` — §2c item 3 through §2h item 3: every absolute
   operand, call immediate and string offset of a transcription resolved through the
   linker map and checked against a declared pairing (33 distinct for the steer consumer,
   20 for the first siren check, 8 for the second, 9 for the IDE payload, 24 for the
-  popup checker including its sixteen columns, 8 for the cone check; 0 mismatch each).
-  This is the check that says *which* slot an `abs` operand names, which the proof
-  cannot — and for a table column it also requires the offset to match exactly.
+  popup checker including its sixteen columns, 8 for the cone check, 19 for the OOC
+  archive builder including its twelve helper calls and three CRT forwarders; 0
+  mismatch each). This is the check that says *which* slot an `abs` operand names,
+  which the proof cannot — and for a table column it also requires the offset to match
+  exactly.
+- `.scratch/ooc_builder/compare.py` — §2h's byte comparison over the builder and its
+  twelve helpers (275/314, 17/20, 26/28, 21/23, 10/11 and eight bodies 100 %), plus
+  each body's byte size against the original's and every branch's target offset.
 - `.scratch/table_report.py` — every `table` row's two content hashes and whether the
   range is all zero: the nine registered tables agree on every row (the model-name
   table's `57ad8796b1b2652c`, the cone hash table's 2,052-byte `02610d9b8ad1da81`, and

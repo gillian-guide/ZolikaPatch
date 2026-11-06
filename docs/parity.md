@@ -70,7 +70,7 @@ feature key, is closed by the converter recorded in its own section below;
 `HighQualityReflections` closed with the site-arithmetic resolution recorded below.
 
 - **98 of 99 option keys closed**;
-- **138 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **151 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe, and the compiled bodies listed in
   [`rebuilt.md`](rebuilt.md) are rebuilt in C++ instead, with no proof row. That file
@@ -940,11 +940,11 @@ the registration is the ASI's own, not the game's.
   `73 63 72 0E`, `fnv1a 0xC883859F`).
 - **The registration is the ASI's own.** `sub_1004B750` registers the table as the
   single fake-pak entry (`finale2.sco`, 179,536 bytes) in its own `std::vector` at
-  `0x1016E43C`, then `sub_1004ACE0` wraps it: a 20-byte header (magic `0x86723DFF`,
-  `3`, the entry count, the name bytes + 16 per entry, the words `16` and `0xE9`),
-  one 16-byte record (stored size, stored offset, index, page count, padding word),
-  the name, then the payload at `0x800` with 688 bytes of zero padding -- 182,272
-  bytes in all, `fnv1a 0xB5AF7B10`.
+  `0x1016E43C`, then the transcribed `sub_1004ACE0` wraps it: a 20-byte header (magic
+  `0x86723DFF`, `3`, the entry count, the name bytes + 16 per entry, the words `16`
+  and `0xE9`), one 16-byte record (stored size, stored offset, index, page count,
+  padding word), the name, then the payload at `0x800` with 688 bytes of zero padding
+  -- 182,272 bytes in all, `fnv1a 0xB5AF7B10`.
 - **The one game call is a call the original makes through a published pointer**,
   exactly like every other arm's: the wrapper formats
   `"memory:$<archive>,<bytes>,0:"` and passes it to the function the `E8` at
@@ -960,7 +960,7 @@ the registration is the ASI's own, not the game's.
 | the decoder's opcode step | `0x1004B150` | 406 | transcribed, proved (`rebuilt.md` §2a) |
 | the decode driver + Adler-32 | `0x1004B570` | 159 | transcribed, proved (same) |
 | the init (decode, register, build) | `0x1004B750` | 991 | rebuilt as C: EH frame + C++ container helpers (`rebuilt.md` §3 class B) |
-| the in-memory archive builder | `0x1004ACE0` | 314 | rebuilt as C, no proof row (`rebuilt.md` §3 class D) |
+| the in-memory archive builder | `0x1004ACE0` | 314 | transcribed, proved, with its twelve helpers (`rebuilt.md` §2h) |
 | the key's own handler | `0x1004C3F0` | 4185 (IDA's total 4199) | rebuilt as C: EH4 frame + C++ string builder (`rebuilt.md` §3 class B) |
 
 - **The handler is compiler output, and it is the arm, not the decoder.**
@@ -986,16 +986,17 @@ the registration is the ASI's own, not the game's.
   original's bytes apart from the six absolute operands (two resume slots, the
   mount slot, the replayed-call slot, the cookie and the two string literals), which
   are what must differ.
-- **The decoder is transcribed and behaviourally proven; the builder is still a
-  rebuild and is proven offline.** `zp_dump --ooc-selftest` runs the module's own
-  decode, registration and archive build against the pinned resource and compares each
-  result with the fingerprint the recovered bytes carry: the stream's Adler-32
-  trailer, the decoded table's `fnv1a 0xC883859F`, the archive's 182,272 bytes and
-  `fnv1a 0xB5AF7B10`, and the header's `16`/`0xE9` words. It answers `PASS`. Because
-  the decode path is now the original's own 565 instructions, that PASS is also a
-  behavioural proof of the transcription. The shipped ASI never calls the selftest --
-  the payload path only runs when the game calls the wrapper, which no offline tool
-  can reach, so this is the only way the decode and build code executes at all.
+- **The decoder and the builder are transcribed and behaviourally proven.**
+  `zp_dump --ooc-selftest` runs the module's own decode, registration and archive build
+  against the pinned resource and compares each result with the fingerprint the
+  recovered bytes carry: the stream's Adler-32 trailer, the decoded table's
+  `fnv1a 0xC883859F`, the archive's 182,272 bytes and `fnv1a 0xB5AF7B10`, and the
+  header's `16`/`0xE9` words. It answers `PASS`. Because the decode path is now the
+  original's own 565 instructions and the builder its own 314 (plus its twelve
+  helpers), that PASS is also a behavioural proof of those transcriptions. The shipped
+  ASI never calls the selftest -- the payload path only runs when the game calls the
+  wrapper, which no offline tool can reach, so this is the only way the code executes
+  at all.
 - **Two build facts the arm inherits.** The branch anchor (`A9 39 44 24 18`, five
   bytes that start on the last byte of the `mov eax, <magic>` preceding the compare)
   is absent from 1.0.0.0 and present exactly once on the other eight images; the
@@ -1030,10 +1031,14 @@ stub's body but keeps it internal to its unit, so the table gets a second copy w
 its own proof row. Eleven methods are transcribed (constructor 17 instructions,
 reject-pointer 2, self 2, null 2, no-op `ret 0` 1, paired no-op 1, reject 2, sync 2,
 slot-18 thunk 5, no-argument no-op 1, installer 5) and the three arena methods are
-rebuilt because every call they make is a CRT allocator internal
-(`0x1005C610`/`0x1005C5A0`) the module cannot name — `rebuilt.md` §3 class D; their
-`/GS` frames are not the reason, those are transcribable. The
-allocate slot is the original's alignment scheme instruction for instruction —
+rebuilt because their registry callees cannot be transcribed: `0x1005C610` (the
+`std::_Hash` emplace) **has an exception frame** — `push -1; push SEH_1005C610;
+… mov fs:[0], eax` at `0x1005C613`-`0x1005C632` — so it is class B, and the free body
+inlines the `std::_Hash` erase unlink over the original's map globals
+(`dword_101A8424`/`dword_101A8418`/`dword_101A8410` at `0x100384CC` onward), which a
+module's `std::unordered_set` does not expose — `rebuilt.md` §3 class D. The bodies'
+own `/GS` frames are not the reason, those are transcribable. The
+rebuild reproduces the original's alignment scheme instruction for instruction —
 `unit = max(0x10, align)`, `want = max(size, unit)`, `HeapAlloc(want + 2 * unit)`,
 align to `((base - 1) / unit + 2) * unit`, store the distance from the base at
 `[pointer - 4]`, fill `want` bytes with `0xCD`, register under the critical section at
@@ -1404,10 +1409,13 @@ body reads a table through an indexed absolute operand:
 4. **The proof row** in `tests/bodies.tsv` — name, recovered VA, symbol resolved from
    the linker map, instruction budget — and `zp_body_proof` must PASS. A body whose
    stream cannot be compared under the proof's operand-slot rule is rebuilt in C++
-   instead, and then has no proof row: an exception frame or a TLS static-init guard.
-   `[rebuilt.md](rebuilt.md)` lists every such piece with its blocking instruction
-   pattern; `SpeedupBugFix`'s body, `OutOfCommissionFix`'s init, archive builder and
-   handler and the steer consumer `sub_10004C70` are the current examples. A `/GS`
+   instead, and then has no proof row: an exception frame, a TLS static-init guard, or
+   a call graph whose callees cannot be transcribed. `[rebuilt.md](rebuilt.md)` lists
+   every such piece with its blocking instruction pattern; `SpeedupBugFix`'s body,
+   `OutOfCommissionFix`'s init and handler, the save converter, the NewFiles updates
+   and the NewMemorySystem arena methods are the current examples (the OOC archive
+   builder and the steer consumer `sub_10004C70` were on that list and are now
+   transcribed). A `/GS`
    cookie is **not** a blocker: the tree transcribes those. A rebuilt
    piece whose result is data rather than a side effect can be pinned a second way,
    without the game: `OutOfCommissionFix`'s decode and archive build run from

@@ -267,11 +267,12 @@ nolivery_body_e 1003D3E0 ?NoliveryBodyE@@YAXXZ 14
 cutscene_chain_b 100388C0 ?CutsceneChainBody@@YAXXZ 146
 # OutOfCommissionFix (source/ooc.ixx): the branch body the E9 at game 0xA22E97
 # jumps to (7 instructions) and the mounting wrapper the E8 at 0xB70733 is
-# retargeted to (41 to its `ret`, 0x1004C350..0x1004C3BF). The key's payload is
-# data plus compiler output -- the decoder (sub_1004B150, sub_1004B570), the init
-# (sub_1004B750), the archive builder (sub_1004ACE0) and the key's own handler
-# (sub_1004C3F0, 4199 instructions with an EH4 frame) -- and is rebuilt, so those
-# pieces have no rows (docs/parity.md).
+# retargeted to (41 to its `ret`, 0x1004C350..0x1004C3BF). The key's remaining
+# rebuilt pieces are compiler output -- the init (sub_1004B750, EH + C++
+# containers) and the key's own handler (sub_1004C3F0, 4199 instructions with an
+# EH4 frame) -- and have no rows (docs/parity.md); the decoder pair is transcribed
+# below and the archive builder with its twelve helpers in the block at the end of
+# this file (docs/rebuilt.md 2h).
 ooc_branch 1004C3C0 ?OocBranchBody@@YAXXZ 7
 ooc_wrap 1004C350 ?OocWrapBody@@YAXXZ 41
 # The decoder pair (source/ooc.ixx): an interpreter with sixteen exits and no
@@ -310,3 +311,24 @@ new_saves_second_hook 10051AD0 ?NewSavesSecondLoadHook@@YAXXZ 33
 # the five slots the arm fills; its two `call` targets are the allocation/memset
 # forwarders and the shared formatter. docs/rebuilt.md.
 dlc_discovery 10023150 ?DlcDiscovery@@YAXXZ 223
+
+# The OOC archive builder (source/ooc.ixx) and its twelve internal helpers: what was
+# the last class-D piece. Its stream has no exception frame and no TLS static-init
+# guard, and every one of the twelve helpers is itself a plain stream -- SSE stores,
+# cmov, direct `E8`s, EBP/ECX-relative -- so the whole graph is transcribed here and
+# the class-D objection ("every call lands in another rebuild") no longer holds. The
+# CRT boundaries (operator new, memset, memcpy, free) are cdecl forwarders, and the
+# vector's element-destroy loop (0x1005CD50) stays rebuilt; docs/rebuilt.md 2h.
+ooc_archive_build 1004ACE0 ?OocBuildArchiveBody@@YAPAXXZ 314
+ooc_pak_zero_header 1004AB70 ?OocZeroHeaderBody@@YAXXZ 5
+ooc_pak_zero_record 1004AB80 ?OocZeroRecordBody@@YAXXZ 4
+ooc_pak_set_pad 1004AB90 ?OocSetRecordPadBody@@YAXXZ 9
+ooc_pak_page_count 1004ABB0 ?OocPageCountBody@@YAXXZ 6
+ooc_pak_append 1004ABD0 ?OocAppendBody@@YAXXZ 20
+ooc_pak_name_bytes 1004AC00 ?OocNameBytesBody@@YAXXZ 28
+ooc_pak_page_total 1004AC40 ?OocPageTotalBody@@YAXXZ 23
+ooc_vector_begin 100564F0 ?OocVectorBeginBody@@YAXXZ 2
+ooc_vector_end 100564E0 ?OocVectorEndBody@@YAXXZ 2
+ooc_vector_size 100564C0 ?OocVectorSizeBody@@YAXXZ 9
+ooc_vector_clear 10056500 ?OocVectorClearBody@@YAXXZ 11
+ooc_entry_name 10057710 ?OocEntryNameBody@@YAXXZ 6

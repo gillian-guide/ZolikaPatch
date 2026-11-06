@@ -956,3 +956,77 @@ bodies, the `ForceCarHeadlightShadows` "what is transcribed" table and its
 **Open, not mine to edit.** `readable-fusion/AGENTS.md` line 11 still says "135 hook
 bodies transcribed"; it is 138 now, and "The pieces that are *not* transcribed are
 rebuilt in C++" no longer includes any class-A piece.
+
+## 2026-11-06 (later) - class D's largest piece: the OOC archive builder and its twelve helpers
+
+**What changed.** `0x1004ACE0` (314 instructions, 1,121 bytes) is transcribed in
+`source/ooc.ixx`, and so are the twelve private helpers that were its class-D
+blocker: `0x1004AB70` (5), `0x1004AB80` (4), `0x1004AB90` (9), `0x1004ABB0` (6),
+`0x1004ABD0` (20), `0x1004AC00` (28), `0x1004AC40` (23), the vector's
+`0x100564F0` (2), `0x100564E0` (2), `0x100564C0` (9), `0x10056500` (11) and the
+entry's `c_str` `0x10057710` (6). 13 bodies, 439 instructions, 1,427 bytes; 392 are
+byte-identical (89.3%) and the 47 differences are 5 absolute operands, 32 `call`
+immediates and 10 `offset Block` immediates - no mnemonic, register, frame offset,
+size or branch form differs, and every body is the original's exact size (1,121 for
+the builder), so all internal branch targets agree.
+
+**Why they could go.** None of the twelve has an exception frame, a TLS static-init
+guard or an indexed absolute operand: SSE header/record zeroing, the `cmovne`
+`/0x800` round-up, two loops over the vector, the append (`memcpy` + cursor at
+`dword_10159C78`), the vector begin/end/size/clear and the `std::string::c_str`
+capacity test. The builder itself is one `/GS` frame, EBP-relative locals and thirty
+direct `E8`s. The one callee that stays rebuilt is `0x1005CD50`, the
+`std::_Destroy_range` loop `0x10056500` calls: it is the CRT's `std::string`
+destructor loop (capacity test, allocator block header past `0x1000`,
+`_invalid_parameter_noinfo_noreturn`), i.e. image-internal CRT state; `OocDestroyEntries`
+performs the same stores on the same 44-byte stride, and the free branch is
+unreachable for the single SSO `"finale2.sco"` entry in both trees.
+
+**New module state.** `zpatch_ooc_offset` = `dword_10159C78`, the builder's write
+cursor; the init reads it back for the archive's byte count, which is what
+`sub_1004B750` does after the call (`mov ecx, dword_10159C78 / mov dword_10159BFC,
+ecx`). `zpatch_ooc_pak` is the fake-pak `std::vector<OocPakEntry>` (the original's
+three pointers at `0x1016E43C/40/44`), declared `extern "C"` so the bodies name one
+short symbol; the C++ file-scope `static` bodies keep the plain `?Ooc...@@YAXXZ` map
+names instead of the anonymous namespace's churning `?A0x...` scope.
+
+**Evidence.** `tests/bodies.tsv` gains 13 rows; `.scratch/ooc_builder/compare.py`
+(the byte comparison, per body and in total) and `.scratch/steer/operand_map.py
+builder` (19 distinct operands, 0 declared-but-unused, 0 mismatch; four expected
+`/OPT:ICF` folds - vector-begin into `Game::Module`, free into `operator delete`,
+allocate into `DlcAlloc`, memset into `AudioZeroBlock`). `zp_dump --ooc-selftest` ->
+`ooc selftest: PASS` on the recovered 182,272-byte archive, `fnv1a 0xB5AF7B10`, header
+`16`/`0xE9`: the builder's behaviour, not only its shape.
+
+**The NMS arena methods (candidate 2) stay rebuilt, and the exact blockers are now
+named.** The three streams have no EH frame and no TLS guard, but `0x10038360` calls
+`0x1005C610`, the `std::_Hash` emplace, which **has an exception frame** (`push -1;
+push SEH_1005C610; ... mov fs:[0], eax` at `0x1005C613`-`0x1005C632`) - class B.
+`0x10038430` inlines the same container's erase unlink over the original's map globals
+(`dword_101A8424` / `dword_101A8418` / `dword_101A8410` at `0x100384CC` onward), and
+`0x100385A0` calls the `std::_Hash::find` `0x1005C5A0` over those globals. A
+transcription would have to read this module's `std::unordered_set` at the original's
+offsets - an unchecked layout assumption, not a proof. Named in `docs/rebuilt.md` §3
+class D, §4 item 2 and `docs/parity.md`'s NewMemorySystem section.
+
+**Gates (final runs).** `cmake --build --preset release` exit 0;
+`ctest --preset release` 12/12; `python tools/parity_report.py 9` ->
+`build 9: 98 key(s) closed, 0 open, 1 oracle-verified (baseline incomplete)`;
+`python tools/verify_bodies.py ...` -> `151 body(ies), 0 failure(s)`;
+`python tools/verify_bodies.py --selftest ...` -> all fifteen cases behave;
+`zp_dump --ooc-selftest` -> `ooc selftest: PASS`; `.scratch/branch_targets.py` ->
+`151 row(s), 321 internal branch target(s), 0 failure(s)`.
+
+**Docs.** `docs/rebuilt.md`: new §2h (the 13 bodies, the method, the folds, the one
+rebuilt destroy loop), §1 class D rewritten (the builder was the class's example and
+is gone), §2's branch counts, §3's OOC init row and class-D table, §4 item 2, §5 item
+6, §6 counts 138 -> 151 and the two new tools. `docs/parity.md`: 138 -> 151, the OOC
+table row, the "decoder and builder are transcribed and behaviourally proven" bullet,
+the NewMemorySystem blocker paragraph, and the transcription-decision list.
+`docs/review.md`: 119 -> 151 bodies, the rebuilt/transcribed lists, the stale
+walk-end-divergence note removed.
+
+**Open, not mine to edit.** `readable-fusion/AGENTS.md` line 11 still says "138 hook
+bodies transcribed"; it is 151 now (and the twelve helpers are not "hook bodies",
+they are the builder's own helpers - the sentence's "hook bodies" now covers
+transcribed internals too).
