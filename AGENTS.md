@@ -13,12 +13,14 @@ instruction-for-instruction against the original ASI. The shipped-INI cell now s
 zero differing and zero extra bytes: everything the tree writes agrees with the
 baseline, and what remains is unimplemented, not wrong.
 
-Two keys are open by construction, not by omission, and both are recorded in
+One key is open by construction, not by omission, and it is recorded in
 `docs/parity.md`: `SkipLauncher` implements the original's full 25-row launcher stage
-and its stored baseline records only the reference's 7-row arm, so the scoreboard shows
-extra bytes instead of closure (parity for it is decided against the oracle);
-`NoImpostorHeightCutoff` reproduces the original's 1.0.0.0 fault instead of guarding it,
-so the 1.0.0.0 dump faults past that arm.
+plus the DFA and ROM stages, but its stored baseline records only the reference's
+7-row arm - an arm nothing in that tree calls - so the scoreboard shows the bytes the
+original writes and the baseline omits, instead of closure. Its parity is decided
+against the oracle: the recovered rows replay to an identical write set on all nine
+images. Separately, `NoImpostorHeightCutoff` reproduces the original's 1.0.0.0 fault
+instead of guarding it, so the 1.0.0.0 dump faults past that arm, as the original does.
 
 `tools/gen_options.py::mask_for()` refuses a build cell it cannot parse; the two cells
 that used to be silently mis-parsed are machine-readable and their masks regenerated.
