@@ -115,10 +115,16 @@ bpm_model_name 10003F00 ?BpmModelNameBody@@YAXXZ 21
 # helper (sub_10005340, 145 instructions) is compiler output and is rebuilt; the
 # same recovered VA is already proven for loading.ixx's RemoveGFWLUpdatePopup arm.
 patch4_stub 100054E0 ?Patch4StubBody@@YAXXZ 8
-# CopSirensFlag (source/misc.ixx): the two model-check shims and the shared IDE
-# parser hook. The checkers they call (sub_10005F70, 191 instructions;
-# sub_10006260, 53; sub_10003FA0, 92) are compiled C and are rebuilt, so they have
-# no rows (docs/parity.md).
+# CopSirensFlag (source/misc.ixx): the two model-check shims, the shared IDE
+# parser hook and both model checks. The checks read the +siren table as a plain
+# absolute (slot 0) and as `[esi/edi + 0x10159380]`, a base-plus-displacement
+# absolute the registry canonicalises with the base register still compared. The
+# table row is the offline projection of the arm's RegisterTable call. The IDE
+# payload (sub_10003FA0, 92) is compiled C and stays rebuilt, so it has no row
+# (docs/rebuilt.md §2d).
+table 10159380 _zpatch_copsirens_models 2048
+copsirens_check_a 10005F70 ?CopSirensCheckABody@@YAXXZ 191
+copsirens_check_b 10006260 ?CopSirensCheckBBody@@YAXXZ 53
 copsirens_shim_a 10006310 ?CopSirensShimABody@@YAXXZ 8
 copsirens_shim_b 10006330 ?CopSirensShimBBody@@YAXXZ 8
 copsirens_ide 100040E0 ?IdeHookBody@@YAXXZ 9

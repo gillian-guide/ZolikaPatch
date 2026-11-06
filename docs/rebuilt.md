@@ -4,7 +4,7 @@ Every other piece of this module is **transcribed**: a body is written instructi
 instruction from the original ASI, and `tools/verify_bodies.py` decodes the same
 instruction count on both sides and compares mnemonic, registers, memory shape and
 immediate *class*. That proof is what `tests/bodies.tsv` is for, and it currently
-covers **133 bodies**. A transcribed body whose original stream reads a table through
+covers **135 bodies**. A transcribed body whose original stream reads a table through
 an indexed absolute operand is provable too, because the tree registers the table and
 the comparator compares its *contents*: §1 and §2b describe that, and the model-name
 lookup (`0x10003F00`) is the first piece transcribed that way. §2c is the largest: the
@@ -197,7 +197,7 @@ six rows §2a adds bring the current total to 206). That check lives in
    `tools/verify_bodies.py`). This is the check that caught the first DLC
    transcription's mis-attached label (§2); it passes for the 125 rows of that pass
    (154 internal targets), for the 131 rows of §2a (206), for the 132 rows of §2b
-   (208) and for today's 133 rows (228).
+   (208), for the 133 rows of §2c (228) and for today's 135 rows (249).
 
 **What remains unproven even for these six.** The bodies now execute only on the
 game's own calls, and no offline harness can make the game call them:
@@ -548,6 +548,99 @@ published by arms the dump proves), and the wheelangle tables' *runtime* content
 which the IDE hook fills from the INI in both trees by the same transcribed body.
 `docs/parity.md` §"The five keys behind `sub_10004C70`" records the play item.
 
+### 2d. This pass: the two siren checkers, and the base-plus-displacement shape
+
+`CopSirensFlag`'s two model checks read their 512-slot siren table as
+`push ds:[esi+0x10159380]` — an absolute *with* a base register and no index, which is
+the shape §2b's recipe left out. The extension in §4 item 3 resolves it: the
+displacement becomes `table:<content hash>` and the base register is still compared, so
+a changed base is an *instruction* difference and not a table one. Both checkers are
+then transcribable, and both are transcribed.
+
+| piece | recovered VA | size | insns | row | byte-identical | differs only in |
+|---|---|---:|---:|---|---:|---|
+| first siren check | `0x10005F70` | `0x2EE` | 191 | `copsirens_check_a` | 127/191 | 34 absolute operands + 15 `call` immediates + 13 name offsets + 2 table displacements |
+| second siren check | `0x10006260` | `0xAE` | 53 | `copsirens_check_b` | 40/53 | 7 absolute operands + 3 `call` immediates + 1 name offset + 2 table displacements |
+
+Every difference is an operand the proof reduces to a slot, a call target, a string
+address or a registered table; no mnemonic, register, frame offset, size or branch form
+differs (0 `other`, 0 branch), and both bodies are the original's exact size (750 and
+174 bytes), so every internal branch sits at the same relative offset. The proof's
+lines are `PASS copsirens_check_a (191 instruction(s), 34 absolute operand(s), 2 table
+operand(s))` and `PASS copsirens_check_b (53 instruction(s), 7 absolute operand(s), 2
+table operand(s))`.
+
+**The bodies, and what they read.** The first check resolves thirteen built-in police
+model names through the original's own resolver (`sub_10003E50`) and the game's
+model-index lookup, in the original's order (`police`, `police2`, `police3`, `police4`,
+`noose`, `pstockade`, `nstockade`, `polpatriot`, `fbi`, `n_police`, `n_police2`,
+`n_polpatriot`, `n_pstockade`), sets the flag on the first match and otherwise walks the
+IDE parser's `+siren` list; the second resolves `"police2"` first, then walks the same
+list. Each name is the original's own `.rdata` string, pushed as an `imm32` offset of a
+module literal; the walk's `cmove` keeps the flag byte it read, and it stops at the
+first zero word or past slot 511. The 3-byte `nop dword ptr [eax]` at `0x100061ED` is
+emitted as bytes. Both /GS frames are the originals' (cookie slot, check call slot); no
+exception frame, no TLS guard.
+
+**The table.** `zpatch_copsirens_models` is the IDE hook's `+siren` list, 512 words,
+and the arm registers it beside the existing `Bodies::Register` calls:
+
+```cpp
+Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_copsirens_models),
+    0x10159380u, sizeof(zpatch_copsirens_models));   // 512 * 4 = 2048
+```
+
+with its manifest row `table 10159380 _zpatch_copsirens_models 2048` (a C symbol, as
+in §2c) and two body rows.
+
+**What the content check does and does not prove for this table.** Like the wheelangle
+tables it is all-zero at load — the original's copy is in the `.data` tail past the
+file's raw size, ours is zero-initialised — so both sides hash to the same value and the
+check says *this operand reads a zero-filled table registered for this row*. It
+**cannot tell one zero table from another** (the two wheelangle tables and this one all
+hash alike at load), so a transcription that read the wrong zero table would pass. That
+this table is *filled at run time* by the IDE hook does not change the comparison: the
+proof compares the shipped state, and the fill path is the transcribed
+`IdeHookBody`/`IdeParse` pair on both sides. What pins the identity is the manifest
+pairing (each row declares one original VA ↔ one symbol) plus the instruction's
+semantics: this walk's slot goes through `dword_10159C0C` and is compared with the site's
+model index, and the IDE hook's `siren` branch is what writes this array.
+
+**How this pass was verified**
+
+1. **Proof rows.** The two PASS lines above, and `python tools/verify_bodies.py …` →
+   `135 body(ies), 0 failure(s)`.
+2. **Byte comparison.** 127/191 and 40/53 identical; the differences are operand slots,
+   call targets, the thirteen/two string offsets and the two table displacements each.
+   `.scratch/steer/compare_body.py sirens_a|sirens` is the run.
+3. **The operand maps.** `.scratch/steer/operand_map.py sirens_a|sirens` resolves every
+   absolute operand, call immediate and string offset against a declared pairing:
+   **20 distinct operands, 0 mismatch** for the first check (including all thirteen
+   names in their order and the `dword_10159370` index slot) and **8 distinct operands,
+   0 mismatch** for the second. That is what says `[edi+0x10159370]` became
+   `zpatch_copsirens_index` and not the `_b` slot 24 bytes away, and that the walk reads
+   `zpatch_copsirens_models`.
+4. **The table is the one the arm registers** — same array the IDE hook writes — and its
+   length is `sizeof` the array (2,048 bytes), not a literal.
+5. **The branch targets.** 191 + 53 instructions with 6 + 4 internal branches, each at
+   the original's relative offset (`135 row(s), 249 internal branch target(s), 0
+   failure(s)`).
+6. **The surrounding behaviour is unchanged.** `ctest --preset release` is 12/12,
+   `python tools/parity_report.py 9` is `98 key(s) closed, 0 open, 1 oracle-verified`,
+   `CopSirensFlag`'s per-option cell is byte-identical to its baseline on all nine
+   images, and `zp_dump --ooc-selftest` passes.
+
+**What stays rebuilt here.** The IDE parser payload (`sub_10003FA0`, 92) still is: its
+four indexed stores into four different tables (`0x1015CE28`, `0x10159380`,
+`0x1015A538`, `0x10159D38`) are transcribable under the registry now, but its payload
+is `strcmp`/`strtof`-shaped C++ that this pass did not take. It is the next class-A
+piece by the §4 item 3 list.
+
+**What stays unproven.** The checks only run when the game's sites call them, so the
+offline proof is of code and wiring; in play a wrong name order or a wrong index slot
+would show as `CopSirensFlag` not applying to one wrecked police car, which is
+cosmetic.
+
 ---
 
 ## 3. Every piece that is still rebuilt
@@ -560,16 +653,16 @@ is IDA's function size.
 
 ### Class A — indexed absolute table operand
 
-The model-name lookup (`0x10003F00`, §2b) and the steer consumer (`0x10004C70`, §2c)
-have left this class: both are transcribed, their tables are registered and their
-operands are compared by content. What remains is the same mechanical blocker on
-tables that are not yet registered, or whose operand carries a base register
-(`[edi+0x10159380]`, which the current registry rule does not cover; §4 item 3).
+The model-name lookup (`0x10003F00`, §2b), the steer consumer (`0x10004C70`, §2c) and
+both siren checkers (`0x10005F70`/`0x10006260`, §2d) have left this class: they are
+transcribed, their tables are registered and their operands are compared by content —
+the checkers through the base-plus-displacement shape. What remains is a mechanical
+blocker on tables that are not yet registered (the IDE payload and the popup-headlights
+checker) and one behavioural blocker the registry does not solve (the headlight-cone
+check's read one word past its table).
 
 | piece | VA | bytes | insns | the operand that blocks it | what the rebuild reproduces | how that was verified | residual risk |
 |---|---|---:|---:|---|---|---|---|
-| copsirens checker, first siren | `0x10005F70` | `0x2EE` | 191 | `push ds:[edi+0x10159380]` (`0x100061FA`), `cmp ds:[edi+0x10159380],0` (`0x1000622B`) | 14 hard-coded model names hashed in order, each looked up through `dword_10159C0C`; the tunable list walked slot by slot; `dword_10159B80` set to 1 on the first hit | `CopSirensFlag`'s cell is closed on every image; the hook sites it shares with the IDE hook are transcribed | moderate: a miss leaves siren flags off (cosmetic) or on (cosmetic), it does not fault |
-| copsirens checker, second siren | `0x10006260` | `0xAE` | 53 | `push ds:[esi+0x10159380]` (`0x100062BC`), `cmp ds:[esi+0x10159380],0` (`0x100062DB`) | `"police2"` always matches (that is the key), then the same list walk; `dword_10159378` is the result the other checker reads | as above | low |
 | IDE parser payload | `0x10003FA0` | `0x13A` | 92 | four indexed stores: `0x1015CE28[ecx*4]`, `0x10159380[ecx*4]`, `0x1015A538[ecx*4]`, `0x10159D38[ecx*4]` | the `popuplights` / `siren` / `wheelangle:<deg>` parser hook's payload: it recognises the key, hashes the model name into a 512-slot list and (for `wheelangle`) converts degrees and stores the float at the same index | the four tables are exported as slots (`zpatch_wheelangle_models`/`_angles`) and the transcribed steer consumer reads the same arrays; `zp_model_tables` drives the reader path | moderate: a wrong slot index here mis-aims a wheel angle for one model |
 | popup-headlights checker | `0x10044310` | `0x216` | 125 | eight: `0x1015CE28[esi*4]` in the walk, `0x1015C628[eax]`…`0x1015C644[eax]` (its own 512×8 table) and `0x1015BE28[eax]`…`0x1015BE44[eax]` (the floats) | reset the angle to π/2, resolve the object's model word once, and copy the eight per-model popup floats the `[PopupLightAngles]` reader stored | `PopupHeadlightsFlag`'s cell is closed on every image; the `[PopupLightAngles]` reader is the transcribed `sub_100523C0` (`zp_model_tables`) | low: eight floats that are only read by the popup-light shims |
 | headlight-cone offset check | `0x1001AD20` | `0x8B` | 46 | `mov eax, ds:[esi*4+0x1015ADBC]` (`0x1001AD6E`), `movss xmm0, ds:[esi*4+0x1015B5C0]` (`0x1001AD8A`) | seed 2.0f, walk the `[HeadlightConeOffsets]` hashes from slot 0 to the first zero, look each up through `dword_10159C0C` and compare with the object's signed word at `+0x2E`, then store that slot's float | `ForceCarHeadlightShadows`' cell is closed; the arm's shim (`0x1001ADB0`, 9 instructions) is transcribed and proven | moderate: it reads *one word past its 512-hash table* in the original (the `.data` that follows), which the rebuild cannot reproduce; a fully-filled 512-row section would diverge (no shipped INI comes close) |
@@ -641,17 +734,16 @@ the registrar alone would prove nothing about the service.
      shapes resolve; a base with an index stays literal.
 
    The self-test covers all three (its verdict is in §6). What that leaves in class A is
-   no longer a *comparator* problem: the copsirens checker `0x10006260` (53) and the
-   IDE payload `0x10003FA0` (92) are now transcribable as they stand, the first siren
-   checker `0x10005F70` (191) likewise, and the popup-headlights checker `0x10044310`
-   (125) after its eight-operand table set is registered. The headlight-cone check
-   `0x1001AD20` (46) still carries the behavioural caveat above (one word past its
-   table), which the registry does not solve.
+   no longer a *comparator* problem: the IDE payload `0x10003FA0` (92) is transcribable
+   as it stands (its four indexed stores all resolve now), and the popup-headlights
+   checker `0x10044310` (125) after its eight-operand table set is registered. The
+   headlight-cone check `0x1001AD20` (46) still carries the behavioural caveat above
+   (one word past its table), which the registry does not solve.
 4. **The internal-branch-target check** (the previous revision's item 1) is **done**:
    it is `tools/verify_bodies.py::internal_branch_mismatch`, it runs on every row, and
    it is what §2a's six transcriptions were proved with. `.scratch/branch_targets.py`
    stays as the independent reference implementation (it skips the `table` rows); the
-   two agree at `133 row(s), 228 internal branch target(s), 0 failure(s)`.
+   two agree at `135 row(s), 249 internal branch target(s), 0 failure(s)`.
 
 ---
 
@@ -696,11 +788,13 @@ deliberately after any change to the modules above.
    on a car with `NoLiveryLimit`, then the OOC fix (a save past the last mission), then
    a DLC start. What to look for: correct `"%s_sign_%d"` livery names, a correct
    `memory:$…` mount string (no truncated path), and correct `\Episode<n>\` probes.
-7. **`0x10005F70`/`0x10006260`/`0x10003FA0`/`0x10044310`, the misc checkers**
-   (class A). Exercise: `CopSirensFlag` (police cars get their flags),
-   `PopupHeadlightsFlag` (pop-up lights on the configured model),
-   `ForceCarHeadlightShadows`. What to look for: the feature silently not applying to
-   one model.
+7. **`0x10003FA0`/`0x10044310`, the misc checkers** (class A; the two siren checks
+   `0x10005F70`/`0x10006260` are transcribed now, §2d). Exercise: `CopSirensFlag`
+   (police cars get their flags; the transcribed pair decides `police`, `police2`, …
+   and the `+siren` list), `PopupHeadlightsFlag` (pop-up lights on the configured
+   model), `ForceCarHeadlightShadows`. What to look for: the feature silently not
+   applying to one model, which for the siren checks would mean a wrong name or index
+   slot — the operand map (§2d item 3) declares every one of them.
 8. **The ROM service and the DFA close-handle body** (classes B/C). Exercise: launch
    through `PlayGTAIV.exe` and watch for the ROM message window to exist (no visible
    symptom); a hang here is the preserved original fault. Then open a save so the DFA
@@ -712,7 +806,7 @@ deliberately after any change to the modules above.
 
 ## 6. Where the numbers live
 
-- `tests/bodies.tsv` — the 133 proof rows; a row's count is the body's exact
+- `tests/bodies.tsv` — the 135 proof rows; a row's count is the body's exact
   instruction count, so it cannot silently shrink. Its `table` rows are the offline
   projection of the arms' `Bodies::RegisterTable` calls (recovered VA, candidate
   symbol, registered length), one per table a transcribed body reads; a symbol may be
@@ -742,12 +836,14 @@ deliberately after any change to the modules above.
   the six of the first pass. It classifies a table displacement as `other`, because it
   has no registry; §2b's 17/21 is that comparison with the two table displacements read
   as such.
-- `.scratch/steer/compare_body.py` — §2c's byte comparison (250/320); it knows the two
-  registered table displacements and reports a branch whose target offset differs.
-- `.scratch/steer/operand_map.py` — §2c item 3: every absolute operand, call immediate
-  and string offset of the transcription resolved through the linker map and checked
-  against a declared pairing (33 distinct operands, 0 mismatch). This is the check that
-  says *which* slot an `abs` operand names, which the proof cannot.
+- `.scratch/steer/compare_body.py` — §2c's and §2d's byte comparison (250/320,
+  127/191, 40/53); it knows the registered table displacements (both shapes) and reports
+  a branch whose target offset differs. `steer`, `sirens_a`, `sirens` select the body.
+- `.scratch/steer/operand_map.py` — §2c item 3 and §2d item 3: every absolute operand,
+  call immediate and string offset of a transcription resolved through the linker map
+  and checked against a declared pairing (33 distinct for the steer consumer, 20 for the
+  first siren check, 8 for the second; 0 mismatch each). This is the check that says
+  *which* slot an `abs` operand names, which the proof cannot.
 - `.scratch/steer/dump_body.py`, `.scratch/steer/peek.py`, `.scratch/steer/tables_probe.py`
   — the listing/constant/table probes §2c was written from.
 - `.scratch/branch_targets.py` — the internal-branch-target check over every row, the

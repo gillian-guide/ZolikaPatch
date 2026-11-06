@@ -2,13 +2,10 @@ module;
 
 #include <common.hxx>
 // The /GS cookie the transcribed helpers' prologues read and their epilogues check
-// (`__security_cookie`, `__security_check_cookie` in vcruntime.h), the variadic
-// list NoLiveryLimit's rebuilt formatter takes, and the CRT entries the transcribed
-// pieces call.
+// (`__security_cookie`, `__security_check_cookie` in vcruntime.h), and the CRT entries
+// the transcribed pieces call (`_stricmp`, `strcpy_s`).
 #include <intrin.h>
 #include <bit>
-#include <cstdarg>
-#include <cstdio>
 #include <cstring>
 
 export module vehicles;

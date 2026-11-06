@@ -1,6 +1,9 @@
 module;
 
 #include <common.hxx>
+// The /GS cookie the transcribed second siren check reads and checks
+// (`__security_cookie`, `__security_check_cookie` in vcruntime.h).
+#include <intrin.h>
 #include <cstdlib>
 #include <cstring>
 
@@ -696,6 +699,24 @@ extern "C"
     uint32_t zpatch_popuplights_models[512] = {};
     uint32_t zpatch_wheelangle_models[512] = {};
     uint32_t zpatch_wheelangle_angles[512] = {};
+
+    // The names the two siren checks resolve, each the original's own .rdata string
+    // and each pushed with `push imm32`: the first check's thirteen built-in police
+    // models in its order (0x1013A6B4 ... 0x10129DB4) and the second check's
+    // "police2" (0x1013A734, the same string the first check uses second).
+    const char zpatch_copsirens_police[] = "police";
+    const char zpatch_copsirens_police2[] = "police2";
+    const char zpatch_copsirens_police3[] = "police3";
+    const char zpatch_copsirens_police4[] = "police4";
+    const char zpatch_copsirens_noose[] = "noose";
+    const char zpatch_copsirens_pstockade[] = "pstockade";
+    const char zpatch_copsirens_nstockade[] = "nstockade";
+    const char zpatch_copsirens_polpatriot[] = "polpatriot";
+    const char zpatch_copsirens_fbi[] = "fbi";
+    const char zpatch_copsirens_n_police[] = "n_police";
+    const char zpatch_copsirens_n_police2[] = "n_police2";
+    const char zpatch_copsirens_n_polpatriot[] = "n_polpatriot";
+    const char zpatch_copsirens_n_pstockade[] = "n_pstockade";
 }
 
 namespace
@@ -734,70 +755,6 @@ namespace
                 return false;
         }
         return true;
-    }
-
-    // sub_10005F70 (191 instructions), rebuilt: the first siren check. The
-    // thirteen built-in police model names are resolved and looked up in the
-    // original's order; a match sets the flag. Otherwise the +siren list the IDE
-    // parser filled is walked the same way. Every lookup is unguarded, as the
-    // original's `call dword_10159C0C` is.
-    void CopSirensCheckA()
-    {
-        constexpr const char* kPoliceModels[] = {
-            "police", "police2", "police3", "police4", "noose", "pstockade",
-            "nstockade", "polpatriot", "fbi", "n_police", "n_police2",
-            "n_polpatriot", "n_pstockade",
-        };
-        const int32_t index = static_cast<int32_t>(zpatch_copsirens_index);
-        zpatch_copsirens_flag = 0;
-        for (const char* name : kPoliceModels)
-        {
-            int32_t found = -1;
-            LookupModel(ResolveModelName(name), &found);
-            if (found == index)
-            {
-                zpatch_copsirens_flag = 1;
-                return;
-            }
-        }
-        for (uint32_t slot = 0; slot < kVehicleLightSlots; ++slot)
-        {
-            const uint32_t model = zpatch_copsirens_models[slot];
-            if (model == 0)
-                break;
-            int32_t found = -1;
-            LookupModel(model, &found);
-            if (found == index)
-                zpatch_copsirens_flag = 1;
-        }
-    }
-
-    // sub_10006260 (53 instructions), rebuilt: "police2" always matches; every
-    // other model goes through the +siren list.
-    void CopSirensCheckB()
-    {
-        const int32_t index = static_cast<int32_t>(zpatch_copsirens_index_b);
-        zpatch_copsirens_flag_b = 0;
-        int32_t found = -1;
-        LookupModel(ResolveModelName("police2"), &found);
-        if (found != index)
-        {
-            for (uint32_t slot = 0; slot < kVehicleLightSlots; ++slot)
-            {
-                const uint32_t model = zpatch_copsirens_models[slot];
-                if (model == 0)
-                    return;
-                found = -1;
-                LookupModel(model, &found);
-                if (found == index)
-                {
-                    zpatch_copsirens_flag_b = 1;
-                    return;
-                }
-            }
-            return;
-        }
-        zpatch_copsirens_flag_b = 1;
     }
 
     // Appends the model's name hash to a 512-slot IDE table, deduplicating; a full
@@ -850,6 +807,311 @@ namespace
     }
 }
 
+// sub_10005F70, recovered VA 0x10005F70 (191 instructions, 750 bytes): the first
+// siren check, transcribed instruction for instruction.
+//
+// Thirteen built-in police model names are resolved through the original's own
+// resolver (sub_10003E50) and the game's model-index lookup, in the original's order;
+// the first match sets the flag and leaves through the shared epilogue. Otherwise the
+// IDE parser's +siren list is walked: `push dword ptr [edi + 0x10159380]` reads slot N
+// of the 512-word table as a base-plus-displacement absolute, `cmove` keeps the flag
+// byte the walk read, and the loop ends at the first zero word or past slot 511
+// (`cmp edi, 7FCh`). The entry check reads the same table's first word as a plain
+// absolute.
+//
+// The /GS frame is the original's, and the 3-byte `nop dword ptr [eax]` at
+// 0x100061ED (0F 1F 00) is emitted as bytes so the assembler cannot choose another
+// padding. No exception frame, no TLS static-init guard: nothing blocks the
+// transcription.
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void CopSirensCheckABody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        sub esp, 8
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, ebp
+        mov DWORD PTR [ebp - 4], eax
+        push esi
+        mov esi, DWORD PTR [zpatch_copsirens_index]
+        push OFFSET zpatch_copsirens_police
+        mov DWORD PTR [zpatch_copsirens_flag], 0
+        call ResolveModelName
+        lea ecx, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push ecx
+        push eax
+        call DWORD PTR [zpatch_model_lookup]
+        add esp, 0Ch
+        cmp DWORD PTR [ebp - 8], esi
+        je copsirens_a_hit
+        mov esi, DWORD PTR [zpatch_copsirens_index]
+        push OFFSET zpatch_copsirens_police2
+        call ResolveModelName
+        lea ecx, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push ecx
+        push eax
+        call DWORD PTR [zpatch_model_lookup]
+        add esp, 0Ch
+        cmp DWORD PTR [ebp - 8], esi
+        je copsirens_a_hit
+        mov esi, DWORD PTR [zpatch_copsirens_index]
+        push OFFSET zpatch_copsirens_police3
+        call ResolveModelName
+        lea ecx, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push ecx
+        push eax
+        call DWORD PTR [zpatch_model_lookup]
+        add esp, 0Ch
+        cmp DWORD PTR [ebp - 8], esi
+        je copsirens_a_hit
+        mov esi, DWORD PTR [zpatch_copsirens_index]
+        push OFFSET zpatch_copsirens_police4
+        call ResolveModelName
+        lea ecx, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push ecx
+        push eax
+        call DWORD PTR [zpatch_model_lookup]
+        add esp, 0Ch
+        cmp DWORD PTR [ebp - 8], esi
+        je copsirens_a_hit
+        mov esi, DWORD PTR [zpatch_copsirens_index]
+        push OFFSET zpatch_copsirens_noose
+        call ResolveModelName
+        lea ecx, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push ecx
+        push eax
+        call DWORD PTR [zpatch_model_lookup]
+        add esp, 0Ch
+        cmp DWORD PTR [ebp - 8], esi
+        je copsirens_a_hit
+        mov esi, DWORD PTR [zpatch_copsirens_index]
+        push OFFSET zpatch_copsirens_pstockade
+        call ResolveModelName
+        lea ecx, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push ecx
+        push eax
+        call DWORD PTR [zpatch_model_lookup]
+        add esp, 0Ch
+        cmp DWORD PTR [ebp - 8], esi
+        je copsirens_a_hit
+        mov esi, DWORD PTR [zpatch_copsirens_index]
+        push OFFSET zpatch_copsirens_nstockade
+        call ResolveModelName
+        lea ecx, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push ecx
+        push eax
+        call DWORD PTR [zpatch_model_lookup]
+        add esp, 0Ch
+        cmp DWORD PTR [ebp - 8], esi
+        je copsirens_a_hit
+        mov esi, DWORD PTR [zpatch_copsirens_index]
+        push OFFSET zpatch_copsirens_polpatriot
+        call ResolveModelName
+        lea ecx, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push ecx
+        push eax
+        call DWORD PTR [zpatch_model_lookup]
+        add esp, 0Ch
+        cmp DWORD PTR [ebp - 8], esi
+        je copsirens_a_hit
+        mov esi, DWORD PTR [zpatch_copsirens_index]
+        push OFFSET zpatch_copsirens_fbi
+        call ResolveModelName
+        lea ecx, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push ecx
+        push eax
+        call DWORD PTR [zpatch_model_lookup]
+        add esp, 0Ch
+        cmp DWORD PTR [ebp - 8], esi
+        je copsirens_a_hit
+        mov esi, DWORD PTR [zpatch_copsirens_index]
+        push OFFSET zpatch_copsirens_n_police
+        call ResolveModelName
+        lea ecx, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push ecx
+        push eax
+        call DWORD PTR [zpatch_model_lookup]
+        add esp, 0Ch
+        cmp DWORD PTR [ebp - 8], esi
+        je copsirens_a_hit
+        mov esi, DWORD PTR [zpatch_copsirens_index]
+        push OFFSET zpatch_copsirens_n_police2
+        call ResolveModelName
+        lea ecx, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push ecx
+        push eax
+        call DWORD PTR [zpatch_model_lookup]
+        add esp, 0Ch
+        cmp DWORD PTR [ebp - 8], esi
+        je copsirens_a_hit
+        mov esi, DWORD PTR [zpatch_copsirens_index]
+        push OFFSET zpatch_copsirens_n_polpatriot
+        call ResolveModelName
+        lea ecx, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push ecx
+        push eax
+        call DWORD PTR [zpatch_model_lookup]
+        add esp, 0Ch
+        cmp DWORD PTR [ebp - 8], esi
+        je copsirens_a_hit
+        mov esi, DWORD PTR [zpatch_copsirens_index]
+        push OFFSET zpatch_copsirens_n_pstockade
+        call ResolveModelName
+        lea ecx, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push ecx
+        push eax
+        call DWORD PTR [zpatch_model_lookup]
+        add esp, 0Ch
+        cmp DWORD PTR [ebp - 8], esi
+        je copsirens_a_hit
+        cmp DWORD PTR [zpatch_copsirens_models], 0
+        je copsirens_a_no_walk
+        push ebx
+        push edi
+        xor edi, edi
+        lea ebx, [edi + 1]
+        // The original's loop alignment: 0F 1F 00 (`nop dword ptr [eax]`).
+        __emit 0x0F
+        __emit 0x1F
+        __emit 0x00
+    copsirens_a_walk:
+        mov esi, DWORD PTR [zpatch_copsirens_index]
+        lea eax, [ebp - 8]
+        push eax
+        push DWORD PTR [edi + zpatch_copsirens_models]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        call DWORD PTR [zpatch_model_lookup]
+        mov eax, DWORD PTR [zpatch_copsirens_flag]
+        add esp, 8
+        cmp DWORD PTR [ebp - 8], esi
+        cmove eax, ebx
+        add edi, 4
+        mov DWORD PTR [zpatch_copsirens_flag], eax
+        cmp edi, 7FCh
+        ja copsirens_a_walk_done
+        cmp DWORD PTR [edi + zpatch_copsirens_models], 0
+        jne copsirens_a_walk
+    copsirens_a_walk_done:
+        pop edi
+        pop ebx
+    copsirens_a_no_walk:
+        pop esi
+        mov ecx, DWORD PTR [ebp - 4]
+        xor ecx, ebp
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    copsirens_a_hit:
+        mov ecx, DWORD PTR [ebp - 4]
+        xor ecx, ebp
+        mov DWORD PTR [zpatch_copsirens_flag], 1
+        pop esi
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
+// sub_10006260, recovered VA 0x10006260 (53 instructions, 174 bytes): the second
+// siren check, transcribed instruction for instruction.
+//
+// It resolves "police2" through the original's own resolver (sub_10003E50) and the
+// game's model-index lookup, and answers flag 1 when the index matches. Otherwise it
+// walks the IDE parser's +siren list: `push dword ptr [esi + 0x10159380]` reads slot
+// N of the 512-word table, an absolute *with* a base register and no index -- the
+// shape the table registry canonicalises as `[esi+table:<hash>]`, with the base
+// register still compared (docs/rebuilt.md §2d). The walk stops at the first
+// zero word (`cmp dword ptr [esi+0x10159380], 0`), and the check before the loop
+// reads the same table's first word as a plain absolute.
+//
+// Its /GS frame is the original's: the cookie is an absolute slot and the check a
+// call slot. The body has no exception frame and no TLS static-init guard, so
+// nothing blocks a transcription.
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void CopSirensCheckBBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        sub esp, 8
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, ebp
+        mov DWORD PTR [ebp - 4], eax
+        push esi
+        push edi
+        mov edi, DWORD PTR [zpatch_copsirens_index_b]
+        push OFFSET zpatch_copsirens_police2
+        mov DWORD PTR [zpatch_copsirens_flag_b], 0
+        call ResolveModelName
+        lea ecx, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push ecx
+        push eax
+        call DWORD PTR [zpatch_model_lookup]
+        add esp, 0Ch
+        cmp DWORD PTR [ebp - 8], edi
+        je sirens_hit
+        cmp DWORD PTR [zpatch_copsirens_models], 0
+        je sirens_done
+        xor esi, esi
+    sirens_walk:
+        lea eax, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push eax
+        push DWORD PTR [esi + zpatch_copsirens_models]
+        call DWORD PTR [zpatch_model_lookup]
+        add esp, 8
+        cmp DWORD PTR [ebp - 8], edi
+        je sirens_hit
+        add esi, 4
+        cmp esi, 7FCh
+        ja sirens_done
+        cmp DWORD PTR [esi + zpatch_copsirens_models], 0
+        jne sirens_walk
+        pop edi
+        pop esi
+        mov ecx, DWORD PTR [ebp - 4]
+        xor ecx, ebp
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    sirens_hit:
+        mov DWORD PTR [zpatch_copsirens_flag_b], 1
+    sirens_done:
+        mov ecx, DWORD PTR [ebp - 4]
+        pop edi
+        xor ecx, ebp
+        pop esi
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
 // sub_10006310, recovered VA 0x10006310 (8 instructions): the first siren shim.
 // It stores the site's model index (EDX), runs the check between pusha/pushfd and
 // popa/popfd, and resumes with EAX = the flag, which the site's `shl al, 6;
@@ -862,7 +1124,7 @@ static __declspec(naked) void CopSirensShimABody()
         mov DWORD PTR [zpatch_copsirens_index], edx
         __emit 0x60  // pusha
         __emit 0x9C  // pushfd
-        call CopSirensCheckA
+        call CopSirensCheckABody
         __emit 0x9D  // popfd
         __emit 0x61  // popa
         mov eax, DWORD PTR [zpatch_copsirens_flag]
@@ -881,7 +1143,7 @@ static __declspec(naked) void CopSirensShimBBody()
         mov DWORD PTR [zpatch_copsirens_index_b], eax
         __emit 0x60  // pusha
         __emit 0x9C  // pushfd
-        call CopSirensCheckB
+        call CopSirensCheckBBody
         __emit 0x9D  // popfd
         __emit 0x61  // popa
         cmp DWORD PTR [zpatch_copsirens_flag_b], 1
@@ -1179,12 +1441,22 @@ export void RegisterMisc()
     Bodies::Register(reinterpret_cast<uintptr_t>(&PopupHeadlightsBodyA), 0x10044530u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&PopupHeadlightsBodyB), 0x10044560u);
 
+    // The second siren check's table: the IDE parser hook's +siren list, which the
+    // transcription reads as `[esi + zpatch_copsirens_models]` and as a plain absolute
+    // at slot 0. The registration pairs this module's array with the original's VA and
+    // the length there (512 words); its tests/bodies.tsv `table` row is the offline
+    // projection of this call (docs/rebuilt.md §3). Unlike the wheelangle tables this
+    // one is *filled* at run time by the transcribed IDE hook, so a content hash of it
+    // compares the shipped all-zero state, not the populated one.
+    Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_copsirens_models),
+        0x10159380u, sizeof(zpatch_copsirens_models));   // 512 * 4 = 2048
+
     // Each stub's inline `call` is invisible to C++; naming the helper here keeps
     // its out-of-line definition in the image.
     [[maybe_unused]] const uintptr_t helpers[] = {
         reinterpret_cast<uintptr_t>(&Patch4Step),
-        reinterpret_cast<uintptr_t>(&CopSirensCheckA),
-        reinterpret_cast<uintptr_t>(&CopSirensCheckB),
+        reinterpret_cast<uintptr_t>(&CopSirensCheckABody),
+        reinterpret_cast<uintptr_t>(&CopSirensCheckBBody),
         reinterpret_cast<uintptr_t>(&IdeParse),
         reinterpret_cast<uintptr_t>(&PopupHeadlightsCheck),
     };

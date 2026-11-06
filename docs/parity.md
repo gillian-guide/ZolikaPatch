@@ -70,26 +70,29 @@ feature key, is closed by the converter recorded in its own section below;
 `HighQualityReflections` closed with the site-arithmetic resolution recorded below.
 
 - **98 of 99 option keys closed**;
-- **133 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **135 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe, and the compiled bodies listed in
   [`rebuilt.md`](rebuilt.md) are rebuilt in C++ instead, with no proof row. That file
   is the catalogue of rebuilt pieces: what blocks each transcription, what the rebuild
   reproduces, how that was verified and what it leaves unproven. The longest is the
   steer/engine/plane consumer (`0x10004C70`, 320 instructions / 1,343 bytes; see the
-  section below), which displaced `HighQualityReflections`' detour
-  (`0x1001F030`, 157 instructions / 858 bytes); before that the row was
+  section below); before it `HighQualityReflections`' detour
+  (`0x1001F030`, 157 instructions / 858 bytes) held the row, and before that
   `CutsceneFixes` chain B's body
-  (`0x100388C0`, 146 instructions / 592 bytes), and before that the livery counter
+  (`0x100388C0`, 146 instructions / 592 bytes) and the livery counter
   (`0x1003D270`, 37 instructions). The pair at 78 instructions / 309
   bytes each (`DualVehicleHeadlights`) is what exposed the proof tool's old
   256-byte sweep window: it compared 64 of 78 and still reported PASS. The tool
   now sweeps 4096 bytes and fails a row that decodes fewer instructions than its
   budget, so a truncated sweep can never pass again. This pass added
-  the steer consumer (`0x10004C70`, 320 instructions), the largest class-A piece:
-  its two wheelangle tables are registered and the proof compares their contents
-  (`rebuilt.md` §2c). Before it came `BadPlayerModelCrashFix`'s model-name lookup
-  (`0x10003F00`, 21 instructions), the first class-A piece transcribed: its table is
+  the steer consumer (`0x10004C70`, 320 instructions), the largest class-A piece,
+  and both siren checks (`0x10005F70` 191, `0x10006260` 53), the first pieces
+  transcribed through a base-plus-displacement table operand; the steer consumer's two
+  wheelangle tables and the siren list are registered and the proof compares their
+  contents (`rebuilt.md` §2c/§2d). Before this pass came `BadPlayerModelCrashFix`'s
+  model-name lookup (`0x10003F00`, 21 instructions), the first class-A piece
+  transcribed: its table is
   registered and the proof compares the table's contents (`rebuilt.md` §2b). Before it
   came `NewSavesCompatibility`'s trampoline; the pass before that added the
   `HighQualityReflections` detour; before that the cutscene body and
@@ -619,7 +622,7 @@ lookups:
 |---|---|---|
 | `SpeedupBugFix` | `E9` at RVA `0x571B0` (game `0x4571B0`) | `sub_10050540`, 93 instructions to its `ret` (109 with the C++ static-init funclet), rebuilt in C++ (`rebuilt.md` §3 class B) |
 | `Patch4RemoveModChecks` | `E9` at RVA `0x3CBF70` (game `0x7CBF70`) | `sub_100054E0`, 8, transcribed |
-| `CopSirensFlag` | `E9` at RVAs `0x4FABE6`, `0x4FEBD3`, `0x646546` | `sub_10006310` 8, `sub_10006330` 8, `sub_100040E0` 9, transcribed |
+| `CopSirensFlag` | `E9` at RVAs `0x4FABE6`, `0x4FEBD3`, `0x646546` | `sub_10006310` 8, `sub_10006330` 8, `sub_100040E0` 9, transcribed; both model checks (`sub_10005F70` 191, `sub_10006260` 53) transcribed (`rebuilt.md` §2d) |
 | `PopupHeadlightsFlag` | `E9` at `0x653A64`, `EB` at `0x653A6E`, the `fld` operand at `0x653AB6` (our pi/2 float, the baseline's `0xD0000000` placeholder), `E9` at `0x646546` | `sub_10044530` 10, `sub_10044560` 10, `sub_100040E0` 9, transcribed |
 
 #### `SpeedupBugFix`: an ungated handler, so the row differs per build only in where it matches
@@ -767,8 +770,13 @@ arm installs later, so a run with *both* keys enabled performs the Patch4 branch
 and not the GFWL writes. Each key alone is 1:1, and the shipped INI has both off.
 
 The `CopSirensFlag` checkers (`sub_10005F70`, 191 instructions;
-`sub_10006260`, 53) and the `PopupHeadlightsFlag` checker (`sub_10044310`, 125)
-are compiled C and rebuilt in C++ against the same state words: a 512-slot
+`sub_10006260`, 53) are **transcribed** (rows `copsirens_check_a`/`_b`): the thirteen
+built-in police names and the `+siren` list are the original's own instructions, its
+own `.rdata` name strings and its own resolver, and the table they walk is registered
+so the proof compares the operand by content with the base register still compared
+(`rebuilt.md` §2d). The `PopupHeadlightsFlag` checker (`sub_10044310`, 125) and the
+shared IDE payload (`sub_10003FA0`, 92) are still compiled C and rebuilt in C++
+against the same state words: a 512-slot
 model-hash list per category, filled by the shared IDE hook (`sub_100040E0` plus
 the rebuilt `sub_10003FA0`, 92) when the game's parser stores a `popuplights`,
 `siren` or `wheelangle:<degrees>` entry. Both keys install that same IDE body at
