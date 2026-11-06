@@ -590,3 +590,75 @@ not match+1: `sub_10003290` computes `edx = 1 - length`, then
 the resume are transcribed/proven but not executed in the running game.
 `AGENTS.md`'s "Current state" (96 keys / 117 bodies) is outside this pass's file
 scope and is stale.
+
+## 2026-11-06 — NewSavesCompatibility, closed on its rebuilt converter
+
+**Closed:** `NewSavesCompatibility` (`build 9: 97 -> 98 key(s) closed, 1 open`; the
+one open key is `SkipLauncher`'s baseline gap).
+
+**What the original does (read end to end in the IDB).** The handler `0x10052200`
+does not convert anything: it scans `68 ? ? ? ? E8 ? ? ? ? 8B 2D ? ? ? ? 83 C4 08`
+(game `0x857CAF`; the pushed operand is the save-name buffer the game fills with
+`sprintf(buffer, "%s%02d", "SGTA4", slot)`) and
+`89 84 24 E0 01 00 00 8B 45 08 53 33 DB` (game `0x85B093`), publishes `match+0xD`
+and writes `E9` to `0x100521E0`. Behind that trampoline:
+
+- `sub_10051B30` (363 instructions) opens the path with `fopen_s(...,"rb")`, reads
+  the `0x110` header and `cmp dword ptr [eax],45564153h` at `+0xC`, then walks
+  eighteen chunks: `fread(&chunk,9,1)`, the dword at `+5` is the total size,
+  `add eax,0FFFFFFF7h` (size-9), `call operator new`, `fread(block,1,size-9)`,
+  `free`. Chunks 9/13/16 are compared with `4C45h`/`1741h`/`0E77h` and stored in
+  `byte_1015AD98/99/9A`. After `fclose` it patches three sites, each resolved once
+  through `_Init_thread_header`/`_footer`-guarded statics: `0x872185` (byte `74` or
+  `EB` from the chunk-9 size), `0x7D8C50` (`E8`+hook, read size `0CBEh` or `0E6Eh`,
+  branch `75 26` or `90 90` from the chunk-16 size) and `0x8DA090` (`E8`+hook, and
+  the read entry republished from `[match+1Eh]+1Eh+4`).
+- `sub_10051FD0` (157 instructions) asks the game's save-directory function
+  (`55 8B EC 83 E4 F8 83 EC 4C 56 33 C0 8D 4C 24 28`, called with `0`, the
+  312-byte `byte_101A8308` and a suffix byte), builds
+  `"<directory>\<save name>"` as a `std::string` and calls the converter.
+- The two hooks it installs are compiled C: `sub_10051A90` (`sub esp,0E7Ch`, reads
+  into its own scratch, keeps the read's value) and `sub_10051AD0` (`sub esp,10h`,
+  twelve extra bytes before and after the original call when chunk 13 is new).
+
+Nothing needed game-side state beyond the directory function and the save-name
+buffer, both reached exactly as the original reaches them, so both steps were
+rebuildable.
+
+**What was built**
+
+- `source/loading.ixx` — the arm (`PublishNewSavesCompatibility` /
+  `InstallNewSavesCompatibility`, the install gated on the *first* anchor as the
+  original returns before its second scan), the eight-instruction trampoline
+  (`NewSavesTrampoline`, `pusha`/`popa` as `__emit 0x60/0x61`), and the four
+  rebuilt pieces with the original's call shape: `NewSavesReadHook` (0x10051A90),
+  `NewSavesSecondLoadHook` (0x10051AD0), `NewSavesPatchSites`, `NewSavesConvert`
+  (0x10051B30), `NewSavesPrepare` (0x10051FD0). Everything is registered in
+  `Bodies::Register`; the arm is `Loader::Enabled`-gated.
+- `tests/bodies.tsv` — `new_saves_tramp 100521E0 ?NewSavesTrampoline@@YAXXZ 8`;
+  the four rebuilt pieces are named in the comment as rebuilds with no row.
+- `tests/signatures.tsv` — the six recovered scans (name, load, branch, read,
+  reload, directory) with the per-image absence note.
+- `docs/parity.md` — status (98/1, 119 bodies), the key's section with the quoted
+  instructions and the transcribed/rebuilt table, and two new preserved-fault rows
+  (the corrupt-save allocation throw / uninitialised header check, and the
+  trampoline's unspecified-EAX store).
+
+**Gates (final runs)**
+
+- `cmake --build --preset release` — success (exit 0).
+- `python tools/parity_report.py 9` — `build 9: 98 key(s) closed, 1 open`; the only
+  OPEN line is `SkipLauncher`, `NewSavesCompatibility` is gone (was 97 closed).
+- `ctest --preset release` — `100% tests passed out of 11`.
+- `python tools/verify_bodies.py …` — `119 body(ies), 0 failure(s)`
+  (`PASS new_saves_tramp (8 instruction(s), 1 absolute operand(s))`).
+- Cross-build parity spot check: `NewSavesCompatibility` has no OPEN line on builds
+  1, 5, 6, 7, 8, 11, 12 and 13 either (1.0.0.4.0 writes nothing because its image
+  lacks the first anchor, as the original does).
+
+**Not verifiable here.** No game launch: the conversion path runs only when the game
+loads a savegame, so the three site patches and the two hooks have not executed. The
+file walk was replayed offline against the two real saves in
+`game_refs/saves/GTA IV/savegames/user_ee000000deadc0de` (`SGTA400`/`SGTA401`: `SAVE`
+at `0x0C`, eighteen `BLOCK` chunks, sizes `0x3AB1`/`0x1729`/`0x0CC7`, i.e. the older
+layout), which validates the walk and the size conditions only.

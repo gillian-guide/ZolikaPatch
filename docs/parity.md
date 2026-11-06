@@ -34,6 +34,8 @@ fix.
 | the cutscene chain faults on an unresolved native or a missed camera site | the game's native resolver answers null (`dword_1015BDE0` unresolved, or the resolver faults and the layer answers zero), or chain B's first scan matched nothing so `dword_1015BDE4` / `dword_1015BDF0` are still zero | `sub_100388C0` reads the resolver's answer unguarded (`mov ecx,[eax+0Eh]`, `0x100388EE`) and writes through the published poke (`dec esi` / `mov byte [esi],1`, `0x10038913`-`0x10038935`); the transcription keeps every hop and both stores unguarded, so it faults at the same instruction on the same condition. All nine stored baselines record both chain B installs, so every supported image matches both patterns; the resolver scan is the native layer's, measured on 1.0.8.0 |
 | the payload init re-runs on every call and leaks its archive | every call of the wrapper the second `E8` installs | the original's one-shot guard `dword_10159C00` is read at `0x1004B77B` and never written anywhere in the image, so `sub_1004B750` decodes, registers and builds again each time, hands the game a fresh archive and never frees the previous one. The rebuild keeps that structure -- no writer, no free -- so the behaviour is the same |
 | the decoded payload is registered and mounted even when its own checks fail | a resource whose decode does not end on `05 FA`, does not fill exactly 179,536 bytes, or does not match its Adler-32 trailer | `sub_1004B570` answers 179,536 or 0 and `sub_1004B750` discards the answer (`call sub_1004B570` at `0x1004B798`, no test of `EAX`), so the partially decoded buffer is registered and archived as it stands. The rebuild discards it the same way. Unreachable with the pinned resource, which passes all three checks |
+| a corrupt save makes the converter throw or check uninitialised bytes | a save whose 9-byte chunk header carries a size below 9, or a file shorter than its header | `sub_10051B30`'s `add eax,0FFFFFFF7h` (`0x10051C14`) feeds `operator new` (`0x100603F1`) unchecked, so the underflowed payload throws `std::bad_alloc` out of the trampoline; a short header read leaves the `cmp dword ptr [eax],45564153h` (`0x10051BD1`) reading the uninitialised stack buffer. The rebuild keeps the same `operator new` / `fread` / `free` sequence and the same unchecked header read, so the same input faults at the same step |
+| the load trampoline stores an unspecified EAX in the game's frame | every savegame load | the replayed `mov [esp+1E0h],eax` (`0x100521E7`) stores the prepare step's return value although `sub_10051FD0` is `void`. The transcription keeps the instruction, so the slot receives whatever EAX the compiled prepare leaves; the original's receives whatever its own prepare left. Both are unspecified and the game's own store at the site wrote a defined value, so the original already replaces it with an undefined one - the rebuild keeps that fault, and only the undefined value itself differs |
 
 Two of these remain assumptions, not measurements: feather 1.41's non-advancing
 `getline` on a long line (the original very likely spins; this tree continues), and
@@ -42,13 +44,14 @@ CRLF folding (the original reads in text mode). The shipped INI's longest line i
 
 ## Status
 
-Measured on 1.0.8.0 with `tools/parity_report.py 9`: `build 9: 97 key(s) closed, 2
-open`. The two open keys are `NewSavesCompatibility` and `SkipLauncher`, whose cell
-is the baseline's own gap (see below); `HighQualityReflections` closed with the
-site-arithmetic resolution recorded below.
+Measured on 1.0.8.0 with `tools/parity_report.py 9`: `build 9: 98 key(s) closed, 1
+open`. The open key is `SkipLauncher`, whose cell is the baseline's own gap (see
+below). `NewSavesCompatibility`, the last substantial feature key, is closed by the
+rebuilt converter recorded in its own section below; `HighQualityReflections` closed
+with the site-arithmetic resolution recorded below.
 
-- **97 of 99 option keys closed**;
-- **118 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **98 of 99 option keys closed**;
+- **119 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe, and the compiled-C bodies listed below are
   rebuilt in C++ instead, with no proof row. The longest is
@@ -59,8 +62,9 @@ site-arithmetic resolution recorded below.
   bytes each (`DualVehicleHeadlights`) is what exposed the proof tool's old
   256-byte sweep window: it compared 64 of 78 and still reported PASS. The tool
   now sweeps 4096 bytes and fails a row that decodes fewer instructions than its
-  budget, so a truncated sweep can never pass again. This pass added the
-  `HighQualityReflections` detour; the passes before it added the cutscene body and
+  budget, so a truncated sweep can never pass again. This pass added
+  `NewSavesCompatibility`'s trampoline; the pass before it added the
+  `HighQualityReflections` detour; before that the cutscene body and
   `OutOfCommissionFix`'s two (the branch body at 7 instructions and the mounting
   wrapper at 41; see that key's section), and `ForceCarHeadlightShadows`' hook
   thunk (`0x1001ADB0`, 9 instructions) was the one before them. The fifteen before
@@ -1075,24 +1079,112 @@ changed bytes at `0x851311..0x851315`, but only the `E9` opcode counts: the othe
 four are the displacement, which the report excludes. Closure is `missing 0,
 extra 0, differing 0`.
 
+### `NewSavesCompatibility`, closed on its rebuilt converter
+
+This was the last key held open by an implementation gap rather than by the
+baseline's own recording. The handler (`0x10052200`, 170 bytes) only scans two
+anchors and writes the jump; the work is behind the jump, in two compiled-C steps
+and the two hooks the converter installs.
+
+**The handler's two scans.** `68 ? ? ? ? E8 ? ? ? ? 8B 2D ? ? ? ? 83 C4 08` lands
+on `push 0x11D0380` at game `0x857CAF`; the pushed operand is the game's save-name
+buffer, which the game fills from `sprintf(buffer, "%s%02d", "SGTA4", slot)` - the
+format at `0xD85E40`, the prefix getter returning `0xD85F80` - so the name a load
+sees is `SGTA400`..`SGTA412`, the file names in the user's savegame directory. The
+second scan lands on `0x85B093`:
+`89 84 24 E0 01 00 00` (`mov dword ptr [esp+1E0h],eax`), `8B 45 08`
+(`mov eax,dword ptr [ebp+8]`), `53` (`push ebx`), `33 DB` (`xor ebx,ebx`). The arm
+publishes `match+0xD` as the resume and writes `E9` to `0x100521E0` - exactly the
+five bytes the baseline records. The write is gated on the *first* anchor because
+the original returns before its second scan when that one misses
+(`jz loc_10052299`, `0x1005222B`); 1.0.0.4.0 carries the second anchor but not the
+first, so the original writes nothing there and neither does this tree.
+
+**The trampoline** (`0x100521E0`, 8 instructions, transcribed and proven as
+`new_saves_tramp`):
+
+```
+60                     pusha
+E8 <prepare>           call sub_10051FD0
+61                     popa
+89 84 24 E0 01 00 00   mov dword ptr [esp+1E0h], eax
+8B 45 08               mov eax, dword ptr [ebp+8]
+53                     push ebx
+33 DB                  xor ebx, ebx
+FF 25 <resume>         jmp dword ptr [dword_1015AD88]
+```
+
+**The converter** (`sub_10051B30`, 363 instructions) is ordinary file IO, rebuilt
+in C++ with the original's call sequence and faults:
+
+- `fopen_s(&Stream, path, "rb")`, `fread(Buffer, 0x110, 1, Stream)`, then
+  `cmp dword ptr [eax], 45564153h` (`0x10051BD1`) on the dword at offset `0xC`
+  - "SAVE";
+- eighteen iterations of `fread(&chunk, 9, 1, Stream)` (`0x10051C01`),
+  `mov eax, [ebp-13Bh]` (the dword at `+5`), `add eax, 0FFFFFFF7h` (size - 9,
+  `0x10051C14`), `call operator new`, `fread(block, 1, size-9, Stream)`, `free`.
+  Three of them are test-and-stored: `cmp dword_1015AD90, 4C45h` ->
+  `byte_1015AD98` (iteration 9), `cmp ..., 1741h` -> `byte_1015AD99` (13),
+  `cmp ..., 0E77h` -> `byte_1015AD9A` (16);
+- `fclose`, then the three site patches, each site resolved once through a
+  function-local static - the original's `_Init_thread_header` / `_footer` guards.
+
+The patches, with the original's own instructions:
+
+| site | condition | write | original instructions |
+| --- | --- | --- | --- |
+| game `0x872185` (`74 37 80 3D ...`) | chunk 9 has the newer size | `74` (`jz rel8`) or `EB` (`jmp rel8`) | `mov ecx,0EBh` / `mov eax,74h` / `cmovnz eax,ecx` / `mov [esi],al` (`0x10051D35`-`0x10051D42`) |
+| game `0x7D8C50` (`68 BE 0C 00 00 50 E8`) | always | `E8` at `+6` + call to `0x10051A90`; `0CBEh` or `0E6Eh` at `+1`; `75 26` or `90 90` at `-5` | `mov byte [esi],0E8h` (`0x10051DD7`) / `mov [edi], sub_10051A90-esi-5` (`0x10051E00`) / `mov ecx,0E6Eh` `mov eax,0CBEh` `cmovnz` `mov [v21],eax` (`0x10051E3B`-`0x10051E4A`) / `mov ecx,9090h` `mov eax,2675h` `cmovnz` `mov [v24],ax` (`0x10051E6E`-`0x10051E7B`) |
+| game `0x8DA090` (`56 E8 ... E8 ... A1 ...`) | always | `E8` at `+6` + call to `0x10051AD0`; the read entry republished from the later call | `mov byte [esi],0E8h` (`0x10051F08`) / `mov [edi], sub_10051AD0-esi-5` (`0x10051F31`) / `mov ecx,[esi+1Eh]` `add ecx,1Eh` `mov eax,[ecx]` `add eax,4` `add eax,ecx` `mov dword_1015AD94,eax` (`0x10051F53`-`0x10051F62`) |
+
+**The prepare step** (`sub_10051FD0`, 157 instructions) is rebuilt as well and
+needs only what the original needs: the save-name buffer the handler captured
+(`cmp Src,0` / `jz`, `0x10051FFA`), the game's own save-directory function (found
+by `55 8B EC 83 E4 F8 83 EC 4C 56 33 C0 8D 4C 24 28` and called as
+`push &suffix; push buffer; push 0; call eax` into the 312-byte `byte_101A8308`
+buffer - 312 is the gap to the next `.bss` object at `0x101A8440`), and then the
+path: `strlen(directory)`, a `\` (written as the word `5Ch`), `strlen(Src)`,
+`memmove`, `call sub_10051B30` with the copy.
+
+**The two hooks** are rebuilt with their exact frames: `sub_10051A90`
+(`sub esp,0E7Ch`; `call dword_1015AD94` with its own buffer and the caller's size,
+the caller's buffer never touched, the call's value returned) and `sub_10051AD0`
+(`sub esp,10h`; `cmp byte_1015AD99,0` before and after `call dword_1015AD8C`, with
+a twelve-byte `push 0Ch` read on both sides and the second read's value returned
+when the block is present).
+
+| piece | VA | instructions | how |
+| --- | ---: | ---: | --- |
+| load trampoline | `0x100521E0` | 8 | transcribed, row `new_saves_tramp` |
+| prepare step | `0x10051FD0` | 157 | rebuilt: TLS static guards, `std::string`, EH frame |
+| converter | `0x10051B30` | 363 | rebuilt: CRT file IO, `operator new`, TLS guards |
+| read hook | `0x10051A90` | 20 | rebuilt: compiled C with a `/GS` cookie |
+| second-load hook | `0x10051AD0` | 33 | rebuilt: compiled C with a `/GS` cookie |
+
+**What is measured.** The trampoline proves whole (8 of 8 instructions). All six
+signatures occur exactly once on every image that carries them (`GTAIV.exe`: name
+`0x857CAF`, load `0x85B093`, branch `0x872185`, read `0x7D8C50`, reload
+`0x8DA090`, directory `0x61E7D0`); the name anchor is absent from 1.0.0.4.0 and the
+branch anchor from 1.0.0.0, 1.0.4.0 and 1.0.0.4, which is why 1.0.0.4.0 writes
+nothing while the older builds still write the jump. The scoreboard cell is the
+five bytes at `0x45B093` (`E9` plus the four displacement bytes the report
+excludes): `missing 0, extra 0, differing 0`, and the other eight stored builds
+keep the key closed too. The converter's walk was replayed against the two real
+saves in `game_refs/saves/GTA IV/savegames/user_ee000000deadc0de` (`SGTA400`,
+`SGTA401`): both carry `SAVE` at `0x0C`, all eighteen `BLOCK` chunk headers parse,
+and chunks 9 / 13 / 16 measure `0x3AB1` / `0x1729` / `0x0CC7` - the older layout, so
+the converter restores the `jz` and the `jne +0x26` and writes `0xCBE`, exactly as
+the original does.
+
+**What is not measured.** The conversion path runs only when the game loads a
+savegame, so no offline harness executes the three patch writes or the two hooks.
+The replay above validates the walk and the size conditions; the writes still need
+an in-game save load.
+
 ### Still blocked
 
 - `FreezeCarFix` needs its 1,421-byte probe and the spawn path around it; the steer
-  consumer `sub_10004C70` it also touched is now in place (see the section above);
-- `NewSavesCompatibility` needs `sub_10051B30`, the save converter: compiled file-IO
-  code that reads the `0x110`-byte header, walks the 18 chunks and then patches three
-  game sites at conversion time (`0x872185`'s branch opcode, `0x7D8C50`'s read call
-  and read size, `0x8DA090`'s second `LoadData` call), plus `sub_10051FD0`'s save
-  directory/name path build (157 instructions with TLS guards). Its trampoline
-  (`0x100521E0`, 8 instructions) is transcribable, but it calls that prepare step, so
-  the trampoline alone would jump into an unimplemented converter; the key stays open
-  rather than shipping the write without the behaviour behind it. The arm itself is
-  already recovered for that pass: handler `0x10052200` scans
-  `68 ? ? ? ? E8 ? ? ? ? 8B 2D ? ? ? ? 83 C4 08` (the pushed operand at `+1` is the
-  game's save-name buffer, `dword_1015AD9C`) and
-  `89 84 24 E0 01 00 00 8B 45 08 53 33 DB`, publishes `match + 0xD` as the resume
-  (`dword_1015AD88`, game RVA `0x45B093`), and writes an `E9` at that match to
-  `0x100521E0` — which is exactly the five-byte write the baseline records.
+  consumer `sub_10004C70` it also touched is now in place (see the section above).
 
 ## Transcribing a body
 
