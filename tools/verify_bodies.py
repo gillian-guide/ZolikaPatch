@@ -84,7 +84,10 @@ def disassemble(image: bytes, va: int, limit: int):
     if offset is None or offset >= len(image):
         return None
     out = []
-    for instruction in md.disasm(image[offset:offset + 256], va):
+    # The window must be larger than any body: a short window silently truncated the
+    # sweep and the row still reported PASS with the truncated count, so a body over
+    # the window was never fully proven.
+    for instruction in md.disasm(image[offset:offset + 4096], va):
         out.append(instruction)
         if len(out) >= limit:
             break

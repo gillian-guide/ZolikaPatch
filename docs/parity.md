@@ -34,10 +34,15 @@ CRLF folding (the original reads in text mode). The shipped INI's longest line i
 
 Measured on 1.0.8.0 with `tools/parity_report.py 9`:
 
-- **74 of 99 option keys closed**;
-- **49 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **78 of 99 option keys closed**;
+- **52 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
-  bodies are still to transcribe;
+  bodies are still to transcribe. Two of the 52 (the `DualVehicleHeadlights` pair,
+  78 instructions each) are longer than the proof tool's 256-byte sweep window, so
+  the built-in proof compares their first 64 instructions and reports that count;
+  the full 78-instruction, 309-byte sweep was proven separately by the same
+  comparator over a 1 KiB window, with zero mismatches on either side. Widening
+  `verify_bodies.disassemble`'s window closes the gap in the harness;
 - launcher: `LaunchWithPlayGTAIV` implemented and its slots verified per build
   (`zp_launcher_slots`); SkipLauncher, DFA and ROM are not started;
 - the 18 full/per-option per-build dump hashes and the oracle differential are not

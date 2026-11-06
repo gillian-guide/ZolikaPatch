@@ -23,11 +23,21 @@ CarDynamicShadowFix	0x8F73EA	51 68 04 05 00 00 6A 02 6A 00 E8	11
 # ids 1000 and 1040). CarPartsShadowFix's second standalone site
 # (`83 FA 04 75 0C`, +3) is the same kind of old-build variant.
 ReversingLightFix	0x8F8840	11 01 00 00 8B 16 8B 42 64 8B CE FF D0 F3 0F 10	16
+# HighFPSBikePhysicsFix: the detour replaces the site's first five bytes; the
+# resume the arm publishes is the site's own `call` at match+9.
+HighFPSBikePhysicsFix	0xB9C05B	D9 45 08 51 8B CE D9 1C 24 E8 ? ? ? ? 8A 86 90 14 00 00	20
+# DualVehicleHeadlights: the CVehicle light-up call site; the arm publishes the
+# operands at +140/+144, +151/+155, +207, +331/+335 and the resume +338, then jumps
+# to the build's body (new 0x100064F0 for build ids 7+, old 0x10006630 for 1..6).
+DualVehicleHeadlights	0x8F7CE5	8B 17 8B 42 64 8B CF FF D0 8B 54	11
 BikeFeetFix	0xBCB919	39 82 ? ? ? ? 0F 85 ? ? ? ? 39 05	14
 BikePhoneAnimsFix	0xB67F01	80 BE ? ? ? ? ? 0F 85 ? ? ? ? 80 BE ? ? ? ? ? 0F 84 ? ? ? ? 83 3D	28
 PipeBombDropIconSupport	0x4A6F50	83 7D ? ? 75 ? 8B 15	8
 TeleportProtection	0x6E7BE0	55 8B EC 83 E4 F8 51 53 8B 5D ? 56 57 6A 08	15
 IncreaseVehicleStructLimit	0xA4A2AB	68 34 EE DA 00	5
+# IncreaseVehicleModelLimit: the loop-tail anchor; the arm writes through the dword
+# at match+77 (the `mov ecx, 0xF3E8E8` operand), which is the model-limit object.
+IncreaseVehicleModelLimit	0x8DD143	83 C7 01 81 FF 18 79 00 00 7C D2	11
 BuildingDynamicShadows	0x958955	8B 47 ? C1 E8 06 83 E0 0F 83 C0 FF	12
 AimProjectileCrashFix	0xA32620	8B 44 24 ? 89 41 ? 8B 44 24 ? 89 41	13
 FreezeGunFix	0xB8C463	2B C2 D1 F8 39 3C C6	7

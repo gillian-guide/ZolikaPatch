@@ -30,6 +30,9 @@ car_parts_shadow 10006880 ?CarPartsShadowShim@@YAXXZ 13
 car_dynamic_shadow 100068A0 ?CarDynamicShadowShim@@YAXXZ 26
 car_dynamic_shadow_b 100068D0 ?CarDynamicShadowShimB@@YAXXZ 27
 collision_deadlock_walk 10005D80 ?CollisionDeadlockShim@@YAXXZ 56
+bike_physics_detour 1001EF60 ?BikePhysicsDetour@@YAXXZ 14
+dual_headlights_new 100064F0 ?DualHeadlightsNewBody@@YAXXZ 78
+dual_headlights_old 10006630 ?DualHeadlightsOldBody@@YAXXZ 78
 super_lod_shim 100469E0 ?SuperLodShim@@YAXXZ 14
 super_lod_model 100469A0 ?SuperLodModel@@YAXXZ 21
 shader_streaming_find_hpe 10045A30 ?ShaderStreamingFindHpe@@YAXXZ 36
