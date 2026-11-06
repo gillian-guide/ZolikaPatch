@@ -293,3 +293,67 @@ without the converter would corrupt save loading. No game launch: the allocator
 vtable's live behaviour, the file-registry helpers' scans and the DLC discovery's
 folder probes are proven at instruction level (or rebuilt faithfully) but not executed
 against a running game.
+
+## 2026-11-06 — the steer consumer `sub_10004C70`, and five keys
+
+**Closed:** `MovingSteeringWheelSupport`, `ShakingEngineBlock`, `MovingPlaneParts`,
+`GarageModelFix`, `NoLiveryLimit` — 88 -> 93 keys on 1.0.8.0, and each one's
+per-option cell is byte-identical to its baseline on all nine images (build 1 is
+measured with isolated single-key cells, because its per-option dump faults at
+`NoImpostorHeightCutoff` by design).
+
+**Characterisation (IDA `ZolikaPatch.asi.i64`, 320 instructions / 1,343 bytes).**
+Compiler output for C, not a transcribable stream: `/GS` frame
+(`mov eax,___security_cookie` at `0x10004C76`, `call @__security_check_cookie@4` at
+`0x100051A6`), SSE double conversions around every float expression (`cvtps2pd` /
+`mulsd` / `divsd` / `cvtpd2ps`), the MSVC float-`!=` idiom (`ucomiss` `lahf`
+`test ah,44h` `jnp` at `0x10004DDF..0x10004DE7`) and `cmova` for the two `>`
+comparisons. It is a pure consumer: reads `dword_1015AD38` (the vehicle the detour
+stores), the three switch bytes, the model word at `+0x2E` and the vehicle's
+`+0xE18/+0xF64/+0x10C8/+0x10D8/+0x1354/+0x1F00..1F3C` fields; writes only the pair
+of matrices and its own state words (`byte_1015AD42`, `dword_1015AD3C`,
+`dword_10159D34`); every game call goes through a loader-resolved slot
+(`dword_10159C0C`, `dword_10159B88`, `dword_1015D63C`, `dword_10159CDC`,
+`dword_1015AD4C`, `sub_10003980`).
+
+**What was built (source/vehicles.ixx, 15 new proven bodies, 98 -> 113).**
+
+- The consumer, rebuilt in C++ with the original's statement order, call sequence
+  and state words; no proof row (docs/parity.md has the assumption table).
+- Transcribed and proven: `sub_10003F40` (43, the model-registry lookup),
+  `sub_100051B0` / `sub_100051E0` (10/10, the two detour variants),
+  `sub_10046B90` (19, garage colour), `sub_10046BD0` (55, garage model lookup,
+  /GS frame + the two `dword_10159C0C` calls), `sub_10046C80` / `sub_10046CA0`
+  (8/7, garage site bodies), `sub_1003D220` (26, livery hasher), `sub_1003D270`
+  (37, livery counter), `sub_1003D2F0` (6, name copy), `sub_1003D310/340/370`
+  (11/11/12, livery site bodies) and `sub_1003D3A0/D3E0` (14/14, collectors).
+  The only rebuilt pieces are `sub_10001280` (the bounded formatter -> `NoliveryFormat`,
+  `_vsnprintf_s` + `_TRUNCATE`) and a one-line forwarder to `Shared::ValueResolver()`.
+- Preamble-like resolution in `ResolveSteerHelpers()`: `dword_1015AD78` (rebased),
+  `dword_10159B88` (its pattern has two hits; the original takes the first,
+  `0x315390`), `dword_1015D63C`/`dword_10159CDC` (-0x30), `_stricmp`, `strcpy_s`, and
+  the `CitizenIV.exe` probe for `byte_10159B85`.
+- The steer keys install the shared IDE parser hook that fills the wheelangle table
+  by jumping to misc's body through `Bodies::All()` (no second copy): published slot
+  `zpatch_ide_hook_slot`, same as CopSirens/PopupHeadlights.
+
+**Write sets on 1.0.8.0** — steer trio: `E9` at `0x6538A0` (detour) and `0x646546`
+(IDE hook), publishing resume `0x6538AE`, part-drive `0x4F65F0`, IDE resume
+`0x64654F`. `GarageModelFix`: `E9` at `0x868BB0` (body `0x10046C80`) and `0x5659C3`
+(body `0x10046CA0`), resumes `0x868BB6`/`0x5659C8`. `NoLiveryLimit`: `E9` at
+`0x64A53D` (D), `0x797A29` (A), `0x797962` (C), `0x79793C` (B), publishing
+fn `0x3A490`, D/E resume `0x64A595`, A/B/C resume `0x797A36`.
+
+**Gates (final runs)**: `cmake --build --preset release` success;
+`python tools/parity_report.py 9` -> `build 9: 93 key(s) closed, 6 open` (exit 1,
+`SkipLauncher` open by construction); `ctest --preset release` -> `100% tests passed
+out of 10`; `verify_bodies.py` -> `113 body(ies), 0 failure(s)`; the shipped-INI full
+cell is `0 differing, 3 missing, 57 extra`, the three missing being open keys
+(`NewSavesCompatibility`, `OutOfCommissionFix`, `CutsceneFixes`) and the extras
+`SkipLauncher`'s incomplete baseline.
+
+**Not verifiable here**: the rebuilt consumer's runtime arithmetic (the two setters,
+the part calls' values, the engine phase) is not executed by the offline tools; it is
+pinned by the disassembly-derived table in `docs/parity.md`, and every piece around
+it is proven instruction for instruction. No game launch. `AGENTS.md`'s "Current
+state" (88 keys / 98 bodies) is outside this pass's edit set and is stale.

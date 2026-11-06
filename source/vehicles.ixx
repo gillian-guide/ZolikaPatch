@@ -1,6 +1,15 @@
 module;
 
 #include <common.hxx>
+// The /GS cookie the transcribed helpers' prologues read and their epilogues check
+// (`__security_cookie`, `__security_check_cookie` in vcruntime.h), the variadic
+// list NoLiveryLimit's rebuilt formatter takes, and the CRT entries the transcribed
+// pieces call.
+#include <intrin.h>
+#include <bit>
+#include <cstdarg>
+#include <cstdio>
+#include <cstring>
 
 export module vehicles;
 
@@ -8,7 +17,10 @@ import bodies;
 import bytes;
 import common;
 import loader;
+import native;
+import options;
 import patch;
+import shared;
 
 // The car-parts shadow bodies' published operands: C linkage because the
 // transcribed asm names them directly. Each slot is the original's own .bss word;
@@ -52,6 +64,89 @@ extern "C"
     uint32_t zpatch_dual_r_edi = 0;    // dword_10159BE8
     uint32_t zpatch_dual_r_ebp = 0;    // dword_10159BDC
     uint32_t zpatch_dual_r_esp = 0;    // dword_10159BF4
+
+    // ---- sub_10004C70, the steer/engine/plane consumer ------------------------
+    //
+    // dword_1015AD38: the vehicle the detour was called for (the site's ESI). The
+    // detour body stores it before the consumer runs; the consumer reads it once.
+    uint32_t zpatch_steer_vehicle = 0;
+    // dword_1015AD44: the site's resume, which the arm publishes (match+16: the
+    // `jnz` the removed vtable call's flags feed).
+    uint32_t zpatch_steer_resume = 0;
+    // dword_1015AD4C: the game's part-drive function, which the arm reads out of the
+    // call operand inside the site's own code (match+0x1A7/+0x1AB, or +0x8C/+0x90 on
+    // the other build variant).
+    uint32_t zpatch_steer_part_call = 0;
+    // dword_10159B88 / dword_1015D63C / dword_10159CDC: the bone-matrix getter and
+    // the two matrix setters. The original's loader preamble resolves all three from
+    // the game image; ResolveSteerHelpers() does the same here.
+    uint32_t zpatch_steer_bone = 0;
+    uint32_t zpatch_steer_matrix_a = 0;
+    uint32_t zpatch_steer_matrix_b = 0;
+    // dword_1015AD78: the model-info array the name lookup starts from (a game
+    // address, rebased through the image's preferred base like the BPM arm's copy).
+    uint32_t zpatch_steer_model_array = 0;
+    // byte_1015AD40 / byte_1015AD41 / byte_10159C17: the three per-key switches the
+    // original's handler sets before it calls the shared installer (0x10054A7A,
+    // 0x10054B56, 0x10054AE8). They start zero and are never cleared.
+    uint8_t zpatch_steer_enabled = 0;
+    uint8_t zpatch_engine_enabled = 0;
+    uint8_t zpatch_plane_enabled = 0;
+    // byte_1015AD42 / dword_1015AD3C / dword_10159D34: the engine shake's live state
+    // -- the direction bit, the phase (kept as float bits) and the last script
+    // timestep the consumer saw.
+    uint8_t zpatch_engine_descending = 0;
+    uint32_t zpatch_engine_phase = 0;
+    uint32_t zpatch_engine_timestep = 0;
+
+    // ---- GarageModelFix ------------------------------------------------------
+    // dword_10159CD4 / dword_10159CD0: the two sites' resumes (match+6, match+5).
+    uint32_t zpatch_garage_resume_a = 0;
+    uint32_t zpatch_garage_resume_b = 0;
+    // byte_10159B85: the original's DllMain sets it to 1 when CitizenIV.exe is
+    // loaded (0x10055DFB..0x10055E17); the garage helper then skips the colour copy.
+    uint8_t zpatch_garage_citizen = 0;
+
+    // ---- NoLiveryLimit -------------------------------------------------------
+    // dword_10159BA8 (the name), dword_10159BB0 (the sign index), dword_10159B98
+    // (the computed hash), dword_10159B9C (the A/B/C resume), dword_10159BA4 (the
+    // count loop's lookup), dword_10159BAC (the D/E resume), dword_10159B94 (the
+    // lookup's `this`), dword_10159B90 (the counted variants), dword_10159BA0 (the
+    // name buffer) and dword_10159B8C (the copy destination).
+    uint32_t zpatch_nolivery_name = 0;
+    uint32_t zpatch_nolivery_index = 0;
+    uint32_t zpatch_nolivery_hash = 0;
+    uint32_t zpatch_nolivery_resume = 0;
+    uint32_t zpatch_nolivery_fn = 0;
+    uint32_t zpatch_nolivery_resume_d = 0;
+    uint32_t zpatch_nolivery_arg = 0;
+    uint32_t zpatch_nolivery_count = 0;
+    uint32_t zpatch_nolivery_bufptr = 0;
+    uint32_t zpatch_nolivery_dest = 0;
+    // The two CRT entries the transcribed helpers call: `_stricmp` for the model
+    // registry lookup and `strcpy_s` for the 0x10-byte name copy. Both stay pointer
+    // slots because the original calls them through its own IAT (`FF 15`), and an
+    // absolute operand on either side compares as a slot.
+    uintptr_t zpatch_steer_stricmp = 0;
+    uintptr_t zpatch_nolivery_strcpy_s = 0;
+
+    // The two `%s_sign_%d` sites' format literal: the original's own string at
+    // 0x1012D4BC, which its formatter wrapper is called with.
+    const char zpatch_nolivery_format_text[] = "%s_sign_%d";
+}
+
+// The other modules' pieces these arms share: the game's model-index lookup
+// (source/shared.ixx, dword_10159C0C), the wheelangle tables the IDE parser hook
+// fills and the hook's own resume (source/misc.ixx, dword_1015A538 / dword_10159D38
+// / dword_1015BE10). The three steer keys install that same hook -- the original's
+// shared installer calls sub_10004110 -- so the consumer reads the one table set the
+// original has.
+extern "C"
+{
+    extern uintptr_t zpatch_model_lookup;
+    extern uint32_t zpatch_wheelangle_models[512];
+    extern uint32_t zpatch_wheelangle_angles[512];
+    extern uint32_t zpatch_ide_hook_slot;
 }
 
 // abi_collision_deadlock_walk, recovered VA 0x10005D80: the whole node-walk of
@@ -490,6 +585,758 @@ static __declspec(naked) void DualHeadlightsOldBody()
         call DWORD PTR [zpatch_dual_bd4]
         add esp, 24h
         jmp DWORD PTR [zpatch_dual_be0]
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The steer/engine/plane consumer, and the garage and livery pieces.
+//
+// The three "moving parts" keys share one site set: the game's per-frame vehicle
+// vtable call is detached to a detour that stores the vehicle, runs the ASI's own
+// consumer (sub_10004C70) between pusha/popa and then replays the call it replaced,
+// and the shared IDE parser hook is installed so the wheelangle table the consumer
+// reads is filled. Only the per-key switch bytes differ.
+// ---------------------------------------------------------------------------
+
+// sub_10003F40, recovered VA 0x10003F40 (43 instructions): the model registry
+// lookup. The registry is `{name**, count}`, entries stride 0xE0, and the answer is
+// the first entry whose name matches case-insensitively -- or null. The original is
+// `__fastcall(ECX = registry, EDX = name)` and calls `_stricmp` through its IAT; the
+// slot here is filled with the same CRT entry, so the call stays `FF 15`.
+static __declspec(naked) void* __fastcall VehicleComponentBody(void*, const char*)
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        push ecx
+        push ebx
+        mov ebx, ecx
+        mov eax, edx
+        push esi
+        xor ecx, ecx
+        mov DWORD PTR [ebp - 4], eax
+        xor esi, esi
+        push edi
+        cmp cx, WORD PTR [ebx + 14h]
+        jnb vehicle_component_miss
+        xor edi, edi
+        // The original's loop alignment: 66 0F 1F 44 00 00, emitted as bytes so the
+        // assembler cannot choose a shorter nop.
+        __emit 0x66
+        __emit 0x0F
+        __emit 0x1F
+        __emit 0x44
+        __emit 0x00
+        __emit 0x00
+    vehicle_component_loop:
+        push eax
+        mov eax, DWORD PTR [ebx]
+        push DWORD PTR [eax + edi]
+        call DWORD PTR [zpatch_steer_stricmp]
+        add esp, 8
+        test eax, eax
+        jz vehicle_component_found
+        movzx eax, WORD PTR [ebx + 14h]
+        inc esi
+        add edi, 0E0h
+        cmp esi, eax
+        mov eax, DWORD PTR [ebp - 4]
+        jl vehicle_component_loop
+    vehicle_component_miss:
+        pop edi
+        pop esi
+        xor eax, eax
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+    vehicle_component_found:
+        imul eax, esi, 0E0h
+        pop edi
+        pop esi
+        add eax, DWORD PTR [ebx]
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
+namespace
+{
+    // sub_10001280, rebuilt: the bounded `vsnprintf` wrapper the livery helpers
+    // format through. The original's callee reaches the UCRT print engine with the
+    // standard-snprintf option bit (docs/parity.md), so `_vsnprintf_s` with
+    // `_TRUNCATE` is the same bound and the same truncate-and-terminate result.
+    // Only the call's shape matters to the transcribed callers; the two bodies for
+    // which 0x10001280 is the only caller are NoLiveryLimit's, and the format is
+    // always "%s_sign_%d" into a 64-byte buffer.
+    int __cdecl NoliveryFormat(char* buffer, unsigned int size, const char* format, ...)
+    {
+        va_list arguments;
+        va_start(arguments, format);
+        const int written = _vsnprintf_s(buffer, size, _TRUNCATE, format, arguments);
+        va_end(arguments);
+        return written;
+    }
+
+    // sub_10003E50 (source/shared.ixx), called as the original's direct `call`:
+    // this forwarder is what an inline-asm `call` can name (the resolver itself is a
+    // naked body in another unit, and a module interface cannot export it).
+    uint32_t __cdecl NoliveryResolve(const char* name)
+    {
+        return reinterpret_cast<uint32_t(__cdecl*)(const char*)>(Shared::ValueResolver())(name);
+    }
+
+    constexpr uint32_t kVehicleLightSlots = 512;
+
+    // The one script float the engine and plane parts read, as the original's
+    // sub_10003980 answers it: resolve the ctx by the salt the consumer carries
+    // (dword_1015803C), take the slot offset at ctx+0x0E, the slot pointer at
+    // ctx+offset+0x18 and the float at slot+8. Every step is unguarded, exactly like
+    // the original's `mov ecx,[eax+0Eh]` chain.
+    std::byte* ScriptSlot()
+    {
+        constexpr uint32_t kScriptSalt = 0x1015803Cu;  // dword_1015803C
+        const auto context = reinterpret_cast<uintptr_t>(Native::Resolve(Native::Salt(kScriptSalt)));
+        const std::uint32_t offset = *reinterpret_cast<const std::uint32_t*>(context + 0x0E);
+        const std::uint32_t slot = *reinterpret_cast<const std::uint32_t*>(context + offset + 0x18);
+        return reinterpret_cast<std::byte*>(static_cast<uintptr_t>(slot));
+    }
+
+    float ScriptFloat()
+    {
+        return *reinterpret_cast<const float*>(ScriptSlot() + 8);
+    }
+
+    // The identity a bone matrix is reset to before either setter runs: the twelve
+    // dwords of a 3x4 matrix, with the fourth column (3/7/11) left alone.
+    void Identity(std::uint32_t* matrix)
+    {
+        constexpr std::uint32_t kOne = 0x3F800000u;  // 1.0f
+        matrix[0] = kOne;
+        matrix[1] = 0;
+        matrix[2] = 0;
+        matrix[4] = 0;
+        matrix[5] = kOne;
+        matrix[6] = 0;
+        matrix[8] = 0;
+        matrix[9] = 0;
+        matrix[10] = kOne;
+    }
+
+    // The registry chain sub_10004C70 walks from the model index: dword_1015AD78
+    // (the model-info array) -> [+8] -> [+0xB4] -> [+0xC] = the registry, then
+    // sub_10003F40 for the named component and dword_10159B88 for its bone matrix.
+    // The index is sign-extended, as the original's `movsx ecx, ax` is, and every hop
+    // is unguarded.
+    std::uint32_t* VehicleBone(void* vehicle, std::int16_t model, const char* name)
+    {
+        const auto array = static_cast<uintptr_t>(zpatch_steer_model_array);
+        const auto index = static_cast<std::uint32_t>(static_cast<std::int32_t>(model));
+        const std::uint32_t info = *reinterpret_cast<const std::uint32_t*>(array + 4u * index);
+        const std::uint32_t parts = *reinterpret_cast<const std::uint32_t*>(
+            static_cast<uintptr_t>(info) + 8);
+        const std::uint32_t components = *reinterpret_cast<const std::uint32_t*>(
+            static_cast<uintptr_t>(parts) + 0xB4);
+        const std::uint32_t registry = *reinterpret_cast<const std::uint32_t*>(
+            static_cast<uintptr_t>(components) + 0xC);
+        const auto* record = static_cast<const std::byte*>(
+            VehicleComponentBody(reinterpret_cast<void*>(static_cast<uintptr_t>(registry)), name));
+        if (record == nullptr)
+            return nullptr;  // the original's own `if (v6)` test
+
+        const std::uint16_t bone = *reinterpret_cast<const std::uint16_t*>(record + 0x14);
+        return reinterpret_cast<std::uint32_t*(__thiscall*)(void*, std::uint32_t)>(
+            static_cast<uintptr_t>(zpatch_steer_bone))(vehicle, bone);
+    }
+
+    // The CVehicle fields sub_10004C70 reads. The offsets are the original's; the
+    // names are what the code at each offset does, not a recovered class layout.
+    struct VehicleView
+    {
+        std::byte pad_0000[0x2E];
+        std::int16_t model;                  // +0x2E: the registry lookup's index
+        std::byte pad_0030[0xE18 - 0x30];
+        void* handling;                      // +0xE18: its +0x84 is the steering lock
+        std::byte pad_0E1C[0xF64 - 0xE1C];
+        std::uint32_t engineState;           // +0xF64: bit 3 live, bit 4 idle
+        std::byte pad_0F68[0x10C8 - 0xF68];
+        float rpm;                           // +0x10C8
+        std::byte pad_10CC[0x10D8 - 0x10CC];
+        float steerAngle;                    // +0x10D8
+        std::byte pad_10DC[0x1354 - 0x10DC];
+        std::uint32_t type;                  // +0x1354: 5 selects the plane path
+        std::byte pad_1358[0x1F00 - 0x1358];
+        float heave;                         // +0x1F00
+        float roll;                          // +0x1F04
+        float pitch;                         // +0x1F08
+        std::byte pad_1F0C[0x1F3C - 0x1F0C];
+        float suspension;                    // +0x1F3C
+    };
+
+    // sub_10004C70, recovered VA 0x10004C70 (1,343 bytes, 320 instructions): the
+    // consumer the shared detour calls between pusha/popa.
+    //
+    // It is compiler output for C, not a hand-written stream: a /GS frame
+    // (`mov eax,___security_cookie` / `xor eax,ebp`, `call __security_check_cookie`),
+    // SSE double conversions around every float expression (`cvtps2pd`/`mulsd`/
+    // `divsd`/`cvtpd2ps` for `(float)((double)a op b)`), the `lahf` / `test ah,44h` /
+    // `jnp` idiom for a float `!=`, and `cmova` for the two `>` comparisons. Nothing
+    // in it is image-specific: every game entry is called through a published slot
+    // (`call dword_10159C0C`, `call edx`, `call dword_1015AD4C`) and every constant
+    // it reads is a plain qword in .rdata. Transcribing 320 instructions would prove
+    // the compiler's register allocation, not the feature, so it is rebuilt with the
+    // original's call sequence, its state words and its exact observable effects;
+    // docs/parity.md records each assumption.
+    void SteeringConsumer()
+    {
+        auto* const vehicle = reinterpret_cast<VehicleView*>(static_cast<uintptr_t>(zpatch_steer_vehicle));
+
+        const auto set_a = reinterpret_cast<void(__thiscall*)(std::uint32_t*, float)>(
+            static_cast<uintptr_t>(zpatch_steer_matrix_a));
+        const auto set_b = reinterpret_cast<void(__thiscall*)(std::uint32_t*, float)>(
+            static_cast<uintptr_t>(zpatch_steer_matrix_b));
+        const auto lookup = reinterpret_cast<int(__cdecl*)(std::uint32_t, std::int32_t*)>(
+            static_cast<uintptr_t>(zpatch_model_lookup));
+
+        if (zpatch_steer_enabled != 0)
+        {
+            constexpr double kPi = 3.141592653589793;
+
+            const std::int16_t model = vehicle->model;
+            // The original divides in float, then widens: `divss`, `cvtps2pd`,
+            // `mulsd -pi`, `cvtpd2ps`. The handling block is read after the steering
+            // angle, so a null block faults on the division like the original's.
+            const float lock = *reinterpret_cast<const float*>(
+                static_cast<const std::byte*>(vehicle->handling) + 0x84);
+            const float turn = static_cast<float>(
+                static_cast<double>(vehicle->steerAngle / lock) * -kPi);
+
+            // The wheelangle table the IDE parser hook fills: the first non-zero
+            // entry whose model-index lookup answers this model. A zero slot or the
+            // 512-slot bound leaves the tilt at zero, and the lookup is called before
+            // the comparison, as the original's `call dword_10159C0C` is.
+            float tilt = 0.0f;
+            for (std::uint32_t slot = 0; slot < kVehicleLightSlots; ++slot)
+            {
+                const std::uint32_t hash = zpatch_wheelangle_models[slot];
+                if (hash == 0u)
+                    break;
+
+                std::int32_t index = -1;
+                lookup(hash, &index);
+                if (index == model)
+                {
+                    // The table stores the angle's float bits (misc.ixx copies them
+                    // out of the parsed text), and the original reloads them with
+                    // `movss`/`cvtps2pd`, so this is a bit-cast, not an integer
+                    // conversion.
+                    tilt = static_cast<float>(
+                        static_cast<double>(std::bit_cast<float>(zpatch_wheelangle_angles[slot]))
+                        * kPi / 180.0);
+                    break;
+                }
+            }
+
+            if (model != -1)
+            {
+                std::uint32_t* const matrix = VehicleBone(vehicle, model, "steeringwheel");
+                if (matrix != nullptr)
+                {
+                    Identity(matrix);
+                    set_a(matrix, tilt);
+                    set_b(matrix, turn);
+                }
+            }
+        }
+
+        if (zpatch_engine_enabled != 0)
+        {
+            constexpr double kEpsilon = 0.01;
+            constexpr double kStep = 0.5;
+
+            // The phase only advances when the script timestep changed, and the
+            // `!=` is true for a NaN pair exactly as the original's `jnp` is.
+            if (std::bit_cast<float>(zpatch_engine_timestep) != ScriptFloat())
+            {
+                const double step = zpatch_engine_descending != 0 ? -kStep : kStep;
+                const float phase = static_cast<float>(
+                    static_cast<double>(ScriptFloat()) * step +
+                    static_cast<double>(std::bit_cast<float>(zpatch_engine_phase)));
+                zpatch_engine_phase = std::bit_cast<std::uint32_t>(phase);
+
+                std::uint8_t descending = zpatch_engine_descending;
+                if (static_cast<double>(phase) > kEpsilon)
+                    descending = 1;
+                if (static_cast<double>(phase) < -kEpsilon)
+                    descending = 0;
+                zpatch_engine_descending = descending;
+            }
+
+            const std::int16_t model = vehicle->model;
+            if (model != -1)
+            {
+                std::uint32_t* const matrix = VehicleBone(vehicle, model, "engineblock");
+                if (matrix != nullptr)
+                {
+                    Identity(matrix);
+
+                    // The shake scale: rpm live -> 0.75*rpm + 0.25, engine at rest ->
+                    // 1.0, neither -> 0.0. The product with the phase is a float
+                    // multiply (`mulss`), not a double one.
+                    float scale = 0.0f;
+                    if ((vehicle->engineState & 8u) != 0u)
+                        scale = static_cast<float>(static_cast<double>(vehicle->rpm) * 0.75 + 0.25);
+                    if ((vehicle->engineState & 0x10u) != 0u)
+                        scale = 1.0f;
+
+                    set_b(matrix, scale * std::bit_cast<float>(zpatch_engine_phase));
+                }
+            }
+        }
+
+        if (zpatch_plane_enabled != 0 && vehicle->type == 5u)
+        {
+            const auto drive = [vehicle](int part, int count, float value, int a, int b, int c)
+            {
+                reinterpret_cast<void(__thiscall*)(void*, int, int, float, int, int, int)>(
+                    static_cast<uintptr_t>(zpatch_steer_part_call))(vehicle, part, count, value, a, b, c);
+            };
+            constexpr float kTravelScale = 100.0f;
+            constexpr double kSurfaceScale = 0.5;
+
+            // The four wheels each take a fresh script float times the suspension
+            // travel times 100 (all three multiplies in float, in this order); the
+            // control surfaces take the vehicle's own pitch/roll/heave scaled by
+            // +/-0.5 in double. Odd part ids first (89, 91, 90, 92), as the original
+            // pushes them. Every field is re-read at its own call site, as the
+            // original's `mulss [edi+1F3Ch]` is, so a part call that touched the
+            // vehicle would be seen by the next one.
+            drive(89, 4, ScriptFloat() * vehicle->suspension * kTravelScale, 0, 0, 0);
+            drive(91, 4, ScriptFloat() * vehicle->suspension * kTravelScale, 0, 0, 0);
+            drive(90, 4, ScriptFloat() * vehicle->suspension * kTravelScale, 0, 0, 0);
+            drive(92, 4, ScriptFloat() * vehicle->suspension * kTravelScale, 0, 0, 0);
+
+            drive(96, 3, static_cast<float>(static_cast<double>(vehicle->pitch) * kSurfaceScale), 1, 0, 0);
+            drive(97, 3, static_cast<float>(static_cast<double>(vehicle->pitch) * -kSurfaceScale), 1, 0, 0);
+            drive(94, 3, static_cast<float>(static_cast<double>(vehicle->roll) * -kSurfaceScale), 1, 0, 0);
+            drive(95, 3, static_cast<float>(static_cast<double>(vehicle->roll) * -kSurfaceScale), 1, 0, 0);
+            drive(93, 5, static_cast<float>(static_cast<double>(vehicle->heave) * kSurfaceScale), 1, 0, 0);
+        }
+
+        // The unconditional tail: snapshot the script timestep the next frame's
+        // comparison reads, and answer the slot pointer (the original returns it in
+        // EAX; the detour ignores it).
+        zpatch_engine_timestep = std::bit_cast<std::uint32_t>(ScriptFloat());
+    }
+}
+
+// sub_100051B0, recovered VA 0x100051B0 (10 instructions): the steer detour. It
+// stores the vehicle the site was called for, runs the consumer between pusha/popa,
+// then replays the ten bytes the jump replaced (`mov edx,[esi]; mov eax,[edx+128h];
+// mov ecx,esi; call eax`) and tail-jumps to the site's `jnz` (match+16), so the
+// resumed branch still tests the vtable call's result. pusha/popa are emitted as
+// bytes: the inline assembler renders those mnemonics with a 0x66 prefix.
+static __declspec(naked) void SteerDetourEaxBody()
+{
+    __asm
+    {
+        mov DWORD PTR [zpatch_steer_vehicle], esi
+        __emit 0x60  // pusha
+        call SteeringConsumer
+        __emit 0x61  // popa
+        mov edx, DWORD PTR [esi]
+        mov eax, DWORD PTR [edx + 128h]
+        mov ecx, esi
+        call eax
+        test al, al
+        jmp DWORD PTR [zpatch_steer_resume]
+    }
+}
+
+// sub_100051E0, recovered VA 0x100051E0 (10 instructions): the older builds'
+// variant of the same detour. The only difference is which register holds the
+// vtable pointer across the call (`mov eax,[esi]; mov edx,[eax+128h]`).
+static __declspec(naked) void SteerDetourEdxBody()
+{
+    __asm
+    {
+        mov DWORD PTR [zpatch_steer_vehicle], esi
+        __emit 0x60  // pusha
+        call SteeringConsumer
+        __emit 0x61  // popa
+        mov eax, DWORD PTR [esi]
+        mov edx, DWORD PTR [eax + 128h]
+        mov ecx, esi
+        call edx
+        test al, al
+        jmp DWORD PTR [zpatch_steer_resume]
+    }
+}
+
+// sub_10046B90, recovered VA 0x10046B90 (19 instructions): GarageModelFix's colour
+// copy. It takes the garage object in ECX and the vehicle in EDX, reads the
+// vehicle's model word into the model-info array, and copies the model's +0x3C
+// dword into four byte fields of the garage object (0x40/0x13/0x41/0x46, in the
+// original's order). The whole body is skipped when the original's DllMain found
+// CitizenIV.exe loaded (byte_10159B85).
+static __declspec(naked) void GarageColourBody()
+{
+    __asm
+    {
+        cmp BYTE PTR [zpatch_garage_citizen], 0
+        push esi
+        mov esi, ecx
+        jnz garage_colour_done
+        movsx edx, WORD PTR [edx + 2Eh]
+        mov eax, DWORD PTR [zpatch_steer_model_array]
+        mov eax, DWORD PTR [eax + edx * 4]
+        mov eax, DWORD PTR [eax + 3Ch]
+        mov ecx, eax
+        shr ecx, 8
+        mov BYTE PTR [esi + 40h], cl
+        mov ecx, eax
+        shr ecx, 10h
+        mov BYTE PTR [esi + 13h], al
+        shr eax, 18h
+        mov BYTE PTR [esi + 41h], cl
+        mov BYTE PTR [esi + 46h], al
+    garage_colour_done:
+        pop esi
+        ret
+    }
+}
+
+// sub_10046BD0, recovered VA 0x10046BD0 (55 instructions): GarageModelFix's model
+// reassignment. It packs the four bytes the colour copy wrote back into a name hash
+// and asks the game's model-index lookup for it. A valid index (1..31999) is stored
+// at the garage object's +0x10; anything else falls back to the hash 0xC703DB5F,
+// whose index is stored the same way, and clears bit 0 of +0x30. Both lookups go
+// through the published dword_10159C0C slot, and the answer (the last index or
+// 0xFFFE) is what the caller re-pushes as the site's argument.
+static __declspec(naked) void GarageLookupBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        sub esp, 8
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, ebp
+        mov DWORD PTR [ebp - 4], eax
+        push esi
+        mov esi, ecx
+        movzx edx, BYTE PTR [esi + 46h]
+        movzx eax, BYTE PTR [esi + 41h]
+        shl edx, 8
+        or edx, eax
+        movzx eax, BYTE PTR [esi + 40h]
+        shl edx, 8
+        or edx, eax
+        movzx eax, BYTE PTR [esi + 13h]
+        shl edx, 8
+        or edx, eax
+        jz garage_lookup_done
+        lea eax, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push eax
+        push edx
+        call DWORD PTR [zpatch_model_lookup]
+        mov eax, DWORD PTR [ebp - 8]
+        add esp, 8
+        test eax, eax
+        jle garage_lookup_fallback
+        cmp eax, 7D00h
+        jge garage_lookup_fallback
+        mov WORD PTR [esi + 10h], ax
+        pop esi
+        mov ecx, DWORD PTR [ebp - 4]
+        xor ecx, ebp
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    garage_lookup_fallback:
+        lea eax, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push eax
+        push 0C703DB5Fh
+        call DWORD PTR [zpatch_model_lookup]
+        mov ax, WORD PTR [ebp - 8]
+        add esp, 8
+        mov WORD PTR [esi + 10h], ax
+        mov eax, 0FFFEh
+        and WORD PTR [esi + 30h], ax
+    garage_lookup_done:
+        mov ecx, DWORD PTR [ebp - 4]
+        xor ecx, ebp
+        pop esi
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
+// sub_10046C80, recovered VA 0x10046C80 (8 instructions): GarageModelFix's first
+// site body. It runs the colour copy with the site's ESI/EDI, then replays the six
+// bytes the jump replaced (`mov edx,[edi+20h]; fld [edx+34h]`) and jumps to the
+// site's `fstp [esi+4]` (match+6).
+static __declspec(naked) void GarageBodyA()
+{
+    __asm
+    {
+        __emit 0x60  // pusha
+        mov ecx, esi
+        mov edx, edi
+        call GarageColourBody
+        __emit 0x61  // popa
+        mov edx, DWORD PTR [edi + 20h]
+        fld DWORD PTR [edx + 34h]
+        jmp DWORD PTR [zpatch_garage_resume_a]
+    }
+}
+
+// sub_10046CA0, recovered VA 0x10046CA0 (7 instructions): GarageModelFix's second
+// site body. It runs the model reassignment, replays `movzx ecx,[esi]; push eax;
+// push ecx` -- EAX being the index the helper answered -- and jumps to the site's
+// own `call` (match+5).
+static __declspec(naked) void GarageBodyB()
+{
+    __asm
+    {
+        __emit 0x60  // pusha
+        call GarageLookupBody
+        __emit 0x61  // popa
+        movzx ecx, WORD PTR [esi]
+        push eax
+        push ecx
+        jmp DWORD PTR [zpatch_garage_resume_b]
+    }
+}
+
+// sub_1003D220, recovered VA 0x1003D220 (26 instructions): NoLiveryLimit's
+// "<name>_sign_<index+1>" hash. The name comes from dword_10159BA8, the index from
+// dword_10159BB0, the formatted text is 64 bytes on the stack, the hash goes
+// through the original's own resolver (sub_10003E50) and lands in dword_10159B98.
+static __declspec(naked) void NoliveryHashBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        sub esp, 44h
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, ebp
+        mov DWORD PTR [ebp - 4], eax
+        mov eax, DWORD PTR [zpatch_nolivery_index]
+        inc eax
+        push eax
+        push DWORD PTR [zpatch_nolivery_name]
+        lea eax, [ebp - 44h]
+        push OFFSET zpatch_nolivery_format_text
+        push 40h
+        push eax
+        call NoliveryFormat
+        lea eax, [ebp - 44h]
+        push eax
+        call NoliveryResolve
+        mov ecx, DWORD PTR [ebp - 4]
+        add esp, 18h
+        xor ecx, ebp
+        mov DWORD PTR [zpatch_nolivery_hash], eax
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
+// sub_1003D270, recovered VA 0x1003D270 (37 instructions): NoLiveryLimit's variant
+// count. It formats "<name>_sign_<i>" from i = 1 up, hashes it, and calls the
+// published lookup (dword_10159BA4) with the object the site saved (dword_10159B94)
+// until the answer is zero; the highest i that answered is stored in dword_10159B90.
+static __declspec(naked) void NoliveryCountBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        sub esp, 44h
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, ebp
+        mov DWORD PTR [ebp - 4], eax
+        mov DWORD PTR [zpatch_nolivery_count], 0
+        xor eax, eax
+        // The original's loop alignment: 0F 1F 40 00.
+        __emit 0x0F
+        __emit 0x1F
+        __emit 0x40
+        __emit 0x00
+    nolivery_count_loop:
+        inc eax
+        push eax
+        push DWORD PTR [zpatch_nolivery_bufptr]
+        lea eax, [ebp - 44h]
+        push OFFSET zpatch_nolivery_format_text
+        push 40h
+        push eax
+        call NoliveryFormat
+        lea eax, [ebp - 44h]
+        push eax
+        call NoliveryResolve
+        mov edx, DWORD PTR [zpatch_nolivery_fn]
+        add esp, 18h
+        mov ecx, DWORD PTR [zpatch_nolivery_arg]
+        push eax
+        call edx
+        test eax, eax
+        jz nolivery_count_done
+        mov eax, DWORD PTR [zpatch_nolivery_count]
+        inc eax
+        mov DWORD PTR [zpatch_nolivery_count], eax
+        jmp nolivery_count_loop
+    nolivery_count_done:
+        mov ecx, DWORD PTR [ebp - 4]
+        xor ecx, ebp
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
+// sub_1003D2F0, recovered VA 0x1003D2F0 (6 instructions): copy the name the site
+// passed into the 0x10-byte buffer. The original calls the CRT's strcpy_s through
+// its IAT slot; the slot here holds the same import, so the call keeps its shape
+// and its unguarded read of both pointers.
+static __declspec(naked) void NoliveryCopyBody()
+{
+    __asm
+    {
+        push DWORD PTR [zpatch_nolivery_bufptr]
+        push 10h
+        push DWORD PTR [zpatch_nolivery_dest]
+        call DWORD PTR [zpatch_nolivery_strcpy_s]
+        add esp, 0Ch
+        ret
+    }
+}
+
+// sub_1003D310, recovered VA 0x1003D310 (11 instructions): the EAX site body. It
+// hashes "<name>_sign_<eax+1>" from the name at [ebx+0x13C], then replays the site's
+// `movsx edx,[ebx+48h]` and pushes the hash and that word before jumping to the
+// site's own call (match+13). pusha/popa ride along so the argument registers of
+// the surrounding code survive the helper.
+static __declspec(naked) void NoliveryBodyA()
+{
+    __asm
+    {
+        __emit 0x60  // pusha
+        lea ecx, [ebx + 13Ch]
+        mov DWORD PTR [zpatch_nolivery_name], ecx
+        mov DWORD PTR [zpatch_nolivery_index], eax
+        call NoliveryHashBody
+        __emit 0x61  // popa
+        mov ecx, DWORD PTR [zpatch_nolivery_hash]
+        movsx edx, WORD PTR [ebx + 48h]
+        push ecx
+        push edx
+        jmp DWORD PTR [zpatch_nolivery_resume]
+    }
+}
+
+// sub_1003D340, recovered VA 0x1003D340 (11 instructions): the ECX site body, the
+// same three steps with the index in ECX and the pushed word in EAX.
+static __declspec(naked) void NoliveryBodyB()
+{
+    __asm
+    {
+        __emit 0x60  // pusha
+        lea edx, [ebx + 13Ch]
+        mov DWORD PTR [zpatch_nolivery_name], edx
+        mov DWORD PTR [zpatch_nolivery_index], ecx
+        call NoliveryHashBody
+        __emit 0x61  // popa
+        mov edx, DWORD PTR [zpatch_nolivery_hash]
+        movsx eax, WORD PTR [ebx + 48h]
+        push edx
+        push eax
+        jmp DWORD PTR [zpatch_nolivery_resume]
+    }
+}
+
+// sub_1003D370, recovered VA 0x1003D370 (12 instructions): the older builds' ECX
+// site body. It is the same as the one above plus the `add esp,8` that drops the
+// two arguments the site's preceding call had pushed.
+static __declspec(naked) void NoliveryBodyC()
+{
+    __asm
+    {
+        __emit 0x60  // pusha
+        lea edx, [ebx + 13Ch]
+        mov DWORD PTR [zpatch_nolivery_name], edx
+        mov DWORD PTR [zpatch_nolivery_index], eax
+        call NoliveryHashBody
+        __emit 0x61  // popa
+        mov edx, DWORD PTR [zpatch_nolivery_hash]
+        movsx eax, WORD PTR [ebx + 48h]
+        add esp, 8
+        push edx
+        push eax
+        jmp DWORD PTR [zpatch_nolivery_resume]
+    }
+}
+
+// sub_1003D3A0, recovered VA 0x1003D3A0 (14 instructions): the site that collects
+// the livery name a caller passes on the stack. It copies that name into the
+// site's own [ebp+0x13C] buffer (the `lea esi,[ebp+0x13C]` it replaces), counts the
+// "<name>_sign_N" variants, stores the count as a byte at [ebp+0xC2] and jumps to
+// the site's continuation (match+90).
+static __declspec(naked) void NoliveryBodyD()
+{
+    __asm
+    {
+        __emit 0x60  // pusha
+        mov DWORD PTR [zpatch_nolivery_arg], edi
+        lea ecx, [ebp + 13Ch]
+        mov DWORD PTR [zpatch_nolivery_dest], ecx
+        lea ecx, [esp + 60h]
+        mov DWORD PTR [zpatch_nolivery_bufptr], ecx
+        call NoliveryCopyBody
+        call NoliveryCountBody
+        __emit 0x61  // popa
+        push ebx
+        mov ebx, DWORD PTR [zpatch_nolivery_count]
+        mov BYTE PTR [ebp + 0C2h], bl
+        pop ebx
+        jmp DWORD PTR [zpatch_nolivery_resume_d]
+    }
+}
+
+// sub_1003D3E0, recovered VA 0x1003D3E0 (14 instructions): the other builds'
+// variant of the same collector. The name buffer is at [edi+0x13C] and the count
+// byte at [edi+0xC2] instead of on the stack; the object registers are unchanged.
+static __declspec(naked) void NoliveryBodyE()
+{
+    __asm
+    {
+        __emit 0x60  // pusha
+        mov DWORD PTR [zpatch_nolivery_arg], esi
+        lea ecx, [edi + 13Ch]
+        mov DWORD PTR [zpatch_nolivery_dest], ecx
+        lea ecx, [esp + 60h]
+        mov DWORD PTR [zpatch_nolivery_bufptr], ecx
+        call NoliveryCopyBody
+        call NoliveryCountBody
+        __emit 0x61  // popa
+        push ebx
+        mov ebx, DWORD PTR [zpatch_nolivery_count]
+        mov BYTE PTR [edi + 0C2h], bl
+        pop ebx
+        jmp DWORD PTR [zpatch_nolivery_resume_d]
     }
 }
 
@@ -1125,12 +1972,289 @@ namespace
         injector::WriteMemory<uint32_t>(
             GamePointer<uint32_t>(*pattern.get_first<uint32_t>(77)), kVehicleModelLimit, true);
     }
+    // The address of a body another module transcribed, by its recovered VA. The
+    // shared IDE parser hook lives in source/misc.ixx, and a module interface cannot
+    // export a naked function; the body registry is what makes it reachable (the same
+    // route the BPM arm uses for the native layer's pieces).
+    uintptr_t RegisteredBody(uint32_t reference)
+    {
+        for (const auto& entry : Bodies::All())
+        {
+            if (entry.reference == reference)
+                return entry.address;
+        }
+        return 0;
+    }
+
+    // The original loader preamble resolves these five entries unconditionally
+    // (sub_100523C0, 0x10052EE6..0x10052F50), before any handler runs: the model-info
+    // array (dword_1015AD78), the bone getter (dword_10159B88) and the two matrix
+    // setters (dword_1015D63C, dword_10159CDC). Each scan's hit is exactly what the
+    // preamble's own pattern takes -- the bone getter's signature has two hits and
+    // the preamble takes the first (`cmovnz ecx, eax` with the scan's front element),
+    // and a miss keeps the slot as it was, which for a first run is zero, so the
+    // consumer faults on the null it reads just as the original's does.
+    //
+    // The two CRT entries are the ones the livery helpers call through their IAT
+    // slots: `_stricmp` (the registry comparator) and `strcpy_s` (the 0x10-byte name
+    // copy). byte_10159B85 is the original DllMain's CitizenIV.exe probe
+    // (0x10055DFB..0x10055E17); it starts zero and is set once, here.
+    void ResolveSteerHelpers()
+    {
+        auto pattern = find_pattern("85 C0 C6 44 24 0C 00 C6 44 24 0D 00 75 07");
+        if (!pattern.empty())
+        {
+            const auto value = *pattern.get_first<uint32_t>(-4);
+            zpatch_steer_model_array = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(GamePointer<std::byte>(value)));
+        }
+
+        pattern = find_pattern("56 8B F1 8B 06 8B 90 A0 00 00 00 57 FF D2 85 C0 74 1C");
+        if (!pattern.empty())
+            zpatch_steer_bone = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)));
+
+        pattern = find_pattern("0F 10 5E 14 F3 0F 10 66 18 F3 0F 10 4C 24 0C F3");
+        if (!pattern.empty())
+            zpatch_steer_matrix_a = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(-0x30)));
+
+        pattern = find_pattern(
+            "0F 10 16 F3 0F 10 5E 04 F3 0F 10 4C 24 0C F3 0F 10 66 08 F2 0F 5A C0");
+        if (!pattern.empty())
+            zpatch_steer_matrix_b = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(-0x30)));
+
+        zpatch_steer_stricmp = reinterpret_cast<uintptr_t>(&_stricmp);
+        // `strcpy_s` is an overload set in the CRT headers (the array form is a
+        // template), so the slot takes the three-argument entry explicitly.
+        zpatch_nolivery_strcpy_s = reinterpret_cast<uintptr_t>(
+            static_cast<errno_t(__cdecl*)(char*, size_t, const char*)>(&strcpy_s));
+
+        zpatch_garage_citizen = GetModuleHandleA("CitizenIV.exe") != nullptr ? 1 : 0;
+    }
+
+    // The three steer keys' shared slots, read before any of their sites is written:
+    // the detour's resume (match+16) and the part-drive function the site's own code
+    // calls, plus the shared IDE hook's resume (the parser anchor's -1, which the
+    // original's sub_10004110 publishes as `result - 1`). Only one of the two site
+    // variants exists per build, and each carries its own operand offsets (423/427 on
+    // the 1.0.6.0-and-later site, 140/144 on the older one).
+    void PublishSteerSites()
+    {
+        auto pattern = find_pattern("32 DB 8B 16 8B 82 28 01 00 00 8B CE FF D0");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            zpatch_steer_resume = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 16));
+            zpatch_steer_part_call = Rel32Target(match, 423, 427);
+        }
+
+        pattern = find_pattern("7C E0 8B 06 8B 90 28 01 00 00 8B CE FF D2");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            zpatch_steer_resume = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 16));
+            zpatch_steer_part_call = Rel32Target(match, 140, 144);
+        }
+
+        pattern = find_pattern("0C 83 88 94 00 00 00 04");
+        if (!pattern.empty())
+            zpatch_ide_hook_slot = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(-1)));
+    }
+
+    // The steer keys' shared write set, exactly the original's sub_10005210 plus its
+    // sub_10004110: the vtable-call site the build carries becomes a jump to that
+    // build's detour body, and the shared IDE parser hook is installed so the
+    // wheelangle table the consumer reads is filled. The three keys call this from
+    // their own arms after setting their switch byte, so enabling two of them writes
+    // the same bytes twice, as the original's two handler calls do.
+    void InstallSteerSites()
+    {
+        auto pattern = find_pattern("32 DB 8B 16 8B 82 28 01 00 00 8B CE FF D0");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(2),
+                reinterpret_cast<void*>(&SteerDetourEaxBody), true);
+
+        pattern = find_pattern("7C E0 8B 06 8B 90 28 01 00 00 8B CE FF D2");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(2),
+                reinterpret_cast<void*>(&SteerDetourEdxBody), true);
+
+        pattern = find_pattern("0C 83 88 94 00 00 00 04");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(-10),
+                reinterpret_cast<void*>(RegisteredBody(0x100040E0u)), true);
+    }
+
+    // MovingSteeringWheelSupport / ShakingEngineBlock / MovingPlaneParts: the
+    // original's handler sets its own switch byte and calls the shared installer
+    // (0x10054A7A, 0x10054B56, 0x10054AE8: `mov byte_1015AD4?, 1; call
+    // sub_10005210`). The switch bytes are module words, so two of the keys on runs
+    // both consumer blocks and one of them off leaves its block dormant -- exactly
+    // the original's per-key switches.
+    void PublishMovingSteeringWheelSupport()
+    {
+        if (!Loader::Enabled("MovingSteeringWheelSupport"))
+            return;
+        PublishSteerSites();
+    }
+
+    void InstallMovingSteeringWheelSupport()
+    {
+        if (!Loader::Enabled("MovingSteeringWheelSupport"))
+            return;
+        zpatch_steer_enabled = 1;
+        InstallSteerSites();
+    }
+
+    void PublishShakingEngineBlock()
+    {
+        if (!Loader::Enabled("ShakingEngineBlock"))
+            return;
+        PublishSteerSites();
+    }
+
+    void InstallShakingEngineBlock()
+    {
+        if (!Loader::Enabled("ShakingEngineBlock"))
+            return;
+        zpatch_engine_enabled = 1;
+        InstallSteerSites();
+    }
+
+    void PublishMovingPlaneParts()
+    {
+        if (!Loader::Enabled("MovingPlaneParts"))
+            return;
+        PublishSteerSites();
+    }
+
+    void InstallMovingPlaneParts()
+    {
+        if (!Loader::Enabled("MovingPlaneParts"))
+            return;
+        zpatch_plane_enabled = 1;
+        InstallSteerSites();
+    }
+
+    // GarageModelFix's two resumes, read from the sites before they are overwritten:
+    // the `fstp [esi+4]` at the first site's +6 and the `call` at the second site's
+    // +5.
+    void PublishGarageModelFix()
+    {
+        if (!Loader::Enabled("GarageModelFix"))
+            return;
+
+        auto pattern = find_pattern("8B 57 20 D9 42 34 D9 5E 04 8B 47 20");
+        if (!pattern.empty())
+            zpatch_garage_resume_a = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(6)));
+
+        pattern = find_pattern("0F B7 0E 50 51 E8");
+        if (!pattern.empty())
+            zpatch_garage_resume_b = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(5)));
+    }
+
+    // GarageModelFix: both sites jump to their own body. The first carries the colour
+    // copy, the second rewrites the model index the garage object hands on.
+    void InstallGarageModelFix()
+    {
+        if (!Loader::Enabled("GarageModelFix"))
+            return;
+
+        auto pattern = find_pattern("8B 57 20 D9 42 34 D9 5E 04 8B 47 20");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(0),
+                reinterpret_cast<void*>(&GarageBodyA), true);
+
+        pattern = find_pattern("0F B7 0E 50 51 E8");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(0),
+                reinterpret_cast<void*>(&GarageBodyB), true);
+    }
+
+    // NoLiveryLimit's published slots, in the original handler's (sub_1003D420)
+    // order and with its own either/or: the first site variant publishes the count
+    // loop's lookup (the call operand six bytes before the anchor) and the D/E resume
+    // (match+90); failing that, the older variant publishes its own pair (match-8 and
+    // match+84). The A/B/C resume comes from the livery anchor's +13 either way.
+    void PublishNoLiveryLimit()
+    {
+        if (!Loader::Enabled("NoLiveryLimit"))
+            return;
+
+        auto pattern = find_pattern("74 52 8D B5 3C 01 00 00 83 FB 04");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            zpatch_nolivery_fn = Rel32Target(match, -6, -2);
+            zpatch_nolivery_resume_d = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(match + 90));
+        }
+        else
+        {
+            pattern = find_pattern("8D AF 3C 01 00 00 8D 54 24 20");
+            if (!pattern.empty())
+            {
+                auto* match = pattern.get_first<std::byte>(0);
+                zpatch_nolivery_fn = Rel32Target(match, -8, -4);
+                zpatch_nolivery_resume_d = static_cast<uint32_t>(
+                    reinterpret_cast<uintptr_t>(match + 84));
+            }
+        }
+
+        pattern = find_pattern("8B 8C 83 3C 01 00 00 0F BF 53 48");
+        if (!pattern.empty())
+            zpatch_nolivery_resume = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(13)));
+    }
+
+    // NoLiveryLimit: the collector site (or the older variant of it), then the three
+    // livery sites at the anchor, -199 and -237, each jumping to its own body. The
+    // order is the original's: the collector first, then the anchor, then -199, then
+    // -237.
+    void InstallNoLiveryLimit()
+    {
+        if (!Loader::Enabled("NoLiveryLimit"))
+            return;
+
+        auto pattern = find_pattern("74 52 8D B5 3C 01 00 00 83 FB 04");
+        if (!pattern.empty())
+        {
+            injector::MakeJMP(pattern.get_first<std::byte>(2),
+                reinterpret_cast<void*>(&NoliveryBodyD), true);
+        }
+        else
+        {
+            pattern = find_pattern("8D AF 3C 01 00 00 8D 54 24 20");
+            if (!pattern.empty())
+                injector::MakeJMP(pattern.get_first<std::byte>(0),
+                    reinterpret_cast<void*>(&NoliveryBodyE), true);
+        }
+
+        pattern = find_pattern("8B 8C 83 3C 01 00 00 0F BF 53 48");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            injector::MakeJMP(match, reinterpret_cast<void*>(&NoliveryBodyA), true);
+            injector::MakeJMP(match - 199, reinterpret_cast<void*>(&NoliveryBodyC), true);
+            injector::MakeJMP(match - 237, reinterpret_cast<void*>(&NoliveryBodyB), true);
+        }
+    }
 }
 
 // Registered like every other arm: the publish tier reads every site the install
 // tier is about to overwrite, and the install tier owns the gate and the writes.
 export void RegisterVehicles()
 {
+    // The original's loader preamble resolves the steer consumer's five game entries
+    // and the two CRT slots before any handler runs, and its DllMain probes for
+    // CitizenIV.exe at the same point; none of it writes an image byte.
+    ResolveSteerHelpers();
+
     Loader::PublishEvent() += []
     {
         PublishCollisionDeadlockFix();
@@ -1138,6 +2262,11 @@ export void RegisterVehicles()
         PublishCarDynamicShadowFix();
         PublishHighFPSBikePhysicsFix();
         PublishDualVehicleHeadlights();
+        PublishMovingSteeringWheelSupport();
+        PublishShakingEngineBlock();
+        PublishMovingPlaneParts();
+        PublishGarageModelFix();
+        PublishNoLiveryLimit();
     };
     Loader::InstallEvent() += []
     {
@@ -1156,5 +2285,37 @@ export void RegisterVehicles()
         InstallDualVehicleHeadlights();
         InstallIncreaseVehicleModelLimit();
         InstallIncreaseVehicleStructLimit();
+        InstallMovingSteeringWheelSupport();
+        InstallShakingEngineBlock();
+        InstallMovingPlaneParts();
+        InstallGarageModelFix();
+        InstallNoLiveryLimit();
+    };
+
+    // The bodies' recovered VAs, so the dump expresses each arm's branch in the
+    // original's coordinates. The three steer keys all jump to the same two detour
+    // bodies, so those are registered once here rather than in the shared installer.
+    Bodies::Register(reinterpret_cast<uintptr_t>(&VehicleComponentBody), 0x10003F40u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&SteerDetourEaxBody), 0x100051B0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&SteerDetourEdxBody), 0x100051E0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&GarageColourBody), 0x10046B90u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&GarageLookupBody), 0x10046BD0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&GarageBodyA), 0x10046C80u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&GarageBodyB), 0x10046CA0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryHashBody), 0x1003D220u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryCountBody), 0x1003D270u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryCopyBody), 0x1003D2F0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryBodyA), 0x1003D310u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryBodyB), 0x1003D340u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryBodyC), 0x1003D370u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryBodyD), 0x1003D3A0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryBodyE), 0x1003D3E0u);
+
+    // Each stub's inline `call` is invisible to C++; naming the forwarders here keeps
+    // their out-of-line definitions in the image.
+    [[maybe_unused]] const uintptr_t helpers[] = {
+        reinterpret_cast<uintptr_t>(&NoliveryFormat),
+        reinterpret_cast<uintptr_t>(&NoliveryResolve),
+        reinterpret_cast<uintptr_t>(&SteeringConsumer),
     };
 }

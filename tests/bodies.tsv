@@ -151,3 +151,33 @@ mf_advance_windows 100241E0 ?MfAdvanceWindowsBody@@YAXXZ 138
 # so it has no row (docs/parity.md).
 load_dlcs_dummy 10023480 ?DlcDummyBody@@YAXXZ 2
 load_dlcs_struct_fixup 10023490 ?DlcStructFixupBody@@YAXXZ 19
+
+# The steer/engine/plane consumer's site set (source/vehicles.ixx). The consumer
+# itself (sub_10004C70, 320 instructions) is compiler output -- /GS frame, SSE
+# double conversions, the `lahf`/`test ah,44h` float compare -- and is rebuilt in
+# C++ with the original's call sequence and state words, so it has no row
+# (docs/parity.md). Its model-registry lookup (sub_10003F40) is transcribed.
+vehicle_component 10003F40 ?VehicleComponentBody@@YIPAXPAXPBD@Z 43
+steer_detour_eax 100051B0 ?SteerDetourEaxBody@@YAXXZ 10
+steer_detour_edx 100051E0 ?SteerDetourEdxBody@@YAXXZ 10
+# GarageModelFix (source/vehicles.ixx): both site bodies and the two helpers they
+# call, all transcribed. The colour copy reads the model-info array and the
+# CitizenIV flag; the lookup makes the two dword_10159C0C calls and carries the
+# /GS frame the original's compiled C has.
+garage_colour 10046B90 ?GarageColourBody@@YAXXZ 19
+garage_lookup 10046BD0 ?GarageLookupBody@@YAXXZ 55
+garage_body_a 10046C80 ?GarageBodyA@@YAXXZ 8
+garage_body_b 10046CA0 ?GarageBodyB@@YAXXZ 7
+# NoLiveryLimit (source/vehicles.ixx): the "<name>_sign_<n>" hasher, the variant
+# counter, the 0x10-byte name copy, and the five site bodies (A-C at the livery
+# anchor, D/E at the collector). The hasher and the counter call the original's
+# own resolver through a forwarder and the bounded formatter through the rebuilt
+# sub_10001280; the proof compares a call as an immediate.
+nolivery_hash 1003D220 ?NoliveryHashBody@@YAXXZ 26
+nolivery_count 1003D270 ?NoliveryCountBody@@YAXXZ 37
+nolivery_copy 1003D2F0 ?NoliveryCopyBody@@YAXXZ 6
+nolivery_body_a 1003D310 ?NoliveryBodyA@@YAXXZ 11
+nolivery_body_b 1003D340 ?NoliveryBodyB@@YAXXZ 11
+nolivery_body_c 1003D370 ?NoliveryBodyC@@YAXXZ 12
+nolivery_body_d 1003D3A0 ?NoliveryBodyD@@YAXXZ 14
+nolivery_body_e 1003D3E0 ?NoliveryBodyE@@YAXXZ 14

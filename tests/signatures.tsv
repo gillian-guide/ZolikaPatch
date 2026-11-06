@@ -241,3 +241,34 @@ LoadDLCs.site_c	0x89040E	80 BE 65 01 00 00 00 74 15 8B 44 24 08 50 E8 DF	15
 LoadDLCs.site_d	0x89043A	E8 F1 9B 25 00 8B CE E8 CA FA FF FF E8 F5 9B 25	15
 LoadDLCs.site_e	0x88F558	E8 83 CD E9 FF 84 C0 74 5D 53 8D 4C 24 14 51 8D	15
 LoadDLCs.tail	0x89043F	8B CE E8 CA FA FF FF E8 F5 9B 25 00 B0 01 5E C2	15
+
+# The steer/engine/plane consumer sub_10004C70 and its site set (source/vehicles.ixx).
+# The three keys (MovingSteeringWheelSupport, ShakingEngineBlock, MovingPlaneParts)
+# share one handler in the original -- sub_10005210 first, then the shared IDE parser
+# hook sub_10004110 -- so they share every row here.
+# The four preamble scans that resolve the consumer's game entries, in the order the
+# original resolves them (0x10052EE6..0x10052F50); none is an arm site.
+SteerPreamble.model_array	0x9EC13	85 C0 C6 44 24 0C 00 C6 44 24 0D 00 75 07	14
+SteerPreamble.bone_getter	0x315390	56 8B F1 8B 06 8B 90 A0 00 00 00 57 FF D2 85 C0 74 1C	17
+SteerPreamble.matrix_setter_a	0x10B8F0	0F 10 5E 14 F3 0F 10 66 18 F3 0F 10 4C 24 0C F3	15
+SteerPreamble.matrix_setter_b	0x10BA00	0F 10 16 F3 0F 10 5E 04 F3 0F 10 4C 24 0C F3 0F 10 66 08 F2 0F 5A C0	24
+# The vtable-call site the 1.0.6.0-and-later builds carry; the arm jumps its +2 and
+# publishes match+16 as the resume and the call operand at match+423/+427 as the
+# part-drive function. The older builds' variant
+# (7C E0 8B 06 8B 90 28 01 00 00 8B CE FF D2, jump at +2, resume +16, operand
+# +140/+144) is absent from the 1.0.8.0 image, so it has no site VA to record.
+MovingParts.vtable_new	0x65389E	32 DB 8B 16 8B 82 28 01 00 00 8B CE FF D0	14
+# The shared IDE parser hook: the arm jumps the anchor's -10 and publishes -1 as its
+# resume. The same row is CopSirensFlag's and PopupHeadlightsFlag's (0x646546).
+MovingParts.ide_hook	0x646550	0C 83 88 94 00 00 00 04	8
+# GarageModelFix: the colour site (jump at match, resume match+6) and the model
+# reassignment site (jump at match, resume match+5).
+GarageModelFix.colour	0x868BB0	8B 57 20 D9 42 34 D9 5E 04 8B 47 20	11
+GarageModelFix.model	0x5659C3	0F B7 0E 50 51 E8	6
+# NoLiveryLimit: the collector site (jump at match+2, resume match+90, lookup operand
+# at match-6/-2) and the livery anchor (three jumps at match, -199 and -237, resume
+# match+13). The older collector variant
+# (8D AF 3C 01 00 00 8D 54 24 20, jump at match, resume match+84, operand at
+# match-8/-4) is absent from the 1.0.8.0 image.
+NoLiveryLimit.collector	0x64A53B	74 52 8D B5 3C 01 00 00 83 FB 04	11
+NoLiveryLimit.livery	0x797A29	8B 8C 83 3C 01 00 00 0F BF 53 48	12

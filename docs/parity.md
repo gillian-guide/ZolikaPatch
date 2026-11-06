@@ -27,6 +27,7 @@ fix.
 | a line longer than 255 bytes is split | the parser's 255-byte line buffer | `Feather::Parse` |
 | the file-registry helpers fault on a scan miss | the original's one-time scans (`0x10051730`, `0x10051610`, `0x100517E0`) match nothing | `NewfilesObject` / `NewfilesCallObject` / `NewfilesCallAdd` read or call through the null the scan left, as the original's unguarded `mov eax,[esi]` with `ESI = 0` and its `call edx` do |
 | the DLC register call's `this` is undefined | every `LoadDLCs` run | the original calls the register entry at `0x48F440` with `ECX` left over from the preceding `strcpy_s`. The callee uses it only through the loader-callback call this key replaces with `0x10023480` and through a branch its non-zero flag argument skips, so the value is never dereferenced. The rebuild keeps the same call shape (`__stdcall`, three stack arguments, `ECX` untouched) rather than inventing a `this` |
+| the steer consumer faults on a preamble miss | a build whose model-info array, bone getter or setter scan matches nothing leaves `dword_1015AD78` / `dword_10159B88` / `dword_1015D63C` / `dword_10159CDC` zero | `sub_10004C70` reads them unguarded (`mov eax,[eax+ecx*4]`, `call edx`, `call dword_1015D63C`); the rebuild keeps every hop and every indirect call unguarded, so a miss faults at the same instruction. 1.0.8.0 has all four patterns |
 
 Two of these remain assumptions, not measurements: feather 1.41's non-advancing
 `getline` on a long line (the original very likely spins; this tree continues), and
@@ -37,19 +38,22 @@ CRLF folding (the original reads in text mode). The shipped INI's longest line i
 
 Measured on 1.0.8.0 with `tools/parity_report.py 9`:
 
-- **88 of 99 option keys closed**;
-- **98 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **93 of 99 option keys closed**;
+- **113 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe, and the compiled-C bodies listed below are
-  rebuilt in C++ instead, with no proof row. The longest two are the
-  `DualVehicleHeadlights` pair at 78 instructions / 309 bytes each, which is what
-  exposed the proof tool's old 256-byte sweep window: it compared 64 of 78 and
-  still reported PASS. The tool now sweeps 4096 bytes and fails a row that
-  decodes fewer instructions than its budget, so a truncated sweep can never pass
-  again. This pass added twelve: `RestoreDeathMusic`'s gate body and its three
-  native wrappers, and `MouseFix`'s eight pieces (see the section below); the
-  loading pass added fourteen more: `NewMemorySystem`'s eleven small table methods,
-  `NewFilesCompatibility`'s registration tail and `LoadDLCs`' two bodies;
+  rebuilt in C++ instead, with no proof row. The longest is the livery counter
+  (`0x1003D270`, 37 instructions); the pair at 78 instructions / 309 bytes each
+  (`DualVehicleHeadlights`) is what exposed the proof tool's old 256-byte sweep
+  window: it compared 64 of 78 and still reported PASS. The tool now sweeps 4096
+  bytes and fails a row that decodes fewer instructions than its budget, so a
+  truncated sweep can never pass again. This pass added fifteen: the steer trio's
+  model-registry lookup and its two detour bodies, `GarageModelFix`'s two site bodies
+  and two helpers, and `NoLiveryLimit`'s five site bodies and three helpers (see the
+  section below); earlier passes added twelve (`RestoreDeathMusic`'s gate body and
+  its three native wrappers, `MouseFix`'s eight pieces) and fourteen
+  (`NewMemorySystem`'s eleven small table methods, `NewFilesCompatibility`'s
+  registration tail, `LoadDLCs`' two bodies);
 - launcher: both arms implemented. `LaunchWithPlayGTAIV` rewrites the two launch
   slots and `zp_launcher_slots` verifies them per build; `SkipLauncher` carries the
   original's 25-row table, both collectors, the DFA file-API stage (IAT capture, six
@@ -284,6 +288,137 @@ original's own pattern). `AllowHashesForIDE` needs exactly that resolver (its si
 the game's hash function at `0x45CF50`). The native-script call layer is
 `source/native.ixx` (above); its public surface is `Native::Call`, `CallBool`,
 `Resolve`, `Invoke`, `Resolver`, `Salt`, `ResolveSalts` and `Register`.
+
+### The five keys behind `sub_10004C70`, closed
+
+The steer/engine/plane trio (`MovingSteeringWheelSupport`, `ShakingEngineBlock`,
+`MovingPlaneParts`), `GarageModelFix` and `NoLiveryLimit` shared one blocker: the
+original's steer/render consumer `sub_10004C70` (1,343 bytes, 320 instructions),
+which the trio's detour calls and which nothing in this tree carried. It is now
+rebuilt in C++, and all five keys are closed on 1.0.8.0 **and on the other eight
+images** (each key's per-option cell is byte-identical to its baseline on builds 1,
+5, 6, 7, 8, 9, 11, 12 and 13; build 1 is measured with isolated single-key cells
+because its per-option dump faults at `NoImpostorHeightCutoff` by design).
+
+**What `sub_10004C70` is, and why it is rebuilt rather than transcribed.** It is
+compiler output for C, and the instruction stream says so: a `/GS` frame
+(`mov eax,___security_cookie` / `xor eax,ebp` at `0x10004C76`; `call
+@__security_check_cookie@4` at `0x100051A6`), SSE double conversions around every
+float expression (`cvtps2pd` / `mulsd` / `divsd` / `cvtpd2ps`, e.g. `0x10004CB2`,
+`0x10004E09..0x10004E1C`, `0x10004E45..0x10004E6C`), the MSVC float-`!=` idiom
+(`ucomiss` at `0x10004DDF`, `lahf`/`test ah,44h`/`jnp` at `0x10004DE3..0x10004DE7`)
+and `cmova` for the two `>` comparisons (`0x10004E8E`, `0x10004E9A`). Nothing in it
+is image-specific: every game entry it reaches is called through a slot the
+loader resolves (`call dword_10159C0C`, `call edx` with `edx = dword_10159B88`,
+`call dword_1015D63C`, `call dword_10159CDC`, `call dword_1015AD4C`) and every
+constant it reads is a plain `.rdata` qword (`-pi` at `0x101523A8`, `pi`/`180` at
+`0x10152358`/`0x10152370`, `0.01`/`-0.01` at `0x10152320`/`0x10152390`,
+`0.5`/`-0.5` at `0x10152348`/`0x10152398`, `0.75`/`0.25` at
+`0x10152350`/`0x10152338`, `1.0f`/`100.0f` at `0x10152310`/`0x10152388`). Typing
+`sub_10004C70` in IDA yields those constants and the slot calls; transcribing 320
+instructions would prove the compiler's register allocation, not the feature, so
+it is rebuilt with the original's statement order, state words and observable
+effects. The rebuild carries **no proof row** (the same rule as `SpeedupBugFix`
+and the launcher's DFA helpers).
+
+The assumptions the rebuild makes, each from the disassembly:
+
+| piece | original (1.0.8.0) | rebuild |
+|---|---|---|
+| the vehicle | `dword_1015AD38`, stored by the detour before the call | `zpatch_steer_vehicle`, same word |
+| steering block gate | `byte_1015AD40` | `zpatch_steer_enabled` |
+| engine block gate | `byte_1015AD41` | `zpatch_engine_enabled` |
+| plane block gate | `byte_10159C17` and `[vehicle+0x1354] == 5` | `zpatch_plane_enabled` and the same field |
+| steer lock | `dword_1015AD38[0xE18]` -> `+0x84`, read after `+0x10D8` | same two reads, float division then widen |
+| wheelangle table | `dword_1015A538[]` / `dword_10159D38[]`, non-zero slot, 512 bound | the IDE hook's tables (`source/misc.ixx`), same order and bound |
+| model word | `+0x2E`, sign-extended for the array index, `-1` skipped | same |
+| bone chain | `dword_1015AD78[model]` -> `+8` -> `+0xB4` -> `+0xC`, then `sub_10003F40` | same, with `sub_10003F40` transcribed |
+| bone matrix | `dword_10159B88(vehicle, entry[0x14])`, then identity at 0/1/2/4/5/6/8/9/10 | same order, same nine stores |
+| wheel tilt | `dword_1015D63C(matrix, angle*pi/180)`, then `dword_10159CDC(matrix, steer/lock*-pi)` | same order |
+| engine phase | `(float)(script*step + phase)` in double, stored to `dword_1015AD3C`; `> 0.01` sets `byte_1015AD42 = 1`, `< -0.01` clears it, otherwise it keeps its value | same, phase kept as float bits |
+| engine scale | `(state & 8) ? (float)(rpm*0.75 + 0.25) : 0`, then `(state & 0x10)` forces `1.0f`; `mulss` with the phase | same |
+| plane parts | parts 89, 91, 90, 92 with `count 4` and `script*suspension*100` (three float multiplies, fields re-read per call); 96, 97 (`pitch`, `+/-0.5` in double), 94, 95 (`roll`, `-0.5`), 93 (`heave`, `+0.5`, `count 5`), all with `1,0,0` and `count 3` for the surfaces | same ids, order, counts and argument order |
+| tail | `dword_10159D34 = script float`, return the slot pointer | same |
+
+The two soap-opera details that are deliberately not "improved": every hop and
+every indirect call is unguarded (a preamble miss faults, see the fault table), and
+the `!=` on the timestep is true for a NaN pair, as the original's `jnp` path is.
+
+**The detours.** `sub_100051B0` (10 instructions) and `sub_100051E0` (10) are
+transcribed and proven: `mov dword_1015AD38, esi`; `pusha`; `call sub_10004C70`;
+`popa`; then the ten bytes the jump replaced (`mov edx,[esi]; mov eax,[edx+128h];
+mov ecx,esi; call eax`, or the `eax`/`edx` swap on the older variant);
+`test al,al`; `jmp dword_1015AD44`. The arm publishes the resume (match+16, the
+`jnz` the removed call's flags feed) and the part-drive target (the call operand at
+match+423/+427 on the 1.0.6.0-and-later site, +140/+144 on the older one), and the
+two builds' handlers each add the shared IDE parser hook through `sub_10004110`
+(`E9` at the parser anchor's -10, resume at -1). `1.0.8.0` writes:
+
+| site | RVA | target |
+|---|---|---|
+| the vtable call | `0x6538A0` (`E9` at the anchor's +2) | detour `0x100051B0` |
+| the shared IDE hook | `0x646546` (`E9` at the parser anchor's -10) | misc's `0x100040E0` body |
+
+Published on 1.0.8.0: resume `0x6538AE`, part-drive `0x4F65F0` (the game function
+the site's own `call` names), IDE resume `0x64654F`. The three keys differ only in
+which switch byte their arm sets (`0x10054A7A` / `0x10054B56` / `0x10054AE8` in the
+original's handler), so enabling one runs one consumer block and enabling two runs
+two -- exactly the original's per-key switches. The steer keys install the shared
+IDE hook, which is also how the wheelangle table gets filled: in the original that
+is the whole point of `sub_10004110`, and this tree installs the *same* body
+(`source/misc.ixx`, reached through the body registry by recovered VA) rather than a
+second copy, so both key families share one table set.
+
+**`GarageModelFix`.** All four pieces are transcribed and proven; no helper needed a
+rebuild. `sub_10046B90` (19) copies the model's `+0x3C` dword into four byte fields
+of the garage object (`0x40`, `0x13`, `0x41`, `0x46`), unless `byte_10159B85` is set
+-- the original's DllMain sets that when `CitizenIV.exe` is loaded
+(`0x10055DFB..0x10055E17`), which this tree reproduces in `ResolveSteerHelpers`.
+`sub_10046BD0` (55) packs those four bytes back into a name hash, asks the game's
+model lookup for the index, accepts 1..31999, and otherwise falls back to the fixed
+hash `0xC703DB5F`, storing the index at `+0x10` and clearing bit 0 of `+0x30`; its
+answer (`EAX`) is what the second site body re-pushes. The two site bodies are
+`sub_10046C80` (8, replays `mov edx,[edi+0x20]; fld [edx+0x34]`, resumes at
+match+6) and `sub_10046CA0` (7, replays `movzx ecx,[esi]; push eax; push ecx`,
+resumes at match+5). Writes on 1.0.8.0: `E9` at `0x868BB0` (to `0x10046C80`) and
+`0x5659C3` (to `0x10046CA0`); published resumes `0x868BB6` and `0x5659C8`.
+
+**`NoLiveryLimit`.** Ten pieces, all transcribed and proven: the
+`"%s_sign_%d"` hasher `sub_1003D220` (26), the variant counter `sub_1003D270` (37),
+the 0x10-byte name copy `sub_1003D2F0` (6), the three livery site bodies
+`sub_1003D310`/`D340`/`D370` (11/11/12) and the two collectors
+`sub_1003D3A0`/`D3E0` (14/14). The two formatter calls are the one substitution:
+`sub_10001280`, the original's bounded `vsnprintf` wrapper, is rebuilt as
+`NoliveryFormat` (`_vsnprintf_s` with `_TRUNCATE`, the same bound and the same
+truncate-and-terminate result -- the same rebuild the BadPlayerModelCrashFix
+formatter uses), and the two resolver calls go through `NoliveryResolve`, a
+forwarder to `Shared::ValueResolver()`. Both are called by `E8`, which the proof
+compares as an immediate, so the bodies are otherwise whole. The handler
+(`sub_1003D420`) is an either/or: the first collector variant publishes the count
+loop's lookup (the call operand at match-6/-2) and the D/E resume (match+90) and
+jumps `match+2` to body D; failing that, the older variant publishes its own pair
+(match-8/-4, match+84) and jumps `match` to body E; then the livery anchor publishes
+its resume (match+13) and the three sites at the anchor, -199 and -237 jump to
+bodies A, C and B. On 1.0.8.0 the older collector is absent, so the writes are:
+
+| RVA | body | published slot |
+|---|---|---|
+| `0x64A53D` (the collector's +2) | D `0x1003D3A0` | fn `0x3A490`, D/E resume `0x64A595` |
+| `0x797A29` | A `0x1003D310` | A/B/C resume `0x797A36` |
+| `0x797962` (anchor -199) | C `0x1003D370` | |
+| `0x79793C` (anchor -237) | B `0x1003D340` | |
+
+The livery sites' arm does not rebase anything: `dword_10159BA4` is a game function
+address (`0x3A490`, `CModelInfo`'s hash query) read out of the site's own call
+operand and only ever called with `call edx`, and every other slot is a module word.
+
+**What the scoreboard proves and what it does not.** The five keys' per-option cells
+are byte-identical to their baselines (0 missing, 0 extra, 0 differing on all nine
+images), which proves the write sets. The rebuilt consumer's *runtime* behaviour --
+the matrix the two setters write, the part calls' arguments, the phase arithmetic --
+is not executed by the offline tools; it is proven by the transcription of every
+piece around it (the body proofs cover 15 new pieces) and by the disassembly-derived
+table above, not by a run of the game. Recorded here as the one unverified surface.
 
 ### The misc keys closed in this pass
 
@@ -594,12 +729,12 @@ loader callback this key replaces. The rebuild reproduces that shape exactly
 ### Still blocked
 
 - `OutOfCommissionFix` (the payload and the C++ path above);
-- `ForceCarHeadlightShadows`, `GarageModelFix`, `MovingPlaneParts`,
-  `MovingSteeringWheelSupport`, `ShakingEngineBlock`, `NoLiveryLimit` have baselines
-  but no arm here yet;
-- `GarageModelFix`, `NoLiveryLimit`, the steer/engine/plane trio and `FreezeCarFix`
-  need `sub_10004C70` (the 1,343-byte steer consumer) and, for `FreezeCarFix`, the
-  1,421-byte probe;
+- `ForceCarHeadlightShadows` has a baseline but no arm here yet (its cell holds the
+  reference dump's `0xD0000000` placeholder for a published float pointer, and the
+  canonicalisation it needs exists -- `PopupHeadlightsFlag` is closed through it --
+  so the arm is the remaining work, not a blocker);
+- `FreezeCarFix` needs its 1,421-byte probe and the spawn path around it; the steer
+  consumer `sub_10004C70` it also touched is now in place (see the section above);
 - `HighQualityReflections` (~200 instructions) and `CutsceneFixes` (~100, with only
   one real baseline byte) are over the transcription budget by design;
 - `NewSavesCompatibility` needs `sub_10051B30`, the save converter: compiled file-IO
@@ -638,7 +773,7 @@ A body-bearing key is committed only when all four parts exist:
    the linker map, instruction budget — and `zp_body_proof` must PASS. A body that is
    compiler output for a C function (an SEH frame, a /GS cookie, the thread-safe
    static-init protocol) is rebuilt in C++ instead, and then has no proof row:
-   `SpeedupBugFix` is the current example.
+   `SpeedupBugFix` and the steer consumer `sub_10004C70` are the current examples.
 
 ## What the scoreboard can and cannot compare
 
