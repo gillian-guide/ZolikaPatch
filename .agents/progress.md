@@ -402,3 +402,69 @@ the original's own value, but a section with rows (as in `game_refs/ZolikaPatch.
 would use per-model offsets in the original and 2.0f here. Fixing it means the
 loader preamble's reader (`sub_100523C0`) plus its unguarded `std::stof`, which
 covers both sections and is a pass of its own.
+
+## 2026-11-06 — the loader preamble's light tables: `[HeadlightConeOffsets]` and `[PopupLightAngles]`
+
+**Closed:** the gap the previous entry recorded. The two 512-slot tables are now
+read from the INI, so `ForceCarHeadlightShadows` and `PopupHeadlightsFlag` publish
+per-model offsets/angles from the user's actual `ZolikaPatch.ini` instead of the
+constant, and keep the constant exactly where the original does (an empty section,
+an absent row, or a hole before the model's row).
+
+**Recovered reader (`sub_100523C0`, `0x10052419..0x10052D9B`).** Two structurally
+identical loops, `[PopupLightAngles]` first (`0x10052419`) and
+`[HeadlightConeOffsets]` second (`0x10052901`):
+
+- `call sub_10055F10` (the section lookup) / `jz` skips a missing section's loop;
+- `mov edi,1` … `inc edi` / `cmp [ebp-5Ch],200h` / `jl` — `Car1`..`Car512`, 512
+  iterations; `Car513` is never asked for;
+- the key is the literal `"Car"` (`sub_1005BEF0`, which prepends it to
+  `std::to_string(ordinal)`) plus `"Name"` (`memmove ...,4`), then separately plus
+  `"Angle"` (`...,5`) or `"Offset"` (`...,6`);
+- `sub_1005AF10(value, "")` / `jnz` — an absent or empty name skips the whole row,
+  so its value is never even fetched;
+- `sub_10003E50(name)` -> `dword_1015C628[slot]` / `dword_1015ADB8[slot]`, stored
+  *before* the value (`0x1005265E` before `0x10052763`, `0x10052B0C` before
+  `0x10052C14`);
+- the value is the inlined `std::stof`: `mov [errno],0` / `call strtof` /
+  `cmp endptr,start` -> `0x100529BC` `_Xinvalid_argument("invalid stof argument")`,
+  `cmp [errno],22h` -> `0x100529B1` `_Xout_of_range("stof argument out of range")`.
+  Both escape the loader uncaught. A value with trailing junk (`5abc`) is truncated
+  instead;
+- the angle is `(double)value * pi / 180` (`0x1005286E..0x10052893`, pi at
+  `0x10152358`, 180 at `0x10152370`), the offset is stored raw.
+
+**Where it lives.** `Config::ReadModelTables(Config::Ini(), resolve)` in
+`source/config.ixx` (`ModelTable`: 512 hashes + 512 floats;
+`Config::PopupLightAngles()` / `Config::HeadlightConeOffsets()`), called once from
+the top of `RegisterVehicles()` — the first registration after `Shared::Register()`
+has published the resolver's two CRT slots, and before anything reads an option or
+writes an image byte, so the tables are complete and a malformed row throws exactly
+where the original's preamble does. `vehicles.ixx` and `misc.ixx` lost their local
+`zpatch_fchs_*` / `zpatch_popup_*` table copies and their checkers read the config
+tables; the 2.0f seed and the pi/2 seed are unchanged, and are what the checkers
+keep when the tables are empty. Nothing in the reader hashes a name itself: the
+caller passes `Shared::ValueResolver()`.
+
+**Tests.** New `zp_model_tables` (`tests/model_tables.cpp`, 55 checks in ctest, 56
+with a real INI path): the section gate, the `1..512` ordinal and `Car01`/`Car0`/
+`Car513` non-keys, index-based fill with holes, an empty name skipping the row, a
+name with no value storing the hash and leaving `0.0f`, a value with no name never
+parsed, `std::invalid_argument` on `abc`/space-only, `std::out_of_range` on
+`1e999`, `5abc` -> `5.0f`, the hash-before-value order, `[PopupLightAngles]`
+before `[HeadlightConeOffsets]` on a throw, a full 512-row table and `Car513`
+ignored, the degrees->radians constants (90 -> `0x3FC90FDB`, 180 -> `0x40490FDB`),
+and the reader driving the transcribed `sub_10003E50` against a reference
+implementation of its body. Manually run against `game_refs/ZolikaPatch.ini`:
+`78 offset row(s) -> 78 slot(s), 0 angle row(s) -> 0 slot(s)`.
+
+**Gates (final runs).** `cmake --build --preset release` -> success;
+`python tools/parity_report.py 9` -> `build 9: 94 key(s) closed, 5 open` (the same
+five as before; no image byte moved — the tables are read-only startup state);
+`ctest --preset release` -> `100% tests passed out of 11`;
+`tools/verify_bodies.py` -> `114 body(ies), 0 failure(s)`.
+
+**Docs.** `docs/parity.md`: the gap paragraphs under `ForceCarHeadlightShadows` and
+the misc keys are replaced with the recovered grammar table, the fault rows are in
+§Preserved faults, and `zp_model_tables` is in §Contracts. `AGENTS.md`'s harness
+sentence still lists the old executables and could name `zp_model_tables`.

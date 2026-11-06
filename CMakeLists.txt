@@ -124,6 +124,15 @@ add_dependencies(zp_tests ${ZP_NAME})
 add_test(NAME zp_tests COMMAND zp_tests $<TARGET_FILE:${ZP_NAME}>)
 set_tests_properties(zp_tests PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
+# The two per-model light tables the loader preamble reads from
+# [PopupLightAngles] / [HeadlightConeOffsets]: the recovered grammar, defaults and
+# faults, on documents only -- no game image and no ASI load.
+add_executable(zp_model_tables tests/model_tables.cpp)
+set_target_properties(zp_model_tables PROPERTIES CXX_SCAN_FOR_MODULES ON)
+target_link_libraries(zp_model_tables PRIVATE zp_modules)
+add_test(NAME zp_model_tables COMMAND zp_model_tables)
+set_tests_properties(zp_model_tables PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+
 add_executable(zp_dump tests/dump_main.cpp)
 set_target_properties(zp_dump PROPERTIES CXX_SCAN_FOR_MODULES ON)
 target_link_libraries(zp_dump PRIVATE zp_modules)

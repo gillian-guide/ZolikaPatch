@@ -16,6 +16,7 @@ export module vehicles;
 import bodies;
 import bytes;
 import common;
+import config;
 import loader;
 import native;
 import options;
@@ -43,13 +44,11 @@ extern "C"
     // the site's `movss xmm2, [0xD95B68]` is retargeted at; the original seeds its
     // copy with 2.0f on disk, so this one starts there too. dword_1015B5BC: the
     // resume, published from the site's own prologue before the E9 replaces it.
-    // dword_1015ADB8 / dword_1015B5C0: the two 512-slot [HeadlightConeOffsets]
-    // lookup tables (model hash, cone offset) the checker walks.
+    // The two 512-slot [HeadlightConeOffsets] tables the checker walks
+    // (dword_1015ADB8 / dword_1015B5C0) live in Config::HeadlightConeOffsets().
     uint32_t zpatch_fchs_param = 0;
     float zpatch_fchs_offset = 2.0f;
     uint32_t zpatch_fchs_resume = 0;
-    uint32_t zpatch_fchs_hashes[512] = {};
-    float zpatch_fchs_offsets[512] = {};
 
     // The bike-physics detour's published state: the incoming value the clamp
     // rewrites, the caller's EAX saved across the clamp call, and the resume (the
@@ -345,12 +344,13 @@ static __declspec(naked) void CarDynamicShadowShimB()
 // `nop dword ptr [eax]` loop alignment -- so a linear transcription would prove the
 // compiler's register allocation, not the feature. What it does is fixed by the
 // shim's `call` and by its own state words: seed the offset float with 2.0f, then
-// walk the [HeadlightConeOffsets] hash table from slot 0, stopping at the first zero
-// hash, and on the first entry whose model-index lookup answers the object's signed
-// model word publish that entry's float. The lookup slot and the object are read
-// unguarded -- the original's `call dword_10159C0C` (0x1001AD5C) and its
-// `movsx eax, word [edi+2Eh]` (0x1001AD62) are -- and the call comes first, so a
-// null object faults on the load and a null lookup faults on the call.
+// walk the [HeadlightConeOffsets] table Config::HeadlightConeOffsets() holds from
+// slot 0, stopping at the first zero hash, and on the first entry whose model-index
+// lookup answers the object's signed model word publish that entry's float. The
+// lookup slot and the object are read unguarded -- the original's `call
+// dword_10159C0C` (0x1001AD5C) and its `movsx eax, word [edi+2Eh]` (0x1001AD62)
+// are -- and the call comes first, so a null object faults on the load and a null
+// lookup faults on the call.
 namespace
 {
     constexpr float kFchsDefaultOffset = 2.0f;  // dword_101580C0's on-disk seed
@@ -362,8 +362,9 @@ namespace
             static_cast<uintptr_t>(zpatch_model_lookup));
         const auto* const object = reinterpret_cast<const std::byte*>(
             static_cast<uintptr_t>(zpatch_fchs_param));
+        const auto& table = Config::HeadlightConeOffsets();
 
-        uint32_t hash = zpatch_fchs_hashes[0];
+        uint32_t hash = table.hashes[0];
         zpatch_fchs_offset = kFchsDefaultOffset;
         if (hash == 0u)
             return;
@@ -375,7 +376,7 @@ namespace
             const auto model = *reinterpret_cast<const std::int16_t*>(object + 0x2E);
             if (static_cast<std::int32_t>(model) == index)
             {
-                zpatch_fchs_offset = zpatch_fchs_offsets[slot];
+                zpatch_fchs_offset = table.values[slot];
                 return;
             }
 
@@ -384,9 +385,9 @@ namespace
             // it; our module's layout differs, so the walk stops at the last slot
             // (docs/parity.md). Unreachable with a section that holds fewer than 512
             // rows, because the walk stops at the first zero hash instead.
-            if (slot == std::size(zpatch_fchs_hashes))
+            if (slot == std::size(table.hashes))
                 return;
-            hash = zpatch_fchs_hashes[slot];
+            hash = table.hashes[slot];
             if (hash == 0u)
                 return;
         }
@@ -2423,6 +2424,16 @@ namespace
 // tier is about to overwrite, and the install tier owns the gate and the writes.
 export void RegisterVehicles()
 {
+    // The original's loader preamble fills both per-model light tables before it
+    // reads a single option (`sub_100523C0`'s first two blocks). This is the first
+    // registration after Shared::Register() has made `sub_10003E50` callable, and
+    // nothing before it reads an option or writes an image byte, so the tables are
+    // complete -- and a malformed row throws -- exactly where the original's
+    // preamble does it. Both sections are read here because the original reads them
+    // in one place, [PopupLightAngles] first.
+    Config::ReadModelTables(Config::Ini(),
+        reinterpret_cast<Config::NameResolver>(Shared::ValueResolver()));
+
     // The original's loader preamble resolves the steer consumer's five game entries
     // and the two CRT slots before any handler runs, and its DllMain probes for
     // CitizenIV.exe at the same point; none of it writes an image byte.

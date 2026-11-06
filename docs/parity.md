@@ -10,6 +10,7 @@ fix.
 | --- | --- |
 | INI grammar (feather-ini-parser 1.41): 255-byte line buffer, first-line BOM drops the file, `#`/`//` comments only, strtok-on-`=` keys that keep a trailing space, values that keep their spaces, empty values not stored, last duplicate wins, a re-opened section starts empty, case-sensitive sections and keys | `zp_tests`, `TestConfigGrammar` |
 | Read boundary is `std::stoi` on the stored text with the arm's default | `zp_tests`, `TestConfigGrammar` |
+| The two light tables: `Car<N>Name` / `Car<N>Angle` / `Car<N>Offset` with `N` = 1..512, the section gate, an empty name skipping the row, the hash stored before the value, the degrees-to-radians conversion, and the reader running before any option is read | `zp_model_tables` |
 | Build classification: the four version fields concatenated (`1.0.7.0` -> 1070, `1.2.0.43` -> 12043) and the original's switch; an unsupported executable is `unknown` and applies nothing | `zp_tests`, `TestBuilds` |
 | Option catalogue: 99 keys with the shipped value, the absent-key default and the build mask | `source/options.inc` (generated), `zp_tests` |
 | The loader preamble's ten salt words: the shipped `.data` values when its probe hits, the recovered fallback set when it misses | `zp_salt_probe` (1.0.8.0 hit; 1.0.0.0 and 1.0.4.0 miss) |
@@ -22,6 +23,7 @@ fix.
 | --- | --- | --- |
 | `std::invalid_argument` escapes the loader | a non-numeric `[Options]` value (`Key=abc`, or `Key= ` of spaces only) | `Config::Integer` -> `std::stoi`, uncaught |
 | `std::out_of_range` escapes the loader | a numeric value outside `int` | same |
+| `std::invalid_argument` / `std::out_of_range` escape the loader from a light-table value | a `[PopupLightAngles]` `Car<N>Angle` or `[HeadlightConeOffsets]` `Car<N>Offset` with no digits (`abc`, or a space-only value) or out of range (`1e999`), with a non-empty `Car<N>Name` | `Config::ReadModelTables` -> `std::stof`, uncaught; the original's inlined `strtof` and its two throw helpers (`0x100529BC` "invalid stof argument", `0x100529B1` "stof argument out of range"), reached with the row's hash already stored (`0x10052B0C` before `0x10052C14`, `0x1005265E` before `0x10052763`) |
 | the whole INI is dropped | the first line starts with a UTF-8 BOM | `Feather::Parse` |
 | null section dereference | a key line before the first `[section]` line | `Feather::Parse` |
 | a line longer than 255 bytes is split | the parser's 255-byte line buffer | `Feather::Parse` |
@@ -367,16 +369,44 @@ slots with resolvable names would walk out of the table in the original and stop
 no shipped or sample INI comes near that, and a table always stops at its first zero
 hash before it.
 
-**The two 512-slot tables are the known shared gap.** `dword_1015ADB8` /
-`dword_1015B5C0` are filled by the loader preamble's `sub_100523C0` from
-`[HeadlightConeOffsets]` (`Car<N>Name` hashed with `sub_10003E50`, `Car<N>Offset`
-parsed with `std::stof`), and this tree does not parse that section yet -- the same
-gap recorded for `[PopupLightAngles]` under the misc keys. With the shipped INI's
-sections empty the checker's own 2.0f is exactly what the original publishes there, so
-the live path agrees; with rows in the section (the live `game_refs/ZolikaPatch.ini`
-has `Car1Name=admiral` / `Car1Offset=-5`, ...) the original would publish those offsets
-and this tree still publishes 2.0f. The gap is the preamble reader plus its unguarded
-`std::stof`, not this key's arm.
+**The two 512-slot tables, and the reader that fills them, are recovered.**
+`dword_1015ADB8` / `dword_1015B5C0` are filled by the loader preamble's
+`sub_100523C0` from `[HeadlightConeOffsets]`, before any handler installs. The
+reader is now `Config::ReadModelTables` (`source/config.ixx`), driven from
+`RegisterVehicles()` -- the first registration after `Shared::Register()` has made
+`sub_10003E50` callable, and before anything reads an option or writes an image
+byte -- and both checkers read the recovered tables
+(`Config::HeadlightConeOffsets()`, `Config::PopupLightAngles()`) instead of a
+module copy.
+
+What `0x10052419..0x10052D9B` does, recovered instruction by instruction:
+
+| piece | instruction(s) | what |
+|---|---|---|
+| section gate | `call sub_10055F10` / `test al,al` / `jz` (`0x10052477..0x10052489`, `0x10052921..0x10052933`) | a missing section skips its whole loop |
+| row counter | `mov edi,1` / ... / `inc edi` / `cmp [ebp-5Ch],200h` / `jl` (`0x10052939..0x10052D9B`) | `Car1` ... `Car512`, 512 iterations; `Car513` is never asked for |
+| key | `sub_1005BEF0` prepends the literal `"Car"` to the ordinal's `std::to_string`, then `memmove(...,4,"Name",4)` / `memmove(...,5,"Angle",5)` / `memmove(...,6,"Offset",6)` (`0x10052525`, `0x100526BE`, `0x10052B6C`) | `Car<N>Name` / `Car<N>Angle` / `Car<N>Offset`, no zero padding |
+| empty name | `call sub_1005AF10` (string == `""`) / `test al,al` / `jnz` (`0x10052631..0x10052638`, `0x10052AE3..0x10052AEA`) | the row is skipped, value and all |
+| hash | `call sub_10003E50` / `mov dword_1015C628[ecx],eax` and `mov dword_1015ADB8[ecx],eax` (`0x1005264A`, `0x10052AFC`) | the raw stored text (leading space, quotes, `hash:` included) is resolved and stored *before* the value is read |
+| value | `call sub_1005BFF0` / `mov [errno],0` / `call strtof` / `cmp esi,[ebp-0CCh]` / `cmp [edi],22h` (`0x10052745..0x10052781`, `0x10052BF6..0x10052C32`) | `std::stof`, unguarded: `jz 0x100529BC` is `_Xinvalid_argument("invalid stof argument")`, `jz 0x100529B1` is `_Xout_of_range("stof argument out of range")` |
+| angle | `movss` / `cvtps2pd` / `mulsd [0x10152358]` / `divsd [0x10152370]` / `cvtpd2ps` / `movss dword_1015BE28[esi]` (`0x1005286E..0x10052893`) | degrees → radians in double, narrowed once |
+| offset | `fstp [ebp-0FCh]` / `movss dword_1015B5C0[esi]` (`0x10052C1D`, `0x10052C50`) | stored raw |
+
+The consequences, all pinned by `zp_model_tables`: a name with no value stores its
+hash and leaves the value at the table's zero, so that model resolves to `0.0f` /
+`0` radians rather than to the checker's default; a value with no name is never
+parsed, so even junk there is inert; a missing row leaves a zero hash at its own
+slot while later rows keep their ordinals, which is where the checker's walk
+stops; a malformed value throws out of the loader (after its hash was stored)
+exactly as `std::stof` does; a full section fills all 512 slots. `zp_model_tables`
+also runs the live `game_refs/ZolikaPatch.ini` through the transcribed resolver:
+78 offset rows → 78 slots, so the user's actual configuration is the one this
+reads.
+
+The walk's end is the divergence recorded above: `sub_1001AD20` reads past its
+512th hash in the original and stops there here, so a section that fills all 512
+slots with resolvable names is the one shape the reader can now produce that
+reaches it -- and only in the original does it differ.
 
 ### The five keys behind `sub_10004C70`, closed
 
@@ -563,12 +593,12 @@ the same site, as the original's two handlers do. The lookups go through
 `dword_10159C0C` and the names through the transcribed `sub_10003E50`, both
 unguarded, so a missing resolver faults where the original's indirect call does.
 The popup shims' second (EDX) pattern has no hit on 1.0.8.0; its body is still
-transcribed and proven. The `[PopupLightAngles]` / `[HeadlightConeOffsets]` INI
-tables that the original's loader preamble parses are not parsed by this tree
-yet; the shipped INI's two sections are empty, so the checker's default pi/2 is
-exactly what the original uses there. `ForceCarHeadlightShadows`' checker reads the
-same kind of preamble-filled table (the `[HeadlightConeOffsets]` pair, default 2.0f)
-and inherits the same gap -- see its section below.
+transcribed and proven. The `[PopupLightAngles]` table the checker walks is filled
+from the INI by `Config::ReadModelTables` (`Config::PopupLightAngles()`); an empty
+section leaves every hash zero, which is what keeps the checker's own pi/2 default
+-- the shipped INI's shape. `ForceCarHeadlightShadows`' checker reads the
+`[HeadlightConeOffsets]` pair the same way; that key's section above records the
+recovered reader and its faults.
 
 ### `RestoreDeathMusic`, closed on the native layer's wrappers
 

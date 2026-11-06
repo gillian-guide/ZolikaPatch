@@ -9,6 +9,7 @@ export module misc;
 import bodies;
 import bytes;
 import common;
+import config;
 import game;
 import loader;
 import native;
@@ -895,18 +896,17 @@ extern "C"
     uint32_t zpatch_popup_resume_a = 0;
     uint32_t zpatch_popup_resume_b = 0;
 
-    // The two 512-slot tables the original's loader preamble fills from
-    // [PopupLightAngles]. This tree does not parse that section yet
-    // (docs/parity.md); the shipped INI's section is empty, so both stay zero and
-    // the checker's default pi/2 is the original's own value there.
-    uint32_t zpatch_popup_hashes[512] = {};
-    float zpatch_popup_angles[512] = {};
+    // The two 512-slot [PopupLightAngles] tables the checker walks
+    // (dword_1015C628 / dword_1015BE28) are Config::PopupLightAngles(), filled by
+    // the loader preamble's reader. When the section is empty the hashes are all
+    // zero, so the checker keeps the pi/2 above -- the original's own default.
 }
 
 namespace
 {
-    // sub_10044310 (125 instructions), rebuilt: reset the angle to pi/2, resolve
-    // "popuplights" (hash 0xEB9F21D3) and compare the model against it, then walk
+    // sub_10044310 (125 instructions), rebuilt: reset the angle to pi/2, ask the
+    // model store for the model the original names by the literal hash 0xEB9F21D3
+    // (`push 0EB9F21D3h` at 0x1004432E) and compare the model against it, then walk
     // the +popuplights list the IDE parser filled. On a match the angle is the
     // last matching [PopupLightAngles] row, as in the original's eight interleaved
     // 64-entry columns (flattened here to 512 slots). The lookup is unguarded.
@@ -942,11 +942,14 @@ namespace
         }
 
         zpatch_popup_flag = 1;
+        // The original scans exactly 512 slots (eight 64-entry columns), no matter
+        // how many the section filled, and keeps the last match.
+        const auto& table = Config::PopupLightAngles();
         for (uint32_t i = 0; i < kVehicleLightSlots; ++i)
         {
-            if (zpatch_popup_hashes[i] != 0 &&
-                zpatch_popup_hashes[i] == zpatch_popuplights_models[slot])
-                zpatch_popup_angle = zpatch_popup_angles[i];
+            if (table.hashes[i] != 0 &&
+                table.hashes[i] == zpatch_popuplights_models[slot])
+                zpatch_popup_angle = table.values[i];
         }
     }
 }

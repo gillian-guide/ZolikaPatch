@@ -142,9 +142,35 @@ export namespace Feather
     }
 }
 
-// What a feature reads: the original's `std::stoi(ini.get(key, default))`, with
-// the same conversion (and the same std::invalid_argument / std::out_of_range it
-// throws, uncaught, on a non-numeric value).
+// The two per-model light tables. The original's loader preamble `sub_100523C0`
+// fills them from the INI before any handler installs, at `0x10052419..0x10052D9B`:
+//
+//   [PopupLightAngles]      Car<N>Name   -> table.hashes[N-1]  (sub_10003E50)
+//                           Car<N>Angle  -> table.values[N-1]  (std::stof, degrees)
+//   [HeadlightConeOffsets]  Car<N>Name   -> table.hashes[N-1]  (sub_10003E50)
+//                           Car<N>Offset -> table.values[N-1]  (std::stof, raw)
+//
+// The section is read only when it exists (`setSection` returns false and the
+// original jumps past the whole loop), the row counter runs 1..512 inclusive
+// (`cmp ..., 200h / jl`), and a row whose name is absent or empty is skipped
+// without even looking at its value -- the original compares the fetched value
+// with `""` (`sub_1005AF10`) and jumps past both stores on equality. A row whose
+// name is present but whose value is absent stores the hash and leaves the value
+// at the table's zero, so the model resolves to an offset of 0.0f (or an angle of
+// 0 radians), not to the checker's default.
+//
+// The value is parsed by `std::stof` with no guard (`strtof` plus MSVC's two
+// throws at `0x100529B1` / `0x100529BC`), so a value with no digits escapes as
+// std::invalid_argument and an out-of-range one as std::out_of_range; a value
+// with trailing junk (`5abc`) is truncated to 5.0f, exactly as std::stof does.
+// The hash is stored *before* the value is parsed (`0x1005265E` before
+// `0x10052763`, `0x10052B0C` before `0x10052C14`), so a throwing value leaves its
+// row's hash in the table.
+//
+// The angle is stored in radians: the original multiplies the parsed float by the
+// double pi at `0x10152358` and divides by 180.0 at `0x10152370` in double, then
+// narrows to float (`movss` / `cvtps2pd` / `mulsd` / `divsd` / `cvtpd2ps` at
+// `0x1005286E..0x10052893`). The offset is stored as parsed.
 export namespace Config
 {
     // The original's file name, opened relative to the process working directory
@@ -183,5 +209,104 @@ export namespace Config
     {
         const std::string defaultText(fallback);
         return std::stof(Feather::Value(document, section, key, defaultText));
+    }
+
+    // One recovered table: the 512 name hashes the checker walks and the 512 values
+    // it publishes on a match (dword_1015C628 / dword_1015BE28 for
+    // [PopupLightAngles], dword_1015ADB8 / dword_1015B5C0 for
+    // [HeadlightConeOffsets]). Both start zeroed, as the original's .bss words do.
+    inline constexpr size_t ModelTableSlots = 512;
+
+    struct ModelTable
+    {
+        std::array<uint32_t, ModelTableSlots> hashes{};
+        std::array<float, ModelTableSlots> values{};
+    };
+
+    ModelTable& PopupLightAngles();
+    ModelTable& HeadlightConeOffsets();
+
+    // sub_10003E50's shape: __cdecl, the name, the hash in EAX. The caller passes
+    // the transcribed resolver; the reader never hashes a name itself.
+    using NameResolver = uint32_t(__cdecl*)(const char*);
+
+    // Fills both tables from `document` in the original's order and with its
+    // grammar, defaults and faults (the block comment above the namespace). Called
+    // once at startup, before any option is read.
+    void ReadModelTables(const Feather::Document& document, NameResolver resolve);
+}
+
+namespace
+{
+    // The two recovered doubles: pi (0x400921FB54442D18 at 0x10152358) and 180.0
+    // (0x4066800000000000 at 0x10152370). The hex literal is exact.
+    constexpr double kPi = 0x1.921fb54442d18p+1;
+    constexpr double kDegreesPerHalfTurn = 180.0;
+
+    void ReadModelTable(const Feather::Document& document, std::string_view section,
+        std::string_view valueSuffix, Config::ModelTable& table, bool degreesToRadians,
+        Config::NameResolver resolve)
+    {
+        // The original asks `setSection` for the section and jumps over the whole
+        // loop when it is absent; with the section absent every `Find` below would
+        // miss anyway, so this only records the recovered shape.
+        if (document.Section(section) == nullptr)
+            return;
+
+        for (size_t index = 1; index <= Config::ModelTableSlots; ++index)
+        {
+            const auto ordinal = std::to_string(index);
+
+            // "Car" + ordinal + "Name", built as the original builds it: a decimal
+            // ordinal with no padding, so `Car01Name` is a different key and is
+            // never asked for.
+            const auto* const name = document.Find(section, "Car" + ordinal + "Name");
+            if (name == nullptr || name->empty())
+                continue;
+
+            table.hashes[index - 1] = resolve(name->c_str());
+
+            const auto* const value = document.Find(section, "Car" + ordinal + std::string(valueSuffix));
+            if (value == nullptr || value->empty())
+                continue;
+
+            // Unguarded, like the original's inlined std::stof: a value with no
+            // digits throws std::invalid_argument and an out-of-range one throws
+            // std::out_of_range out of the loader.
+            const float parsed = std::stof(*value);
+            table.values[index - 1] = degreesToRadians
+                ? static_cast<float>(static_cast<double>(parsed) * kPi / kDegreesPerHalfTurn)
+                : parsed;
+        }
+    }
+}
+
+namespace Config
+{
+    ModelTable& PopupLightAngles()
+    {
+        static ModelTable table;
+        return table;
+    }
+
+    ModelTable& HeadlightConeOffsets()
+    {
+        static ModelTable table;
+        return table;
+    }
+
+    void ReadModelTables(const Feather::Document& document, NameResolver resolve)
+    {
+        // The original's tables are zero-filled .bss written once; a read starts
+        // from zero so the caller sees exactly that, and a throw leaves the
+        // half-filled tables the original would leave.
+        PopupLightAngles() = ModelTable{};
+        HeadlightConeOffsets() = ModelTable{};
+
+        // The original's order: [PopupLightAngles] first (0x10052419), then
+        // [HeadlightConeOffsets] (0x10052901). A throw in the first section leaves
+        // the second table untouched.
+        ReadModelTable(document, "PopupLightAngles", "Angle", PopupLightAngles(), true, resolve);
+        ReadModelTable(document, "HeadlightConeOffsets", "Offset", HeadlightConeOffsets(), false, resolve);
     }
 }
