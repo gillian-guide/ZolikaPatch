@@ -4,10 +4,12 @@ Every other piece of this module is **transcribed**: a body is written instructi
 instruction from the original ASI, and `tools/verify_bodies.py` decodes the same
 instruction count on both sides and compares mnemonic, registers, memory shape and
 immediate *class*. That proof is what `tests/bodies.tsv` is for, and it currently
-covers **132 bodies**. A transcribed body whose original stream reads a table through
+covers **133 bodies**. A transcribed body whose original stream reads a table through
 an indexed absolute operand is provable too, because the tree registers the table and
 the comparator compares its *contents*: §1 and §2b describe that, and the model-name
-lookup (`0x10003F00`) is the first piece transcribed that way.
+lookup (`0x10003F00`) is the first piece transcribed that way. §2c is the largest: the
+steer consumer (`0x10004C70`, 320 instructions), whose two tables are also the reason
+the registry now reads a section's uninitialised tail and accepts C symbol names.
 
 This file is about the pieces that are **not** in that file. They are rebuilt in C++
 because their original instruction stream cannot be compared under the proof's rules,
@@ -33,7 +35,7 @@ with four consequences that decide every case below:
 | register, or `[ebp+disp]` / `[esp+disp]` / `[reg+disp]` | the displacement **literally** | a transcription must use the same frame offsets, which it does because it writes the same instructions |
 | memory with **no base and no index** (`[0x1015AD94]`) | `abs` — a slot | the module may point it at its own global or slot |
 | `call`/`jmp`/`push` immediate | `imm` — a slot | the module may name its own function or literal |
-| memory **with an index and no base** (`[esi*4 + 0x1015A538]`) | the displacement **literally**, unless a manifest table row names it | the module cannot match the original's VA; if the table is registered the displacement becomes `table:<content hash>` and the body is provable (§2b) |
+| memory **with an index and no base** (`[esi*4 + 0x1015A538]`) | the displacement **literally**, unless a manifest table row names it | the module cannot match the original's VA; if the table is registered the displacement becomes `table:<content hash>` and the body is provable (§2b, §2c). The row may name a C symbol (`_name`), and the table may live in a section's uninitialised tail (read as zeros) — both properties the 512-slot model tables need |
 
 So the blockers are mechanical, and there are exactly four kinds in this tree:
 
@@ -194,8 +196,8 @@ six rows §2a adds bring the current total to 206). That check lives in
    from the body start on both sides (`.scratch/branch_targets.py`, now inside
    `tools/verify_bodies.py`). This is the check that caught the first DLC
    transcription's mis-attached label (§2); it passes for the 125 rows of that pass
-   (154 internal targets), for the 131 rows of §2a (206) and for today's 132 rows
-   (208).
+   (154 internal targets), for the 131 rows of §2a (206), for the 132 rows of §2b
+   (208) and for today's 133 rows (228).
 
 **What remains unproven even for these six.** The bodies now execute only on the
 game's own calls, and no offline harness can make the game call them:
@@ -429,6 +431,123 @@ original. A transcription reads our array, so the word after it has to be the
 original's next word for that pathological case to match; the registered length covers
 the table, not its neighbour.
 
+### 2c. This pass: the steer consumer, and the two table properties the registry needed
+
+`0x10004C70` is the largest piece transcribed so far and the highest-risk one: it runs
+every frame the player drives. Its two table operands also exposed two gaps in the
+per-table registry §2b introduced, both now closed.
+
+| piece | recovered VA | size | insns | row | byte-identical | differs only in |
+|---|---|---:|---:|---|---:|---|
+| steer/engine/plane consumer | `0x10004C70` | `0x53F` | 320 | `steer_consumer` | 250/320 | 56 absolute operands + 10 `call` immediates + 2 string offsets + 2 table displacements |
+
+Every non-identical instruction differs in an operand the proof already reduces to a
+slot, a call target, a string address or a registered table. No instruction's
+mnemonic, register, frame offset or size differs (0 `other`), no branch changed form
+(0 branch), and the body is 1,343 bytes on both sides — the original's exact size — so
+every instruction sits at the same relative offset and all 20 internal branch targets
+agree. The proof's line is `PASS steer_consumer (320 instruction(s), 56 absolute
+operand(s), 2 table operand(s))`.
+
+**The two gaps the tables exposed.** The original keeps both wheelangle tables in its
+`.data` at `0x1015A538` / `0x10159D38`, past the raw size of that section (`0x1000` of
+a `0x504D4` virtual extent): the file holds none of their bytes, and the loader maps
+zeros there. `read_table()` used to answer "not in the image" for those addresses, so
+no `table` row could name any of the 512-slot model tables — every class-A table except
+the model-name one is in some section's uninitialised tail. And the arrays belong to
+`source/misc.ixx` (the transcribed IDE parser hook is what fills them), declared
+`extern "C"`, so the map's name for them is `_zpatch_wheelangle_models` rather than a
+`?`-mangled one, which `read_map()` did not record. Both are now handled:
+
+- `read_table()` reads the file-backed prefix of the range and fills the section's
+  uninitialised tail with zeros — what the loaded image holds, which is what the proof
+  compares. A range that leaves its section is still rejected, and a table with real
+  content on either side still hashes differently, so the change cannot turn a real
+  difference into a PASS.
+- `read_map()` records `_name` symbols as well as `?name@@…` ones. This is symbol
+  resolution, not comparison: `summarise` and `table_mismatch` are untouched.
+
+The self-test grew a case for each: the consumer compared against itself with both
+tables registered must PASS with **2 resolved table operands** (a file-only read would
+raise `registered table … is not in the image`); the same comparison with the tables
+registered on the original side only must FAIL as `table 0x1015a538 is registered on
+the original side only`; and a synthetic map must resolve both decorations. Its verdict
+is quoted in §6.
+
+**The tables and how they were verified.** Nothing new was added to the module: the
+tables are the IDE hook's own arrays, in the original's slot order by construction
+(the hook stores the model word at the slot it found and the angle bits beside it).
+The arm registers them next to its `Bodies::Register` calls:
+
+```cpp
+Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_wheelangle_models),
+    0x1015A538u, sizeof(zpatch_wheelangle_models));   // 512 * 4 = 2048
+Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_wheelangle_angles),
+    0x10159D38u, sizeof(zpatch_wheelangle_angles));   // 512 * 4 = 2048
+```
+
+and `tests/bodies.tsv` carries the offline projection, one row per table, each pairing
+the recovered VA with the candidate symbol explicitly:
+
+```
+table 1015A538 _zpatch_wheelangle_models 2048
+table 10159D38 _zpatch_wheelangle_angles 2048
+```
+
+**What the content check does and does not prove for these two tables.** Both are
+all-zero at load — the original's sit in the uninitialised tail, ours are
+zero-initialised — so both hash to the same value (`707280d9b4da7bba`, 2,048 zero
+bytes). The PASS therefore says *this operand reads a zero-filled table registered for
+this row*; it **cannot distinguish the two tables from each other**. A transcription
+that pointed the model operand at the angle table would pass the content check. What
+pins the identity is the manifest pairing above (each row declares one original VA ↔
+one symbol) together with the instruction's own semantics: the slot that goes through
+`dword_10159C0C` and is compared with the model index is the model table, and the value
+multiplied by `pi` and divided by `180` is the angle table. No sentinel can strengthen
+this: the first zero word is what ends the walk and what the IDE hook treats as a free
+slot, so any non-zero content in our copy would change behaviour.
+
+**How this pass was verified**
+
+1. **Proof row.** `PASS steer_consumer (320 instruction(s), 56 absolute operand(s), 2
+   table operand(s))`; `python tools/verify_bodies.py …` → `133 body(ies), 0
+   failure(s)`. The row's count is exact, so a missing or extra instruction fails it.
+2. **Byte comparison.** 250 of the 320 instructions are byte-identical (the table
+   above); the 70 differences are operand slots, call targets, the two string offsets
+   and the two table displacements.
+3. **The operand map.** The proof cannot see *which* slot an absolute operand names —
+   an absolute is compared as `abs`. `.scratch/steer/operand_map.py` decodes the
+   transcription against the original instruction by instruction, resolves every
+   absolute operand, call immediate and string offset through the linker map, and
+   checks it against a declared expected pairing: **33 distinct original operands
+   exercised, 0 declared but unused, 0 mismatch(es)**. That is what says
+   `mulsd xmm0,[0x101523a8]` became `zpatch_steer_neg_pi` (the original's exact bit
+   pattern) and not another qword, that `[0x1015A538]`/`[0x10159D38]` became the model
+   and angle arrays and not each other, and that the four `call 0x10003980` sites go
+   through the resolve forwarder. One alias is expected: `/OPT:ICF` folds the six-byte
+   `jmp [zpatch_native_resolve_entry]` forwarder into `loading.ixx`'s identical
+   `CutsceneResolveEntry`, so the call resolves to that name — same bytes, same target,
+   the same fold the formatter forwarders show (§2 item 6).
+4. **The constants are the original's.** Each `.rdata` qword/dword was read out of the
+   image at the VA named in its comment: `-pi`, `+pi`, `180.0`, `±0.5`, `0.75`, `0.25`,
+   `±0.01`, `1.0f` and `100.0f`, plus the two bone names (`"steeringwheel"` at
+   `0x10129518`, `"engineblock"` at `0x10129570`). The proof compares these operands as
+   `abs` and cannot see the values; the comment and the bit pattern are the record.
+5. **The branch targets.** 320 instructions with 23 internal branches, every one at
+   the original's relative offset (0 branch differences in the byte comparison).
+6. **The surrounding behaviour is unchanged.** `ctest --preset release` is 12/12,
+   `python tools/parity_report.py 9` is `98 key(s) closed, 0 open, 1
+   oracle-verified`, the five keys' per-option cells stay byte-identical to their
+   baselines on all nine images, and `zp_dump --ooc-selftest` passes.
+
+**What stays unproven.** The body only runs in play (the detours are installed at the
+game's vtable call), so nothing here executes it: the proof is of code and operand
+wiring, not of a wheel turning. The two things that could still be wrong are a slot the
+operand map declares correctly but whose runtime value differs (all of them are
+published by arms the dump proves), and the wheelangle tables' *runtime* contents,
+which the IDE hook fills from the INI in both trees by the same transcribed body.
+`docs/parity.md` §"The five keys behind `sub_10004C70`" records the play item.
+
 ---
 
 ## 3. Every piece that is still rebuilt
@@ -441,14 +560,14 @@ is IDA's function size.
 
 ### Class A — indexed absolute table operand
 
-The model-name lookup (`0x10003F00`) has left this class: it is transcribed, its table
-is registered and its operand is compared by content (§2b). What remains is the same
-mechanical blocker on tables that are not yet registered, or whose operand carries a
-base register (`[edi+0x10159380]`, which the current registry rule does not cover).
+The model-name lookup (`0x10003F00`, §2b) and the steer consumer (`0x10004C70`, §2c)
+have left this class: both are transcribed, their tables are registered and their
+operands are compared by content. What remains is the same mechanical blocker on
+tables that are not yet registered, or whose operand carries a base register
+(`[edi+0x10159380]`, which the current registry rule does not cover; §4 item 3).
 
 | piece | VA | bytes | insns | the operand that blocks it | what the rebuild reproduces | how that was verified | residual risk |
 |---|---|---:|---:|---|---|---|---|
-| steer/render consumer | `0x10004C70` | `0x53F` | 320 | `mov eax, ds:[esi*4+0x1015A538]` (`0x10004CD0`) and `movss xmm0, ds:[esi*4+0x10159D38]` (`0x10004E00`) — the wheelangle model/angle tables | the five keys behind it: steer lock → wheel angle, steering-wheel bone transform, engine-block shake, plane parts, plus the `GarageModelFix`/`NoLiveryLimit` call paths. Every game entry is a published slot, every constant a `.rdata` qword; the rebuild keeps the statement order, the state words and the unguarded reads | the five keys' per-option cells are byte-identical to their baselines on all nine images (`parity_report`, `dump_matrix`); the tables it walks are the ones the transcribed IDE hook fills (`zp_model_tables`) | **highest in this class**: it runs on every frame the player drives, and a wrong wheel-angle index or unit conversion would show as a wrong-looking steering wheel, not a crash; nothing offline pins its arithmetic |
 | copsirens checker, first siren | `0x10005F70` | `0x2EE` | 191 | `push ds:[edi+0x10159380]` (`0x100061FA`), `cmp ds:[edi+0x10159380],0` (`0x1000622B`) | 14 hard-coded model names hashed in order, each looked up through `dword_10159C0C`; the tunable list walked slot by slot; `dword_10159B80` set to 1 on the first hit | `CopSirensFlag`'s cell is closed on every image; the hook sites it shares with the IDE hook are transcribed | moderate: a miss leaves siren flags off (cosmetic) or on (cosmetic), it does not fault |
 | copsirens checker, second siren | `0x10006260` | `0xAE` | 53 | `push ds:[esi+0x10159380]` (`0x100062BC`), `cmp ds:[esi+0x10159380],0` (`0x100062DB`) | `"police2"` always matches (that is the key), then the same list walk; `dword_10159378` is the result the other checker reads | as above | low |
 | IDE parser payload | `0x10003FA0` | `0x13A` | 92 | four indexed stores: `0x1015CE28[ecx*4]`, `0x10159380[ecx*4]`, `0x1015A538[ecx*4]`, `0x10159D38[ecx*4]` | the `popuplights` / `siren` / `wheelangle:<deg>` parser hook's payload: it recognises the key, hashes the model name into a 512-slot list and (for `wheelangle`) converts degrees and stores the float at the same index | the four tables are exported as slots (`zpatch_wheelangle_models`/`_angles`) and the transcribed steer consumer reads the same arrays; `zp_model_tables` drives the reader path | moderate: a wrong slot index here mis-aims a wheel angle for one model |
@@ -508,16 +627,31 @@ the registrar alone would prove nothing about the service.
    i.e. a transcription could read the wrong table and still pass. What replaced it is
    the per-table opt-in §2b describes: `Bodies::RegisterTable` plus a `table` row in
    `tests/bodies.tsv`. A table that is not named still compares literally, and two
-   registered tables with different contents fail as `table contents differ`. The next
-   step for class A is to extend the resolution to operands that carry a **base**
-   register and no index (`[edi+0x10159380]`, the copsirens checkers): same rule, same
-   content hash, but the base register has to keep being compared and the extension has
-   to be made deliberately, not folded into the current one.
+   registered tables with different contents fail as `table contents differ`. Three
+   properties the class-A tables needed are now in place:
+
+   - a table's bytes are read as the *loaded* image holds them: a section's
+     uninitialised tail (where the original keeps every 512-slot model table) reads as
+     zeros (§2c);
+   - a row may name a C symbol (`_name`) as well as a C++ one (§2c);
+   - the registry resolves the **base-plus-displacement** shape as well as the indexed
+     absolute: `push ds:[edi+0x10159380]` becomes `[edi+table:<hash>]` with the base
+     register still compared, and a base that changed is reported as an *instruction*
+     difference, not a table one. `table_read` is the single place that decides which
+     shapes resolve; a base with an index stays literal.
+
+   The self-test covers all three (its verdict is in §6). What that leaves in class A is
+   no longer a *comparator* problem: the copsirens checker `0x10006260` (53) and the
+   IDE payload `0x10003FA0` (92) are now transcribable as they stand, the first siren
+   checker `0x10005F70` (191) likewise, and the popup-headlights checker `0x10044310`
+   (125) after its eight-operand table set is registered. The headlight-cone check
+   `0x1001AD20` (46) still carries the behavioural caveat above (one word past its
+   table), which the registry does not solve.
 4. **The internal-branch-target check** (the previous revision's item 1) is **done**:
    it is `tools/verify_bodies.py::internal_branch_mismatch`, it runs on every row, and
    it is what §2a's six transcriptions were proved with. `.scratch/branch_targets.py`
    stays as the independent reference implementation (it skips the `table` rows); the
-   two agree at `132 row(s), 208 internal branch target(s), 0 failure(s)`.
+   two agree at `133 row(s), 228 internal branch target(s), 0 failure(s)`.
 
 ---
 
@@ -542,11 +676,14 @@ deliberately after any change to the modules above.
    from the transcribed `0x10003F00` walking the registered table (§2b): a wrong name in
    that text is the visible symptom of a bad table, and the proof already compares the
    table's contents.
-3. **`0x10004C70`, the steer/render consumer** (class A, runs every frame). Exercise:
+3. **`0x10004C70`, the steer/render consumer** (now transcribed, §2c — 320
+   instructions, but they only run in play). Exercise:
    drive a car with `MovingSteeringWheelSupport`, then a plane with
    `MovingPlaneParts`, then a car with `ShakingEngineBlock`. What to look for: the
    steering wheel turning with the wheels, the engine block shaking with RPM, the
-   plane's parts moving; and nothing rendering at the world origin.
+   plane's parts moving; and nothing rendering at the world origin. A wrong wheel-angle
+   slot would show as a wrong-looking wheel rather than a crash, which is why the
+   operand map (§2c item 3) exists.
 4. **`0x10023150`, the DLC discovery** (now transcribed, but only shape-proven).
    Exercise: start the game with an EFLC install (or with `\dlc\tlad\content\`
    present) and check the episode picker lists the episodes; then with none and check
@@ -575,25 +712,44 @@ deliberately after any change to the modules above.
 
 ## 6. Where the numbers live
 
-- `tests/bodies.tsv` — the 132 proof rows; a row's count is the body's exact
+- `tests/bodies.tsv` — the 133 proof rows; a row's count is the body's exact
   instruction count, so it cannot silently shrink. Its `table` rows are the offline
   projection of the arms' `Bodies::RegisterTable` calls (recovered VA, candidate
-  symbol, registered length), one per table a transcribed body reads.
+  symbol, registered length), one per table a transcribed body reads; a symbol may be
+  C++ (`?name@@…`) or C (`_name`), and a table may live in a section's uninitialised
+  tail (its bytes read as zeros, what the loader maps there).
 - `tools/verify_bodies.py` — the comparator, including the internal-branch-target
-  check and the table registry (`Tables`, `table_content_hash`, `table_mismatch`);
+  check and the table registry (`Tables`, `table_content_hash`, `table_mismatch`,
+  `table_read`, `read_table`, `read_map`); `table_read` is the one place that decides
+  which operand shapes resolve (an indexed absolute, or a base plus displacement).
   `--selftest` proves it against the original, against a one-byte corruption, against a
-  moved branch target, and against the four table cases (registered → PASS, changed
+  moved branch target, against the four table cases (registered → PASS, changed
   contents → FAIL as a content difference, operand moved to another registered table →
-  FAIL as a content difference, unregistered operand → FAIL literally). Its verdict:
+  FAIL as a content difference, unregistered operand → FAIL literally), against the
+  uninitialised-tail table path, against the base-plus-displacement shape (PASS with
+  both operands resolved; a changed base register → FAIL as an instruction difference;
+  changed table contents → FAIL as a table difference), and against the map's two
+  decorations. Its verdict:
   `selftest: identical PASS, corrupted opcode FAIL, moved branch target FAIL, registered
   table PASS (2 operands resolved), changed table contents FAIL, moved table operand
-  FAIL, unregistered table operand FAIL`.
+  FAIL, unregistered table operand FAIL, uninitialised-tail table PASS (2 operands
+  resolved), one-side-only tail table FAIL, map C and C++ symbols PASS, base+disp table
+  PASS (2 operands resolved), changed base register FAIL (instruction), base+disp
+  contents differ FAIL (table)`.
 - `.scratch/byte_compare.py` — the byte-level comparison quoted in §2, §2a and §2b
   (absolute operands and `call`/`push` immediates are the only differences, by
   construction). Run it with body names to select rows; with no arguments it prints
   the six of the first pass. It classifies a table displacement as `other`, because it
   has no registry; §2b's 17/21 is that comparison with the two table displacements read
   as such.
+- `.scratch/steer/compare_body.py` — §2c's byte comparison (250/320); it knows the two
+  registered table displacements and reports a branch whose target offset differs.
+- `.scratch/steer/operand_map.py` — §2c item 3: every absolute operand, call immediate
+  and string offset of the transcription resolved through the linker map and checked
+  against a declared pairing (33 distinct operands, 0 mismatch). This is the check that
+  says *which* slot an `abs` operand names, which the proof cannot.
+- `.scratch/steer/dump_body.py`, `.scratch/steer/peek.py`, `.scratch/steer/tables_probe.py`
+  — the listing/constant/table probes §2c was written from.
 - `.scratch/branch_targets.py` — the internal-branch-target check over every row, the
   independent reference implementation of what `verify_bodies.py` now does (it skips
   the `table` rows).

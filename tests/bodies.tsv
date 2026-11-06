@@ -187,11 +187,19 @@ mf_advance_windows 100241E0 ?MfAdvanceWindowsBody@@YAXXZ 138
 load_dlcs_dummy 10023480 ?DlcDummyBody@@YAXXZ 2
 load_dlcs_struct_fixup 10023490 ?DlcStructFixupBody@@YAXXZ 19
 
-# The steer/engine/plane consumer's site set (source/vehicles.ixx). The consumer
-# itself (sub_10004C70, 320 instructions) is compiler output -- /GS frame, SSE
-# double conversions, the `lahf`/`test ah,44h` float compare -- and is rebuilt in
-# C++ with the original's call sequence and state words, so it has no row
-# (docs/parity.md). Its model-registry lookup (sub_10003F40) is transcribed.
+# The steer/engine/plane consumer (0x10004C70, 320 instructions) and the two tables
+# it walks. Every operand is an absolute slot except the two indexed absolutes into
+# the wheelangle model/angle tables, which are registered: `table` rows below pair
+# the recovered VA with the candidate symbol the linker map resolves (a C name,
+# because the arrays are `extern "C"` in misc.ixx where the IDE parser hook fills
+# them) and the length there (512 dwords). Both tables are all-zero at load in the
+# original and here, so the content check pins "reads a zero-filled table registered
+# for this row"; which table each operand reads is pinned by the manifest pairing and
+# the instruction's own semantics (docs/rebuilt.md §2c).
+table 1015A538 _zpatch_wheelangle_models 2048
+table 10159D38 _zpatch_wheelangle_angles 2048
+steer_consumer 10004C70 ?SteerConsumerBody@@YAXXZ 320
+# Its model-registry lookup (sub_10003F40) is transcribed too.
 vehicle_component 10003F40 ?VehicleComponentBody@@YIPAXPAXPBD@Z 43
 steer_detour_eax 100051B0 ?SteerDetourEaxBody@@YAXXZ 10
 steer_detour_edx 100051E0 ?SteerDetourEdxBody@@YAXXZ 10

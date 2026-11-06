@@ -112,6 +112,37 @@ extern "C"
     uint32_t zpatch_engine_phase = 0;
     uint32_t zpatch_engine_timestep = 0;
 
+    // ---- sub_10004C70's constants, in its own read order ----------------------
+    //
+    // The original keeps these in .rdata and reads them with an absolute operand
+    // (`mulsd xmm0, qword ptr [0x101523a8]`). Each is the exact bit pattern at the
+    // VA named in its comment, read out of the original image; the proof compares
+    // an absolute operand as a slot, so it cannot see the value -- the value is
+    // pinned here, by the VA and by the .rdata bytes it was taken from.
+    uint64_t zpatch_steer_neg_pi = 0xC00921FB54442D18ull;          // 0x101523A8 -pi
+    uint64_t zpatch_steer_pi = 0x400921FB54442D18ull;              // 0x10152358 +pi
+    uint64_t zpatch_steer_degrees = 0x4066800000000000ull;         // 0x10152370 180.0
+    uint64_t zpatch_steer_half = 0x3FE0000000000000ull;            // 0x10152348 0.5
+    uint64_t zpatch_steer_neg_half = 0xBFE0000000000000ull;        // 0x10152398 -0.5
+    uint64_t zpatch_steer_three_quarters = 0x3FE8000000000000ull;  // 0x10152350 0.75
+    uint64_t zpatch_steer_quarter = 0x3FD0000000000000ull;         // 0x10152338 0.25
+    uint64_t zpatch_steer_epsilon = 0x3F847AE147AE147Bull;         // 0x10152320 0.01
+    uint64_t zpatch_steer_neg_epsilon = 0xBF847AE147AE147Bull;     // 0x10152390 -0.01
+    uint32_t zpatch_steer_one = 0x3F800000u;                       // 0x10152310 1.0f
+    uint32_t zpatch_steer_hundred = 0x42C80000u;                   // 0x10152388 100.0f
+
+    // The two bone names the consumer hands sub_10003F40: the original's own .rdata
+    // strings at 0x10129518 and 0x10129570, loaded with `mov edx, imm32`.
+    const char zpatch_steer_name_wheel[] = "steeringwheel";
+    const char zpatch_steer_name_engine[] = "engineblock";
+
+    // The native layer's resolve entry (source/native.ixx) and the salt the consumer
+    // passes it. The original's four `mov ecx, dword_1015803C / call sub_10003980`
+    // pairs are direct calls, so ours go through the same six-byte forwarder the
+    // drive-by helper uses.
+    extern uint32_t zpatch_native_salt_1015803C;
+    extern uintptr_t zpatch_native_resolve_entry;
+
     // ---- GarageModelFix ------------------------------------------------------
     // dword_10159CD4 / dword_10159CD0: the two sites' resumes (match+6, match+5).
     uint32_t zpatch_garage_resume_a = 0;
@@ -757,6 +788,403 @@ static __declspec(naked) void* __fastcall VehicleComponentBody(void*, const char
     }
 }
 
+// The consumer's call target: the original's `call sub_10003980` (E8), so ours is a
+// direct call as well, through the six-byte forwarder the drive-by helper uses
+// (0x10006450). ECX (the salt) and the stack reach the native layer untouched.
+static __declspec(naked) void SteerResolveEntry()
+{
+    __asm
+    {
+        jmp DWORD PTR [zpatch_native_resolve_entry]
+    }
+}
+
+// sub_10004C70, recovered VA 0x10004C70 (1,343 bytes, 320 instructions): the
+// steer/engine/plane consumer the shared detours call between pusha/popa.
+//
+// Transcribed instruction for instruction from the original, absolute operands and
+// all. It is compiler output for C -- a /GS frame, SSE double conversions around
+// every float expression, the `lahf` / `test ah,44h` / `jnp` float-`!=` idiom and two
+// `cmova` -- and none of that blocks a transcription: the cookie is an absolute
+// slot, the check is a call slot, the .rdata constants are absolute slots, and the
+// two 512-slot wheelangle tables are indexed absolutes the table registry covers
+// (tests/bodies.tsv table rows `1015A538` / `10159D38`, docs/rebuilt.md §2c).
+//
+// What the operands are:
+//   * `[0x1015A538 + esi*4]` / `[0x10159D38 + esi*4]` are the wheelangle model and
+//     angle tables the transcribed IDE parser hook fills (source/misc.ixx,
+//     dword_1015A538 / dword_10159D38). Both are all-zero at load, in the original
+//     and here: the walk stops at the first zero model word and the angle is only
+//     read for a slot that matched.
+//   * `[0x10159C0C]`, `[0x10159B88]`, `[0x1015D63C]`, `[0x10159CDC]`, `[0x1015AD4C]`
+//     are the game's model-index lookup, the bone-matrix getter, the two matrix
+//     setters and the plane's part-drive function: published slots here, filled by
+//     ResolveSteerHelpers() and the site publish, exactly as the original resolves
+//     them in its loader preamble.
+//   * the four `call sub_10003980` sites resolve the script-timestep slot by the
+//     salt dword_1015803C; `[0x1015800C]` is the /GS cookie and the epilogue's
+//     `call __security_check_cookie` is the CRT routine.
+//
+// Every instruction's size is the original's, so every internal branch sits at the
+// same offset from the body start -- which is what the proof's branch-target check
+// compares. The 10-byte loop padding at 0x10004CC6 (`66 66 0F 1F 84 00 ...`) is
+// emitted as bytes because the inline assembler's `nop` is one byte.
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void SteerConsumerBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        sub esp, 14h
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, ebp
+        mov DWORD PTR [ebp - 4], eax
+        cmp BYTE PTR [zpatch_steer_enabled], 0
+        push edi
+        mov edi, DWORD PTR [zpatch_steer_vehicle]
+        je steer_engine
+        mov eax, DWORD PTR [edi + 0E18h]
+        movss xmm0, DWORD PTR [edi + 10D8h]
+        push ebx
+        movsx ebx, WORD PTR [edi + 2Eh]
+        divss xmm0, DWORD PTR [eax + 84h]
+        push esi
+        xor esi, esi
+        cvtps2pd xmm0, xmm0
+        mulsd xmm0, QWORD PTR [zpatch_steer_neg_pi]
+        cvtpd2ps xmm0, xmm0
+        movss DWORD PTR [ebp - 10h], xmm0
+        // The original's loop alignment: 66 66 0F 1F 84 00 00 00 00 00.
+        __emit 0x66
+        __emit 0x66
+        __emit 0x0F
+        __emit 0x1F
+        __emit 0x84
+        __emit 0x00
+        __emit 0x00
+        __emit 0x00
+        __emit 0x00
+        __emit 0x00
+    steer_wheel_walk:
+        mov eax, DWORD PTR [esi*4 + zpatch_wheelangle_models]
+        test eax, eax
+        je steer_wheel_none
+        lea ecx, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push ecx
+        push eax
+        call DWORD PTR [zpatch_model_lookup]
+        add esp, 8
+        cmp DWORD PTR [ebp - 8], ebx
+        je steer_wheel_angle
+        inc esi
+        cmp esi, 200h
+        jl steer_wheel_walk
+    steer_wheel_none:
+        xorps xmm0, xmm0
+    steer_wheel_resume:
+        movzx eax, WORD PTR [edi + 2Eh]
+        movss DWORD PTR [ebp - 0Ch], xmm0
+        cmp ax, 0FFFFh
+        je steer_steer_done
+        movsx ecx, ax
+        mov edx, OFFSET zpatch_steer_name_wheel
+        mov eax, DWORD PTR [zpatch_steer_model_array]
+        mov eax, DWORD PTR [eax + ecx*4]
+        mov eax, DWORD PTR [eax + 8]
+        mov ecx, DWORD PTR [eax + 0B4h]
+        mov ecx, DWORD PTR [ecx + 0Ch]
+        call VehicleComponentBody
+        test eax, eax
+        je steer_steer_done
+        movzx eax, WORD PTR [eax + 14h]
+        mov ecx, edi
+        mov edx, DWORD PTR [zpatch_steer_bone]
+        push eax
+        call edx
+        mov esi, eax
+        test esi, esi
+        je steer_steer_done
+        movss xmm0, DWORD PTR [ebp - 0Ch]
+        push ecx
+        mov ecx, esi
+        mov DWORD PTR [esi], 3F800000h
+        mov DWORD PTR [esi + 4], 0
+        mov DWORD PTR [esi + 8], 0
+        mov DWORD PTR [esi + 10h], 0
+        mov DWORD PTR [esi + 14h], 3F800000h
+        mov DWORD PTR [esi + 18h], 0
+        mov DWORD PTR [esi + 20h], 0
+        mov DWORD PTR [esi + 24h], 0
+        mov DWORD PTR [esi + 28h], 3F800000h
+        movss DWORD PTR [esp], xmm0
+        call DWORD PTR [zpatch_steer_matrix_a]
+        movss xmm0, DWORD PTR [ebp - 10h]
+        push ecx
+        mov ecx, esi
+        movss DWORD PTR [esp], xmm0
+        call DWORD PTR [zpatch_steer_matrix_b]
+    steer_steer_done:
+        pop esi
+        pop ebx
+    steer_engine:
+        cmp BYTE PTR [zpatch_engine_enabled], 0
+        je steer_plane
+        mov ecx, DWORD PTR [zpatch_native_salt_1015803C]
+        call SteerResolveEntry
+        movss xmm0, DWORD PTR [zpatch_engine_timestep]
+        mov ecx, DWORD PTR [eax + 0Eh]
+        mov eax, DWORD PTR [ecx + eax + 18h]
+        ucomiss xmm0, DWORD PTR [eax + 8]
+        lahf
+        test ah, 44h
+        jnp steer_engine_matrix
+        cmp BYTE PTR [zpatch_engine_descending], 0
+        je steer_step_up
+        movsd xmm0, QWORD PTR [zpatch_steer_neg_half]
+        jmp steer_step_ready
+    // The walk's hit path sits here in the original's layout (0x10004E00), between
+    // the step selection and its join: the compiler placed it out of line.
+    steer_wheel_angle:
+        movss xmm0, DWORD PTR [esi*4 + zpatch_wheelangle_angles]
+        cvtps2pd xmm0, xmm0
+        mulsd xmm0, QWORD PTR [zpatch_steer_pi]
+        divsd xmm0, QWORD PTR [zpatch_steer_degrees]
+        cvtpd2ps xmm0, xmm0
+        jmp steer_wheel_resume
+    steer_step_up:
+        movsd xmm0, QWORD PTR [zpatch_steer_half]
+    steer_step_ready:
+        mov ecx, DWORD PTR [zpatch_native_salt_1015803C]
+        movsd QWORD PTR [ebp - 14h], xmm0
+        call SteerResolveEntry
+        movss xmm0, DWORD PTR [zpatch_engine_phase]
+        cvtps2pd xmm0, xmm0
+        mov ecx, DWORD PTR [eax + 0Eh]
+        mov eax, DWORD PTR [ecx + eax + 18h]
+        mov ecx, 1
+        movss xmm1, DWORD PTR [eax + 8]
+        cvtps2pd xmm1, xmm1
+        movzx eax, BYTE PTR [zpatch_engine_descending]
+        mulsd xmm1, QWORD PTR [ebp - 14h]
+        addsd xmm1, xmm0
+        cvtpd2ps xmm0, xmm1
+        cvtps2pd xmm1, xmm0
+        movss DWORD PTR [zpatch_engine_phase], xmm0
+        cvtps2pd xmm0, xmm0
+        comisd xmm0, QWORD PTR [zpatch_steer_epsilon]
+        movsd xmm0, QWORD PTR [zpatch_steer_neg_epsilon]
+        cmova eax, ecx
+        xor ecx, ecx
+        comisd xmm0, xmm1
+        movzx eax, al
+        cmova eax, ecx
+        mov BYTE PTR [zpatch_engine_descending], al
+    steer_engine_matrix:
+        movzx eax, WORD PTR [edi + 2Eh]
+        cmp ax, 0FFFFh
+        je steer_plane
+        movsx ecx, ax
+        mov edx, OFFSET zpatch_steer_name_engine
+        mov eax, DWORD PTR [zpatch_steer_model_array]
+        mov eax, DWORD PTR [eax + ecx*4]
+        mov eax, DWORD PTR [eax + 8]
+        mov ecx, DWORD PTR [eax + 0B4h]
+        mov ecx, DWORD PTR [ecx + 0Ch]
+        call VehicleComponentBody
+        test eax, eax
+        je steer_plane
+        movzx eax, WORD PTR [eax + 14h]
+        mov ecx, edi
+        mov edx, DWORD PTR [zpatch_steer_bone]
+        push eax
+        call edx
+        test eax, eax
+        je steer_plane
+        mov DWORD PTR [eax], 3F800000h
+        mov DWORD PTR [eax + 4], 0
+        mov DWORD PTR [eax + 8], 0
+        mov DWORD PTR [eax + 10h], 0
+        mov DWORD PTR [eax + 14h], 3F800000h
+        mov DWORD PTR [eax + 18h], 0
+        mov DWORD PTR [eax + 20h], 0
+        mov DWORD PTR [eax + 24h], 0
+        mov DWORD PTR [eax + 28h], 3F800000h
+        mov ecx, DWORD PTR [edi + 0F64h]
+        test cl, 8
+        jne steer_engine_live
+        xorps xmm0, xmm0
+        jmp steer_engine_scale
+    steer_engine_live:
+        movss xmm0, DWORD PTR [edi + 10C8h]
+        cvtps2pd xmm0, xmm0
+        mulsd xmm0, QWORD PTR [zpatch_steer_three_quarters]
+        addsd xmm0, QWORD PTR [zpatch_steer_quarter]
+        cvtpd2ps xmm0, xmm0
+    steer_engine_scale:
+        test cl, 10h
+        je steer_engine_set
+        movss xmm0, DWORD PTR [zpatch_steer_one]
+    steer_engine_set:
+        mulss xmm0, DWORD PTR [zpatch_engine_phase]
+        push ecx
+        mov ecx, eax
+        movss DWORD PTR [esp], xmm0
+        call DWORD PTR [zpatch_steer_matrix_b]
+    steer_plane:
+        cmp BYTE PTR [zpatch_plane_enabled], 0
+        je steer_done
+        cmp DWORD PTR [edi + 1354h], 5
+        jne steer_done
+        mov ecx, DWORD PTR [zpatch_native_salt_1015803C]
+        call SteerResolveEntry
+        push 0
+        push 0
+        push 0
+        mov ecx, DWORD PTR [eax + 0Eh]
+        push ecx
+        mov eax, DWORD PTR [ecx + eax + 18h]
+        mov ecx, edi
+        movss xmm0, DWORD PTR [eax + 8]
+        mulss xmm0, DWORD PTR [edi + 1F3Ch]
+        mulss xmm0, DWORD PTR [zpatch_steer_hundred]
+        movss DWORD PTR [esp], xmm0
+        push 4
+        push 59h
+        call DWORD PTR [zpatch_steer_part_call]
+        mov ecx, DWORD PTR [zpatch_native_salt_1015803C]
+        call SteerResolveEntry
+        push 0
+        push 0
+        push 0
+        mov ecx, DWORD PTR [eax + 0Eh]
+        push ecx
+        mov eax, DWORD PTR [ecx + eax + 18h]
+        mov ecx, edi
+        movss xmm0, DWORD PTR [eax + 8]
+        mulss xmm0, DWORD PTR [edi + 1F3Ch]
+        mulss xmm0, DWORD PTR [zpatch_steer_hundred]
+        movss DWORD PTR [esp], xmm0
+        push 4
+        push 5Bh
+        call DWORD PTR [zpatch_steer_part_call]
+        mov ecx, DWORD PTR [zpatch_native_salt_1015803C]
+        call SteerResolveEntry
+        push 0
+        push 0
+        push 0
+        mov ecx, DWORD PTR [eax + 0Eh]
+        push ecx
+        mov eax, DWORD PTR [eax + ecx + 18h]
+        mov ecx, edi
+        movss xmm0, DWORD PTR [eax + 8]
+        mulss xmm0, DWORD PTR [edi + 1F3Ch]
+        mulss xmm0, DWORD PTR [zpatch_steer_hundred]
+        movss DWORD PTR [esp], xmm0
+        push 4
+        push 5Ah
+        call DWORD PTR [zpatch_steer_part_call]
+        mov ecx, DWORD PTR [zpatch_native_salt_1015803C]
+        call SteerResolveEntry
+        push 0
+        push 0
+        push 0
+        mov ecx, DWORD PTR [eax + 0Eh]
+        push ecx
+        mov eax, DWORD PTR [ecx + eax + 18h]
+        mov ecx, edi
+        movss xmm0, DWORD PTR [eax + 8]
+        mulss xmm0, DWORD PTR [edi + 1F3Ch]
+        mulss xmm0, DWORD PTR [zpatch_steer_hundred]
+        movss DWORD PTR [esp], xmm0
+        push 4
+        push 5Ch
+        call DWORD PTR [zpatch_steer_part_call]
+        movss xmm0, DWORD PTR [edi + 1F08h]
+        cvtps2pd xmm0, xmm0
+        push 0
+        push 0
+        push 1
+        push ecx
+        mov ecx, edi
+        mulsd xmm0, QWORD PTR [zpatch_steer_half]
+        cvtpd2ps xmm0, xmm0
+        movss DWORD PTR [esp], xmm0
+        push 3
+        push 60h
+        call DWORD PTR [zpatch_steer_part_call]
+        movss xmm0, DWORD PTR [edi + 1F08h]
+        push 0
+        push 0
+        push 1
+        cvtps2pd xmm0, xmm0
+        push ecx
+        mov ecx, edi
+        mulsd xmm0, QWORD PTR [zpatch_steer_neg_half]
+        cvtpd2ps xmm0, xmm0
+        movss DWORD PTR [esp], xmm0
+        push 3
+        push 61h
+        call DWORD PTR [zpatch_steer_part_call]
+        movss xmm0, DWORD PTR [edi + 1F04h]
+        cvtps2pd xmm0, xmm0
+        push 0
+        push 0
+        push 1
+        push ecx
+        mov ecx, edi
+        mulsd xmm0, QWORD PTR [zpatch_steer_neg_half]
+        cvtpd2ps xmm0, xmm0
+        movss DWORD PTR [esp], xmm0
+        push 3
+        push 5Eh
+        call DWORD PTR [zpatch_steer_part_call]
+        movss xmm0, DWORD PTR [edi + 1F04h]
+        cvtps2pd xmm0, xmm0
+        push 0
+        push 0
+        push 1
+        push ecx
+        mov ecx, edi
+        mulsd xmm0, QWORD PTR [zpatch_steer_neg_half]
+        cvtpd2ps xmm0, xmm0
+        movss DWORD PTR [esp], xmm0
+        push 3
+        push 5Fh
+        call DWORD PTR [zpatch_steer_part_call]
+        movss xmm0, DWORD PTR [edi + 1F00h]
+        cvtps2pd xmm0, xmm0
+        push 0
+        push 0
+        push 1
+        push ecx
+        mov ecx, edi
+        mulsd xmm0, QWORD PTR [zpatch_steer_half]
+        cvtpd2ps xmm0, xmm0
+        movss DWORD PTR [esp], xmm0
+        push 5
+        push 5Dh
+        call DWORD PTR [zpatch_steer_part_call]
+    steer_done:
+        mov ecx, DWORD PTR [zpatch_native_salt_1015803C]
+        call SteerResolveEntry
+        pop edi
+        mov ecx, DWORD PTR [eax + 0Eh]
+        mov eax, DWORD PTR [eax + ecx + 18h]
+        mov ecx, DWORD PTR [ebp - 4]
+        xor ecx, ebp
+        movss xmm0, DWORD PTR [eax + 8]
+        movss DWORD PTR [zpatch_engine_timestep], xmm0
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
 namespace
 {
     // sub_10001280, recovered VA 0x10001280: the bounded formatter, transcribed once
@@ -781,248 +1209,6 @@ namespace
         return reinterpret_cast<uint32_t(__cdecl*)(const char*)>(Shared::ValueResolver())(name);
     }
 
-    constexpr uint32_t kVehicleLightSlots = 512;
-
-    // The one script float the engine and plane parts read, as the original's
-    // sub_10003980 answers it: resolve the ctx by the salt the consumer carries
-    // (dword_1015803C), take the slot offset at ctx+0x0E, the slot pointer at
-    // ctx+offset+0x18 and the float at slot+8. Every step is unguarded, exactly like
-    // the original's `mov ecx,[eax+0Eh]` chain.
-    std::byte* ScriptSlot()
-    {
-        constexpr uint32_t kScriptSalt = 0x1015803Cu;  // dword_1015803C
-        const auto context = reinterpret_cast<uintptr_t>(Native::Resolve(Native::Salt(kScriptSalt)));
-        const std::uint32_t offset = *reinterpret_cast<const std::uint32_t*>(context + 0x0E);
-        const std::uint32_t slot = *reinterpret_cast<const std::uint32_t*>(context + offset + 0x18);
-        return reinterpret_cast<std::byte*>(static_cast<uintptr_t>(slot));
-    }
-
-    float ScriptFloat()
-    {
-        return *reinterpret_cast<const float*>(ScriptSlot() + 8);
-    }
-
-    // The identity a bone matrix is reset to before either setter runs: the twelve
-    // dwords of a 3x4 matrix, with the fourth column (3/7/11) left alone.
-    void Identity(std::uint32_t* matrix)
-    {
-        constexpr std::uint32_t kOne = 0x3F800000u;  // 1.0f
-        matrix[0] = kOne;
-        matrix[1] = 0;
-        matrix[2] = 0;
-        matrix[4] = 0;
-        matrix[5] = kOne;
-        matrix[6] = 0;
-        matrix[8] = 0;
-        matrix[9] = 0;
-        matrix[10] = kOne;
-    }
-
-    // The registry chain sub_10004C70 walks from the model index: dword_1015AD78
-    // (the model-info array) -> [+8] -> [+0xB4] -> [+0xC] = the registry, then
-    // sub_10003F40 for the named component and dword_10159B88 for its bone matrix.
-    // The index is sign-extended, as the original's `movsx ecx, ax` is, and every hop
-    // is unguarded.
-    std::uint32_t* VehicleBone(void* vehicle, std::int16_t model, const char* name)
-    {
-        const auto array = static_cast<uintptr_t>(zpatch_steer_model_array);
-        const auto index = static_cast<std::uint32_t>(static_cast<std::int32_t>(model));
-        const std::uint32_t info = *reinterpret_cast<const std::uint32_t*>(array + 4u * index);
-        const std::uint32_t parts = *reinterpret_cast<const std::uint32_t*>(
-            static_cast<uintptr_t>(info) + 8);
-        const std::uint32_t components = *reinterpret_cast<const std::uint32_t*>(
-            static_cast<uintptr_t>(parts) + 0xB4);
-        const std::uint32_t registry = *reinterpret_cast<const std::uint32_t*>(
-            static_cast<uintptr_t>(components) + 0xC);
-        const auto* record = static_cast<const std::byte*>(
-            VehicleComponentBody(reinterpret_cast<void*>(static_cast<uintptr_t>(registry)), name));
-        if (record == nullptr)
-            return nullptr;  // the original's own `if (v6)` test
-
-        const std::uint16_t bone = *reinterpret_cast<const std::uint16_t*>(record + 0x14);
-        return reinterpret_cast<std::uint32_t*(__thiscall*)(void*, std::uint32_t)>(
-            static_cast<uintptr_t>(zpatch_steer_bone))(vehicle, bone);
-    }
-
-    // The CVehicle fields sub_10004C70 reads. The offsets are the original's; the
-    // names are what the code at each offset does, not a recovered class layout.
-    struct VehicleView
-    {
-        std::byte pad_0000[0x2E];
-        std::int16_t model;                  // +0x2E: the registry lookup's index
-        std::byte pad_0030[0xE18 - 0x30];
-        void* handling;                      // +0xE18: its +0x84 is the steering lock
-        std::byte pad_0E1C[0xF64 - 0xE1C];
-        std::uint32_t engineState;           // +0xF64: bit 3 live, bit 4 idle
-        std::byte pad_0F68[0x10C8 - 0xF68];
-        float rpm;                           // +0x10C8
-        std::byte pad_10CC[0x10D8 - 0x10CC];
-        float steerAngle;                    // +0x10D8
-        std::byte pad_10DC[0x1354 - 0x10DC];
-        std::uint32_t type;                  // +0x1354: 5 selects the plane path
-        std::byte pad_1358[0x1F00 - 0x1358];
-        float heave;                         // +0x1F00
-        float roll;                          // +0x1F04
-        float pitch;                         // +0x1F08
-        std::byte pad_1F0C[0x1F3C - 0x1F0C];
-        float suspension;                    // +0x1F3C
-    };
-
-    // sub_10004C70, recovered VA 0x10004C70 (1,343 bytes, 320 instructions): the
-    // consumer the shared detour calls between pusha/popa.
-    //
-    // It is compiler output for C, not a hand-written stream: a /GS frame
-    // (`mov eax,___security_cookie` / `xor eax,ebp`, `call __security_check_cookie`),
-    // SSE double conversions around every float expression (`cvtps2pd`/`mulsd`/
-    // `divsd`/`cvtpd2ps` for `(float)((double)a op b)`), the `lahf` / `test ah,44h` /
-    // `jnp` idiom for a float `!=`, and `cmova` for the two `>` comparisons. Nothing
-    // in it is image-specific: every game entry is called through a published slot
-    // (`call dword_10159C0C`, `call edx`, `call dword_1015AD4C`) and every constant
-    // it reads is a plain qword in .rdata. Transcribing 320 instructions would prove
-    // the compiler's register allocation, not the feature, so it is rebuilt with the
-    // original's call sequence, its state words and its exact observable effects;
-    // docs/parity.md records each assumption.
-    void SteeringConsumer()
-    {
-        auto* const vehicle = reinterpret_cast<VehicleView*>(static_cast<uintptr_t>(zpatch_steer_vehicle));
-
-        const auto set_a = reinterpret_cast<void(__thiscall*)(std::uint32_t*, float)>(
-            static_cast<uintptr_t>(zpatch_steer_matrix_a));
-        const auto set_b = reinterpret_cast<void(__thiscall*)(std::uint32_t*, float)>(
-            static_cast<uintptr_t>(zpatch_steer_matrix_b));
-        const auto lookup = reinterpret_cast<int(__cdecl*)(std::uint32_t, std::int32_t*)>(
-            static_cast<uintptr_t>(zpatch_model_lookup));
-
-        if (zpatch_steer_enabled != 0)
-        {
-            constexpr double kPi = 3.141592653589793;
-
-            const std::int16_t model = vehicle->model;
-            // The original divides in float, then widens: `divss`, `cvtps2pd`,
-            // `mulsd -pi`, `cvtpd2ps`. The handling block is read after the steering
-            // angle, so a null block faults on the division like the original's.
-            const float lock = *reinterpret_cast<const float*>(
-                static_cast<const std::byte*>(vehicle->handling) + 0x84);
-            const float turn = static_cast<float>(
-                static_cast<double>(vehicle->steerAngle / lock) * -kPi);
-
-            // The wheelangle table the IDE parser hook fills: the first non-zero
-            // entry whose model-index lookup answers this model. A zero slot or the
-            // 512-slot bound leaves the tilt at zero, and the lookup is called before
-            // the comparison, as the original's `call dword_10159C0C` is.
-            float tilt = 0.0f;
-            for (std::uint32_t slot = 0; slot < kVehicleLightSlots; ++slot)
-            {
-                const std::uint32_t hash = zpatch_wheelangle_models[slot];
-                if (hash == 0u)
-                    break;
-
-                std::int32_t index = -1;
-                lookup(hash, &index);
-                if (index == model)
-                {
-                    // The table stores the angle's float bits (misc.ixx copies them
-                    // out of the parsed text), and the original reloads them with
-                    // `movss`/`cvtps2pd`, so this is a bit-cast, not an integer
-                    // conversion.
-                    tilt = static_cast<float>(
-                        static_cast<double>(std::bit_cast<float>(zpatch_wheelangle_angles[slot]))
-                        * kPi / 180.0);
-                    break;
-                }
-            }
-
-            if (model != -1)
-            {
-                std::uint32_t* const matrix = VehicleBone(vehicle, model, "steeringwheel");
-                if (matrix != nullptr)
-                {
-                    Identity(matrix);
-                    set_a(matrix, tilt);
-                    set_b(matrix, turn);
-                }
-            }
-        }
-
-        if (zpatch_engine_enabled != 0)
-        {
-            constexpr double kEpsilon = 0.01;
-            constexpr double kStep = 0.5;
-
-            // The phase only advances when the script timestep changed, and the
-            // `!=` is true for a NaN pair exactly as the original's `jnp` is.
-            if (std::bit_cast<float>(zpatch_engine_timestep) != ScriptFloat())
-            {
-                const double step = zpatch_engine_descending != 0 ? -kStep : kStep;
-                const float phase = static_cast<float>(
-                    static_cast<double>(ScriptFloat()) * step +
-                    static_cast<double>(std::bit_cast<float>(zpatch_engine_phase)));
-                zpatch_engine_phase = std::bit_cast<std::uint32_t>(phase);
-
-                std::uint8_t descending = zpatch_engine_descending;
-                if (static_cast<double>(phase) > kEpsilon)
-                    descending = 1;
-                if (static_cast<double>(phase) < -kEpsilon)
-                    descending = 0;
-                zpatch_engine_descending = descending;
-            }
-
-            const std::int16_t model = vehicle->model;
-            if (model != -1)
-            {
-                std::uint32_t* const matrix = VehicleBone(vehicle, model, "engineblock");
-                if (matrix != nullptr)
-                {
-                    Identity(matrix);
-
-                    // The shake scale: rpm live -> 0.75*rpm + 0.25, engine at rest ->
-                    // 1.0, neither -> 0.0. The product with the phase is a float
-                    // multiply (`mulss`), not a double one.
-                    float scale = 0.0f;
-                    if ((vehicle->engineState & 8u) != 0u)
-                        scale = static_cast<float>(static_cast<double>(vehicle->rpm) * 0.75 + 0.25);
-                    if ((vehicle->engineState & 0x10u) != 0u)
-                        scale = 1.0f;
-
-                    set_b(matrix, scale * std::bit_cast<float>(zpatch_engine_phase));
-                }
-            }
-        }
-
-        if (zpatch_plane_enabled != 0 && vehicle->type == 5u)
-        {
-            const auto drive = [vehicle](int part, int count, float value, int a, int b, int c)
-            {
-                reinterpret_cast<void(__thiscall*)(void*, int, int, float, int, int, int)>(
-                    static_cast<uintptr_t>(zpatch_steer_part_call))(vehicle, part, count, value, a, b, c);
-            };
-            constexpr float kTravelScale = 100.0f;
-            constexpr double kSurfaceScale = 0.5;
-
-            // The four wheels each take a fresh script float times the suspension
-            // travel times 100 (all three multiplies in float, in this order); the
-            // control surfaces take the vehicle's own pitch/roll/heave scaled by
-            // +/-0.5 in double. Odd part ids first (89, 91, 90, 92), as the original
-            // pushes them. Every field is re-read at its own call site, as the
-            // original's `mulss [edi+1F3Ch]` is, so a part call that touched the
-            // vehicle would be seen by the next one.
-            drive(89, 4, ScriptFloat() * vehicle->suspension * kTravelScale, 0, 0, 0);
-            drive(91, 4, ScriptFloat() * vehicle->suspension * kTravelScale, 0, 0, 0);
-            drive(90, 4, ScriptFloat() * vehicle->suspension * kTravelScale, 0, 0, 0);
-            drive(92, 4, ScriptFloat() * vehicle->suspension * kTravelScale, 0, 0, 0);
-
-            drive(96, 3, static_cast<float>(static_cast<double>(vehicle->pitch) * kSurfaceScale), 1, 0, 0);
-            drive(97, 3, static_cast<float>(static_cast<double>(vehicle->pitch) * -kSurfaceScale), 1, 0, 0);
-            drive(94, 3, static_cast<float>(static_cast<double>(vehicle->roll) * -kSurfaceScale), 1, 0, 0);
-            drive(95, 3, static_cast<float>(static_cast<double>(vehicle->roll) * -kSurfaceScale), 1, 0, 0);
-            drive(93, 5, static_cast<float>(static_cast<double>(vehicle->heave) * kSurfaceScale), 1, 0, 0);
-        }
-
-        // The unconditional tail: snapshot the script timestep the next frame's
-        // comparison reads, and answer the slot pointer (the original returns it in
-        // EAX; the detour ignores it).
-        zpatch_engine_timestep = std::bit_cast<std::uint32_t>(ScriptFloat());
-    }
 }
 
 // sub_100051B0, recovered VA 0x100051B0 (10 instructions): the steer detour. It
@@ -1037,7 +1223,7 @@ static __declspec(naked) void SteerDetourEaxBody()
     {
         mov DWORD PTR [zpatch_steer_vehicle], esi
         __emit 0x60  // pusha
-        call SteeringConsumer
+        call SteerConsumerBody
         __emit 0x61  // popa
         mov edx, DWORD PTR [esi]
         mov eax, DWORD PTR [edx + 128h]
@@ -1057,7 +1243,7 @@ static __declspec(naked) void SteerDetourEdxBody()
     {
         mov DWORD PTR [zpatch_steer_vehicle], esi
         __emit 0x60  // pusha
-        call SteeringConsumer
+        call SteerConsumerBody
         __emit 0x61  // popa
         mov eax, DWORD PTR [esi]
         mov edx, DWORD PTR [eax + 128h]
@@ -2500,12 +2686,25 @@ export void RegisterVehicles()
     Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryBodyD), 0x1003D3A0u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryBodyE), 0x1003D3E0u);
 
+    // The steer consumer's two 512-slot wheelangle tables. The transcription reads
+    // them through indexed absolute operands (`[esi*4 + zpatch_wheelangle_models]`),
+    // which cannot name the original's VA, so each registration pairs this module's
+    // copy with the address the original keeps it at and the length there: 512
+    // dwords. The registration is mirrored by a `table` row in tests/bodies.tsv, the
+    // offline projection the proof resolves (docs/rebuilt.md). The arrays belong to
+    // source/misc.ixx because the transcribed IDE parser hook is what fills them;
+    // both are all-zero at load, as the original's are.
+    Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_wheelangle_models),
+        0x1015A538u, sizeof(zpatch_wheelangle_models));   // 512 * 4 = 2048
+    Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_wheelangle_angles),
+        0x10159D38u, sizeof(zpatch_wheelangle_angles));   // 512 * 4 = 2048
+
     // Each stub's inline `call` is invisible to C++; naming the forwarders here keeps
     // their out-of-line definitions in the image.
     [[maybe_unused]] const uintptr_t helpers[] = {
         reinterpret_cast<uintptr_t>(&NoliveryFormat),
         reinterpret_cast<uintptr_t>(&NoliveryResolve),
-        reinterpret_cast<uintptr_t>(&SteeringConsumer),
+        reinterpret_cast<uintptr_t>(&SteerConsumerBody),
         reinterpret_cast<uintptr_t>(&FchsCheck),
     };
 }

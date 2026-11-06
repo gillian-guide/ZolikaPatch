@@ -22,13 +22,20 @@ whose displacement is that table (`push ds:off_100DE770[esi*4]`) is compared as
 asks "does this read the same table?" and not "does the table sit at the same
 address?". A displacement that is not a registered table keeps the literal
 comparison: the relaxation is opt-in, per table, and an unregistered one behaves
-exactly as before.
+exactly as before. The symbol may be C++ (`?name@@...`) or C (`_name`): a table can
+belong to another module and carry only a C name. The content hash covers the bytes
+the *loaded* image holds, so a table in a section's uninitialised tail (the original
+keeps every 512-slot model table past `.data`'s raw size) reads as zeros, which is
+what the loader maps there.
 
     --selftest   the comparator against the original itself (must pass) and
                  against a one-byte corruption (must fail), plus the table path:
                  a registered table passes, a changed table *content* fails as
-                 `table contents differ`, and an unregistered displacement still
-                 compares literally
+                 `table contents differ`, an unregistered displacement still
+                 compares literally, a table in the uninitialised `.data` tail
+                 resolves by content, a base-plus-displacement table read passes
+                 with its base compared (a changed base is an instruction
+                 difference), and the map reader resolves both symbol decorations
 
 Exit status: 0 proved, 1 a body differs, 2 inputs or capstone missing.
 """
@@ -37,6 +44,7 @@ import argparse
 import hashlib
 import struct
 import sys
+import tempfile
 from pathlib import Path
 
 IMAGE_BASE = 0x10000000
@@ -108,19 +116,70 @@ def disassemble(image: bytes, va: int, limit: int):
     return out
 
 
-def read_table(image: bytes, va: int, size: int):
-    """The registered table's bytes, or None when the image does not hold them.
+def sections(image: bytes):
+    """The PE section table as (virtual_address, virtual_size, raw_pointer, raw_size).
 
-    The table has to be one contiguous run in the file: a registration that crossed a
-    section boundary would otherwise hash whatever bytes happen to follow, and a
-    wrong table would compare as a content mismatch rather than as a bad input.
+    `virtual_size` is the extent the section occupies once loaded; `raw_size` the
+    part of it the file actually holds. The two differ for every section whose tail
+    is uninitialised (`.bss`, and the `.data` beyond its raw size), and that
+    difference is what `read_table` has to model.
     """
-    offset = image_offset(image, va)
-    if offset is None or offset + size > len(image):
+    if len(image) < 0x40 or image[:2] != b"MZ":
+        return []
+    span = int.from_bytes(image[0x3C:0x40], "little")
+    if image[span:span + 4] != b"PE\0\0":
+        return []
+    count = int.from_bytes(image[span + 6:span + 8], "little")
+    table = span + 24 + int.from_bytes(image[span + 20:span + 22], "little")
+    out = []
+    for index in range(count):
+        entry = table + index * 40
+        out.append((
+            int.from_bytes(image[entry + 12:entry + 16], "little"),
+            int.from_bytes(image[entry + 8:entry + 12], "little"),
+            int.from_bytes(image[entry + 20:entry + 24], "little"),
+            int.from_bytes(image[entry + 16:entry + 20], "little"),
+        ))
+    return out
+
+
+def section_containing(image: bytes, va: int):
+    """The section record whose loaded extent holds `va`, or None."""
+    rva = va - IMAGE_BASE
+    for section in sections(image):
+        virtual_address, virtual_size, raw_pointer, raw_size = section
+        size = virtual_size or raw_size
+        if virtual_address <= rva < virtual_address + size:
+            return section
+    return None
+
+
+def read_table(image: bytes, va: int, size: int):
+    """The registered table's bytes as the *loaded* image holds them.
+
+    A table's bytes are the file's where the section is file-backed and **zero**
+    where the section's tail is uninitialised: those bytes are not in the file at
+    all, but the loader maps zeros there, and that is what the table holds at
+    runtime. The original keeps every 512-slot model table in the `.data` tail
+    beyond its raw size (its `.data` is 0x504D4 bytes of virtual extent but only
+    0x1000 of raw), so a file-only read would report the table as "not in the
+    image" and the registry could only ever name file-backed tables. Reading the
+    zero tail is what the loaded image means; it cannot create a false pass,
+    because a table with real content on either side still hashes differently and a
+    range that leaves its section is still rejected -- one contiguous run inside one
+    section, exactly as before.
+    """
+    section = section_containing(image, va)
+    if section is None:
         return None
-    if size and image_offset(image, va + size - 1) != offset + size - 1:
+    virtual_address, virtual_size, raw_pointer, raw_size = section
+    extent = virtual_size or raw_size
+    delta = va - IMAGE_BASE - virtual_address
+    if delta < 0 or delta + size > extent:
         return None
-    return image[offset:offset + size]
+    offset = raw_pointer + delta
+    backed = max(0, min(size, raw_size - delta))
+    return image[offset:offset + backed] + b"\0" * (size - backed)
 
 
 def table_content_hash(image: bytes, va: int, size: int):
@@ -193,11 +252,14 @@ def summarise(instruction, tables=None):
     """The comparable shape: mnemonic, registers, memory displacement, and an
     absolute operand reduced to its slot.
 
-    An indexed operand with no base register is an indexed absolute: its
-    displacement names a table. When `tables` resolves it, the displacement is
-    compared as `table:<content hash>` and the index register and scale are still
-    compared, so the same table read through a different register still fails. A
-    displacement the registry does not name keeps the literal comparison.
+    Two shapes are table reads the registry can name: an indexed absolute (an index
+    and no base register) and a base plus displacement (a base register and no
+    index). For either, a displacement `tables` resolves is compared as
+    `table:<content hash>` while the registers around it are still compared -- the
+    index register and scale, or the base register -- so the same table read through a
+    different register still fails. A displacement the registry does not name keeps
+    the literal comparison, and a base *with* an index stays literal too: the
+    relaxation is per shape and per table, not global.
     """
     parts = []
     for operand in instruction.operands:
@@ -208,11 +270,13 @@ def summarise(instruction, tables=None):
         elif operand.type == capstone.x86.X86_OP_MEM:
             base = instruction.reg_name(operand.mem.base) if operand.mem.base else ""
             index = instruction.reg_name(operand.mem.index) if operand.mem.index else ""
-            if not base and index and tables is not None:
-                table = tables.resolve(operand.mem.disp)
-                if table is not None:
+            table = table_read(operand, tables)
+            if table is not None:
+                if index:
                     parts.append(f"[{index}*{operand.mem.scale}+table:{table}]")
-                    continue
+                else:
+                    parts.append(f"[{base}+table:{table}]")
+                continue
             if not base and not index:
                 parts.append("abs")
             else:
@@ -222,15 +286,32 @@ def summarise(instruction, tables=None):
     return f"{instruction.mnemonic} {' '.join(parts)}".strip()
 
 
+def table_read(operand, tables):
+    """The content hash when the operand is a table read the registry names.
+
+    Two shapes resolve, and they are the two the original's class-A pieces use: an
+    indexed absolute (`push ds:off_100DE770[esi*4]`, an index and no base) and a
+    base-plus-displacement (`push ds:[edi+0x10159380]`, a base and no index). A base
+    *with* an index is not one of them, and a plain absolute keeps the `abs` slot
+    comparison, so an unrelated `[reg+disp]` never becomes a table read by accident.
+    """
+    if tables is None or operand.type != capstone.x86.X86_OP_MEM:
+        return None
+    if operand.mem.index and not operand.mem.base:
+        return tables.resolve(operand.mem.disp)
+    if operand.mem.base and not operand.mem.index:
+        return tables.resolve(operand.mem.disp)
+    return None
+
+
 def table_operand_count(stream, tables) -> int:
-    """How many indexed absolute operands the stream resolves to a table."""
+    """How many operands the stream resolves to a registered table."""
     if tables is None:
         return 0
     count = 0
     for instruction in stream:
         for operand in instruction.operands:
-            if (operand.type == capstone.x86.X86_OP_MEM and not operand.mem.base
-                    and operand.mem.index and tables.resolve(operand.mem.disp) is not None):
+            if table_read(operand, tables) is not None:
                 count += 1
     return count
 
@@ -241,18 +322,24 @@ def table_mismatch(left, right, left_tables, right_tables):
     Two registered tables whose contents differ is not an instruction difference:
     the transcription reads a different table. A table that resolves on one side
     and not the other is the registration (or the displacement) being wrong, and is
-    reported as such.
+    reported as such. A base-register difference is *not* a table finding -- the
+    instruction differs -- so that case is left to the caller's instruction report.
     """
     for left_operand, right_operand in zip(left.operands, right.operands):
         if (left_operand.type != capstone.x86.X86_OP_MEM
                 or right_operand.type != capstone.x86.X86_OP_MEM):
             continue
-        if left_operand.mem.base or right_operand.mem.base:
+        if bool(left_operand.mem.base) != bool(right_operand.mem.base):
             continue
-        if not left_operand.mem.index or not right_operand.mem.index:
+        if bool(left_operand.mem.index) != bool(right_operand.mem.index):
             continue
-        left_hash = left_tables.resolve(left_operand.mem.disp) if left_tables else None
-        right_hash = right_tables.resolve(right_operand.mem.disp) if right_tables else None
+        if left_operand.mem.base and left_operand.mem.index:
+            continue
+        if left_operand.mem.base and (left.reg_name(left_operand.mem.base)
+                                      != right.reg_name(right_operand.mem.base)):
+            continue
+        left_hash = table_read(left_operand, left_tables)
+        right_hash = table_read(right_operand, right_tables)
         if left_hash is not None and right_hash is not None:
             if left_hash != right_hash:
                 return (f"table contents differ: {left_operand.mem.disp & 0xFFFFFFFF:#x} "
@@ -381,12 +468,18 @@ def read_manifest(path: Path):
 def read_map(path: Path):
     """symbol -> VA from the linker map. A candidate address is a link result, so it
     is looked up at test time instead of written down: a relink moves every body,
-    and a stale literal would read the middle of a different function."""
+    and a stale literal would read the middle of a different function.
+
+    Both decorations are recorded: a C++ symbol is `?name@@...`, a C one is
+    `_name`. Tables are not always C++ objects -- the wheelangle tables are
+    `extern "C"` arrays owned by the module whose hook fills them, so the only name
+    the map gives them is the C one, and a `table` row has to be able to name it.
+    """
     symbols = {}
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
         parts = line.split()
         for index, token in enumerate(parts[:-1]):
-            if not token.startswith("?"):
+            if not (token.startswith("?") or token.startswith("_")):
                 continue
             candidate = parts[index + 1]
             if len(candidate) == 8:
@@ -484,13 +577,113 @@ def main() -> int:
                                Tables(bytes(moved), {unknown_va: 12}, "candidate")))
         seventh = report(compare(original, bytes(moved), name_rows, name_symbols))
 
+        # The uninitialised-tail path. The steer consumer (sub_10004C70, 320
+        # instructions) reads both 512-slot wheelangle tables through indexed
+        # absolute operands: 0x1015A538 in the walk and 0x10159D38 at the angle
+        # conversion. Both live past the raw 0x1000 of the original's 0x504D4-byte
+        # `.data` extent, so the file holds none of their bytes and a file-only read
+        # would raise "registered table ... is not in the image". Reading the zero
+        # tail the loader maps makes them resolvable, and the row's detail has to
+        # say both operands resolved -- otherwise this case proves nothing.
+        steer = IMAGE_BASE + 0x4C70
+        steer_rows = [("selftest-tail-table", steer, steer, 320)]
+        steer_symbols = {steer: steer}
+        tail = {IMAGE_BASE + 0x15A538: 2048, IMAGE_BASE + 0x159D38: 2048}
+        eighth_results = compare(original, original, steer_rows, steer_symbols,
+                                 Tables(original, tail, "original"),
+                                 Tables(original, tail, "original"))
+        eighth = report(eighth_results)
+        tail_resolved = any("2 table operand" in detail for _, _, detail in eighth_results)
+        # The opt-in still bites for a zero table: registered on one side only is a
+        # registration difference, not a match. (Two zero tables cannot be told
+        # apart by content, which is why the manifest names the pairing explicitly.)
+        ninth = report(compare(original, original, steer_rows, steer_symbols,
+                               Tables(original, tail, "original"),
+                               Tables(original, {}, "candidate")))
+
+        # The map reader resolves both decorations. A table can be a C array in
+        # another unit (the wheelangle tables are `extern "C"` in misc.ixx and the
+        # map gives them no C++ name), so a `table` row has to be able to name it.
+        map_text = (" 0001:00000000       ?SelftestBody@@YAXXZ             10001000"
+                    "     zp_modules:vehicles.obj\n"
+                    " 0003:000045a8       _zpatch_wheelangle_models        1017d5a8"
+                    "     zp_modules:misc.obj\n")
+        with tempfile.NamedTemporaryFile("w", suffix=".map", delete=False) as handle:
+            handle.write(map_text)
+            map_path = Path(handle.name)
+        resolved_symbols = read_map(map_path)
+        map_path.unlink()
+        tenth = 0 if (resolved_symbols.get("?SelftestBody@@YAXXZ") == 0x10001000
+                      and resolved_symbols.get("_zpatch_wheelangle_models") == 0x1017d5a8) else 1
+
+        # The base-plus-displacement shape. sub_10006260 (53 instructions) reads the
+        # 512-slot siren list as `push dword ptr [esi+0x10159380]` (0x100062BC) and
+        # `cmp dword ptr [esi+0x10159380],0` (0x100062DB): an absolute *with* a base
+        # register and no index, which used to compare literally. Three cases:
+        # registered on both sides -> PASS with both operands resolved; the base
+        # register changed -> FAIL as an *instruction* difference (the base is still
+        # compared), not as a table difference; the table's contents changed -> FAIL
+        # as `table contents differ`.
+        siren_body = IMAGE_BASE + 0x6260
+        siren_rows = [("selftest-base-disp", siren_body, siren_body, 53)]
+        siren_symbols = {siren_body: siren_body}
+        siren_table = IMAGE_BASE + 0x159380
+        siren_tables = {siren_table: 2048}
+        eleventh_results = compare(original, original, siren_rows, siren_symbols,
+                                   Tables(original, siren_tables, "original"),
+                                   Tables(original, siren_tables, "candidate"))
+        eleventh = report(eleventh_results)
+        base_resolved = any("2 table operand" in detail for _, _, detail in eleventh_results)
+
+        # `FF B6` -> `FF B7`: the push reads the table through EDI instead of ESI.
+        other_base = bytearray(original)
+        spot = image_offset(original, IMAGE_BASE + 0x62BC)
+        if spot is None or other_base[spot:spot + 2] != b"\xFF\xB6":
+            raise SystemExit("selftest: the siren checker's push is not at 0x100062BC")
+        other_base[spot + 1] = 0xB7
+        twelfth_results = compare(original, bytes(other_base), siren_rows, siren_symbols,
+                                  Tables(original, siren_tables, "original"),
+                                  Tables(bytes(other_base), siren_tables, "candidate"))
+        twelfth = report(twelfth_results)
+        # The finding has to be the register, not the table: both sides resolve, so the
+        # detail is an instruction difference and not one of table_mismatch's answers.
+        base_is_instruction = all(detail.startswith("instruction ")
+                                  for _, status, detail in twelfth_results if status == "FAIL")
+
+        # Retarget both base+disp operands at a file-backed 2,048-byte range and change
+        # one byte of it on the candidate side: same registration, different contents.
+        moved_table = IMAGE_BASE + 0x100000
+        moved_image = bytearray(original)
+        for at in (0x62BE, 0x62DD):
+            offset = image_offset(original, IMAGE_BASE + at)
+            if offset is None or moved_image[offset:offset + 4] != struct.pack("<I", siren_table):
+                raise SystemExit(f"selftest: the siren operand at {at:#x} is not a disp32")
+            struct.pack_into("<I", moved_image, offset, moved_table)
+        mutated = bytearray(moved_image)
+        mutated[image_offset(original, moved_table)] ^= 0x01
+        thirteenth_results = compare(bytes(moved_image), bytes(mutated), siren_rows, siren_symbols,
+                                     Tables(bytes(moved_image), {moved_table: 2048}, "original"),
+                                     Tables(bytes(mutated), {moved_table: 2048}, "candidate"))
+        thirteenth = report(thirteenth_results)
+        contents_named = any("table contents differ" in detail
+                             for _, _, detail in thirteenth_results)
+
         ok = (first == 0 and second == 1 and third == 1 and fourth == 0 and resolved
-              and fifth == 1 and sixth == 1 and seventh == 1)
+              and fifth == 1 and sixth == 1 and seventh == 1
+              and eighth == 0 and tail_resolved and ninth == 1 and tenth == 0
+              and eleventh == 0 and base_resolved and twelfth == 1 and base_is_instruction
+              and thirteenth == 1 and contents_named)
         print("selftest: identical PASS, corrupted opcode FAIL, moved branch target FAIL, "
               "registered table PASS (2 operands resolved), changed table contents FAIL, "
-              "moved table operand FAIL, unregistered table operand FAIL"
+              "moved table operand FAIL, unregistered table operand FAIL, "
+              "uninitialised-tail table PASS (2 operands resolved), "
+              "one-side-only tail table FAIL, map C and C++ symbols PASS, "
+              "base+disp table PASS (2 operands resolved), changed base register FAIL "
+              "(instruction), base+disp contents differ FAIL (table)"
               if ok else f"selftest: BROKEN ({first}, {second}, {third}, {fourth}, "
-                         f"{resolved}, {fifth}, {sixth}, {seventh})")
+                         f"{resolved}, {fifth}, {sixth}, {seventh}, {eighth}, "
+                         f"{tail_resolved}, {ninth}, {tenth}, {eleventh}, {base_resolved}, "
+                         f"{twelfth}, {base_is_instruction}, {thirteenth}, {contents_named})")
         return 0 if ok else 2
 
     if not (args.original and args.candidate and args.bodies and args.map):

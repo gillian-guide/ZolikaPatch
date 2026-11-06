@@ -29,7 +29,7 @@ fix.
 | a line longer than 255 bytes is split | the parser's 255-byte line buffer | `Feather::Parse` |
 | the file-registry helpers fault on a scan miss | the original's one-time scans (`0x10051730`, `0x10051610`, `0x100517E0`) match nothing | `NewfilesObject` / `NewfilesCallObject` / `NewfilesCallAdd` read or call through the null the scan left, as the original's unguarded `mov eax,[esi]` with `ESI = 0` and its `call edx` do |
 | the DLC register call's `this` is undefined | every `LoadDLCs` run | the original calls the register entry (image base + the stored register RVA) with `ECX` left over from the preceding `strcpy_s`: `mov ecx,dword_1015AD70 / mov esi,dword_1015804C / … / lea esi,[esi+ecx] / call esi` (`0x10023220`-`0x10023276`). The callee uses it only through the loader-callback call this key replaces with `0x10023480` and through a branch its non-zero flag argument skips, so the value is never dereferenced. The transcription (`dlc_discovery`) leaves `ECX` exactly where the original leaves it -- no `this` is invented and no register is set up |
-| the steer consumer faults on a preamble miss | a build whose model-info array, bone getter or setter scan matches nothing leaves `dword_1015AD78` / `dword_10159B88` / `dword_1015D63C` / `dword_10159CDC` zero | `sub_10004C70` reads them unguarded (`mov eax,[eax+ecx*4]`, `call edx`, `call dword_1015D63C`); the rebuild keeps every hop and every indirect call unguarded, so a miss faults at the same instruction. 1.0.8.0 has all four patterns |
+| the steer consumer faults on a preamble miss | a build whose model-info array, bone getter or setter scan matches nothing leaves `dword_1015AD78` / `dword_10159B88` / `dword_1015D63C` / `dword_10159CDC` zero | `sub_10004C70` reads them unguarded (`mov eax,[eax+ecx*4]`, `call edx`, `call dword_1015D63C`); the transcription is the original's instruction stream, so a miss faults at the same instruction. 1.0.8.0 has all four patterns |
 | the headlight-shadow check faults on a null lookup or object | a build whose `dword_10159C0C` scan matched nothing, or a call with a null object | `sub_1001AD20`'s `call dword_10159C0C` (`0x1001AD5C`) and `movsx eax, word [edi+2Eh]` (`0x1001AD62`) are both unguarded in the original; the rebuild calls first and loads second, so it faults on the same instruction of either condition (the key's section below records the rebuild) |
 | the cutscene chain faults on an unresolved native or a missed camera site | the game's native resolver answers null (`dword_1015BDE0` unresolved, or the resolver faults and the layer answers zero), or chain B's first scan matched nothing so `dword_1015BDE4` / `dword_1015BDF0` are still zero | `sub_100388C0` reads the resolver's answer unguarded (`mov ecx,[eax+0Eh]`, `0x100388EE`) and writes through the published poke (`dec esi` / `mov byte [esi],1`, `0x10038913`-`0x10038935`); the transcription keeps every hop and both stores unguarded, so it faults at the same instruction on the same condition. All nine stored baselines record both chain B installs, so every supported image matches both patterns; the resolver scan is the native layer's, measured on 1.0.8.0 |
 | the payload init re-runs on every call and leaks its archive | every call of the wrapper the second `E8` installs | the original's one-shot guard `dword_10159C00` is read at `0x1004B77B` and never written anywhere in the image, so `sub_1004B750` decodes, registers and builds again each time, hands the game a fresh archive and never frees the previous one. The rebuild keeps that structure -- no writer, no free -- so the behaviour is the same |
@@ -50,12 +50,16 @@ or a TLS static-init guard -- or when every call it makes lands in another rebui
 An indexed absolute table access used to be on that list and no longer is: the tree
 registers the table (`Bodies::RegisterTable`) and the proof compares the operand's
 table *contents* instead of its displacement, so a body that reads a registered table
-is transcribed like any other (`rebuilt.md` §1 and §2b; the model-name lookup
-`0x10003F00` is the first). [`rebuilt.md`](rebuilt.md) is the catalogue: recovered
-VA and size, the exact instruction pattern that blocks each one, what the rebuild
-reproduces, how that was verified, the residual risk, and the order to check them in
-play. This file stays the record of *behaviour* and *faults*; the rebuild reasons are
-not repeated here.
+is transcribed like any other (`rebuilt.md` §1, §2b and §2c; the model-name lookup
+`0x10003F00` was the first, the steer consumer `0x10004C70` the largest). A table is
+nameable whether the map calls it `?name` (a C++ object) or `_name` (an `extern "C"`
+array owned by another module), and a table the original keeps in the uninitialised
+tail of a section reads as the zeros the loader maps there -- two properties the
+registry needed before it could cover any of the 512-slot model tables.
+[`rebuilt.md`](rebuilt.md) is the catalogue: recovered VA and size, the exact
+instruction pattern that blocks each one, what the rebuild reproduces, how that was
+verified, the residual risk, and the order to check them in play. This file stays the
+record of *behaviour* and *faults*; the rebuild reasons are not repeated here.
 
 ## Status
 
@@ -66,24 +70,28 @@ feature key, is closed by the converter recorded in its own section below;
 `HighQualityReflections` closed with the site-arithmetic resolution recorded below.
 
 - **98 of 99 option keys closed**;
-- **132 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **133 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe, and the compiled bodies listed in
   [`rebuilt.md`](rebuilt.md) are rebuilt in C++ instead, with no proof row. That file
   is the catalogue of rebuilt pieces: what blocks each transcription, what the rebuild
-  reproduces, how that was verified and what it leaves unproven. The longest is
-  `HighQualityReflections`' detour (`0x1001F030`, 157 instructions / 858 bytes;
-  see the section below), which displaced `CutsceneFixes` chain B's body
-  (`0x100388C0`, 146 instructions / 592 bytes); before that the livery counter
-  (`0x1003D270`, 37 instructions) held the row; the pair at 78 instructions / 309
+  reproduces, how that was verified and what it leaves unproven. The longest is the
+  steer/engine/plane consumer (`0x10004C70`, 320 instructions / 1,343 bytes; see the
+  section below), which displaced `HighQualityReflections`' detour
+  (`0x1001F030`, 157 instructions / 858 bytes); before that the row was
+  `CutsceneFixes` chain B's body
+  (`0x100388C0`, 146 instructions / 592 bytes), and before that the livery counter
+  (`0x1003D270`, 37 instructions). The pair at 78 instructions / 309
   bytes each (`DualVehicleHeadlights`) is what exposed the proof tool's old
   256-byte sweep window: it compared 64 of 78 and still reported PASS. The tool
   now sweeps 4096 bytes and fails a row that decodes fewer instructions than its
   budget, so a truncated sweep can never pass again. This pass added
-  `BadPlayerModelCrashFix`'s model-name lookup (`0x10003F00`, 21 instructions), the
-  first class-A piece transcribed: its table is registered and the proof compares the
-  table's contents (`rebuilt.md` §2b). Before it came
-  `NewSavesCompatibility`'s trampoline; the pass before that added the
+  the steer consumer (`0x10004C70`, 320 instructions), the largest class-A piece:
+  its two wheelangle tables are registered and the proof compares their contents
+  (`rebuilt.md` §2c). Before it came `BadPlayerModelCrashFix`'s model-name lookup
+  (`0x10003F00`, 21 instructions), the first class-A piece transcribed: its table is
+  registered and the proof compares the table's contents (`rebuilt.md` §2b). Before it
+  came `NewSavesCompatibility`'s trampoline; the pass before that added the
   `HighQualityReflections` detour; before that the cutscene body and
   `OutOfCommissionFix`'s two (the branch body at 7 instructions and the mounting
   wrapper at 41; see that key's section), and `ForceCarHeadlightShadows`' hook
@@ -448,57 +456,79 @@ reaches it -- and only in the original does it differ.
 ### The five keys behind `sub_10004C70`, closed
 
 The steer/engine/plane trio (`MovingSteeringWheelSupport`, `ShakingEngineBlock`,
-`MovingPlaneParts`), `GarageModelFix` and `NoLiveryLimit` shared one blocker: the
+`MovingPlaneParts`), `GarageModelFix` and `NoLiveryLimit` shared one piece: the
 original's steer/render consumer `sub_10004C70` (1,343 bytes, 320 instructions),
-which the trio's detour calls and which nothing in this tree carried. It is now
-rebuilt in C++, and all five keys are closed on 1.0.8.0 **and on the other eight
-images** (each key's per-option cell is byte-identical to its baseline on builds 1,
-5, 6, 7, 8, 9, 11, 12 and 13; build 1 is measured with isolated single-key cells
-because its per-option dump faults at `NoImpostorHeightCutoff` by design).
+which the trio's detour calls. It is **transcribed instruction for instruction**
+(row `steer_consumer`: 320 instructions, 56 absolute operands, 2 table operands), and
+all five keys are closed on 1.0.8.0 **and on the other eight images** (each key's
+per-option cell is byte-identical to its baseline on builds 1, 5, 6, 7, 8, 9, 11, 12
+and 13; build 1 is measured with isolated single-key cells because its per-option dump
+faults at `NoImpostorHeightCutoff` by design).
 
-**What `sub_10004C70` is, and the one operand that blocks its transcription.** It is
-compiler output for C -- a `/GS` frame (`mov eax,___security_cookie` / `xor eax,ebp`
-at `0x10004C76`; `call @__security_check_cookie@4` at `0x100051A6`), SSE double
-conversions around every float expression (`cvtps2pd` / `mulsd` / `divsd` /
-`cvtpd2ps`), the MSVC float-`!=` idiom (`ucomiss` at `0x10004DDF`,
-`lahf`/`test ah,44h`/`jnp`) and `cmova` for the two `>` comparisons. None of that
-blocks a transcription: the tree transcribes `/GS` and SSE bodies elsewhere, and every
-game entry it reaches is called through a slot the loader resolves
-(`call dword_10159C0C`, `call edx` with `edx = dword_10159B88`,
-`call dword_1015D63C`, `call dword_10159CDC`, `call dword_1015AD4C`) while every
+**Why it was the last rebuilt piece, and what changed.** It is compiler output for C
+-- a `/GS` frame (`mov eax,___security_cookie` / `xor eax,ebp` at `0x10004C76`;
+`call @__security_check_cookie@4` at `0x100051A6`), SSE double conversions around
+every float expression (`cvtps2pd` / `mulsd` / `divsd` / `cvtpd2ps`), the MSVC
+float-`!=` idiom (`ucomiss` at `0x10004DDF`, `lahf`/`test ah,44h`/`jnp`) and `cmova`
+for the two `>` comparisons. None of that blocks a transcription: the tree transcribes
+`/GS` and SSE bodies elsewhere, every game entry it reaches is called through a slot
+the loader resolves (`call dword_10159C0C`, `call edx` with `edx = dword_10159B88`,
+`call dword_1015D63C`, `call dword_10159CDC`, `call dword_1015AD4C`) and every
 constant is a plain `.rdata` qword (`-pi` at `0x101523A8`, `pi`/`180` at
-`0x10152358`/`0x10152370`, and the rest). What blocks it is exactly two operands:
+`0x10152358`/`0x10152370`, and the rest). What blocked it was exactly two operands:
 `mov eax,dword ptr [esi*4+0x1015A538]` (`0x10004CD0`) and
 `movss xmm0,dword ptr [esi*4+0x10159D38]` (`0x10004E00`) -- the wheelangle
-model/angle tables, read as an *indexed absolute* address, which the whole-body
-comparator compares literally. Those two tables are the tree's own arrays
-(`zpatch_wheelangle_models`/`_angles` in `source/misc.ixx`), whose address cannot be
-the original's. `rebuilt.md` §3 class A records the rebuild and its risk. It carries
-**no proof row**, the same rule as `SpeedupBugFix` and the launcher's DFA
-close-handle body.
+model/angle tables, read as *indexed absolute* addresses, which the whole-body
+comparator compares literally, against arrays (`zpatch_wheelangle_models`/`_angles`
+in `source/misc.ixx`) whose address cannot be the original's. Two properties of those
+tables were outside the registry's reach and are now covered (`rebuilt.md` §2c): the
+original keeps them past the raw size of its `.data` (raw `0x1000` of a `0x504D4`
+virtual extent, so the file holds none of their bytes and they are zeros when
+loaded), and the arrays are `extern "C"` in `misc.ixx`, so the map names them
+`_zpatch_…` rather than `?zpatch_…`. `tools/verify_bodies.py` now reads a section's
+uninitialised tail as the zeros the loader maps and resolves both decorations. The
+comparison rules themselves are unchanged: `summarise` and `table_mismatch` compare
+the same shapes they always did.
 
-The assumptions the rebuild makes, each from the disassembly:
+**What the body is.** The transcription is the original's instruction stream, so the
+blocks below are what it computes rather than a reimplementation of them; every
+operand points at the same thing the original's does (see the operand map under
+`rebuilt.md` §2c):
 
-| piece | original (1.0.8.0) | rebuild |
+| block | original (1.0.8.0) | transcription |
 |---|---|---|
 | the vehicle | `dword_1015AD38`, stored by the detour before the call | `zpatch_steer_vehicle`, same word |
 | steering block gate | `byte_1015AD40` | `zpatch_steer_enabled` |
 | engine block gate | `byte_1015AD41` | `zpatch_engine_enabled` |
 | plane block gate | `byte_10159C17` and `[vehicle+0x1354] == 5` | `zpatch_plane_enabled` and the same field |
-| steer lock | `dword_1015AD38[0xE18]` -> `+0x84`, read after `+0x10D8` | same two reads, float division then widen |
-| wheelangle table | `dword_1015A538[]` / `dword_10159D38[]`, non-zero slot, 512 bound | the IDE hook's tables (`source/misc.ixx`), same order and bound |
-| model word | `+0x2E`, sign-extended for the array index, `-1` skipped | same |
-| bone chain | `dword_1015AD78[model]` -> `+8` -> `+0xB4` -> `+0xC`, then `sub_10003F40` | same, with `sub_10003F40` transcribed |
-| bone matrix | `dword_10159B88(vehicle, entry[0x14])`, then identity at 0/1/2/4/5/6/8/9/10 | same order, same nine stores |
-| wheel tilt | `dword_1015D63C(matrix, angle*pi/180)`, then `dword_10159CDC(matrix, steer/lock*-pi)` | same order |
-| engine phase | `(float)(script*step + phase)` in double, stored to `dword_1015AD3C`; `> 0.01` sets `byte_1015AD42 = 1`, `< -0.01` clears it, otherwise it keeps its value | same, phase kept as float bits |
-| engine scale | `(state & 8) ? (float)(rpm*0.75 + 0.25) : 0`, then `(state & 0x10)` forces `1.0f`; `mulss` with the phase | same |
-| plane parts | parts 89, 91, 90, 92 with `count 4` and `script*suspension*100` (three float multiplies, fields re-read per call); 96, 97 (`pitch`, `+/-0.5` in double), 94, 95 (`roll`, `-0.5`), 93 (`heave`, `+0.5`, `count 5`), all with `1,0,0` and `count 3` for the surfaces | same ids, order, counts and argument order |
-| tail | `dword_10159D34 = script float`, return the slot pointer | same |
+| steer lock | `dword_1015AD38[0xE18]` -> `+0x84`, read after `+0x10D8` | the same two reads, float division then widen |
+| wheelangle table | `dword_1015A538[]` / `dword_10159D38[]`, non-zero slot, 512 bound | the IDE hook's tables (`source/misc.ixx`), registered as 2048-byte tables |
+| model word | `+0x2E`, sign-extended for the array index, `-1` skipped | the same instructions |
+| bone chain | `dword_1015AD78[model]` -> `+8` -> `+0xB4` -> `+0xC`, then `sub_10003F40` | the same chain, calling the transcribed `sub_10003F40` |
+| bone matrix | `dword_10159B88(vehicle, entry[0x14])`, then identity at 0/1/2/4/5/6/8/9/10 | the same nine stores with the same `0x3F800000` immediate |
+| wheel tilt | `dword_1015D63C(matrix, angle*pi/180)`, then `dword_10159CDC(matrix, steer/lock*-pi)` | the same order and the same two setters |
+| engine phase | `(float)(script*step + phase)` in double, stored to `dword_1015AD3C`; `> 0.01` sets `byte_1015AD42 = 1`, `< -0.01` clears it | the same `comisd`/`cmova` sequence, phase kept as float bits |
+| engine scale | `(state & 8) ? (float)(rpm*0.75 + 0.25) : 0`, then `(state & 0x10)` forces `1.0f`; `mulss` with the phase | the same |
+| plane parts | parts 89, 91, 90, 92 with `count 4` and `script*suspension*100`; 96, 97 (`pitch`, `±0.5` in double), 94, 95 (`roll`, `-0.5`), 93 (`heave`, `+0.5`, `count 5`), all with `1,0,0` and `count 3` for the surfaces | the same ids, order, counts and argument pushes |
+| tail | `dword_10159D34 = script float`, return the slot pointer | the same |
 
-The two soap-opera details that are deliberately not "improved": every hop and
-every indirect call is unguarded (a preamble miss faults, see the fault table), and
-the `!=` on the timestep is true for a NaN pair, as the original's `jnp` path is.
+The two soap-opera details that are deliberately not "improved": every hop and every
+indirect call is unguarded (a preamble miss faults, see the fault table), and the
+`!=` on the timestep is true for a NaN pair, as the original's `jnp` path is.
+
+**What the two table operands' proof does and does not say.** Both wheelangle tables
+are all-zero at load -- the original's are in its uninitialised `.data` tail, ours are
+zero-initialised and filled by the same IDE hook -- so both hash to the same content
+value (`707280d9b4da7bba`, 2048 bytes of zeros). The PASS therefore pins that each
+operand reads *a zero-filled table registered for this row*, and the content check
+**cannot tell the two tables apart**: a transcription that read the angle table where
+the model table is meant would pass it. What pins the identity is the manifest
+declaration (`rebuilt.md` §2c pairs `0x1015A538` with `_zpatch_wheelangle_models` and
+`0x10159D38` with `_zpatch_wheelangle_angles`, per row) together with the
+instruction's own semantics -- the slot that goes through `dword_10159C0C` and is
+compared with the model index is the model table, and the value multiplied by `pi`
+and divided by `180` is the angle table. Recorded here rather than left implied by a
+PASS line.
 
 **The detours.** `sub_100051B0` (10 instructions) and `sub_100051E0` (10) are
 transcribed and proven: `mov dword_1015AD38, esi`; `pusha`; `call sub_10004C70`;
@@ -570,11 +600,13 @@ operand and only ever called with `call edx`, and every other slot is a module w
 
 **What the scoreboard proves and what it does not.** The five keys' per-option cells
 are byte-identical to their baselines (0 missing, 0 extra, 0 differing on all nine
-images), which proves the write sets. The rebuilt consumer's *runtime* behaviour --
-the matrix the two setters write, the part calls' arguments, the phase arithmetic --
-is not executed by the offline tools; it is proven by the transcription of every
-piece around it (the body proofs cover 15 new pieces) and by the disassembly-derived
-table above, not by a run of the game. Recorded here as the one unverified surface.
+images), which proves the write sets. The consumer's *runtime* behaviour -- the
+matrix the two setters write, the part calls' arguments, the phase arithmetic -- is
+not executed by the offline tools: the body is proven to be the original's
+instructions with the original's operands, but nothing here makes the game call it.
+Residual: a wiring mistake the operand map (`rebuilt.md` §2c) and the proof would both
+miss, or a table the IDE hook fills differently, would only show in play. Recorded
+here as the one unverified surface.
 
 ### The misc keys closed in this pass
 
