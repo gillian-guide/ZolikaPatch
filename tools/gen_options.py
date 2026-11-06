@@ -60,8 +60,17 @@ def mask_for(text):
     if text in SHORTHANDS:
         builds = SHORTHANDS[text]
     else:
-        builds = [part.strip() for part in re.split(r"[,/]", text)
-                  if part.strip() in BUILDS or part.strip().isdigit()]
+        tokens = [part.strip() for part in re.split(r"[,/]", text)]
+        # A cell that mixes prose with build ids used to be parsed by dropping the
+        # prose silently, which produced a mask that looked plausible and was wrong:
+        # DualVehicleHeadlights came out as 1.0.4.0-only when the original gates it
+        # on every build. Refusing is the only safe failure mode for a generated
+        # table - the cell must say ALL, a shorthand, or nothing but build ids.
+        builds = [part for part in tokens if part in BUILDS or part.isdigit()]
+        unparseable = [part for part in tokens if part and part not in builds]
+        if unparseable:
+            raise SystemExit(f"build cell is not machine-readable: {text!r} "
+                             f"(unparseable: {unparseable})")
     mask = 0
     for name in builds:
         compact = BUILDS[name] if name in BUILDS else int(name)
