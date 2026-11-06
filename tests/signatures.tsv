@@ -16,6 +16,17 @@ CarDynamicShadowFix	0x8F7420	50 68 04 01 00 00 6A 02 6A 00 E8	11
 CarDynamicShadowFix	0x95A418	83 E0 0F 83 F8 03 75 17 F6 86 6C 02 00 00 04	14
 CarDynamicShadowFix	0x8F719F	0F 84 9E 00 00 00 80 7D 28	9
 CarDynamicShadowFix	0x8F73EA	51 68 04 05 00 00 6A 02 6A 00 E8	11
+# ForceCarHeadlightShadows (source/vehicles.ixx): the shadow function's prologue
+# (the E9 at the match; the shim replays the twelve bytes and resumes at match+12)
+# and the four anchors of its site writes. At the first anchor the arm writes `EB`
+# at +6, `E9` at +95 (to match+476) and `EB` at +379, retargets the `movss` operand
+# at +211 at the module's offset float, and its handler tail rewrites the two push
+# immediates and the `je` below with their own recovered bytes.
+ForceCarHeadlightShadows	0x8F7590	55 8B EC 83 E4 F0 81 EC D4 00 00 00 8B 45 20 8B	16
+ForceCarHeadlightShadows.a	0x8F7C5B	3C 01 75 50 84 DB 75 79	7
+ForceCarHeadlightShadows.b	0x8F7199	F3 0F 11 44 24 1C 0F 84 9E 00 00 00	12
+ForceCarHeadlightShadows.c	0x8F73E6	8D 4C 24 50 51 68 04 05 00 00	11
+ForceCarHeadlightShadows.d	0x8F741C	8D 44 24 50 50 68 04 01 00 00	11
 # CarDynamicShadowFix's old-build pieces are absent from the 1.0.8.0 IDB, so there is
 # no site VA to record for them: the pattern-B body anchor
 # (56 6A 02 6A 00 6A 00 57 E8 ...), the pattern-C `83 F8 14 7D 05 83 F8 06 7D 14`

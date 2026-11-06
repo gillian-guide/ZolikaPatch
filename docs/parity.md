@@ -28,6 +28,7 @@ fix.
 | the file-registry helpers fault on a scan miss | the original's one-time scans (`0x10051730`, `0x10051610`, `0x100517E0`) match nothing | `NewfilesObject` / `NewfilesCallObject` / `NewfilesCallAdd` read or call through the null the scan left, as the original's unguarded `mov eax,[esi]` with `ESI = 0` and its `call edx` do |
 | the DLC register call's `this` is undefined | every `LoadDLCs` run | the original calls the register entry at `0x48F440` with `ECX` left over from the preceding `strcpy_s`. The callee uses it only through the loader-callback call this key replaces with `0x10023480` and through a branch its non-zero flag argument skips, so the value is never dereferenced. The rebuild keeps the same call shape (`__stdcall`, three stack arguments, `ECX` untouched) rather than inventing a `this` |
 | the steer consumer faults on a preamble miss | a build whose model-info array, bone getter or setter scan matches nothing leaves `dword_1015AD78` / `dword_10159B88` / `dword_1015D63C` / `dword_10159CDC` zero | `sub_10004C70` reads them unguarded (`mov eax,[eax+ecx*4]`, `call edx`, `call dword_1015D63C`); the rebuild keeps every hop and every indirect call unguarded, so a miss faults at the same instruction. 1.0.8.0 has all four patterns |
+| the headlight-shadow check faults on a null lookup or object | a build whose `dword_10159C0C` scan matched nothing, or a call with a null object | `sub_1001AD20`'s `call dword_10159C0C` (`0x1001AD5C`) and `movsx eax, word [edi+2Eh]` (`0x1001AD62`) are both unguarded in the original; the rebuild calls first and loads second, so it faults on the same instruction of either condition (the key's section below records the rebuild) |
 
 Two of these remain assumptions, not measurements: feather 1.41's non-advancing
 `getline` on a long line (the original very likely spins; this tree continues), and
@@ -38,8 +39,8 @@ CRLF folding (the original reads in text mode). The shipped INI's longest line i
 
 Measured on 1.0.8.0 with `tools/parity_report.py 9`:
 
-- **93 of 99 option keys closed**;
-- **113 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **94 of 99 option keys closed**;
+- **114 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe, and the compiled-C bodies listed below are
   rebuilt in C++ instead, with no proof row. The longest is the livery counter
@@ -47,7 +48,9 @@ Measured on 1.0.8.0 with `tools/parity_report.py 9`:
   (`DualVehicleHeadlights`) is what exposed the proof tool's old 256-byte sweep
   window: it compared 64 of 78 and still reported PASS. The tool now sweeps 4096
   bytes and fails a row that decodes fewer instructions than its budget, so a
-  truncated sweep can never pass again. This pass added fifteen: the steer trio's
+  truncated sweep can never pass again. This pass added one, `ForceCarHeadlightShadows`'
+  hook thunk (`0x1001ADB0`, 9 instructions). The fifteen before it were the vehicles
+  pass's: the steer trio's
   model-registry lookup and its two detour bodies, `GarageModelFix`'s two site bodies
   and two helpers, and `NoLiveryLimit`'s five site bodies and three helpers (see the
   section below); earlier passes added twelve (`RestoreDeathMusic`'s gate body and
@@ -289,6 +292,92 @@ the game's hash function at `0x45CF50`). The native-script call layer is
 `source/native.ixx` (above); its public surface is `Native::Call`, `CallBool`,
 `Resolve`, `Invoke`, `Resolver`, `Salt`, `ResolveSalts` and `Register`.
 
+### `ForceCarHeadlightShadows`, closed on the published float slot
+
+This was the last blocked key for a mechanical reason: its arm writes a *pointer to a
+float* into the shadow function's `movss` operand. The original writes its own image's
+`dword_101580C0` there (`0x101580C0`); this module writes its own word; and the stored
+baseline records the reference dump's `0xD0000000` placeholder for that word rather
+than either address. `Bodies::RegisterPublishedImage` is what tells the dump which
+word it is -- the registry for an address-shaped operand rather than a module word a
+body reads -- and the dump substitutes the placeholder only for a word the run
+actually wrote. The arm writes the real address; only the tool speaks the baseline's
+convention. Nothing in the mod writes a placeholder and no guard was added for this.
+
+The write set on 1.0.8.0, in the original handler's order (all RVAs are game RVAs;
+`match` is 0x8F7C5B for the anchor rows):
+
+| site | write | what it is |
+|---|---|---|
+| `0x8F7590` | `E9` -> `0x1001ADB0` | the shadow function's entry, hooked to the shim; the resume is match+12 |
+| `0x8F7C61` (match+6) | `EB` | the `jne +79h` after `cmp al,1` / `test bl,bl`, forced |
+| `0x8F7CBA` (match+95) | `E9` -> match+476 | the second `jne +177h`, forced; the five bytes start on its `0F 85` opcode, so its sixth byte becomes unreachable remainder |
+| `0x8F7D2E` (match+211) | dword -> this module's offset float | the `movss xmm2, [0xD95B68]` operand (the game's word there is `0.0f`) |
+| `0x8F7DD6` (match+379) | `EB` | the `jne +5Fh` on the same target, forced |
+| `0x8F73EC` (`0x8F73E6`+6) | dword `0x504` | the first shadow buffer's `push` immediate, restored |
+| `0x8F7422` (`0x8F741C`+6) | dword `0x104` | the second shadow buffer's `push` immediate, restored |
+| `0x8F719F` (`0x8F7199`+6) | `0F 84 9E 00 00` | the `je` that skips the shadow, restored |
+
+The last three are the two keys' interaction, not dead writes. The arm reaches them
+through the handler tail (the original's `sub_1000E870`, which only runs with this key
+on) and every one of them is a no-op on a pristine image; they exist to undo exactly
+the three rewrites `CarDynamicShadowFix` makes in its `@noFCHS` half (the 0x504 and
+0x104 pushes and the `jz`->`jmp`), which that arm skips while this key is on. The
+arm order is load-bearing and reproduced: `InstallCarDynamicShadowFix` runs first and
+its `mov dword [0x8F7422], 0x100` (the EA00 step) is unconditional, so with both keys
+on it destroys this arm's own `8D 44 24 50 50 68 04 01 00 00` signature and the second
+restore never happens -- measured in a combined cell, which leaves `0x8F7422` at `00`
+and `0x8F7423` at `01`, exactly the two bytes the reference's notes record for the
+original under the same pair of keys.
+
+The scoreboard cell is 15 rows: the eight non-branch ones (two `EB`s, two `E9`
+opcodes and the four placeholder bytes) plus seven displacement bytes it excludes.
+
+**What is transcribed and what is rebuilt.**
+
+| piece | VA | instructions/bytes | how |
+|---|---|---|---|
+| the hook thunk | `0x1001ADB0` | 9 instructions | transcribed and proven (`force_headlight_shadows_shim`) |
+| the offset check | `0x1001AD20` | 139 bytes | rebuilt as C++, no proof row |
+
+The shim is the whole body: store `ECX` into `dword_1015BDD0`, `pushad`, call the
+check, `popad`, replay the prologue the `E9` replaced (`push ebp` / `mov ebp,esp` /
+`and esp,-16` / `sub esp,0xD4`) and tail-jump to the published resume. The replay is
+why the resume has to be read from the site before the site is written: those twelve
+bytes belong to the function the hook replaced, so the continuation must run with the
+frame already established.
+
+The check is **not** transcribed because it is compiler output: a `/GS` frame
+(`mov eax,___security_cookie` / `xor eax,ebp`, `call __security_check_cookie` at
+`0x1005FE7B`), a tail-merged epilogue shared by its two returns, `movss` for the float
+store and a `nop dword ptr [eax]` loop alignment. Its behaviour is fixed by its own
+state words and by sitting between the shim's `pushad`/`popad`: seed
+`dword_101580C0` with 2.0f, walk the `dword_1015ADB8` hash table from slot 0
+(`hash = hashes[0]`, stop at the first zero), ask `dword_10159C0C` for each hash's
+model index and compare it with the object's signed word at `+0x2E`, and on the first
+hit store that slot's float from `dword_1015B5C0`. The lookup runs before the object
+is read and neither is guarded, so a null lookup faults on the call (`0x1001AD5C`) and
+a null object faults on the load (`0x1001AD62`), as in the original.
+
+The one divergence, and why it is unavoidable: the original's walk runs past the end
+of its 512 hashes into the `.data` that follows its table (`0x1015B5B8`, its own
+`CarDynamicShadowFix` slot), which is a property of its layout and cannot be
+reproduced here. The rebuild stops at the 512th slot, so a section that fills all 512
+slots with resolvable names would walk out of the table in the original and stop here;
+no shipped or sample INI comes near that, and a table always stops at its first zero
+hash before it.
+
+**The two 512-slot tables are the known shared gap.** `dword_1015ADB8` /
+`dword_1015B5C0` are filled by the loader preamble's `sub_100523C0` from
+`[HeadlightConeOffsets]` (`Car<N>Name` hashed with `sub_10003E50`, `Car<N>Offset`
+parsed with `std::stof`), and this tree does not parse that section yet -- the same
+gap recorded for `[PopupLightAngles]` under the misc keys. With the shipped INI's
+sections empty the checker's own 2.0f is exactly what the original publishes there, so
+the live path agrees; with rows in the section (the live `game_refs/ZolikaPatch.ini`
+has `Car1Name=admiral` / `Car1Offset=-5`, ...) the original would publish those offsets
+and this tree still publishes 2.0f. The gap is the preamble reader plus its unguarded
+`std::stof`, not this key's arm.
+
 ### The five keys behind `sub_10004C70`, closed
 
 The steer/engine/plane trio (`MovingSteeringWheelSupport`, `ShakingEngineBlock`,
@@ -477,7 +566,9 @@ The popup shims' second (EDX) pattern has no hit on 1.0.8.0; its body is still
 transcribed and proven. The `[PopupLightAngles]` / `[HeadlightConeOffsets]` INI
 tables that the original's loader preamble parses are not parsed by this tree
 yet; the shipped INI's two sections are empty, so the checker's default pi/2 is
-exactly what the original uses there.
+exactly what the original uses there. `ForceCarHeadlightShadows`' checker reads the
+same kind of preamble-filled table (the `[HeadlightConeOffsets]` pair, default 2.0f)
+and inherits the same gap -- see its section below.
 
 ### `RestoreDeathMusic`, closed on the native layer's wrappers
 
@@ -729,10 +820,6 @@ loader callback this key replaces. The rebuild reproduces that shape exactly
 ### Still blocked
 
 - `OutOfCommissionFix` (the payload and the C++ path above);
-- `ForceCarHeadlightShadows` has a baseline but no arm here yet (its cell holds the
-  reference dump's `0xD0000000` placeholder for a published float pointer, and the
-  canonicalisation it needs exists -- `PopupHeadlightsFlag` is closed through it --
-  so the arm is the remaining work, not a blocker);
 - `FreezeCarFix` needs its 1,421-byte probe and the spawn path around it; the steer
   consumer `sub_10004C70` it also touched is now in place (see the section above);
 - `HighQualityReflections` (~200 instructions) and `CutsceneFixes` (~100, with only
@@ -752,11 +839,6 @@ loader callback this key replaces. The rebuild reproduces that shape exactly
   (`dword_1015AD88`, game RVA `0x45B093`), and writes an `E9` at that match to
   `0x100521E0` — which is exactly the five-byte write the baseline records.
 
-`ForceCarHeadlightShadows` has no arm in this tree yet; the published-pointer
-canonicalisation its baseline needs now exists (`Bodies::RegisterPublished` plus
-`tests/dump_main.cpp`'s rewrite to the baseline's `0xD0000000` placeholder) and
-`PopupHeadlightsFlag` is closed through it.
-
 ## Transcribing a body
 
 A body-bearing key is committed only when all four parts exist:
@@ -773,7 +855,8 @@ A body-bearing key is committed only when all four parts exist:
    the linker map, instruction budget — and `zp_body_proof` must PASS. A body that is
    compiler output for a C function (an SEH frame, a /GS cookie, the thread-safe
    static-init protocol) is rebuilt in C++ instead, and then has no proof row:
-   `SpeedupBugFix` and the steer consumer `sub_10004C70` are the current examples.
+   `SpeedupBugFix`, the steer consumer `sub_10004C70` and
+   `ForceCarHeadlightShadows`' offset check are the current examples.
 
 ## What the scoreboard can and cannot compare
 

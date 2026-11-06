@@ -37,6 +37,20 @@ extern "C"
     uint32_t zpatch_collision_should_walk = 0;  // dword_1015BDD4
     uint32_t zpatch_collision_iterations = 0;   // dword_1015BDD8
 
+    // ---- ForceCarHeadlightShadows --------------------------------------------
+    // dword_1015BDD0: the object the hooked function receives in ECX (the shim
+    // stores it, the checker reads +0x2E of it). dword_101580C0: the offset float
+    // the site's `movss xmm2, [0xD95B68]` is retargeted at; the original seeds its
+    // copy with 2.0f on disk, so this one starts there too. dword_1015B5BC: the
+    // resume, published from the site's own prologue before the E9 replaces it.
+    // dword_1015ADB8 / dword_1015B5C0: the two 512-slot [HeadlightConeOffsets]
+    // lookup tables (model hash, cone offset) the checker walks.
+    uint32_t zpatch_fchs_param = 0;
+    float zpatch_fchs_offset = 2.0f;
+    uint32_t zpatch_fchs_resume = 0;
+    uint32_t zpatch_fchs_hashes[512] = {};
+    float zpatch_fchs_offsets[512] = {};
+
     // The bike-physics detour's published state: the incoming value the clamp
     // rewrites, the caller's EAX saved across the clamp call, and the resume (the
     // site's own `call`, match+9).
@@ -320,6 +334,84 @@ static __declspec(naked) void CarDynamicShadowShimB()
         add esp, 0x14
         nop
         jmp DWORD PTR [zpatch_carparts_resume_2]
+    }
+}
+
+// abi_fchs_check, recovered VA 0x1001AD20 (139 bytes, 0x1001AD20..0x1001ADAA):
+// ForceCarHeadlightShadows' per-model offset check, rebuilt rather than
+// transcribed. It is compiler output for a C function -- a /GS frame
+// (`mov eax,___security_cookie` / `xor eax,ebp`, `call __security_check_cookie` at
+// 0x1005FE7B), a tail-merged epilogue shared by its two returns, and a
+// `nop dword ptr [eax]` loop alignment -- so a linear transcription would prove the
+// compiler's register allocation, not the feature. What it does is fixed by the
+// shim's `call` and by its own state words: seed the offset float with 2.0f, then
+// walk the [HeadlightConeOffsets] hash table from slot 0, stopping at the first zero
+// hash, and on the first entry whose model-index lookup answers the object's signed
+// model word publish that entry's float. The lookup slot and the object are read
+// unguarded -- the original's `call dword_10159C0C` (0x1001AD5C) and its
+// `movsx eax, word [edi+2Eh]` (0x1001AD62) are -- and the call comes first, so a
+// null object faults on the load and a null lookup faults on the call.
+namespace
+{
+    constexpr float kFchsDefaultOffset = 2.0f;  // dword_101580C0's on-disk seed
+    static_assert(std::bit_cast<uint32_t>(kFchsDefaultOffset) == 0x40000000u);
+
+    void FchsCheck()
+    {
+        const auto lookup = reinterpret_cast<int(__cdecl*)(uint32_t, std::int32_t*)>(
+            static_cast<uintptr_t>(zpatch_model_lookup));
+        const auto* const object = reinterpret_cast<const std::byte*>(
+            static_cast<uintptr_t>(zpatch_fchs_param));
+
+        uint32_t hash = zpatch_fchs_hashes[0];
+        zpatch_fchs_offset = kFchsDefaultOffset;
+        if (hash == 0u)
+            return;
+
+        for (uint32_t slot = 0;;)
+        {
+            std::int32_t index = -1;
+            lookup(hash, &index);
+            const auto model = *reinterpret_cast<const std::int16_t*>(object + 0x2E);
+            if (static_cast<std::int32_t>(model) == index)
+            {
+                zpatch_fchs_offset = zpatch_fchs_offsets[slot];
+                return;
+            }
+
+            ++slot;
+            // The original walks off the end of its table into the .data that follows
+            // it; our module's layout differs, so the walk stops at the last slot
+            // (docs/parity.md). Unreachable with a section that holds fewer than 512
+            // rows, because the walk stops at the first zero hash instead.
+            if (slot == std::size(zpatch_fchs_hashes))
+                return;
+            hash = zpatch_fchs_hashes[slot];
+            if (hash == 0u)
+                return;
+        }
+    }
+}
+
+// abi_fchs_shim, recovered VA 0x1001ADB0 (9 instructions, 0x1001ADB0..0x1001ADCE):
+// the hook body the arm installs at the shadow function's entry (game 0x8F7590).
+// It stores the object the function was called with, runs the check between
+// pushad/popad, then replays the prologue the E9 replaced -- the resume must run
+// with the frame those twelve bytes establish -- and tail-jumps to the published
+// resume, never calls it.
+static __declspec(naked) void FchsShimBody()
+{
+    __asm
+    {
+        mov DWORD PTR [zpatch_fchs_param], ecx
+        __emit 0x60  // pushad
+        call FchsCheck
+        __emit 0x61  // popad
+        push ebp
+        mov ebp, esp
+        and esp, 0FFFFFFF0h
+        sub esp, 0D4h
+        jmp DWORD PTR [zpatch_fchs_resume]
     }
 }
 
@@ -1687,6 +1779,87 @@ namespace
             injector::WriteMemory<uint32_t>(pattern.get_first(2), 0x100u, true);
     }
 
+    // ForceCarHeadlightShadows' resume: the E9 replaces the shadow function's entry
+    // (game 0x8F7590), and the shim replays those twelve prologue bytes itself, so
+    // the continuation is the instruction after them (match+12, the `mov eax,
+    // [ebp+20h]`). Read before the site is written, as the original's handler does.
+    void PublishForceCarHeadlightShadows()
+    {
+        if (!Loader::Enabled("ForceCarHeadlightShadows"))
+            return;
+
+        auto pattern = find_pattern("55 8B EC 83 E4 F0 81 EC D4 00 00 00 8B 45 20 8B");
+        if (!pattern.empty())
+            zpatch_fchs_resume = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(12)));
+    }
+
+    // ForceCarHeadlightShadows: the shadow function hooks to the shim, the three
+    // branches that decide whether the headlight cone draws its shadow are forced so
+    // the shadow always runs, and the offset float is retargeted at this module's
+    // word instead of the game's 0.0f at 0xD95B68. The writes, in the original
+    // handler's order:
+    //   * `EB` at the anchor's +6 (the `jne +79h` of `cmp al,1` / `test bl,bl`),
+    //     `E9` at +95 to match+476 (the second `jne +177h`, one byte shorter than the
+    //     six-byte `0F 85` it replaces, which is why the write starts on the opcode
+    //     and its sixth byte becomes the unreachable remainder), `EB` at +379 (the
+    //     `jne +5Fh` on the same target) and the `movss` operand at +211;
+    //   * the E9 at the shadow function's entry;
+    //   * the handler tail's restore of the two shadow-buffer pushes (0x504 / 0x104)
+    //     and of the `je +9Eh` at 0x8F719F. On a pristine image every one of those is
+    //     a no-op; they are the original's `sub_1000E870` writes, which undo exactly
+    //     the CarDynamicShadowFix rewrites that arm skips while this key is on, so
+    //     the two keys interact the way they do in the original.
+    void InstallForceCarHeadlightShadows()
+    {
+        if (!Loader::Enabled("ForceCarHeadlightShadows"))
+            return;
+
+        auto pattern = find_pattern("3C 01 75 50 84 DB 75 79");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            injector::WriteMemory<std::byte>(match + 6, Bytes::ShortJmp, true);
+            injector::MakeJMP(match + 95, match + 476, true);
+            injector::WriteMemory<std::byte>(match + 379, Bytes::ShortJmp, true);
+
+            // The `movss xmm2, [0xD95B68]` operand becomes this module's float. The
+            // original writes its own image's dword_101580C0 here (0x101580C0); the
+            // stored baseline records the reference dump's 0xD0000000 placeholder for
+            // the word, so the slot is registered for the dump's canonicalisation.
+            injector::WriteMemory<uint32_t>(match + 211,
+                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&zpatch_fchs_offset)), true);
+            Bodies::RegisterPublishedImage(reinterpret_cast<uintptr_t>(match + 211));
+        }
+
+        pattern = find_pattern("55 8B EC 83 E4 F0 81 EC D4 00 00 00 8B 45 20 8B");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(0),
+                reinterpret_cast<void*>(&FchsShimBody), true);
+
+        // `push 0x504` (the first shadow buffer) and `push 0x104` (the second) are
+        // written back as dwords; both immediates are unchanged on a pristine image.
+        pattern = find_pattern("8D 4C 24 50 51 68 04 05 00 00");
+        if (!pattern.empty())
+            injector::WriteMemory<uint32_t>(pattern.get_first<std::byte>(6), 0x00000504u, true);
+
+        pattern = find_pattern("8D 44 24 50 50 68 04 01 00 00");
+        if (!pattern.empty())
+            injector::WriteMemory<uint32_t>(pattern.get_first<std::byte>(6), 0x00000104u, true);
+
+        // `0F 84 9E 00 00 00` (the `je` that skips the shadow) is rewritten with its
+        // own six bytes, the last one left as it was.
+        pattern = find_pattern("F3 0F 11 44 24 1C 0F 84 9E 00 00 00");
+        if (!pattern.empty())
+        {
+            auto* site = pattern.get_first<std::byte>(6);
+            injector::WriteMemory<std::byte>(site, std::byte{ 0x0F }, true);
+            injector::WriteMemory<std::byte>(site + 1, std::byte{ 0x84 }, true);
+            injector::WriteMemory<uint16_t>(site + 2, 0x009Eu, true);
+            injector::WriteMemory<std::byte>(site + 4, Bytes::Zero, true);
+        }
+    }
+
     // InfiniteCarBottomDistance: the `ja` of the bottom-distance clamp becomes an
     // unconditional jump over it (`EB 2A`, written as its two bytes -- there is no
     // short-jump API).
@@ -2260,6 +2433,7 @@ export void RegisterVehicles()
         PublishCollisionDeadlockFix();
         PublishCarPartsShadowFix();
         PublishCarDynamicShadowFix();
+        PublishForceCarHeadlightShadows();
         PublishHighFPSBikePhysicsFix();
         PublishDualVehicleHeadlights();
         PublishMovingSteeringWheelSupport();
@@ -2274,6 +2448,10 @@ export void RegisterVehicles()
         InstallCollisionDeadlockFix();
         InstallCarPartsShadowFix();
         InstallCarDynamicShadowFix();
+        // After the shadow arm: the original's ForceCarHeadlightShadows handler runs
+        // after the CarDynamicShadowFix block, and its tail restores what that block
+        // rewrites -- so with both keys on, the restore is what the game sees.
+        InstallForceCarHeadlightShadows();
         InstallInfiniteCarBottomDistance();
         InstallReversingLightFix();
         InstallBikeFeetFix();
@@ -2296,6 +2474,7 @@ export void RegisterVehicles()
     // original's coordinates. The three steer keys all jump to the same two detour
     // bodies, so those are registered once here rather than in the shared installer.
     Bodies::Register(reinterpret_cast<uintptr_t>(&VehicleComponentBody), 0x10003F40u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&FchsShimBody), 0x1001ADB0u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&SteerDetourEaxBody), 0x100051B0u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&SteerDetourEdxBody), 0x100051E0u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&GarageColourBody), 0x10046B90u);
@@ -2317,5 +2496,6 @@ export void RegisterVehicles()
         reinterpret_cast<uintptr_t>(&NoliveryFormat),
         reinterpret_cast<uintptr_t>(&NoliveryResolve),
         reinterpret_cast<uintptr_t>(&SteeringConsumer),
+        reinterpret_cast<uintptr_t>(&FchsCheck),
     };
 }

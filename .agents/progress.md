@@ -357,3 +357,48 @@ the part calls' values, the engine phase) is not executed by the offline tools; 
 pinned by the disassembly-derived table in `docs/parity.md`, and every piece around
 it is proven instruction for instruction. No game launch. `AGENTS.md`'s "Current
 state" (88 keys / 98 bodies) is outside this pass's edit set and is stale.
+
+## 2026-11-06 - `ForceCarHeadlightShadows` closed (93 -> 94 keys, 113 -> 114 bodies)
+
+**What closed it.** The key's arm writes a *pointer to a float* into the shadow
+function's `movss` operand, and the stored baseline records the reference dump's
+`0xD0000000` placeholder for that word. `Bodies::RegisterPublishedImage` (the
+registry `source/bodies.ixx` already exposed) names the word for the dump; the arm
+writes the real module address and the mod writes no placeholder.
+
+**Write set on 1.0.8.0** (game RVAs; anchor match = 0x8F7C5B): `E9` at `0x8F7590`
+-> `0x1001ADB0` (shadow function entry; resume match+12); `EB` at `0x8F7C61`,
+`E9` at `0x8F7CBA` -> match+476 and `EB` at `0x8F7DD6` (the three shadow
+branches forced); the dword at `0x8F7D2E` -> this module's offset float (the
+`movss xmm2,[0xD95B68]` operand; the game's word is 0.0f); and the handler tail's
+three restores at `0x8F73EC` (0x504), `0x8F7422` (0x104) and `0x8F719F` (`je
++9Eh`), which are no-ops on a pristine image and undo `CarDynamicShadowFix`'s
+`@noFCHS` rewrites when both keys are on.
+
+**Transcribed vs rebuilt.** The hook thunk `0x1001ADB0` (9 instructions) is
+transcribed and proven (`force_headlight_shadows_shim`, new row in
+`tests/bodies.tsv`); the per-model offset check `0x1001AD20` (139 bytes,
+..0x1001ADAA) is rebuilt in C++ with the same state words (`dword_1015BDD0`,
+`dword_101580C0` seeded 2.0f, `dword_1015B5BC`, the `dword_1015ADB8` /
+`dword_1015B5C0` 512-slot tables) and the same unguarded call-then-load order, so
+it has no proof row: it is compiler output (/GS frame, tail-merged epilogue,
+`movss` store, `nop dword ptr [eax]` alignment). One unavoidable divergence: the
+original's walk runs off its own table into the following .data; the rebuild stops
+at the 512th slot (unreachable through the INI).
+
+**Gates (final runs).** `cmake --build --preset release` -> success;
+`python tools/parity_report.py 9` -> `build 9: 94 key(s) closed, 5 open` (exit 1,
+`SkipLauncher` still open by construction; the key is not in the OPEN list);
+`ctest --preset release` -> `100% tests passed out of 10`;
+`tools/verify_bodies.py` -> `114 body(ies), 0 failure(s)`. The key's per-option cell
+is byte-identical to the baseline on builds 5, 6, 7, 8, 9, 11, 12 and 13, and on
+build 1 in an isolated single-key cell (15 rows; only the four `E9` displacement
+bytes differ, which the scoreboard excludes by design).
+
+**Open, recorded in `docs/parity.md`.** The `[HeadlightConeOffsets]` table the
+checker walks is still not parsed from the INI (the same shared gap as
+`[PopupLightAngles]`): with the shipped INI's empty sections the checker's 2.0f is
+the original's own value, but a section with rows (as in `game_refs/ZolikaPatch.ini`)
+would use per-model offsets in the original and 2.0f here. Fixing it means the
+loader preamble's reader (`sub_100523C0`) plus its unguarded `std::stof`, which
+covers both sections and is a pass of its own.

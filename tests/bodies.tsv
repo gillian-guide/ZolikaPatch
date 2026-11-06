@@ -29,6 +29,10 @@ car_decals_selector 1001B2E0 ?CarDecalsSelectorShim@@YAXXZ 13
 car_parts_shadow 10006880 ?CarPartsShadowShim@@YAXXZ 13
 car_dynamic_shadow 100068A0 ?CarDynamicShadowShim@@YAXXZ 26
 car_dynamic_shadow_b 100068D0 ?CarDynamicShadowShimB@@YAXXZ 27
+# ForceCarHeadlightShadows (source/vehicles.ixx): the shadow function's hook body.
+# The per-model offset check it calls (sub_1001AD20, 139 bytes) is compiler output
+# and is rebuilt, so it has no row (docs/parity.md).
+force_headlight_shadows_shim 1001ADB0 ?FchsShimBody@@YAXXZ 9
 collision_deadlock_walk 10005D80 ?CollisionDeadlockShim@@YAXXZ 56
 bike_physics_detour 1001EF60 ?BikePhysicsDetour@@YAXXZ 14
 dual_headlights_new 100064F0 ?DualHeadlightsNewBody@@YAXXZ 78
