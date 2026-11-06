@@ -1572,3 +1572,17 @@ the whole catalogue. The 1.0.0.0 fault above therefore surfaces from a
 `SpeedupBugFix`'s own signature has no hit on 1.0.0.0, so that arm is the
 original's clean skip there. Only the explicit all-`0` document isolates a key.
 
+
+## Open item: an oracle-verified class for baselines that are incomplete
+
+`SkipLauncher` is measured against the oracle rather than the baseline, and the
+scoreboard has no way to say so: it reports the key as open, which is accurate about
+the comparison and misleading about the work. The intended fix is a sidecar
+(`tests/oracle_verified.tsv`: key, why, doc anchor, how it was measured) that the
+scoreboard reports *apart* from the open keys and never counts as closed, so the line
+reads `98 closed, 0 open, 1 oracle-verified (baseline incomplete)`.
+
+An attempt at that change mangled `tools/parity_report.py` (a scripted edit split a
+line), so it was reverted rather than left half-applied - the scoreboard is the tool
+every other number depends on. The change is small and the design is above; it needs
+a careful edit, not a scripted one.
