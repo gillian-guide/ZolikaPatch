@@ -147,6 +147,17 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/saves)
   set_tests_properties(zp_save_walk PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
+# The native layer's two guarded entries (source/native.ixx), asserted by behaviour
+# instead of by their disassembly: the normal answers of the invoke (calls the
+# handler, answers 1) and of the resolve (answers the handler address, does not call
+# it), a fault swallowed inside the guarded region, the invoke's null-handler skip,
+# and the null resolver whose zero the *caller* faults on, in a child process.
+add_executable(zp_native_guard tests/native_guard.cpp)
+set_target_properties(zp_native_guard PROPERTIES CXX_SCAN_FOR_MODULES ON)
+target_link_libraries(zp_native_guard PRIVATE zp_modules)
+add_test(NAME zp_native_guard COMMAND zp_native_guard)
+set_tests_properties(zp_native_guard PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+
 add_executable(zp_dump tests/dump_main.cpp)
 set_target_properties(zp_dump PROPERTIES CXX_SCAN_FOR_MODULES ON)
 target_link_libraries(zp_dump PRIVATE zp_modules)

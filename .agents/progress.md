@@ -1110,3 +1110,86 @@ question. §5 item 1 keeps the in-game exercise.
 **Open, not mine to edit.** `docs/review.md` still says "12 tests" and
 `ctest --preset release # 12/12`; it is 13. `readable-fusion/AGENTS.md` line 11's body
 count is still stale at 138/151 from the previous pass.
+
+## 2026-11-07 - the two guarded native entries, executed at last: `zp_native_guard`
+
+**What changed.** `0x100038E0` (59 instructions, guarded resolve-and-invoke) and
+`0x10003980` (52, guarded resolve) are class-B rebuilds whose `__except` frame *is* the
+behaviour, and that behaviour was argued from the disassembly only. It is now a ctest.
+`zp_native_guard` (27 checks) runs both entries against a resolver the test installs,
+with no game image and no ASI load. It is ctest 4, so the suite is 14.
+
+- `source/native.ixx` - one new exported entry, `Native::SetResolverForTest(uintptr_t)`,
+  a single store to `zpatch_native_resolver` (the slot `Register()` fills from the
+  game's scan). It exists for the test; the shipped path never calls it. No other
+  behaviour change: the two guards, the wrappers and the salts are untouched.
+- `tests/native_guard.cpp` (new) + `CMakeLists.txt` (`zp_native_guard`, ctest entry 4).
+  The fake resolver is naked because the layer calls its resolver with the hash in ESI
+  and no stack argument (the game's resolver reads ESI; `0x626AF0` opens `mov eax,esi`);
+  it answers a target the test picks, or 0.
+- `docs/rebuilt.md` - section 1 class B's sentence, section 3 class B's two rows (the
+  "how verified" cell no longer says "the fault path is unreachable offline"), section 5
+  item 2, section 6 (a `tests/native_guard.cpp` bullet). `docs/parity.md` - a contracts
+  row for the two entries, the native-layer section's behaviour paragraph rewritten
+  around the four paths, and the resolver paragraph now says the test measures both
+  halves.
+
+**What the disassembly says, and what is asserted.** The original's scope table at
+`0x10153EE8` has three-dword entries (`EnclosingLevel`, `FilterFunc`, `HandlerFunc`, no
+address range), with filter `mov eax,1; ret` at `0x1000395A` and handler `... xor al,al;
+ret` at `0x10003960`; the resolve's pair is `0x100039EC`/`0x100039F2`. So a fault while
+the try level is 0 is caught wherever it was raised - including the resolver call.
+
+- normal invoke: a target that returns 7 answers the original's `1`; the handler ran
+  once and received the caller's block (`args[0] = 0xC0FFEE01`); the resolver saw the
+  hash in ESI (`0x0BADF00D`).
+- normal resolve: answers the handler address unchanged and did not call it; ESI too.
+- fault inside the region: a handler that reads through null answers 0; a handler that
+  writes to `0x10` answers 0; the process is still usable afterwards (the next normal
+  call is asserted, so the frame unwound cleanly, not just "no crash yet"). A resolver
+  that faults answers 0 through *both* entries - the invoke's `0x1000392B` and the
+  resolve's `0x100039C9` are in the same frame.
+- null handler: this is the **invoke only**. `test eax,eax / je 0x1000393F` (the `je`
+  at `0x10003937`) skips `push edi; call eax; add esp,4` and falls to `mov [ebp-4],-2;
+  mov al,1`: it answers **1** (success) without calling. The **resolve has no test at
+  all**: it answers the null pointer to its caller (`0x100039D0`..`0x100039EB`).
+- null resolver: the SEH catches `call [dword_1015BDE0]` with `dword_1015BDE0 = 0` and
+  answers 0 in-process (both entries; asserted). The original's preserved fault is one
+  level up: the *caller* reads through that 0. That read kills a process, so it is a
+  child (`--child <report>`): the child installs the null resolver, calls
+  `Native::Resolve`, writes `RESOLVED=0`, then reads `[eax+0Eh]` (the measured
+  `DrivebyFOVFix` helper consumer, `0x1000646E`). The parent asserts the report says
+  `RESOLVED=0` *and* the child exited `0xC0000005`, so "the guard answered 0" and "the
+  caller faulted" cannot be confused with "the guard itself faulted".
+
+**The test can fail.** Two mutations of the guards' fault path, both reverted (the file
+is byte-identical afterwards: SHA-256 `CD5ACCCB...D02749A` before and after).
+(a) Make the fault answer success - `return 1;` in the invoke's handler and
+`return reinterpret_cast<void*>(1);` in the resolve's: exactly 7 of 27 checks fail and no
+others, all of them the fault-value checks (`a handler that dereferences null answered
+0`, the unmapped write, the resolver fault through both entries, the null resolver, and
+the child's report `RESOLVED=nonzero`). The child's exit-code check still passed (the
+read of `0x0000000F` is also an access violation), which is exactly why the report check
+exists. (b) Make the guard re-raise - `EXCEPTION_CONTINUE_SEARCH` in both filters: the
+seven normal-path checks pass, the process dies at the first fault call, and ctest
+reports `***Exception: SegFault`, `0% tests passed, 1 tests failed out of 1`; the last
+flushed line is the seventh normal-path PASS, which is why `Check` now flushes.
+
+**Gates (final runs, after the revert and a full rebuild).** `cmake --build --preset
+release` exit 0; `ctest --preset release` `100% tests passed out of 14` three times in a
+row (6.42 s, 5.31 s and 5.63 s; no flake recurred); `python tools/parity_report.py 9` ->
+`build 9: 98 key(s) closed, 0 open, 1 oracle-verified (baseline incomplete)`; `python
+tools/verify_bodies.py --original ... --candidate ... --bodies tests/bodies.tsv --map
+...` -> `151 body(ies), 0 failure(s)`; `build\win-x86\Release\zp_dump.exe --ooc-selftest`
+-> `ooc selftest: PASS`.
+
+**What stays unproven.** The test pins the frame's four outcomes, not the faults' sources:
+which real game faults actually raise inside the region is a play question, and the
+caller-side fault uses a stand-in caller (the read the measured consumer performs), not
+`DrivebyFOVFix` itself. `Native::SetResolverForTest` is compiled into the shipped ASI; it
+is inert unless called, and the shipped path does not call it. The test calls
+`Native::Resolve`/`Invoke` (the C entries), not the six-byte `jmp [slot]` forwarders the
+arms reach them through.
+
+**Open, not mine to edit.** `docs/review.md` line 14 still says "13 tests" and line 24
+`# 13/13`; it is 14. (`readable-fusion/AGENTS.md` is current: it says 151 hook bodies.)

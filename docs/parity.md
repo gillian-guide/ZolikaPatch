@@ -14,6 +14,7 @@ fix.
 | Build classification: the four version fields concatenated (`1.0.7.0` -> 1070, `1.2.0.43` -> 12043) and the original's switch; an unsupported executable is `unknown` and applies nothing | `zp_tests`, `TestBuilds` |
 | Option catalogue: 99 keys with the shipped value, the absent-key default and the build mask | `source/options.inc` (generated), `zp_tests` |
 | The loader preamble's ten salt words: the shipped `.data` values when its probe hits, the recovered fallback set when it misses | `zp_salt_probe` (1.0.8.0 hit; 1.0.0.0 and 1.0.4.0 miss) |
+| The two guarded native entries (`sub_100038E0` / `sub_10003980`): the invoke calls the handler and answers `1` (the handler's own return value is ignored), the resolve answers the handler address without calling it; a fault inside either guarded region (the handler call or the resolver call) answers `0` and the process keeps working; a resolver that answers null is the invoke's skip (`mov al,1`) while the resolve answers null; a null resolver (`dword_1015BDE0` = 0) is caught as `0`, and the *caller's* read through that zero faults | `zp_native_guard` (27 checks; the caller fault is a child process that must exit `0xC0000005` with the report saying `RESOLVED=0`) |
 | With no arm installed the pipeline changes nothing on any supported image | `zp_dump_empty` (9 images) |
 | The save converter's walk (`sub_10051B30`): `SAVE` at `+0xC`, eighteen 9-byte chunk headers in file order, the three size tests (`4C45`/`1741`/`0E77`) and the three patch values they select (`74`/`EB`, `0CBE`/`0E6E`, `75 26`/`90 90`), on both real saves and on synthetic new/old layouts; a chunk size below nine throws `std::bad_alloc`; a header shorter than `0x110` is not rejected on its header when the file itself carries the magic, and a file shorter than the magic offset is decided by a fresh process's stack | `zp_save_walk` (258 checks; every expected value is recomputed from the file by the test's own parser, not by the converter) |
 | The generated catalogue and INI cannot drift from their sources | `zp_catalogue_drift`, `zp_ini_drift` |
@@ -138,18 +139,35 @@ exists as `source/native.ixx`, and the key is closed with it.
 | zero-argument call, hash from `ECX` | `0x1005B150` | 44 | transcribed |
 | copy pending records out, dword result | `0x1005DE40` | 21 | transcribed |
 | copy pending records out, byte result | `0x1005DE80` | 21 | transcribed |
-| guarded resolve-and-invoke | `0x100038E0` | 59 | rebuilt as C: `__try`/`__except` frame (`rebuilt.md` §3 class B) |
-| guarded resolve-only | `0x10003980` | 52 | rebuilt as C: same frame (class B) |
+| guarded resolve-and-invoke | `0x100038E0` | 59 | rebuilt as C: `__try`/`__except` frame (`rebuilt.md` §3 class B); behaviour asserted by `zp_native_guard` |
+| guarded resolve-only | `0x10003980` | 52 | rebuilt as C: same frame (class B); behaviour asserted by `zp_native_guard` |
 
 The last two are compiler output for a C function with `__try`/`__except`
 (`GuardedInvoke` / `GuardedResolve`): their frames carry a cookie-xored scope table
 whose handler fields are addresses inside the original image, so there is no
 instruction stream to transcribe -- the same reason the launcher's DFA close-handle
-body is rebuilt. Both keep the original ABI and behaviour: on the normal path the invoke
-entry answers `1` (a null resolver skips the handler call at `0x10003937`), a fault
-anywhere inside the guarded region -- the resolver call or the handler call -- is
-caught and answers `0`, and when the resolver answers null the *caller* then faults
-on the unresolved handler. That is the original's split, preserved.
+body is rebuilt. Both keep the original ABI and behaviour, and `zp_native_guard` now
+asserts the split instead of arguing it from the disassembly:
+
+- the normal path: the invoke resolves the hash, **calls** the handler with the block
+  and answers `1` (the handler's own EAX is ignored -- the original's `push edi;
+  call eax; add esp,4` is followed by `mov al,1`); the resolve answers the handler
+  address and does not call it;
+- a fault **inside the guarded region** -- the handler call, or the resolver call
+  itself -- is caught and answers `0` (`xor al,al` at `0x1000396A`, `xor eax,eax` at
+  `0x100039FC`), and the process carries on: the test's next normal call still works;
+- a resolver that answers **null** is the invoke's `test eax,eax / je 0x1000393F`
+  (the `je` at `0x10003937`), which skips the call and still reports success
+  (`mov al,1`); the resolve has no `test` at all and answers the null to its caller;
+- a **null resolver** (`dword_1015BDE0` unresolved) is caught by the same frame as
+  `0`, and the *caller* then faults when it reads through the zero (`DrivebyFOVFix`'s
+  `[eax+0Eh]` at `0x1000646E` is the measured consumer). That last one kills the
+  process, so the test runs the caller in a child and asserts the child's
+  `0xC0000005`, with `RESOLVED=0` written before the read so "the guard answered 0"
+  and "the caller faulted" cannot be confused with "the guard itself faulted".
+
+`Native::SetResolverForTest` exists for that test: one store to the slot `Register()`
+would fill and no other state; the shipped path never calls it.
 
 The resolver is not invented. The original's loader preamble fills `dword_1015BDE0`
 at `0x10052E88..0x10052E9E` by scanning the game module for `08 0B C2 8B F0 E8`
@@ -159,7 +177,9 @@ native-handle resolver, and `Native::Register()` reproduces the scan with
 `find_pattern` at startup. A missing pattern skips the store exactly as the
 original's `jz` does, so the preserved fault is a null resolver: the layer's SEH
 catches the call and answers zero, then the caller (for `DrivebyFOVFix`, the
-`[eax+0Eh]` read at `0x1000646E`) faults where the original faults.
+`[eax+0Eh]` read at `0x1000646E`) faults where the original faults. `zp_native_guard`
+measures both halves: the guard's zero in-process, and the caller's fault in a child
+process.
 
 Two ABI details the transcribed pieces rely on. The game resolver reads the hash
 from **ESI**, not from the argument registers (`0x626AF0` opens `mov eax, esi`), and

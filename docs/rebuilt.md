@@ -59,8 +59,9 @@ So the blockers are mechanical, and there are exactly four kinds in this tree:
   *separate* funclet with its own address, and a scope table / throw-info record in
   `.data` decides what the frame does. The funclet's bytes are not in the linear
   stream, and the table is not an instruction at all. For `0x100038E0`/`0x10003980`
-  the frame *is* the feature: the `__except` is what answers 0 instead of crashing on
-  a null native handler.
+  the frame *is* the feature: the `__except` is what answers 0 on a fault inside the
+  region (a null native handler is the invoke's skip, not a fault), and
+  `zp_native_guard` now runs those outcomes instead of arguing them (§3 class B).
 - **C · TLS static-init guard.** A function-local `static` in the original is
   initialised through `_Init_thread_header` / `_Init_thread_footer`
   (`0x1005FFC3` / `0x1005FF77`), which reach the CRT's per-thread block through
@@ -1218,8 +1219,8 @@ unregistered indexed absolute keeps the literal comparison.
 
 | piece | VA | bytes | insns | the frame that blocks it | what the rebuild reproduces | how that was verified | residual risk |
 |---|---|---:|---:|---|---|---|---|
-| guarded resolve-and-invoke | `0x100038E0` | `0x9E` | 59 | `__try/__except`: `push -1; push 0x10153EE8; push __except_handler4; … mov fs:[0],eax`, two funclets (`mov eax,1; ret` and the unwind path) | resolve a native handler by hash, call it with the one argument, answer `true`; a fault in the call is caught and answered `false` — that is the feature | the *bodies* of the native-call layer that call it are transcribed (`audio_call_*`, `bad_player_model_*`); its consumers' cells are closed; the fault path is unreachable offline | high: the `__except` is the whole point. If the rebuild's frame caught a different range, a game fault would either crash (original: answered 0) or be swallowed (original: crash) |
-| guarded resolve-only | `0x10003980` | `0x90` | 52 | same, scope table `0x10153F08` | resolve only, answer the handler pointer or 0 | as above; called from the transcribed steer consumer, the popup shims and `MouseFix`'s helpers | high, same reason |
+| guarded resolve-and-invoke | `0x100038E0` | `0x9E` | 59 | `__try/__except`: `push -1; push 0x10153EE8; push __except_handler4; … mov fs:[0],eax`, two funclets (`mov eax,1; ret` and the unwind path) | resolve a native handler by hash, call it with the one argument, answer `true`; a fault in the call is caught and answered `false` — that is the feature | `zp_native_guard` (ctest) runs it against a resolver the test installs: a target that returns 7 answers `1` and receives the block, a target that reads null or writes an unmapped address answers `0` with the process still usable, a *resolver* that faults answers `0` (the region covers `0x1000392B`), and a null handler skips the call and answers `1`. The bodies that call it are transcribed (`audio_call_*`, `bad_player_model_*`), and its consumers' cells are closed | high, by impact; the frame's four outcomes are now measured, so what stays unproven is that a real game fault always raises inside this region, and that the in-game consumer is the one the test models (a stand-in caller does the read) |
+| guarded resolve-only | `0x10003980` | `0x90` | 52 | same, scope table `0x10153F08` | resolve only, answer the handler pointer or 0 | `zp_native_guard` as above, plus this entry's own shape: it answers the handler address without calling it (`0x100039D0`..`0x100039EB`), a faulting resolver answers `0`, a null handler is answered as null (this entry has no `test`), and a child process shows a caller's `[eax+0Eh]` read through that null dying with `0xC0000005`. Called from the transcribed steer consumer, the popup shims and `MouseFix`'s helpers | high, same reason: the caller's unguarded read is the original's fault, and the test models that caller rather than running it |
 | DFA close-handle body | `0x10004790` | `0x81` | 45 | `__try/__except` around `CloseHandle`: `push -2; push 0x10153FC0; push __except_handler4 (0x1005FE4C); … mov fs:[0], eax`, with the filter (`or eax, -1; ret` at `0x100047EC`) and the unwind continuation (`0x100047F0`) inside the same byte range | `CloseHandle` behind the guard, answering `-1` when the call faults | the DFA stage's write set and the launcher cell (`oracle-verified`); the body runs when the game closes a file through DFA | low: a close that faults is caught either way. The frame is the feature, so it stays rebuilt; the four forwarders beside it are transcribed (§2a) |
 | SpeedupBugFix body | `0x10050540` | `0x16F` | 93 (+funclet at `0x10061981`) | C++ static-init EH: `push -1; push SEH_10050540; … fs:[0]`, funclet `jmp __CxxFrameHandler3` with throw info `0x10154358`, plus the `_Init_thread_header/footer` TLS guard (`0x1005FFC3`/`0x1005FF77`) around the one-time QPC/scan | the clock fix: QPC frequency → one-over-frequency into eight published float slots, then tail-call `sub_10003830`'s resolver result − 0x33 (the game's timer getter) and return its `(eax,edx)` pair in a 64-bit answer | the arm's eight operands are validated per site and the per-key dump is byte-identical to the pre-change dump on all nine images; the *body* never runs offline | moderate: the eight timer slots are the whole fix. A wrong slot or a float/double mix-up would show as a broken game clock, not a crash |
 | audio install body | `0x10050AD0` | `0xF9` | 75 | EH4 (`push __except_handler4`, scope `0x10154384`, funclet `0x100619C1`) + the CRT clock/seed block through `fs:[2Ch]` and `TlsIndex` | resolve the `6A 06 68 ? ? ? ? 8D 8C` site once and write `rand() % 5 + 1` into its `push` immediate, gated on the transcribed `0x10050A50` gate | `RestoreDeathMusic`'s cell is closed; the gate and the three native wrappers around it are transcribed and proven | **the one recorded 1:1 divergence in that key**: the original's guard compares `dword_101A84C0` with the CRT per-thread word and may skip the whole block on a fresh process; the rebuild always writes. Recorded in `parity.md` §RestoreDeathMusic |
@@ -1324,14 +1325,19 @@ deliberately after any change to the modules above.
    savegame with chunk 9 `0x4C45`, 16 `0x0E77`) is the case the synthetic images cover
    offline and only play can confirm end to end.
 2. **`0x100038E0`/`0x10003980`, the guarded native calls** (class B, high impact,
-   fault-parity is the feature). Exercise: any path that calls a native with a slot
-   that has not resolved — the audio wrappers, `DrivebyFOVFix`, `BadPlayerModelCrashFix`
-   on a non-ped model. What to look for: a clean no-op (original: answered 0), not a
-   crash; and the reverse — a genuine game fault must still crash in the same place.
-   With GTAC.dll loaded, the same path prints the diagnostic, whose model name now comes
-   from the transcribed `0x10003F00` walking the registered table (§2b): a wrong name in
-   that text is the visible symptom of a bad table, and the proof already compares the
-   table's contents.
+   fault-parity is the feature). Offline, `zp_native_guard` now pins the four outcomes
+   (§3 class B): the invoke's `1` and the resolve's handler address, a fault swallowed
+   inside the region (handler or resolver call) with the process still usable, the
+   invoke's null-handler skip (`mov al,1`), and the null resolver's `0` that the
+   *caller* faults on, in a child process. What play still decides is which real game
+   faults land inside the region and whether the in-game caller is the one modelled
+   here. Exercise: any path that calls a native with a slot that has not resolved — the
+   audio wrappers, `DrivebyFOVFix`, `BadPlayerModelCrashFix` on a non-ped model. What to
+   look for: a clean no-op (original: answered 0), not a crash; and the reverse — a
+   genuine game fault must still crash in the same place. With GTAC.dll loaded, the same
+   path prints the diagnostic, whose model name now comes from the transcribed
+   `0x10003F00` walking the registered table (§2b): a wrong name in that text is the
+   visible symptom of a bad table, and the proof already compares the table's contents.
 3. **`0x10004C70`, the steer/render consumer** (now transcribed, §2c — 320
    instructions, but they only run in play). Exercise:
    drive a car with `MovingSteeringWheelSupport`, then a plane with
@@ -1391,6 +1397,17 @@ deliberately after any change to the modules above.
   two faults (typed `std::bad_alloc` in-process, the uninitialised magic in a child
   process). It reads saves from `../game_refs/saves` and writes its synthetic inputs
   under `<build>/save_walk_inputs`.
+- `tests/native_guard.cpp` — the two guarded entries' behavioural test (§3 class B),
+  ctest entry `zp_native_guard` (27 checks, no game image): the invoke's `1` and the
+  resolve's handler address (and that the resolve did not call it), a fault swallowed
+  inside the region for both the handler call and the resolver call with the guard
+  still answering the normal path afterwards, the invoke's null-handler skip versus the
+  resolve's null answer, and the null resolver whose `0` the caller's `[eax+0Eh]` read
+  faults on — that last one as a child process (`--child <report>`) that must exit
+  `0xC0000005` with the report saying `RESOLVED=0`, so "the guard answered 0" and "the
+  caller faulted" are distinguished. `Native::SetResolverForTest` is the test-only
+  single store that installs the resolver; the fake resolver is naked because the layer
+  passes the hash in ESI.
 - `tools/verify_bodies.py` — the comparator, including the internal-branch-target
   check and the table registry (`Tables`, `table_content_hash`, `table_mismatch`,
   `table_read`, `read_table`, `read_map`); `table_read` is the one place that decides

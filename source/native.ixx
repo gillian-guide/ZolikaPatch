@@ -396,6 +396,13 @@ export namespace Native
     // The resolved dword_1015BDE0 value, for the startup trace and the tools.
     uintptr_t Resolver();
 
+    // Installs an alternative dword_1015BDE0. It exists for the guard test
+    // (tests/native_guard.cpp, ctest `zp_native_guard`), which drives the two
+    // guarded entries against targets of its own because a test process has no
+    // game image to scan; nothing in the shipped path calls it, and `0` is the
+    // original's unresolved slot, the case the guard's frame must survive.
+    void SetResolverForTest(uintptr_t resolver);
+
     // The current value of one of the original preamble's ten salt words, named by
     // the VA it has in the ASI (0x10158054, 0x101580C8, ..., 0x1015805C). Those are
     // the slots the transcribed wrappers read; exposed for the startup trace, the
@@ -471,6 +478,13 @@ namespace Native
     uintptr_t Resolver()
     {
         return zpatch_native_resolver;
+    }
+
+    void SetResolverForTest(uintptr_t resolver)
+    {
+        // A single store to the slot Register() would fill: no other state, no
+        // behaviour change on the shipped path, which never calls this.
+        zpatch_native_resolver = resolver;
     }
 
     uint32_t Salt(uint32_t reference)
