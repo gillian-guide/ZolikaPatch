@@ -31,6 +31,9 @@ fix.
 | the DLC register call's `this` is undefined | every `LoadDLCs` run | the original calls the register entry at `0x48F440` with `ECX` left over from the preceding `strcpy_s`. The callee uses it only through the loader-callback call this key replaces with `0x10023480` and through a branch its non-zero flag argument skips, so the value is never dereferenced. The rebuild keeps the same call shape (`__stdcall`, three stack arguments, `ECX` untouched) rather than inventing a `this` |
 | the steer consumer faults on a preamble miss | a build whose model-info array, bone getter or setter scan matches nothing leaves `dword_1015AD78` / `dword_10159B88` / `dword_1015D63C` / `dword_10159CDC` zero | `sub_10004C70` reads them unguarded (`mov eax,[eax+ecx*4]`, `call edx`, `call dword_1015D63C`); the rebuild keeps every hop and every indirect call unguarded, so a miss faults at the same instruction. 1.0.8.0 has all four patterns |
 | the headlight-shadow check faults on a null lookup or object | a build whose `dword_10159C0C` scan matched nothing, or a call with a null object | `sub_1001AD20`'s `call dword_10159C0C` (`0x1001AD5C`) and `movsx eax, word [edi+2Eh]` (`0x1001AD62`) are both unguarded in the original; the rebuild calls first and loads second, so it faults on the same instruction of either condition (the key's section below records the rebuild) |
+| the cutscene chain faults on an unresolved native or a missed camera site | the game's native resolver answers null (`dword_1015BDE0` unresolved, or the resolver faults and the layer answers zero), or chain B's first scan matched nothing so `dword_1015BDE4` / `dword_1015BDF0` are still zero | `sub_100388C0` reads the resolver's answer unguarded (`mov ecx,[eax+0Eh]`, `0x100388EE`) and writes through the published poke (`dec esi` / `mov byte [esi],1`, `0x10038913`-`0x10038935`); the transcription keeps every hop and both stores unguarded, so it faults at the same instruction on the same condition. All nine stored baselines record both chain B installs, so every supported image matches both patterns; the resolver scan is the native layer's, measured on 1.0.8.0 |
+| the payload init re-runs on every call and leaks its archive | every call of the wrapper the second `E8` installs | the original's one-shot guard `dword_10159C00` is read at `0x1004B77B` and never written anywhere in the image, so `sub_1004B750` decodes, registers and builds again each time, hands the game a fresh archive and never frees the previous one. The rebuild keeps that structure -- no writer, no free -- so the behaviour is the same |
+| the decoded payload is registered and mounted even when its own checks fail | a resource whose decode does not end on `05 FA`, does not fill exactly 179,536 bytes, or does not match its Adler-32 trailer | `sub_1004B570` answers 179,536 or 0 and `sub_1004B750` discards the answer (`call sub_1004B570` at `0x1004B798`, no test of `EAX`), so the partially decoded buffer is registered and archived as it stands. The rebuild discards it the same way. Unreachable with the pinned resource, which passes all three checks |
 
 Two of these remain assumptions, not measurements: feather 1.41's non-advancing
 `getline` on a long line (the original very likely spins; this tree continues), and
@@ -39,19 +42,28 @@ CRLF folding (the original reads in text mode). The shipped INI's longest line i
 
 ## Status
 
-Measured on 1.0.8.0 with `tools/parity_report.py 9`:
+Measured on 1.0.8.0 with `tools/parity_report.py 9`: `build 9: 96 key(s) closed, 3
+open`. Of the 96, `CutsceneFixes` is this pass's and one is the `OutOfCommissionFix`
+pass that landed beside it; the three open keys are `HighQualityReflections`,
+`NewSavesCompatibility` and `SkipLauncher`, whose cell is the baseline's own gap
+(see below).
 
-- **94 of 99 option keys closed**;
-- **114 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **96 of 99 option keys closed**;
+- **117 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe, and the compiled-C bodies listed below are
-  rebuilt in C++ instead, with no proof row. The longest is the livery counter
-  (`0x1003D270`, 37 instructions); the pair at 78 instructions / 309 bytes each
+  rebuilt in C++ instead, with no proof row. The longest is `CutsceneFixes` chain
+  B's body (`0x100388C0`, 146 instructions / 592 bytes; see the section below),
+  which displaced the livery counter (`0x1003D270`, 37 instructions) as the
+  longest row; the pair at 78 instructions / 309 bytes each
   (`DualVehicleHeadlights`) is what exposed the proof tool's old 256-byte sweep
   window: it compared 64 of 78 and still reported PASS. The tool now sweeps 4096
   bytes and fails a row that decodes fewer instructions than its budget, so a
-  truncated sweep can never pass again. This pass added one, `ForceCarHeadlightShadows`'
-  hook thunk (`0x1001ADB0`, 9 instructions). The fifteen before it were the vehicles
+  truncated sweep can never pass again. This pass added the cutscene body and
+  `OutOfCommissionFix`'s two (the branch body at 7 instructions and the mounting
+  wrapper at 41; see that key's section); `ForceCarHeadlightShadows`' hook thunk
+  (`0x1001ADB0`, 9 instructions) was the one before them. The fifteen before that
+  were the vehicles
   pass's: the steer trio's
   model-registry lookup and its two detour bodies, `GarageModelFix`'s two site bodies
   and two helpers, and `NoLiveryLimit`'s five site bodies and three helpers (see the
@@ -697,39 +709,100 @@ excludes by design).
   routine pops that value later and eight calls of `nop` fill would overflow the
   x87 stack.
 
-### `OutOfCommissionFix`, still blocked: what is missing
+### `OutOfCommissionFix`, closed on its recovered payload
 
-The key's writes on 1.0.8.0 are one `E9` at RVA `0x622E97` (the 7-instruction
-branch body) and one `E8` at `0x770733` (the 29-instruction wrapper). Neither is
-installed, because the branch exists only to accept what the missing table
-produces:
+The key's writes on 1.0.8.0 are one `E9` at RVA `0x622E97` (game VA `0xA22E97`, the
+first anchor's +7) to the 7-instruction branch body `0x1004C3C0`, and one `E8` at
+RVA `0x770733` (game VA `0xB70733`, the second anchor itself) retargeted to the
+41-instruction wrapper `0x1004C350`. The second site is already an `E8` in the
+pristine image, so only its displacement changes and the scoreboard excludes those
+four bytes as a branch; the `E9`'s five bytes are the key's only comparable ones.
 
-- **The payload.** The original embeds the compressed `finale2.sco` as 163,796
-  bytes of `.rdata` at VA `0x100B6798` (file offset `0xB5B98`, first bytes
-  `2A 73 63 72`), and `sub_1004B750` decodes it into a 179,536-byte
-  (`0x2BD50`) table with `sub_1004B570`/`sub_1004B150`, registers it through a
-  fake-pak vector and builds an in-memory archive around it. Carrying that as
-  recovered data means a new ~164 KB byte table in source form (the
-  `source/model_names.inc` precedent: a data file with an extraction recipe and a
-  pinned image SHA-256), which is a new `data/` file outside this pass's edit set
-  and roughly a megabyte of source text.
-- **The code.** `sub_1004C3F0` is 16,311 bytes of C++: an EH4 prologue
-  (`push -1; push 0x10061940; ...`, scope table in `.data`), `std::string`
-  SSO temporaries at `[ebp-0x520]` (capacity `0xF`), `std::to_string`-shaped
-  formatting loops and virtual/indirect calls through the CRT import slots. It is
-  compiler output, not an instruction stream, so it would have to be rebuilt
-  alongside `sub_1004B750`, `sub_1004ACE0` (the archive builder), the fake-pak
-  vector's `operator new`/`delete` growth and the mount call -- a module of its
-  own, not a feature arm.
-- **Why the `E9` must wait for it.** The branch body's whole job is to re-compare
-  the game's script-resource check against the archive's magic `0x86723DFF`. With
-  no registered table nothing produces that magic, so the widened branch accepts
-  nothing while every other script-resource check keeps its original behaviour:
-  the write set would match the baseline (1 differing byte) and the feature would
-  do nothing. The wrapper has the same dependency: it mounts the archive the
-  missing builder returns.
+The refusal this key carried twice was right about the shape and wrong about the
+reach: the payload is a deterministic transform of bytes the original carries, and
+the registration is the ASI's own, not the game's.
 
-So the key stays open rather than shipping one half of a two-part feature.
+- **The resource.** 163,796 bytes of `.rdata` at VA `0x100B6798` (file offset
+  `0xB5B98`), first bytes `2A 73 63 72`. Carried verbatim as
+  `source/ooc_finale2.inc`, whose header pins the image SHA-256, the VA and length,
+  the extraction recipe, and the decoded table's own hashes -- the
+  `source/model_names.inc` precedent.
+- **The decode is a pure transform, and that is what decided the key.**
+  `sub_1004B150` is one opcode step of a small LZ decoder: four literal forms and
+  five back-reference forms, with `05` (and `00`-`03`) as the no-progress opcode.
+  `sub_1004B570` drives it from the resource's first byte into a 179,536-byte
+  (`0x2BD50`) buffer, stops on the no-progress opcode, requires the `05 FA`
+  terminator and the exact output length, and checks the Adler-32 trailer the
+  stream itself carries (zlib's variant: `a` seeded 1, `b` seeded 0, both reduced
+  modulo `0xFFF1`, 5552-byte blocks). Neither function reads the game image, calls
+  the game, or allocates anything but the output: the only state they touch is the
+  three output pointers (`dword_101A842C`/`30`/`dword_10196374`) and the source's
+  lower bound (`dword_101887D4`, the resource's base - 16, which every stream
+  position satisfies, so the original's source test is constant-true). On the
+  pinned resource the decode is 446 opcodes, ends at `0x27FCE`, and the trailer
+  `0x41E794AB` matches the decoded table (`sha256 86d2bb26…`, starting
+  `73 63 72 0E`, `fnv1a 0xC883859F`).
+- **The registration is the ASI's own.** `sub_1004B750` registers the table as the
+  single fake-pak entry (`finale2.sco`, 179,536 bytes) in its own `std::vector` at
+  `0x1016E43C`, then `sub_1004ACE0` wraps it: a 20-byte header (magic `0x86723DFF`,
+  `3`, the entry count, the name bytes + 16 per entry, the words `16` and `0xE9`),
+  one 16-byte record (stored size, stored offset, index, page count, padding word),
+  the name, then the payload at `0x800` with 688 bytes of zero padding -- 182,272
+  bytes in all, `fnv1a 0xB5AF7B10`.
+- **The one game call is a call the original makes through a published pointer**,
+  exactly like every other arm's: the wrapper formats
+  `"memory:$<archive>,<bytes>,0:"` and passes it to the function the `E8` at
+  `match-0x33` names (`0xA22BE0` on 1.0.8.0 -- the device register that walks the
+  `0xA0`-stride table at `0x1399810` looking for a free slot), then replays the
+  function the site's own `E8` named (`0xACBE60`). Nothing is registered with the
+  game that the original does not register the same way.
+
+| piece | VA | instructions | how |
+|---|---|---:|---|
+| the branch body (the `E9`'s target) | `0x1004C3C0` | 7 | transcribed, proved |
+| the mounting wrapper (the `E8`'s target) | `0x1004C350` | 41 | transcribed, proved |
+| the decoder's opcode step | `0x1004B150` | -- | rebuilt as C, no proof row |
+| the decode driver + Adler-32 | `0x1004B570` | -- | rebuilt as C, no proof row |
+| the init (decode, register, build) | `0x1004B750` | -- | rebuilt as C, no proof row |
+| the in-memory archive builder | `0x1004ACE0` | -- | rebuilt as C, no proof row |
+| the key's own handler | `0x1004C3F0` | 4199 | rebuilt as C, no proof row |
+
+- **The handler is compiler output, and it is the arm, not the decoder.**
+  `sub_1004C3F0` is 16,311 bytes of C++: an EH4 prologue
+  (`push -1; push 0x10061940`, scope table in `.data`), a `/GS` cookie, and the
+  original's string builder -- every pattern string is assembled one character at a
+  time through `std::to_string`-shaped digit loops, `strtol` and `toupper`, which is
+  why 4,199 instructions fill 16,311 bytes. It scans the branch anchor with
+  `sub_1005B6A0`, publishes `dword_10158034` = `match+0x11`, `VirtualProtect`s
+  `match+7` and writes the `E9` and its displacement to `sub_1004C3C0`; then it
+  scans the wrapper anchor, publishes `dword_10159BF8` = the target of the call at
+  `match-0x33` (`sub_10001670`: `site + 5 + disp32`) and `dword_10159C04` = the
+  original target of the call at the match, and calls `sub_1005BA80`, which writes
+  `E8` plus the displacement to `sub_1004C350` and returns the old target. The
+  rebuild publishes the same four words in the publish tier and writes the same two
+  branches in the install tier.
+- **Both transcribed bodies are `/GS`-framed compiler output and are transcribed
+  anyway**, because both are plain functions with a stable register contract: the
+  wrapper's prologue reads `___security_cookie`, xors it with `EBP` and its epilogue
+  calls `__security_check_cookie`, and the proof compares all 41 instructions. A
+  byte-level comparison agrees as well: the two bodies are identical to the
+  original's bytes apart from the six absolute operands (two resume slots, the
+  mount slot, the replayed-call slot, the cookie and the two string literals), which
+  are what must differ.
+- **The rebuilt decoder and builder are proven offline without the game.**
+  `zp_dump --ooc-selftest` runs the module's own decode, registration and archive
+  build against the pinned resource and compares each result with the fingerprint
+  the recovered bytes carry: the stream's Adler-32 trailer, the decoded table's
+  `fnv1a 0xC883859F`, the archive's 182,272 bytes and `fnv1a 0xB5AF7B10`, and the
+  header's `16`/`0xE9` words. It answers `PASS`. The shipped ASI never calls it --
+  the payload path only runs when the game calls the wrapper, which no offline tool
+  can reach, so this is the only way the rebuilt code executes at all.
+- **Two build facts the arm inherits.** The branch anchor (`A9 39 44 24 18`, five
+  bytes that start on the last byte of the `mov eax, <magic>` preceding the compare)
+  is absent from 1.0.0.0 and present exactly once on the other eight images; the
+  wrapper anchor is absent from 1.0.0.0, 1.0.4.0 and 1.0.0.4 and present exactly
+  once on 1.0.6.0 and later. A miss is the original's own clean skip, so those
+  builds install only the half their image carries.
 
 ### The three loading keys closed in this pass
 
@@ -847,13 +920,75 @@ loader callback this key replaces. The rebuild reproduces that shape exactly
 (`__stdcall`, three stack arguments, `ECX` untouched) instead of inventing a `this`
 — recorded above under preserved faults.
 
+### `CutsceneFixes`, and why the proof can compare its constants
+
+The key was recorded here as over budget because its body reads sixteen absolute
+operands the proof cannot decide: five float/double constants, the frame-time
+accumulator, two game pointers, a `VirtualProtect` import slot and the loader
+salt. That is a limit of the *proof*, not of the transcription.
+`verify_bodies.py` compares an absolute operand as a **slot**
+(`movss xmm0, [abs]` on both sides, whatever the address), so a body that reads
+its own module slots is provable instruction for instruction; what the arm owes
+is the *values*, published at the VAs the original reads them from. The key is now
+closed on every image the scoreboard can measure (1.0.0.0 stops earlier, at
+`NoImpostorHeightCutoff`'s preserved fault).
+
+The key is two halves of one chain in the original, run by two loader arms under
+one option:
+
+| piece | original | arm |
+|---|---|---|
+| chain B's body | `sub_100388C0`, 146 instructions / 592 bytes | transcribed, `Bodies::Register(..., 0x100388C0)` |
+| chain B's install | worker `sub_10038B40`: scan 1 at `0x1003B8E0`, scan 2 at `0x1003D1E8`, an `E8` at match-5 in both | two `injector::MakeCALL(match - 5, ...)`, one per recovered signature |
+| chain B's publishes | `dword_1015BDE4 = match + [match-4]`, `dword_1015BDF0 = that + 0x4F` | `PublishCutsceneFixes`, before the installs |
+| chain A's install | worker `sub_1003DA50` (two build-variant texts) publishes the match; callback `0x10044160` writes one `EB` there | `find_pattern` first text, fall back to the second, `WriteMemory<std::byte>(..., Bytes::ShortJmp)` |
+
+The body's slots, and where each value comes from:
+
+| slot | original VA | value |
+|---|---|---|
+| `zpatch_cutscene_target` | `dword_1015BDE4` | published: the site's `E8` destination (1.0.8.0 game `0xC9A640`, the camera function) |
+| `zpatch_cutscene_poke` | `dword_1015BDF0` | published: that + `0x4F`; the body's `dec esi` lands the store on the immediate at + `0x4E` |
+| `zpatch_cutscene_virtual_protect` | `0x10063010` (the ASI's IAT slot) | the module's own `&VirtualProtect` |
+| `zpatch_cutscene_accum` | `dword_1015BDE8` | .bss double, zero at load |
+| `zpatch_cutscene_zero` | `0x101522F0` | `0x0000000000000000` (0.0) |
+| `zpatch_cutscene_limit` | `0x10152340` | `0x3FD554C985F06F69` (0.3333) |
+| `zpatch_cutscene_abs_mask` | `0x101523D0` | `0x7FFFFFFF` |
+| `zpatch_cutscene_eps_a` | `0x101522F8` | `0x3D4CCCCD` (0.05f) |
+| `zpatch_cutscene_eps_b` | `0x101522FC` | `0x3F000000` (0.5f) |
+| the native salt | `dword_1015803C` | the layer's resolved salt (`Native::Salt`), `0x022B2DA9` on a probe hit |
+
+Two call targets differ from the original's, both inside the proof's
+call-is-an-immediate rule: the body's `call 0x10003980` names a six-byte `jmp`
+forwarder through the native layer's published resolve entry, because the
+original's target is the layer's C entry (`Native::Resolve`, rebuilt from
+`sub_10003980`) and a module interface cannot export a naked function to call
+directly; and the two epilogues `call __security_check_cookie`, which is the
+CRT check the original's own `E8` names (`0x1005FE7B`).
+
+What the sweep covers. The row's 146 instructions run to the `ret 4` at
+`0x10038B0D` (that is exactly 592 bytes); the restore block at
+`0x10038B10..0x10038B3F` follows that `ret` and is reached only by the six `ja`
+exits, so the linear sweep stops before it — the same boundary the original's own
+`ret` sets. Everything before it is compared: the four `rep movsd` block copies
+the sweep reaches (the body's fifth is in the restore block), both
+`fstp`/`ucomisd`/`lahf`/`jnp` result tests, the sixteen absolute operands and the
+`comiss` cascade. Swept past the `ret` with the same comparator, the restore block
+compares clean too: 161 instructions and `0x280` bytes, the original function's own
+length, so the short/near jump choices match as well.
+
+The scoreboard can only see one of the key's nine changed bytes — the `EB` —
+because the other eight are the two installed `E8`s' displacements, which the
+report excludes by design. Closure is therefore `missing 0, extra 0, differing 0`
+on `0x89A840`'s `EB`, backed by the body proof for the behaviour behind it and by
+`tests/signatures.tsv` for the three anchors.
+
 ### Still blocked
 
-- `OutOfCommissionFix` (the payload and the C++ path above);
 - `FreezeCarFix` needs its 1,421-byte probe and the spawn path around it; the steer
   consumer `sub_10004C70` it also touched is now in place (see the section above);
-- `HighQualityReflections` (~200 instructions) and `CutsceneFixes` (~100, with only
-  one real baseline byte) are over the transcription budget by design;
+- `HighQualityReflections` (~200 instructions) is over the transcription budget by
+  design;
 - `NewSavesCompatibility` needs `sub_10051B30`, the save converter: compiled file-IO
   code that reads the `0x110`-byte header, walks the 18 chunks and then patches three
   game sites at conversion time (`0x872185`'s branch opcode, `0x7D8C50`'s read call
@@ -885,8 +1020,13 @@ A body-bearing key is committed only when all four parts exist:
    the linker map, instruction budget — and `zp_body_proof` must PASS. A body that is
    compiler output for a C function (an SEH frame, a /GS cookie, the thread-safe
    static-init protocol) is rebuilt in C++ instead, and then has no proof row:
-   `SpeedupBugFix`, the steer consumer `sub_10004C70` and
-   `ForceCarHeadlightShadows`' offset check are the current examples.
+   `SpeedupBugFix`, the steer consumer `sub_10004C70`,
+   `ForceCarHeadlightShadows`' offset check and `OutOfCommissionFix`'s decoder,
+   init, archive builder and handler are the current examples. A rebuilt piece whose
+   result is data rather than a side effect can be pinned a second way, without the
+   game: `OutOfCommissionFix`'s decode and archive build run from
+   `zp_dump --ooc-selftest` and are compared with the fingerprints the recovered
+   bytes carry (that key's section).
 
 ## What the scoreboard can and cannot compare
 
@@ -931,7 +1071,11 @@ call our equivalent helper instead of the original's compiled target:
   CRT `memset`), `BpmFormat` (the rebuilt `0x10001280`), `BpmModelName` (the rebuilt
   `0x10003F00`) and five one-instruction `jmp` forwarders into the layer's pieces.
   The forwarders are the same shape as `DrivebyResolveEntry` and for the same
-  reason; the two rebuilt helpers are named in the section above.
+  reason; the two rebuilt helpers are named in the section above;
+- `cutscene_chain_b` calls `CutsceneResolveEntry`, the same six-byte forwarder shape
+  into the native layer's resolve entry (the original's `E8` to `sub_10003980`), and
+  its two epilogues call the CRT's `__security_check_cookie`, which is the function
+  the original's `E8` names.
 
 The stored baselines have one gap of their own: they were produced by the
 reference tree, whose `ApplyCarDynamicShadowFixNoE` pass is defined but never

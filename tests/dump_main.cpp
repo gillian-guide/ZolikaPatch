@@ -17,6 +17,7 @@ import launcher;
 import loading;
 import audio;
 import misc;
+import ooc;
 
 // The write-set dump: load a copy of a game image into this process, run the
 // same load pipeline the ASI runs, and print every byte it changed as
@@ -147,6 +148,7 @@ int main(int argc, char** argv)
     std::filesystem::path output;
     std::filesystem::path ini = "ZolikaPatch.ini";
     bool perOption = false;
+    bool oocSelfTest = false;
 
     for (int index = 1; index < argc; ++index)
     {
@@ -157,14 +159,29 @@ int main(int argc, char** argv)
             build = argv[++index];
         else if (argument == "--per-option")
             perOption = true;
+        else if (argument == "--ooc-selftest")
+            oocSelfTest = true;
         else if (output.empty())
             output = argv[index];
         else
             ini = argv[index];
     }
+
+    // The payload path only runs when the game calls the wrapper the arm installs,
+    // so this is the one way the rebuilt decoder and archive builder execute
+    // offline: decode the pinned resource and check both results against the
+    // fingerprints the recovered bytes carry (source/ooc.ixx, docs/parity.md).
+    if (oocSelfTest)
+    {
+        const char* failure = OocSelfCheck();
+        std::printf("ooc selftest: %s\n", failure == nullptr ? "PASS" : failure);
+        return failure == nullptr ? 0 : 1;
+    }
+
     if (output.empty())
     {
-        std::printf("usage: zp_dump [--exe <image>] [--build <compact>] [--per-option] <out> [ini]\n");
+        std::printf("usage: zp_dump [--exe <image>] [--build <compact>] [--per-option] <out> [ini]\n"
+                    "       zp_dump --ooc-selftest\n");
         return 2;
     }
 
@@ -195,6 +212,7 @@ int main(int argc, char** argv)
     RegisterLoading();
     RegisterAudio();
     RegisterMisc();
+    RegisterOoc();
 
     if (perOption)
     {

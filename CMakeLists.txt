@@ -78,7 +78,8 @@ target_sources(zp_modules PUBLIC
     source/launcher.ixx
     source/loading.ixx
     source/audio.ixx
-    source/misc.ixx)
+    source/misc.ixx
+    source/ooc.ixx)
 target_include_directories(zp_modules PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/source
   ${CMAKE_CURRENT_SOURCE_DIR}/external/injector/include

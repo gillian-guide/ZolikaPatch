@@ -15,6 +15,7 @@ import launcher;
 import loading;
 import audio;
 import misc;
+import ooc;
 
 extern "C" __declspec(dllexport) void InitializeASI();
 
@@ -63,6 +64,7 @@ namespace
         RegisterLoading();
         RegisterAudio();
         RegisterMisc();
+        RegisterOoc();
         Loader::Run();
 
 #ifdef ZP_TRACE

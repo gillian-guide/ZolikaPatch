@@ -185,3 +185,19 @@ nolivery_body_b 1003D340 ?NoliveryBodyB@@YAXXZ 11
 nolivery_body_c 1003D370 ?NoliveryBodyC@@YAXXZ 12
 nolivery_body_d 1003D3A0 ?NoliveryBodyD@@YAXXZ 14
 nolivery_body_e 1003D3E0 ?NoliveryBodyE@@YAXXZ 14
+# CutsceneFixes (source/graphics.ixx): chain B's body, the original's sub_100388C0.
+# 146 is the count to its `ret 4` at 0x10038B0D, which is 592 bytes; the restore
+# block at 0x10038B10..0x10038B3F follows that `ret` and is reached only by the six
+# `ja` exits, so the linear sweep does not decode it. The body's `call` names the
+# local resolve forwarder that stands in for sub_10003980, which is rebuilt as C in
+# source/native.ixx; the proof compares a call as an immediate.
+cutscene_chain_b 100388C0 ?CutsceneChainBody@@YAXXZ 146
+# OutOfCommissionFix (source/ooc.ixx): the branch body the E9 at game 0xA22E97
+# jumps to (7 instructions) and the mounting wrapper the E8 at 0xB70733 is
+# retargeted to (41 to its `ret`, 0x1004C350..0x1004C3BF). The key's payload is
+# data plus compiler output -- the decoder (sub_1004B150, sub_1004B570), the init
+# (sub_1004B750), the archive builder (sub_1004ACE0) and the key's own handler
+# (sub_1004C3F0, 4199 instructions with an EH4 frame) -- and is rebuilt, so those
+# pieces have no rows (docs/parity.md).
+ooc_branch 1004C3C0 ?OocBranchBody@@YAXXZ 7
+ooc_wrap 1004C350 ?OocWrapBody@@YAXXZ 41

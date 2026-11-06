@@ -468,3 +468,73 @@ five as before; no image byte moved — the tables are read-only startup state);
 the misc keys are replaced with the recovered grammar table, the fault rows are in
 §Preserved faults, and `zp_model_tables` is in §Contracts. `AGENTS.md`'s harness
 sentence still lists the old executables and could name `zp_model_tables`.
+
+## 2026-11-06 — `OutOfCommissionFix`: the payload carried, the key closed
+
+**Decided first, then built.** The key had been refused twice because its payload
+looked like game-side registration. It is not: `sub_1004B150` + `sub_1004B570` are a
+pure LZ decode of the 163,796 bytes the ASI embeds, `sub_1004B750`/`sub_1004ACE0`
+are the ASI's own registration and archive build, and the only game call is one the
+original makes through a pointer published from the game image (the device register
+at `0xA22BE0`), exactly like every other arm's calls. So the table is a deterministic
+transform and was carried.
+
+**Characterisation that mattered (IDA `ZolikaPatch.asi.i64`).**
+`sub_1004C3F0` is **not** the decoder: it is the key's own handler (16,311 bytes /
+4,199 instructions, EH4 frame, `/GS`, the original's one-character-at-a-time string
+builder). It scans `A9 39 44 24 18`, publishes `dword_10158034 = match+0x11`,
+`VirtualProtect`s `match+7` and writes `E9` to `sub_1004C3C0`; then scans
+`E8 ? ? ? ? 8B 74 24 14 83 C4 08 6A 00 56`, publishes `dword_10159BF8` (the target of
+the call at `match-0x33`, `sub_10001670`) and `dword_10159C04` (the old target of the
+call at the match), and calls `sub_1005BA80`, which writes `E8` + displacement to
+`sub_1004C350` and returns the old target. The decoder is `sub_1004B150` (opcode
+step) + `sub_1004B570` (driver: `05 FA` terminator, exact 179,536-byte output,
+Adler-32 trailer). `sub_1004B750` = malloc(0x2BD50) + decode + push_back into the
+`std::vector` at `0x1016E43C` + build + `dword_10159BFC = dword_10159C78`.
+
+**What was built**
+
+- `source/ooc_finale2.inc` — the 163,796-byte resource, verbatim, with the image
+  SHA-256 (`720fbceb…`), VA `0x100B6798`, file offset `0xB5B98`, the extraction
+  recipe, the decoded table's `sha256 86d2bb26…` / `fnv1a 0xC883859F`, and the
+  archive's 182,272 bytes / `fnv1a 0xB5AF7B10` in its header (1,035,979 bytes of
+  source). The decode was verified independently in Python first: 446 opcodes,
+  ends at `0x27FCE`, trailer `0x41E794AB` matches, and the table is byte-identical
+  to `../readable/data/finale2.sco`.
+- `source/ooc.ixx` (new module `ooc`) — the decoder (`OocStep`/`OocDecode`, the nine
+  opcode forms and the two fault paths), the Adler-32, the fake-pak entry/vector,
+  the archive builder (`OocBuildArchive`: 20-byte header, 16-byte record, name,
+  payload at `0x800`, padding to the page), the init (`OocInitialise`, re-running on
+  every call like the original's writerless guard), a rebuilt `sub_10001280`
+  formatter, and `OocSelfCheck()`.
+- The two bodies, transcribed: `OocBranchBody` (7, `0x1004C3C0`) and `OocWrapBody`
+  (41, `0x1004C350` — the brief's "29" does not survive measurement). Both proved
+  whole, and a byte comparison shows them identical to the original apart from the
+  six absolute operands.
+- The arm: publish tier reads the resume and the two call targets, install tier
+  writes `E9` at `match+7` and retargets the `E8` at the second anchor.
+- `CMakeLists.txt` (one module), `source/dllmain.cpp` + `tests/dump_main.cpp`
+  (`import ooc;`, `RegisterOoc()`, and `zp_dump --ooc-selftest`), `tests/bodies.tsv`
+  (+2 rows), `tests/signatures.tsv` (+2 anchors), `docs/parity.md` (the blocked
+  section replaced by the closed one, two new preserved-fault rows, the rebuilt-body
+  list).
+
+**Gates (final runs)**
+
+- `cmake --build --preset release` — success.
+- `python tools/parity_report.py 9` — `build 9: 96 key(s) closed, 3 open`
+  (`OutOfCommissionFix` gone; 94 before this pass, 96 with the cutscene pass beside
+  it).
+- `ctest --preset release` — `100% tests passed out of 11`.
+- `python tools/verify_bodies.py …` — `117 body(ies), 0 failure(s)` (both new rows
+  PASS: `ooc_branch` 7, `ooc_wrap` 41).
+- `zp_dump --ooc-selftest` — `ooc selftest: PASS` (the rebuilt decode, the table's
+  `fnv1a`, the archive's length and `fnv1a`, the header words).
+- The key's per-option cell is the baseline's 9 rows with our two displacements
+  (excluded as branch bytes); the full shipped-INI cell differs from the same cell
+  with the key off by exactly those 9 bytes.
+
+**Not verifiable here.** No game launch: whether the game accepts the mounted
+in-memory archive and loads `finale2.sco` from it is a runtime property. The artifact
+is 1,637,376 bytes (the resource is 163,796 of them). `AGENTS.md`'s "Current state"
+(94 keys / 114 bodies) is outside this pass's file scope and is stale.

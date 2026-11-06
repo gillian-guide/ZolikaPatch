@@ -483,6 +483,274 @@ static __declspec(naked) void BorderlessWindowBodyA()
     }
 }
 
+// ---------------------------------------------------------------------------
+// CutsceneFixes
+//
+// One option, two halves of one chain. Chain B is the original's sub_100388C0: a
+// thiscall `char(float)` that the worker sub_10038B40 installs as a `call` at the
+// two places the game's camera function (1.0.8.0 `0xC9A640`) is entered, so both
+// callers run it. Chain A is the single `je` -> `jmp` inside that same function
+// that makes its "target found" test unconditional. The original runs them from
+// two loader arms under one option, so one arm installs both here.
+//
+// The body's mutable state sits in the original's .bss beside it
+// (dword_1015BDE4 / dword_1015BDF0 / dword_1015BDE8) and its constants in its
+// .rdata (0x101522F0, 0x101522F8, 0x101522FC, 0x10152340, 0x101523D0); the
+// transcribed asm names module slots instead, and the arm fills the two game
+// pointers from the site's own call operand before it overwrites the call.
+// ---------------------------------------------------------------------------
+extern "C"
+{
+    // dword_1015BDE4: the camera function the site calls. The worker publishes
+    // `match + [match - 4]` -- the destination of the `E8` it is about to
+    // overwrite -- and this is that address.
+    uint32_t zpatch_cutscene_target = 0;
+
+    // dword_1015BDF0: the same address + 0x4F. The camera function's
+    // `mov byte [esp + 1Ch], 1` sits at target + 0x4A and its immediate byte is the
+    // last one (target + 0x4E); the body's `dec esi` lands the store there.
+    uint32_t zpatch_cutscene_poke = 0;
+
+    // dword_1015BDE8: the accumulated scene-frame time, a double that starts at
+    // zero (the original's .bss).
+    uint64_t zpatch_cutscene_accum = 0;
+
+    // 0x10063010: the original's VirtualProtect import slot. The arm fills this
+    // with the module's own import; the body still calls it indirectly (`call edi`
+    // after `mov edi, [slot]`), exactly as the original does.
+    uint32_t zpatch_cutscene_virtual_protect = 0;
+
+    // The body's literal pool, recovered from the original ASI's .rdata as raw
+    // words so the bit patterns are exactly the original's.
+    uint64_t zpatch_cutscene_zero = 0x0000000000000000ull;   // 0x101522F0  0.0
+    uint64_t zpatch_cutscene_limit = 0x3FD554C985F06F69ull;  // 0x10152340  0.3333
+    uint32_t zpatch_cutscene_abs_mask = 0x7FFFFFFFu;         // 0x101523D0  0x7FFFFFFF
+    uint32_t zpatch_cutscene_eps_a = 0x3D4CCCCDu;            // 0x101522F8  0.05f
+    uint32_t zpatch_cutscene_eps_b = 0x3F000000u;            // 0x101522FC  0.5f
+}
+
+// The loader preamble's salt this body resolves its native with (dword_1015803C)
+// and the native layer's guarded resolve entry, which is the original's
+// sub_10003980 rebuilt as C (source/native.ixx). Both live in another module
+// unit, so they are declared here with the C linkage they are defined with.
+extern "C"
+{
+    extern uint32_t zpatch_native_salt_1015803C;
+    extern uintptr_t zpatch_native_resolve_entry;
+}
+
+// The body's `call 0x10003980` must stay a direct `call`: the original's is an
+// `E8`, and an indirect `call [slot]` is a different instruction shape. A module
+// interface cannot export a naked function either (C2488), so the call names this
+// six-byte forwarder, which enters the layer's C entry with ECX (the salt) and
+// the stack untouched -- the same shape as misc.ixx's drive-by forwarder.
+static __declspec(naked) void CutsceneResolveEntry()
+{
+    __asm
+    {
+        jmp DWORD PTR [zpatch_native_resolve_entry]
+    }
+}
+
+// sub_100388C0, recovered VA 0x100388C0: chain B's body, 146 instructions and 592
+// bytes to its `ret 4`, plus the restore block at 0x10038B10..0x10038B3F that the
+// six `ja` exits reach (the proof sweeps the 146; the restore block follows the
+// `ret` and is not decoded by it). Its frame is the original's 0xA18: two
+// 0x140-dword object copies (ebp-504h and ebp-0A04h), the 8-byte block
+// VirtualProtect writes its old protection to, and the three scratch words the
+// camera call uses.
+//
+// It resolves a game native through the loader salt dword_1015803C, copies the
+// scene object it answers with into the first block and accumulates that object's
+// frame delta (a float at +8) into the double accumulator. It then makes the
+// camera function's `mov byte [esp + 1Ch], 1` immediate readable, writes 1 over
+// it, calls the function with the body's own float argument and keeps the call's
+// double result as a flag. Once the recovered limit (0.3333) has accumulated it
+// calls again with that immediate forced to 0, and if the two runs' position
+// floats differ by more than (0.05, 0.05, 0.05, 0.5, 0.5, 0.5) it restores the
+// object as it was before the second call and resets the accumulator; otherwise
+// it answers the second call's flag.
+//
+// The `ucomisd`/`lahf`/`test ah,44h`/`jnp` sequences are the original's own
+// codegen for its `!= 0` tests: `mov al,1` when the comparison is non-zero or
+// unordered. `rep movsd` is one instruction (F3 A5) on both sides.
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void CutsceneChainBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        sub esp, 0A18h
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, ebp
+        mov DWORD PTR [ebp - 4], eax
+        push esi
+        mov esi, ecx
+        mov ecx, DWORD PTR [zpatch_native_salt_1015803C]
+        push edi
+        mov DWORD PTR [ebp - 0A10h], esi
+        call CutsceneResolveEntry
+        lea edi, [ebp - 504h]
+        mov ecx, DWORD PTR [eax + 0Eh]
+        mov eax, DWORD PTR [ecx + eax + 18h]
+        mov ecx, 140h
+        rep movsd
+        movss xmm0, DWORD PTR [eax + 8]
+        lea eax, [ebp - 0A08h]
+        mov esi, DWORD PTR [zpatch_cutscene_poke]
+        mov edi, DWORD PTR [zpatch_cutscene_virtual_protect]
+        dec esi
+        cvtps2pd xmm0, xmm0
+        push eax
+        push 40h
+        push 1
+        push esi
+        addsd xmm0, QWORD PTR [zpatch_cutscene_accum]
+        movsd QWORD PTR [zpatch_cutscene_accum], xmm0
+        call edi
+        lea eax, [ebp - 0A08h]
+        mov BYTE PTR [esi], 1
+        push eax
+        push DWORD PTR [ebp - 0A08h]
+        push 1
+        push esi
+        call edi
+        mov eax, DWORD PTR [zpatch_cutscene_target]
+        movss xmm0, DWORD PTR [ebp + 8]
+        push ecx
+        mov ecx, DWORD PTR [ebp - 0A10h]
+        mov DWORD PTR [ebp - 0A14h], eax
+        movss DWORD PTR [esp], xmm0
+        call DWORD PTR [ebp - 0A14h]
+        fstp QWORD PTR [ebp - 0A18h]
+        movsd xmm0, QWORD PTR [ebp - 0A18h]
+        ucomisd xmm0, QWORD PTR [zpatch_cutscene_zero]
+        lahf
+        test ah, 44h
+        jnp ccb_al_zero
+        mov al, 1
+        jmp ccb_al_done
+    ccb_al_zero:
+        xor al, al
+    ccb_al_done:
+        mov edx, DWORD PTR [ebp - 0A10h]
+        lea edi, [ebp - 0A04h]
+        movsd xmm0, QWORD PTR [zpatch_cutscene_limit]
+        mov ecx, 140h
+        comisd xmm0, QWORD PTR [zpatch_cutscene_accum]
+        mov esi, edx
+        mov BYTE PTR [ebp - 0A09h], al
+        rep movsd
+        ja ccb_return_al
+        mov edi, edx
+        lea eax, [ebp - 0A08h]
+        push eax
+        mov ecx, 140h
+        lea esi, [ebp - 504h]
+        rep movsd
+        mov esi, DWORD PTR [zpatch_cutscene_poke]
+        mov edi, DWORD PTR [zpatch_cutscene_virtual_protect]
+        dec esi
+        push 40h
+        push 1
+        push esi
+        call edi
+        lea eax, [ebp - 0A08h]
+        mov BYTE PTR [esi], 0
+        push eax
+        push DWORD PTR [ebp - 0A08h]
+        push 1
+        push esi
+        call edi
+        mov eax, DWORD PTR [zpatch_cutscene_target]
+        movss xmm0, DWORD PTR [ebp + 8]
+        push ecx
+        mov ecx, DWORD PTR [ebp - 0A10h]
+        mov DWORD PTR [ebp - 0A14h], eax
+        movss DWORD PTR [esp], xmm0
+        call DWORD PTR [ebp - 0A14h]
+        fstp QWORD PTR [ebp - 0A18h]
+        movsd xmm0, QWORD PTR [ebp - 0A18h]
+        xorps xmm3, xmm3
+        ucomisd xmm0, xmm3
+        lahf
+        test ah, 44h
+        jnp ccb_dl_zero
+        mov dl, 1
+        jmp ccb_dl_done
+    ccb_dl_zero:
+        xor dl, dl
+    ccb_dl_done:
+        mov eax, DWORD PTR [ebp - 0A10h]
+        lea edi, [ebp - 504h]
+        movss xmm1, DWORD PTR [zpatch_cutscene_abs_mask]
+        mov ecx, 140h
+        movss xmm2, DWORD PTR [zpatch_cutscene_eps_a]
+        mov esi, eax
+        rep movsd
+        movss xmm0, DWORD PTR [ebp - 4E4h]
+        subss xmm0, DWORD PTR [ebp - 9E4h]
+        andps xmm0, xmm1
+        comiss xmm0, xmm2
+        ja ccb_restore
+        movss xmm0, DWORD PTR [ebp - 4E0h]
+        subss xmm0, DWORD PTR [ebp - 9E0h]
+        andps xmm0, xmm1
+        comiss xmm0, xmm2
+        ja ccb_restore
+        movss xmm0, DWORD PTR [ebp - 4DCh]
+        subss xmm0, DWORD PTR [ebp - 9DCh]
+        andps xmm0, xmm1
+        comiss xmm0, xmm2
+        ja ccb_restore
+        movss xmm0, DWORD PTR [ebp - 4C4h]
+        subss xmm0, DWORD PTR [ebp - 9C4h]
+        movss xmm2, DWORD PTR [zpatch_cutscene_eps_b]
+        andps xmm0, xmm1
+        comiss xmm0, xmm2
+        ja ccb_restore
+        movss xmm0, DWORD PTR [ebp - 4C0h]
+        subss xmm0, DWORD PTR [ebp - 9C0h]
+        andps xmm0, xmm1
+        comiss xmm0, xmm2
+        ja ccb_restore
+        movss xmm0, DWORD PTR [ebp - 4BCh]
+        subss xmm0, DWORD PTR [ebp - 9BCh]
+        andps xmm0, xmm1
+        comiss xmm0, xmm2
+        ja ccb_restore
+        pop edi
+        mov al, dl
+        pop esi
+        mov ecx, DWORD PTR [ebp - 4]
+        xor ecx, ebp
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret 4
+    ccb_restore:
+        mov edi, eax
+        movsd QWORD PTR [zpatch_cutscene_accum], xmm3
+        mov al, BYTE PTR [ebp - 0A09h]
+        lea esi, [ebp - 0A04h]
+        mov ecx, 140h
+        rep movsd
+    ccb_return_al:
+        mov ecx, DWORD PTR [ebp - 4]
+        pop edi
+        xor ecx, ebp
+        pop esi
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret 4
+        __emit 0CCh
+    }
+}
+
 namespace
 {
     // BuildingAlphaFix: two copies of the `test [esi+24h], 40000000h` alpha gate.
@@ -842,6 +1110,73 @@ namespace
         injector::MakeCALL(match + 253, reinterpret_cast<void*>(&ShaderStreamingFindV), true);
         injector::MakeJMP(match + 266, match + 1158, true);
     }
+
+    // CutsceneFixes' published state. The worker publishes two game pointers from
+    // the primary site's own `E8` operand: the call's destination (the camera
+    // function) and that destination + 0x4F, one past the immediate the body
+    // pokes. Both are read here, before the install tier overwrites the call; the
+    // secondary site calls the same function and publishes nothing, as the
+    // original's second scan does.
+    void PublishCutsceneFixes()
+    {
+        if (!Loader::Enabled("CutsceneFixes"))
+            return;
+
+        auto pattern = find_pattern("8B 4C 24 2C 5F 5E 5B 33 CC B0 01 E8");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            const auto displacement = *pattern.get_first<int32_t>(-4);
+            zpatch_cutscene_target =
+                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + displacement));
+            zpatch_cutscene_poke =
+                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + displacement + 0x4F));
+        }
+
+        // The body's VirtualProtect call goes through a slot because the original
+        // loads its IAT entry by absolute address; fill it from the module's own
+        // import, as audio.ixx does for its advance helper.
+        zpatch_cutscene_virtual_protect = reinterpret_cast<uintptr_t>(&VirtualProtect);
+    }
+
+    // CutsceneFixes: chain B's two camera call sites become calls into
+    // sub_100388C0, and chain A's `je` in the camera function becomes the
+    // unconditional `jmp` that skips its "target found" test. Each caller's
+    // pattern starts at the epilogue/a byte the call precedes, so the site is the
+    // five bytes before the match. Chain A's two texts are the original worker's
+    // first and fallback patterns: the first is the one the supported 1.0.8.0-class
+    // images carry, the second covers the older ones.
+    void InstallCutsceneFixes()
+    {
+        if (!Loader::Enabled("CutsceneFixes"))
+            return;
+
+        Bodies::Register(reinterpret_cast<uintptr_t>(&CutsceneChainBody), 0x100388C0u);
+        // The body's call names the resolve forwarder, which stands in for the
+        // original's sub_10003980; recording that VA keeps the registered branch in
+        // the original's coordinates.
+        Bodies::Register(reinterpret_cast<uintptr_t>(&CutsceneResolveEntry), 0x10003980u);
+
+        auto pattern = find_pattern("8B 4C 24 2C 5F 5E 5B 33 CC B0 01 E8");
+        if (!pattern.empty())
+        {
+            injector::MakeCALL(pattern.get_first(-5),
+                reinterpret_cast<void*>(&CutsceneChainBody), true);
+        }
+
+        pattern = find_pattern("8B CF 88 44 24 0F E8 ? ? ? ? A1");
+        if (!pattern.empty())
+        {
+            injector::MakeCALL(pattern.get_first(-5),
+                reinterpret_cast<void*>(&CutsceneChainBody), true);
+        }
+
+        pattern = find_pattern("74 24 8B 44 24 2C 83 F8 03");
+        if (pattern.empty())
+            pattern = find_pattern("74 0B 83 7C 24 2C 03");
+        if (!pattern.empty())
+            injector::WriteMemory<std::byte>(pattern.get_first(0), Bytes::ShortJmp, true);
+    }
 }
 
 // Registered like every other arm: the publish tier reads every site the install
@@ -851,12 +1186,14 @@ export void RegisterGraphics()
     Loader::PublishEvent() += []
     {
         PublishBuildingDynamicShadows();
+        PublishCutsceneFixes();
         PublishEmissiveLerpFix();
         PublishSuperLODFix();
     };
     Loader::InstallEvent() += [] { InstallBorderlessWindowed(); };
     Loader::InstallEvent() += [] { InstallBuildingAlphaFix(); };
     Loader::InstallEvent() += [] { InstallBuildingDynamicShadows(); };
+    Loader::InstallEvent() += [] { InstallCutsceneFixes(); };
     Loader::InstallEvent() += [] { InstallEmissiveLerpFix(); };
     Loader::InstallEvent() += [] { InstallForceDynamicShadowsEverywhere(); };
     Loader::InstallEvent() += [] { InstallForceShadowsOnObjects(); };

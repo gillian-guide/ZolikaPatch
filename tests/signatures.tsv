@@ -114,6 +114,17 @@ NoImpostorHeightCutoff.b	0xCA118E	76 0B F3 0F 11 8C 24 88 00 00 00 EB 09	13
 NoLODLightHeightCutoff	0xC9FA70	76 08 F3 0F 11 4C 24 1C EB 06 F3 0F 11 44 24 1C 89 5C 24 64	20
 SuperLODFix	0x940E19	F6 40 ?? ?? 74 ?? 85 ED 0F 85 ?? ?? ?? ?? 55 6A ?? E8 ?? ?? ?? ?? 8B F8	24
 ImprovedShaderStreaming	0xCB21F1	33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24	31
+# CutsceneFixes, chain B: the two places the game's camera function (0xC9A640) is
+# called. Each row's match starts five bytes after the `E8` the arm replaces, so
+# the call is at match-5 and its destination is `match + [match-4]`; that is what
+# the publish reads before the call is overwritten (dword_1015BDE4, and +0x4F into
+# dword_1015BDF0). Both sites call the same function, so the second publishes
+# nothing. Chain A's `je` in that function becomes `EB`; its first pattern is the
+# row below, and the older builds' fallback (`74 0B 83 7C 24 2C 03`, 7 bytes) is
+# absent from the 1.0.8.0 image, so it has no site VA to record.
+CutsceneFixes.caller_a	0xA2362D	8B 4C 24 2C 5F 5E 5B 33 CC B0 01 E8	12
+CutsceneFixes.caller_b	0xC9AB20	8B CF 88 44 24 0F E8 ? ? ? ? A1	11
+CutsceneFixes.target_found	0xC9A840	74 24 8B 44 24 2C 83 F8 03	9
 AllowHashesForIDE	0x45CF50	8B 4C 24 08 56 8B 74 24 08 80 3E 22	12
 CombinedRadioFreezeFix	0x895F59	E8 ? ? ? ? 8B 35 ? ? ? ? 3B F0	13
 BetterMPSync	0x6D9356	8B 90 E8 00 00 00 55 8B CE FF	10
@@ -283,3 +294,16 @@ GarageModelFix.model	0x5659C3	0F B7 0E 50 51 E8	6
 # match-8/-4) is absent from the 1.0.8.0 image.
 NoLiveryLimit.collector	0x64A53B	74 52 8D B5 3C 01 00 00 83 FB 04	11
 NoLiveryLimit.livery	0x797A29	8B 8C 83 3C 01 00 00 0F BF 53 48	12
+# OutOfCommissionFix (source/ooc.ixx): the two anchors the original handler scans
+# for itself. The first starts on the last byte of the `mov eax, <magic>` that
+# precedes the script resource's compare, so the E9 the arm writes at match+7
+# lands on the compare (and the body's resume, match+0x11, on the `movq` store two
+# instructions later). The second is the device lookup the wrapper replaces: the
+# E8 at the match, whose target the wrapper replays after mounting, and the call
+# at match-0x33, which is the game's device register -- the function that takes
+# the "memory:$<ptr>,<bytes>,0:" string. Both anchors are unique on 1.0.8.0. The
+# branch anchor is absent from 1.0.0.0 and the wrapper anchor from 1.0.0.0,
+# 1.0.4.0 and 1.0.0.4; a miss is the original's own clean skip, so those builds
+# install only the half their image carries.
+OutOfCommissionFix.branch	0xA22E90	A9 39 44 24 18	5
+OutOfCommissionFix.wrapper	0xB70733	E8 ? ? ? ? 8B 74 24 14 83 C4 08 6A 00 56	15
