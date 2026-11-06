@@ -2,6 +2,8 @@ module;
 
 #include <common.hxx>
 #include <cstring>
+#include <shlwapi.h>
+#include <unordered_set>
 
 export module loading;
 
@@ -12,6 +14,7 @@ import config;
 import game;
 import loader;
 import patch;
+import shared;
 
 // The load-time arms: the fixes the original applies while the game is loading,
 // one arm per INI key, each anchored to its own recovered signature.
@@ -869,6 +872,821 @@ namespace
     }
 }
 
+// ---------------------------------------------------------------------------
+// NewMemorySystem, as the original handler applies it: the allocator-initialisation
+// call at game 0x107A is retargeted to this module's vtable installer, and a jump
+// at 0x107F skips the five-slot clear the installer replaces, resuming at 0x108C.
+//
+// The table is the original's CRageAllocator vtable (original 0x100B5038, 24
+// slots). Ten of its methods are transcribed below as bodies; the three arena
+// methods (allocate 0x10038360, free 0x10038430, "is this mine" 0x100385A0) are
+// compiled code in the original and are rebuilt in C++; five slots point at
+// bodies another arm already installs, because the original's table does exactly
+// that (0x10038550 RGSC login, 0x10038570 savegame null path, 0x100057F0 MP sync).
+namespace
+{
+    constexpr uint32_t kNmsVtableSlots = 24;
+    constexpr uint8_t kNmsHeapPoison = 0xCD;  // the fill the original memsets with
+}
+
+extern "C"
+{
+    // dword_10159CD8: the address the arm reads from the allocator init's
+    // `mov esi, <singleton>` operand.
+    uint32_t zpatch_nms_object = 0;
+
+    // 0x100B5038: the vtable the installer writes into that singleton.
+    uint32_t zpatch_nms_vtable[kNmsVtableSlots] = {};
+}
+
+// sub_10038560, recovered VA 0x10038560 (1 instruction): the table's release
+// hook. It cleans no stack argument (`ret 0`), which is why it is written as an
+// immediate rather than a plain `ret` (that is `ret`, opcode C3).
+static __declspec(naked) void NmsNoopRet0Body()
+{
+    __asm
+    {
+        ret 0
+    }
+}
+
+// sub_10038640, recovered VA 0x10038640 (17 instructions): the CRageAllocator
+// constructor, __thiscall with one stack argument the callee pops. It installs
+// this module's vtable in the object and, for the `& 5 == 5` selector, runs the
+// release hook on a stack scratch slot.
+static __declspec(naked) void* NmsCtorBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        mov eax, DWORD PTR [ebp + 8]
+        push esi
+        mov esi, ecx
+        and eax, 5
+        mov DWORD PTR [esi], OFFSET zpatch_nms_vtable
+        cmp al, 5
+        jne nms_ctor_done
+        push 4
+        push esi
+        call NmsNoopRet0Body
+        add esp, 8
+    nms_ctor_done:
+        mov eax, esi
+        pop esi
+        pop ebp
+        ret 4
+    }
+}
+
+// sub_10038350, recovered VA 0x10038350 (2 instructions): reject a pointer.
+static __declspec(naked) void NmsRejectPtrBody()
+{
+    __asm
+    {
+        xor al, al
+        ret 4
+    }
+}
+
+// sub_10038540, recovered VA 0x10038540 (2 instructions): the "self" slot.
+static __declspec(naked) void* NmsSelfBody()
+{
+    __asm
+    {
+        mov eax, ecx
+        ret 4
+    }
+}
+
+// sub_10001950, recovered VA 0x10001950 (2 instructions): the null slot.
+static __declspec(naked) void* NmsZeroBody()
+{
+    __asm
+    {
+        xor eax, eax
+        ret 4
+    }
+}
+
+// sub_10038580, recovered VA 0x10038580 (1 instruction): paired no-op, two
+// stack arguments.
+static __declspec(naked) void NmsNoopPairBody()
+{
+    __asm
+    {
+        ret 8
+    }
+}
+
+// sub_10038590, recovered VA 0x10038590 (2 instructions): the reject slot. It
+// sets only AL, so the upper 24 bits of EAX stay whatever the caller had.
+static __declspec(naked) void NmsRejectBody()
+{
+    __asm
+    {
+        xor al, al
+        ret
+    }
+}
+
+// sub_100057F0, recovered VA 0x100057F0 (2 instructions): the MP-sync stub, which
+// the original's table shares with BetterMPSync. audio.ixx owns that body but
+// keeps it inside its own unit, so the table gets this copy of the same two
+// instructions.
+static __declspec(naked) void NmsSyncBody()
+{
+    __asm
+    {
+        xor eax, eax
+        ret
+    }
+}
+
+// sub_10038630, recovered VA 0x10038630 (1 instruction): no-op with one stack
+// argument.
+static __declspec(naked) void NmsNoopArgBody()
+{
+    __asm
+    {
+        ret 4
+    }
+}
+
+// sub_10038620, recovered VA 0x10038620 (5 instructions): forward through the
+// object's slot 18. The tail jump keeps the caller's return address and EBP.
+static __declspec(naked) void NmsThunk18Body()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        mov eax, DWORD PTR [ecx]
+        pop ebp
+        jmp DWORD PTR [eax + 18h]
+    }
+}
+
+// sub_10038670, recovered VA 0x10038670 (5 instructions): the installer. It
+// writes this module's vtable into the published singleton and returns without
+// cleaning a stack argument (the site's call is replaced wholesale).
+static __declspec(naked) void NmsApplyBody()
+{
+    __asm
+    {
+        mov eax, DWORD PTR [zpatch_nms_object]
+        test eax, eax
+        je nms_apply_done
+        mov DWORD PTR [eax], OFFSET zpatch_nms_vtable
+    nms_apply_done:
+        ret
+    }
+}
+
+namespace
+{
+    // The allocation registry. The original keeps the pointers it handed out in a
+    // hash map (FNV-1a over the pointer's four bytes) behind the recursive
+    // critical section at 0x101A0808; only membership is observable, so the keys
+    // go in a plain set behind an equivalent lock.
+    CRITICAL_SECTION nms_registry_lock;
+    std::unordered_set<uint32_t> nms_allocations;
+
+    // sub_10038360, recovered VA 0x10038360: the vtable's allocate slot
+    // (__stdcall, three arguments). Assembly in the original: unit =
+    // max(0x10, align), want = max(size, unit), HeapAlloc(want + 2 * unit),
+    // align up to ((base - 1) / unit + 2) * unit, store the distance from the
+    // base at [pointer - 4], fill `want` bytes with 0xCD, register the pointer.
+    // ECX is the object, which the original's body ignores too.
+    void* __stdcall NmsAllocateBody(uint32_t size, uint32_t align, uint32_t flags)
+    {
+        (void)flags;
+        const uint32_t unit = align < 0x10u ? 0x10u : align;
+        const uint32_t want = size < unit ? unit : size;
+        void* base = HeapAlloc(GetProcessHeap(), 0, want + unit * 2u);
+        if (base == nullptr)
+            return nullptr;
+
+        const auto raw = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(base));
+        const auto aligned = ((raw - 1u) / unit + 2u) * unit;
+        *reinterpret_cast<uint32_t*>(aligned - 4u) = aligned - raw;
+        std::memset(reinterpret_cast<void*>(aligned), kNmsHeapPoison, want);
+
+        EnterCriticalSection(&nms_registry_lock);
+        nms_allocations.insert(aligned);
+        LeaveCriticalSection(&nms_registry_lock);
+        return reinterpret_cast<void*>(aligned);
+    }
+
+    // sub_10038430, recovered VA 0x10038430: the free slot (__stdcall, one
+    // argument). The base is recovered from the distance stored at [ptr - 4].
+    void __stdcall NmsFreeBody(void* pointer)
+    {
+        if (pointer == nullptr)
+            return;
+
+        const auto raw = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pointer));
+        const auto base = raw - *reinterpret_cast<const uint32_t*>(raw - 4u);
+        HeapFree(GetProcessHeap(), 0, reinterpret_cast<void*>(base));
+
+        EnterCriticalSection(&nms_registry_lock);
+        nms_allocations.erase(raw);
+        LeaveCriticalSection(&nms_registry_lock);
+    }
+
+    // sub_100385A0, recovered VA 0x100385A0: the "is this pointer mine" query
+    // (__stdcall, one argument, returns AL).
+    uint8_t __stdcall NmsContainsBody(uint32_t key)
+    {
+        EnterCriticalSection(&nms_registry_lock);
+        const bool found = nms_allocations.find(key) != nms_allocations.end();
+        LeaveCriticalSection(&nms_registry_lock);
+        return found ? uint8_t{ 1 } : uint8_t{ 0 };
+    }
+
+    // 0x100B5038's entry order. Slots 4/5, 6/7, 8/9, 11/14/17, 15/16/23 and
+    // 20/21 repeat an entry, exactly as the original's table does.
+    void PublishNmsVtable()
+    {
+        const uint32_t entries[kNmsVtableSlots] = {
+            reinterpret_cast<uint32_t>(&NmsCtorBody),           // [0]  0x10038640
+            reinterpret_cast<uint32_t>(&NmsRejectPtrBody),      // [1]  0x10038350
+            reinterpret_cast<uint32_t>(&NmsAllocateBody),       // [2]  0x10038360
+            reinterpret_cast<uint32_t>(&NmsFreeBody),           // [3]  0x10038430
+            reinterpret_cast<uint32_t>(&NmsSelfBody),           // [4]  0x10038540
+            reinterpret_cast<uint32_t>(&NmsSelfBody),           // [5]  0x10038540
+            reinterpret_cast<uint32_t>(&NmsZeroBody),           // [6]  0x10001950
+            reinterpret_cast<uint32_t>(&NmsZeroBody),           // [7]  0x10001950
+            reinterpret_cast<uint32_t>(&NmsSyncBody),           // [8]  0x100057F0
+            reinterpret_cast<uint32_t>(&NmsSyncBody),           // [9]  0x100057F0
+            reinterpret_cast<uint32_t>(&RgscLoginRemovedBody),  // [10] 0x10038550
+            reinterpret_cast<uint32_t>(&NmsNoopRet0Body),       // [11] 0x10038560
+            reinterpret_cast<uint32_t>(&SavegameNullBody),      // [12] 0x10038570
+            reinterpret_cast<uint32_t>(&NmsNoopPairBody),       // [13] 0x10038580
+            reinterpret_cast<uint32_t>(&NmsNoopRet0Body),       // [14] 0x10038560
+            reinterpret_cast<uint32_t>(&NmsRejectBody),         // [15] 0x10038590
+            reinterpret_cast<uint32_t>(&NmsRejectBody),         // [16] 0x10038590
+            reinterpret_cast<uint32_t>(&NmsNoopRet0Body),       // [17] 0x10038560
+            reinterpret_cast<uint32_t>(&NmsContainsBody),       // [18] 0x100385A0
+            reinterpret_cast<uint32_t>(&NmsThunk18Body),        // [19] 0x10038620
+            reinterpret_cast<uint32_t>(&NmsSyncBody),           // [20] 0x100057F0
+            reinterpret_cast<uint32_t>(&NmsSyncBody),           // [21] 0x100057F0
+            reinterpret_cast<uint32_t>(&NmsNoopArgBody),        // [22] 0x10038630
+            reinterpret_cast<uint32_t>(&NmsRejectBody),         // [23] 0x10038590
+        };
+        std::memcpy(zpatch_nms_vtable, entries, sizeof(entries));
+    }
+
+    void PublishNewMemorySystem()
+    {
+        if (!Loader::Enabled("NewMemorySystem"))
+            return;
+
+        // The allocator init's `mov esi, <singleton>`: the operand is the address
+        // the installer writes the vtable at.
+        auto pattern = find_pattern("6A 01 B9 00 00 40 06");
+        if (!pattern.empty())
+            zpatch_nms_object = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(
+                GamePointer<std::byte>(*pattern.get_first<uint32_t>(8))));
+
+        // The registry lock and the table are this module's own state: the game
+        // initialises them once, and the offline tools call the pipeline once per
+        // dump cell, so the one-time flag keeps a second initialisation off the
+        // section (nothing about the game's behaviour depends on it).
+        static bool prepared = false;
+        if (!prepared)
+        {
+            prepared = true;
+            InitializeCriticalSection(&nms_registry_lock);
+            PublishNmsVtable();
+        }
+    }
+
+    void InstallNewMemorySystem()
+    {
+        if (!Loader::Enabled("NewMemorySystem"))
+            return;
+
+        auto pattern = find_pattern("3D 80 99 99 59 73 05");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            // -34 is the call the original retargets, -29 the five-slot clear's
+            // first store; the jump resumes four instructions later at -16.
+            injector::MakeCALL(match - 34, reinterpret_cast<void*>(&NmsApplyBody), true);
+            injector::MakeJMP(match - 29, reinterpret_cast<void*>(match - 16), true);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NewFilesCompatibility, as the original handler applies it: the two file-type
+// update calls become this module's bodies and the registrar's own `ret` becomes
+// a jump to the registration body. Both arms are gated on the two modules the
+// original refuses to run beside.
+extern "C"
+{
+    // dword_10159C08: the game's file-registration entry, published from the
+    // `call` operand the registrar site carries.
+    uint32_t zpatch_newfiles_register_slot = 0;
+}
+
+namespace
+{
+    // The original's gate: NewFilesCompatibility is skipped entirely when GTAC.dll
+    // or JacksIVFixes.asi is loaded, because both install the same feature.
+    bool ConflictingFileModulePresent()
+    {
+        return GetModuleHandleA("GTAC.dll") != nullptr || GetModuleHandleA("JacksIVFixes.asi") != nullptr;
+    }
+
+    // sub_10003E50 again (source/shared.ixx): the bodies hash the file name with
+    // the original's own resolver, so a "hash:NNNN" name resolves as it does there.
+    uint32_t ResolveFileName(const char* name)
+    {
+        return reinterpret_cast<uint32_t(__cdecl*)(const char*)>(Shared::ValueResolver())(name);
+    }
+
+    // sub_100515D0, recovered VA 0x100515D0 (5 instructions): the registered
+    // callback. It marks the object it is handed and returns it.
+    void* __cdecl NewfilesCallback(void** object)
+    {
+        void* const result = *object;
+        *reinterpret_cast<int*>(result) = 1;
+        return result;
+    }
+
+    // sub_100515E0, recovered VA 0x100515E0 (6 instructions): register the
+    // callback under the original's key through the published entry. A slot that
+    // was never published is a null call, as the original's `call dword_10159C08`
+    // is.
+    void __cdecl NewfilesRegister()
+    {
+        using RegisterFn = void(__cdecl*)(uint32_t, void*);
+        reinterpret_cast<RegisterFn>(zpatch_newfiles_register_slot)(
+            0x2C89A1F9u, reinterpret_cast<void*>(&NewfilesCallback));
+    }
+
+    // The three helper scans the update bodies use. The original resolves each one
+    // once behind a function-local static guard and re-reads the game state on
+    // every call; a scan that misses leaves a null the body then calls or
+    // dereferences, which is the original's fault and is preserved.
+    uintptr_t FirstMatch(std::string_view signature)
+    {
+        auto pattern = find_pattern(signature);
+        return pattern.empty() ? 0u : reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0));
+    }
+
+    // sub_10051730, recovered VA 0x10051730: the container the file registry hangs
+    // off. The scan finds the game's `mov esi, <global>`, whose operand is the
+    // global itself; the global is dereferenced again on every call because the
+    // game rebuilds the registry at runtime. A miss reads through the null the scan
+    // left behind, as the original's `mov eax,[esi]` with ESI = 0 does.
+    void* NewfilesObject()
+    {
+        static const uintptr_t match = FirstMatch(
+            "8B 35 ? ? ? ? 6A 00 50 E8 ? ? ? ? 83 C4 08 50 8B CE E8 ? ? ? ? 85 C0 89 07 5E 74 05");
+        const uint32_t global = match != 0 ? *reinterpret_cast<const uint32_t*>(match + 2u) : 0u;
+        return *reinterpret_cast<void**>(global);
+    }
+
+    // sub_10051610, recovered VA 0x10051610: ask the container whether the hash is
+    // registered. The original tries one function signature and, on a miss, one
+    // older build's; both are cached, and a double miss calls null.
+    int NewfilesCallObject(void* object, uint32_t hash)
+    {
+        static const uintptr_t function = []() -> uintptr_t
+        {
+            if (const auto direct = FirstMatch("85 C9 53 55 56 57 74 40 8B 6C 24 14 8D 64 24 00"); direct != 0)
+                return direct;
+            return FirstMatch("53 55 8B 6C 24 0C 56 57 EB 06");
+        }();
+        using Fn = int(__fastcall*)(void*, int, uint32_t);
+        return reinterpret_cast<Fn>(function)(object, 0, hash);
+    }
+
+    // sub_100517E0, recovered VA 0x100517E0: append the name to the container. The
+    // scan lands twenty bytes inside the function, so its start is match - 0x14.
+    int NewfilesCallAdd(void* self, void* name)
+    {
+        static const uintptr_t match = FirstMatch("8B 0F 85 C9 74 ? 0F B7 41 0A 66 85 C0");
+        static const uintptr_t function = match != 0 ? match - 20u : 0u;
+        using Fn = int(__fastcall*)(void*, int, void*);
+        return reinterpret_cast<Fn>(function)(self, 0, name);
+    }
+}
+
+// sub_10051600, recovered VA 0x10051600 (4 instructions): the registrar's
+// replacement tail. The original runs the registration between pushad/popad so
+// the caller's registers survive, then returns to the registrar's caller.
+static __declspec(naked) void NewfilesRegisterBody()
+{
+    __asm
+    {
+        __emit 0x60  // pushad
+        call NewfilesRegister
+        __emit 0x61  // popad
+        ret
+    }
+}
+
+// sub_10051890, recovered VA 0x10051890: the first file type's update, called
+// with the object in ECX. Compiled in the original and rebuilt here: a name at
+// +0x10 means "new file"; resolve it through the container's registry and append
+// it to the +8 list when it is known. AL is the original's answer; the site's
+// caller discards EAX.
+static char __fastcall NewfilesUpdateABody(void* self, int)
+{
+    auto* base = static_cast<uint8_t*>(self);
+    if (base[0x10] == 0)
+        return 0;
+
+    void* const object = NewfilesObject();
+    if (NewfilesCallObject(object, ResolveFileName(reinterpret_cast<const char*>(base + 0x10))))
+        NewfilesCallAdd(base + 8, base + 0x10);
+    return 1;
+}
+
+// sub_100518D0, recovered VA 0x100518D0: the second file type's update, the same
+// shape with the name at +0x10F and the list at +4.
+static char __fastcall NewfilesUpdateBBody(void* self, int)
+{
+    auto* base = static_cast<uint8_t*>(self);
+    if (base[0x10F] == 0)
+        return 0;
+
+    void* const object = NewfilesObject();
+    if (NewfilesCallObject(object, ResolveFileName(reinterpret_cast<const char*>(base + 0x10F))))
+        NewfilesCallAdd(base + 4, base + 0x10F);
+    return 1;
+}
+
+namespace
+{
+    void PublishNewFilesCompatibility()
+    {
+        if (!Loader::Enabled("NewFilesCompatibility") || ConflictingFileModulePresent())
+            return;
+
+        // The registrar's `call <entry>`: the operand at +6 is the displacement the
+        // update bodies register their callback through.
+        auto pattern = find_pattern("68 64 28 C8 67 E8");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            int32_t displacement{};
+            std::memcpy(&displacement, match + 6, sizeof(displacement));
+            zpatch_newfiles_register_slot = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(match) + 10 + displacement);
+        }
+    }
+
+    void InstallNewFilesCompatibility()
+    {
+        if (!Loader::Enabled("NewFilesCompatibility") || ConflictingFileModulePresent())
+            return;
+
+        auto pattern = find_pattern("E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 7B FF FF FF");
+        if (!pattern.empty())
+            injector::MakeCALL(pattern.get_first<std::byte>(0),
+                reinterpret_cast<void*>(&NewfilesUpdateABody), true);
+
+        pattern = find_pattern("E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 6C FF FF FF");
+        if (!pattern.empty())
+            injector::MakeCALL(pattern.get_first<std::byte>(0),
+                reinterpret_cast<void*>(&NewfilesUpdateBBody), true);
+
+        pattern = find_pattern("68 64 28 C8 67 E8");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(28),
+                reinterpret_cast<void*>(&NewfilesRegisterBody), true);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LoadDLCs, as the original handler sub_100234E0 applies it.
+//
+// The handler does not scan: per build it stores three game entry points and then
+// rewrites six sites, each at a fixed RVA, with the instruction it computes in
+// place (an optional jump/call to another fixed RVA, a jump/call to one of the two
+// bodies below, or a twelve-byte NOP fill). The rows were read from the handler
+// itself, which switches on the build id; 1.0.8.0 is the `cmp eax, 9` block and
+// its `lea`/`add` immediates are the RVAs recorded here. The sites were checked
+// against GTAIV_1060.exe, GTAIV_1070.exe and GTAIV.exe: each carries the shape the
+// row replaces (`E8` for a call site, `E8` for the two rewritten call sites, `B8`
+// for the struct-fixup site, and the register/callback body of the loader for the
+// tail NOPs).
+//
+// The two bodies: 0x10023480 replaces the loader callback the register function
+// calls (it reports success), and 0x10023490 replaces the DLC manager's
+// initialisation tail, clearing five request slots and - the first time - running
+// the discovery pass before marking the object loaded.
+extern "C"
+{
+    // dword_1015BDDC: the loader callback, an absolute address.
+    uint32_t zpatch_dlc_load_callback = 0;
+    // dword_1015804C / dword_101580D0: the register and apply entry points, which
+    // the original stores as RVAs and adds the image base to at the call.
+    uint32_t zpatch_dlc_register_rva = 0;
+    uint32_t zpatch_dlc_apply_rva = 0;
+    // dword_1015AD70: the image base the discovery adds those RVAs to.
+    uint32_t zpatch_dlc_game_base = 0;
+}
+
+namespace
+{
+    constexpr std::size_t kDlcTailNopLength = 12;
+
+    enum class DlcWriteKind : uint8_t
+    {
+        jump_rva,
+        call_rva,
+        jump_body,
+        call_body,
+        nop_tail,
+    };
+
+    struct DlcWrite
+    {
+        uint32_t site;    // game RVA the write lands at
+        DlcWriteKind kind;
+        uint32_t target;  // game RVA, for the two *_rva kinds
+    };
+
+    struct DlcBuild
+    {
+        Build build;
+        uint32_t register_rva;
+        uint32_t apply_rva;
+        uint32_t load_callback_rva;
+        std::span<const DlcWrite> writes;
+    };
+
+    // The handler's write order, per build.
+    constexpr DlcWrite kDlcWrites1060[] = {
+        { 0x41450Eu, DlcWriteKind::jump_rva, 0x41452Cu },
+        { 0x41453Au, DlcWriteKind::call_rva, 0x413E30u },
+        { 0x41453Fu, DlcWriteKind::nop_tail, 0u },
+        { 0x41445Cu, DlcWriteKind::jump_rva, 0x4144B8u },
+        { 0x4137CDu, DlcWriteKind::call_body, 0u },
+        { 0x4144D4u, DlcWriteKind::jump_body, 0u },
+    };
+
+    constexpr DlcWrite kDlcWrites1070[] = {
+        { 0x4142AEu, DlcWriteKind::jump_rva, 0x4142CCu },
+        { 0x4142DAu, DlcWriteKind::call_rva, 0x413BD0u },
+        { 0x4142DFu, DlcWriteKind::nop_tail, 0u },
+        { 0x4141FCu, DlcWriteKind::jump_rva, 0x414258u },
+        { 0x41356Du, DlcWriteKind::call_body, 0u },
+        { 0x414274u, DlcWriteKind::jump_body, 0u },
+    };
+
+    constexpr DlcWrite kDlcWrites1080[] = {
+        { 0x49040Eu, DlcWriteKind::jump_rva, 0x49042Cu },
+        { 0x49043Au, DlcWriteKind::call_rva, 0x48FBB0u },
+        { 0x49043Fu, DlcWriteKind::nop_tail, 0u },
+        { 0x49035Cu, DlcWriteKind::jump_rva, 0x4903B8u },
+        { 0x48F558u, DlcWriteKind::call_body, 0u },
+        { 0x4903D4u, DlcWriteKind::jump_body, 0u },
+    };
+
+    // The key's build mask is exactly these three.
+    constexpr DlcBuild kDlcBuilds[] = {
+        { Build::v1060, 0x4136E0u, 0x414080u, 0x414560u, kDlcWrites1060 },
+        { Build::v1070, 0x413480u, 0x413E20u, 0x414300u, kDlcWrites1070 },
+        { Build::v1080, 0x48F440u, 0x48FE00u, 0x490460u, kDlcWrites1080 },
+    };
+}
+
+// The discovery pass's constants (original sub_10023150): the 0x104-byte path
+// buffers, the 0x168-byte request block with its flag at +358 and its mode dword
+// at +344, the two named DLC ids, the episode channel range and the object byte
+// the pass finishes with.
+namespace
+{
+    constexpr std::size_t kDlcPathCapacity = 0x104;
+    constexpr std::size_t kDlcRequestCapacity = 0x168;
+    constexpr std::size_t kDlcRequestFlagOffset = 358;
+    constexpr std::size_t kDlcRequestModeOffset = 344;
+    constexpr std::size_t kDlcObjectFlagOffset = 0x166;
+    constexpr std::size_t kDlcSuffixCapacity = 0x40;
+    constexpr int kTladDlcId = 2;
+    constexpr int kTbogtDlcId = 4;
+    constexpr int kFirstEpisodeChannel = 3;
+    constexpr int kLastEpisodeChannel = 0xFF;  // one past 254
+    constexpr int kEpisodeChannelScale = 2;
+
+    // "\Episode<n>\": the original formats it with its bounded formatter at a
+    // 0x40-byte capacity; the text is what the game's path table is probed with.
+    void BuildEpisodeSuffix(char* out, int episode)
+    {
+        *out++ = '\\';
+        for (const char character : std::string_view("Episode"))
+            *out++ = character;
+        char digits[4];
+        int count = 0;
+        do
+        {
+            digits[count++] = static_cast<char>('0' + episode % 10);
+            episode /= 10;
+        } while (episode != 0);
+        while (count > 0)
+            *out++ = digits[--count];
+        *out++ = '\\';
+        *out = '\0';
+    }
+}
+
+// sub_10023150, recovered VA 0x10023150: the DLC discovery. For each of the two
+// named DLC folders it picks one path - the "content" layout if it exists, else
+// the legacy fallback - and probes \Episode3\ .. \Episode254\ next to the
+// executable, registering every folder that exists and applying it to the object
+// the body was entered with. Both calls go through the handler-published RVAs,
+// and the register call is the same call shape the original has (three stack
+// arguments; see the note on the undefined `this` below).
+//
+// The pass leaves EDX holding whatever its last callee left. That is not
+// observable: the only caller of the patched game function (game 0x4931FA) does
+// not read EDX or EAX - it calls 0x8CCCD0 straight after - and neither image
+// mentions 0x890320 anywhere else (checked as both a branch target and a dword).
+// The rebuild still performs the same calls in the same order, so EDX ends up the
+// same value on every path.
+static void* DlcDiscovery(void* object)
+{
+    // The original allocates this block unchecked and never frees it; owning it
+    // would only change its lifetime.
+    char* const modulePath = static_cast<char*>(::operator new(kDlcPathCapacity));
+    GetModuleFileNameA(nullptr, modulePath, static_cast<DWORD>(kDlcPathCapacity));
+    PathRemoveFileSpecA(modulePath);
+
+    using RegisterFn = bool(__stdcall*)(int, void*, int);
+    using ApplyFn = void(__thiscall*)(void*, void*);
+    const auto gameBase = static_cast<uintptr_t>(zpatch_dlc_game_base);
+
+    char path[kDlcPathCapacity];
+    char suffix[kDlcSuffixCapacity];
+
+    // The register entry is a __thiscall that the original calls without setting
+    // ECX: with the flag argument non-zero it skips the only branch that would use
+    // `this`, and the one call that still reads it is the loader callback this key
+    // replaces with the dummy body. Declaring it __stdcall keeps that contract -
+    // the callee pops the three arguments and ECX is left alone.
+    const auto registerDlc = reinterpret_cast<RegisterFn>(gameBase + zpatch_dlc_register_rva);
+    const auto applyDlc = reinterpret_cast<ApplyFn>(gameBase + zpatch_dlc_apply_rva);
+
+    const auto registerAndApply = [&](int id)
+    {
+        char request[kDlcRequestCapacity] = {};
+        strcpy_s(request, kDlcPathCapacity, path);
+        request[kDlcRequestFlagOffset] = 1;
+        *reinterpret_cast<uint32_t*>(request + kDlcRequestModeOffset) = 1;
+        registerDlc(id, request, 1);
+        applyDlc(object, request);
+    };
+
+    // A named folder: the primary layout, else the fallback. The probe runs again
+    // on the substituted path (and again on the primary when it was the one that
+    // existed), exactly as the original's two PathFileExistsA calls do.
+    const auto tryNamed = [&](const char* primary, const char* fallback, int id)
+    {
+        strcpy_s(path, kDlcPathCapacity, modulePath);
+        strcat_s(path, kDlcPathCapacity, primary);
+        if (PathFileExistsA(path) == FALSE)
+        {
+            strcpy_s(path, kDlcPathCapacity, modulePath);
+            strcat_s(path, kDlcPathCapacity, fallback);
+        }
+        if (PathFileExistsA(path) == FALSE)
+            return;
+        registerAndApply(id);
+    };
+
+    tryNamed("\\dlc\\tlad\\content\\", "\\TLAD\\", kTladDlcId);
+    tryNamed("\\dlc\\TBoGT\\content\\", "\\TBoGT\\", kTbogtDlcId);
+
+    for (int episode = kFirstEpisodeChannel; episode < kLastEpisodeChannel; ++episode)
+    {
+        strcpy_s(path, kDlcPathCapacity, modulePath);
+        BuildEpisodeSuffix(suffix, episode);
+        strcat_s(path, kDlcPathCapacity, suffix);
+        if (PathFileExistsA(path) == FALSE)
+            continue;
+        registerAndApply(episode * kEpisodeChannelScale);
+    }
+
+    *reinterpret_cast<uint8_t*>(static_cast<uint8_t*>(object) + kDlcObjectFlagOffset) = 2;
+    return object;
+}
+
+// sub_10023480, recovered VA 0x10023480 (2 instructions): the loader callback's
+// replacement. It sets only AL, so a caller's `test al, al` sees success while the
+// upper 24 bits of EAX stay whatever the caller had.
+static __declspec(naked) void DlcDummyBody()
+{
+    __asm
+    {
+        mov al, 1
+        ret 8
+    }
+}
+
+// sub_10023490, recovered VA 0x10023490 (19 instructions): the DLC manager's
+// initialisation tail. It clears the five request slots the site's loop cleared,
+// marks the object initialised when it already was, and otherwise runs the
+// loader callback and the discovery pass before setting the loaded byte. Entered
+// through the site's jump, so the ESI object is live and the epilogue returns to
+// the game function's caller.
+static __declspec(naked) void DlcStructFixupBody()
+{
+    __asm
+    {
+        mov BYTE PTR [esi], 0
+        mov BYTE PTR [esi + 40h], 0
+        mov BYTE PTR [esi + 80h], 0
+        mov BYTE PTR [esi + 0C0h], 0
+        mov BYTE PTR [esi + 100h], 0
+        cmp BYTE PTR [esi + 167h], 0
+        je dlc_fixup_load
+        mov BYTE PTR [esi + 168h], 1
+    dlc_fixup_exit:
+        pop esi
+        pop ebx
+        add esp, 14h
+        ret
+    dlc_fixup_load:
+        mov ecx, esi
+        call DWORD PTR [zpatch_dlc_load_callback]
+        push esi
+        call DlcDiscovery
+        pop esi
+        mov BYTE PTR [esi + 0A4h], 1
+        jmp dlc_fixup_exit
+    }
+}
+
+namespace
+{
+    const DlcBuild* DlcBuildFor(Build build)
+    {
+        for (const auto& row : kDlcBuilds)
+        {
+            if (row.build == build)
+                return &row;
+        }
+        return nullptr;
+    }
+
+    void PublishLoadDLCs()
+    {
+        if (!Loader::Enabled("LoadDLCs"))
+            return;
+
+        const DlcBuild* const row = DlcBuildFor(Loader::Current());
+        if (row == nullptr)
+            return;
+
+        const auto base = static_cast<uint32_t>(Game::Get().ImageBase());
+        zpatch_dlc_game_base = base;
+        zpatch_dlc_register_rva = row->register_rva;
+        zpatch_dlc_apply_rva = row->apply_rva;
+        zpatch_dlc_load_callback = base + row->load_callback_rva;
+    }
+
+    void InstallLoadDLCs()
+    {
+        if (!Loader::Enabled("LoadDLCs"))
+            return;
+
+        const DlcBuild* const row = DlcBuildFor(Loader::Current());
+        if (row == nullptr)
+            return;
+
+        auto* const base = reinterpret_cast<std::byte*>(Game::Get().ImageBase());
+        for (const auto& write : row->writes)
+        {
+            auto* site = base + write.site;
+            switch (write.kind)
+            {
+            case DlcWriteKind::jump_rva:
+                injector::MakeJMP(site, base + write.target, true);
+                break;
+            case DlcWriteKind::call_rva:
+                injector::MakeCALL(site, base + write.target, true);
+                break;
+            case DlcWriteKind::jump_body:
+                injector::MakeJMP(site, reinterpret_cast<void*>(&DlcStructFixupBody), true);
+                break;
+            case DlcWriteKind::call_body:
+                injector::MakeCALL(site, reinterpret_cast<void*>(&DlcDummyBody), true);
+                break;
+            case DlcWriteKind::nop_tail:
+                injector::MakeNOP(site, kDlcTailNopLength, true);
+                break;
+            }
+        }
+    }
+}
+
 // Registered like every other arm: the install tier owns the gate.
 export void RegisterLoading()
 {
@@ -876,6 +1694,9 @@ export void RegisterLoading()
     {
         PublishLocalSettingsPath();
         CopyOverrideDatPath();
+        PublishNewMemorySystem();
+        PublishNewFilesCompatibility();
+        PublishLoadDLCs();
     };
     Loader::InstallEvent() += []
     {
@@ -891,6 +1712,9 @@ export void RegisterLoading()
         InstallSkipIntro();
         InstallSkipMenu();
         InstallSavegameFix();
+        InstallNewMemorySystem();
+        InstallNewFilesCompatibility();
+        InstallLoadDLCs();
     };
 
     // The hook bodies carry their recovered VAs so the dump can express every
@@ -907,6 +1731,42 @@ export void RegisterLoading()
     Bodies::Register(reinterpret_cast<uintptr_t>(&SavegameCloseBody), 0x10045580u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&SavegameCopyBody), 0x100455A0u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&SavegameMutexBody), 0x100455E0u);
+
+    // NewMemorySystem's ten transcribed methods and the three rebuilt arena
+    // methods of its vtable (0x100B5038).
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsCtorBody), 0x10038640u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsRejectPtrBody), 0x10038350u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsSelfBody), 0x10038540u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsZeroBody), 0x10001950u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsNoopRet0Body), 0x10038560u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsNoopPairBody), 0x10038580u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsRejectBody), 0x10038590u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsSyncBody), 0x100057F0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsThunk18Body), 0x10038620u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsNoopArgBody), 0x10038630u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsApplyBody), 0x10038670u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsAllocateBody), 0x10038360u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsFreeBody), 0x10038430u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsContainsBody), 0x100385A0u);
+
+    // NewFilesCompatibility's registration tail (transcribed) and its two update
+    // bodies (rebuilt, so they carry no proof row).
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NewfilesRegisterBody), 0x10051600u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NewfilesUpdateABody), 0x10051890u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NewfilesUpdateBBody), 0x100518D0u);
+
+    // LoadDLCs' two bodies, and the discovery pass the fixup body calls (a rebuild,
+    // so it carries no proof row).
+    Bodies::Register(reinterpret_cast<uintptr_t>(&DlcDummyBody), 0x10023480u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&DlcStructFixupBody), 0x10023490u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&DlcDiscovery), 0x10023150u);
+
+    // The registrar's inline-asm `call` and the callbacks it names are invisible
+    // to C++; naming them here keeps their out-of-line definitions in the image.
+    const auto newfilesRegister = reinterpret_cast<uintptr_t>(&NewfilesRegister);
+    const auto newfilesCallback = reinterpret_cast<uintptr_t>(&NewfilesCallback);
+    (void)newfilesRegister;
+    (void)newfilesCallback;
 
     // The two imports the save bodies call: the original calls them through its
     // own IAT slots, so the bodies call through these published addresses.

@@ -7,8 +7,8 @@ and EFLC. The oracle is `../game_refs/ZolikaPatch_original.asi.off`; the old
 ## Current state
 
 Thirteen feature modules are in place (stability, vehicles, graphics, useless_checks,
-launcher, audio, misc, options, loader, pattern, shared, loading, native) and 84 of the 99
-catalogue keys are closed on 1.0.8.0, with 72 hook bodies transcribed and proven
+launcher, audio, misc, options, loader, pattern, shared, loading, native) and 88 of the 99
+catalogue keys are closed on 1.0.8.0, with 98 hook bodies transcribed and proven
 instruction-for-instruction against the original ASI. The shipped-INI cell now shows
 zero differing and zero extra bytes: everything the tree writes agrees with the
 baseline, and what remains is unimplemented, not wrong.

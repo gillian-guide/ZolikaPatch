@@ -25,6 +25,8 @@ fix.
 | the whole INI is dropped | the first line starts with a UTF-8 BOM | `Feather::Parse` |
 | null section dereference | a key line before the first `[section]` line | `Feather::Parse` |
 | a line longer than 255 bytes is split | the parser's 255-byte line buffer | `Feather::Parse` |
+| the file-registry helpers fault on a scan miss | the original's one-time scans (`0x10051730`, `0x10051610`, `0x100517E0`) match nothing | `NewfilesObject` / `NewfilesCallObject` / `NewfilesCallAdd` read or call through the null the scan left, as the original's unguarded `mov eax,[esi]` with `ESI = 0` and its `call edx` do |
+| the DLC register call's `this` is undefined | every `LoadDLCs` run | the original calls the register entry at `0x48F440` with `ECX` left over from the preceding `strcpy_s`. The callee uses it only through the loader-callback call this key replaces with `0x10023480` and through a branch its non-zero flag argument skips, so the value is never dereferenced. The rebuild keeps the same call shape (`__stdcall`, three stack arguments, `ECX` untouched) rather than inventing a `this` |
 
 Two of these remain assumptions, not measurements: feather 1.41's non-advancing
 `getline` on a long line (the original very likely spins; this tree continues), and
@@ -35,8 +37,8 @@ CRLF folding (the original reads in text mode). The shipped INI's longest line i
 
 Measured on 1.0.8.0 with `tools/parity_report.py 9`:
 
-- **84 of 99 option keys closed**;
-- **72 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **88 of 99 option keys closed**;
+- **98 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe, and the compiled-C bodies listed below are
   rebuilt in C++ instead, with no proof row. The longest two are the
@@ -44,7 +46,10 @@ Measured on 1.0.8.0 with `tools/parity_report.py 9`:
   exposed the proof tool's old 256-byte sweep window: it compared 64 of 78 and
   still reported PASS. The tool now sweeps 4096 bytes and fails a row that
   decodes fewer instructions than its budget, so a truncated sweep can never pass
-  again;
+  again. This pass added twelve: `RestoreDeathMusic`'s gate body and its three
+  native wrappers, and `MouseFix`'s eight pieces (see the section below); the
+  loading pass added fourteen more: `NewMemorySystem`'s eleven small table methods,
+  `NewFilesCompatibility`'s registration tail and `LoadDLCs`' two bodies;
 - launcher: both arms implemented. `LaunchWithPlayGTAIV` rewrites the two launch
   slots and `zp_launcher_slots` verifies them per build; `SkipLauncher` carries the
   original's 25-row table, both collectors, the DFA file-API stage (IAT capture, six
@@ -339,13 +344,278 @@ tables that the original's loader preamble parses are not parsed by this tree
 yet; the shipped INI's two sections are empty, so the checker's default pi/2 is
 exactly what the original uses there.
 
+### `RestoreDeathMusic`, closed on the native layer's wrappers
+
+The key's handler (`0x10050BD0`) scans three signatures and writes nothing but an
+`E8` and its displacement at each site; all three sites are already `E8` calls in
+the image, so the only bytes that differ from the pristine image are the twelve
+displacement bytes, and the stored baseline's twelve rows are exactly those. That
+is why the key read "closed" before it had an arm: both sides were all-branch and
+the scoreboard excludes branch bytes. It now has its arm.
+
+| piece | VA | instructions | how |
+|---|---|---:|---|
+| the gate body | `0x10050A50` | 41 | transcribed |
+| the two-argument native wrapper | `0x1005B1E0` | 48 | transcribed |
+| the byte native wrapper | `0x1005B490` | 46 | transcribed |
+| the zero-argument bool wrapper | `0x1005B360` | 44 | transcribed |
+| the install body | `0x10050AD0` | 75 | rebuilt as C, no proof row |
+
+- The three sites: `0x81E3C5` (the track-select function entry, written at the
+  match's `-13`), `0x81E509` (the gate call, also `-13`) and `0x81E53A` (the second
+  gate call, at the match).
+- The gate body reads the original's salt words `dword_1015805C`,
+  `dword_101580A8` and `dword_10158050`; the two wrappers it calls read
+  `dword_10158054` and `dword_10158028`. All five are copied from
+  `Native::Salt(ref)` in `RegisterAudio()`, never from a literal, so a hit build
+  keeps the shipped `.data` values and 1.0.0.0/1.0.4.0 get the preamble's fallback
+  set (the rule the section above records).
+- The wrappers are transcribed in `audio.ixx` rather than added to the layer
+  because only four of the layer's pieces are exported and none of the wrappers
+  is: they reach `sub_100038C0`, `sub_100038E0`, `sub_1005DE40`, `sub_1005DE80`
+  and `sub_1005B150` through six-byte `jmp` forwarders filled from the body
+  registry, exactly like `BadPlayerModelCrashFix`'s. Their `memset` call names a
+  local cdecl forwarder (the inline assembler rejects the intrinsic's name, C2420).
+- **The two counts the brief carried do not survive measurement**: `sub_10050A50`
+  is 41 instructions to its `ret`, and `sub_10050AD0` is 75 (0x10050AD0 ..
+  0x10050BC8), not 91. The 91 is the *handler* `0x10050BD0`'s count (0x10050BD0 ..
+  0x10050D09), which the install path never executes as a body.
+- The install body is rebuilt because it is compiler output: an EH4 frame
+  (prologue `0x10050AD3..0x10050AF4` pushing `__except_handler4`, handler
+  `0x100619C1` with its scope table at `0x10154384`, epilogue
+  `0x10050BAE..0x10050BC8`), and a clock/seed block that calls the static CRT's own
+  helpers (`0x1005FFC3`, `0x1005FF77`), which reach the CRT's per-thread state
+  through `fs:[2Ch]` and the TLS index `dword_10159328` -- image-internal addresses
+  a rebuilt module cannot name. The rebuild keeps the state word `dword_101A84B8`,
+  calls the transcribed gate, resolves `6A 06 68 ? ? ? ? 8D 8C` once and writes
+  `rand() % 5 + 1` into the `push` immediate at site+1, which is the original's
+  write.
+- **The one unproven divergence in this key, recorded rather than hidden.** The
+  original resolves the site *inside* a guard it keeps at `0x10050B07..0x10050B21`:
+  it reads `dword_101A84C0` (`.bss`, so 0 on a fresh process), compares it with the
+  CRT per-thread word at `[tls + 4]`, and jumps over the whole clock/scan/seed block
+  when `dword_101A84C0 <= that word`. Should that comparison always skip on a fresh
+  process, the original would resolve nothing and write nothing; the rebuild
+  resolves on the first call and always writes. The guard's meaning is CRT-internal
+  and cannot be settled without running the original ASI, so the rebuild keeps the
+  writing path (the intent both reference trees implement) and this note records
+  that the guard's branch and the exact draw are the parts of `0x10050AD0` that are
+  not proven 1:1.
+
+### `MouseFix`, closed with all eight pieces transcribed
+
+The arm writes seven branches and five `cvtsi2ss` replacements at ten sites; the
+scoreboard's 51-row baseline cell matches ours byte for byte (our dump has 53 rows,
+the two extra being displacement bytes of the two `E8` sites, which the scoreboard
+excludes by design).
+
+| piece | VA | instructions | role |
+|---|---|---:|---|
+| axis reader, float | `0x10024060` | 30 | X or Y * 1/128 in st(0) |
+| axis reader, negated | `0x100240C0` | 23 | -127.5 * the axis |
+| axis reader, int | `0x10024120` | 22 | `(int)(v * 1/128 * 255)` |
+| axis reader, flagged | `0x10024170` | 28 | the negated form, sign flipped by the invert byte |
+| angle step | `0x10024440` | 62 | advances pitch at +144h and yaw at +148h |
+| angle site body | `0x10024560` | 25 | xmm save/restore, then the site's `-15` resume |
+| advance site body | `0x100243A0` | 23 | xmm save/restore, then the site's `+1862` resume |
+| advance helper | `0x100241E0` | 138 | patches three 8-byte windows at resume+34h/+5Eh/+6Bh |
+
+- The published words are the sites' own operands, read in the publish tier: the
+  two axis pointers (`0x17945D0`, `0x17945C0`), the invert byte `0x10FC0D0`, the
+  game's frame clock `0xB4D3A0` and the two resumes (`0xA81B1F` and `+1878`). Each
+  is rebased through the image's preferred base, so the offline dump reads the
+  same words at a heap base that the game reads at `0x400000`.
+- The literals the bodies read are the original's `.data`, kept as raw words so the
+  bit patterns are exact: `0.0078125`, `255.0`, `0.075`, `0.025`, `-1.0` (double and
+  float), pi, 2pi, -pi, 127.5f, 0.1f, and the two `xorps` sign masks (four
+  single-precision sign bits at `0x101523F0`, two double-precision ones at
+  `0x101523E0`). The masks are 16 bytes and `xorps` reads sixteen, so they are
+  declared `alignas(16)`.
+- The advance helper (`0x100241E0`) is transcribed rather than rebuilt. Its only
+  indirect call is the game's `VirtualProtect`, which the original reaches through
+  its own IAT slot (`FF 15`), so ours is a `call dword ptr [slot]` as well: the
+  proof compares the memory operand, not the address. Its three window images are
+  the original's immediates (`F3 0F 11 86 44 01 00 00`, `F3 0F 11 8E 48 01 00 00`,
+  `D9 9E 48 01 00 00 8B 5C`), and the disabled forms are `90` fill plus `DD D8`
+  (`fstp st(0)`) for the x87 window -- the pop must stay, because the enclosing
+  routine pops that value later and eight calls of `nop` fill would overflow the
+  x87 stack.
+
+### `OutOfCommissionFix`, still blocked: what is missing
+
+The key's writes on 1.0.8.0 are one `E9` at RVA `0x622E97` (the 7-instruction
+branch body) and one `E8` at `0x770733` (the 29-instruction wrapper). Neither is
+installed, because the branch exists only to accept what the missing table
+produces:
+
+- **The payload.** The original embeds the compressed `finale2.sco` as 163,796
+  bytes of `.rdata` at VA `0x100B6798` (file offset `0xB5B98`, first bytes
+  `2A 73 63 72`), and `sub_1004B750` decodes it into a 179,536-byte
+  (`0x2BD50`) table with `sub_1004B570`/`sub_1004B150`, registers it through a
+  fake-pak vector and builds an in-memory archive around it. Carrying that as
+  recovered data means a new ~164 KB byte table in source form (the
+  `source/model_names.inc` precedent: a data file with an extraction recipe and a
+  pinned image SHA-256), which is a new `data/` file outside this pass's edit set
+  and roughly a megabyte of source text.
+- **The code.** `sub_1004C3F0` is 16,311 bytes of C++: an EH4 prologue
+  (`push -1; push 0x10061940; ...`, scope table in `.data`), `std::string`
+  SSO temporaries at `[ebp-0x520]` (capacity `0xF`), `std::to_string`-shaped
+  formatting loops and virtual/indirect calls through the CRT import slots. It is
+  compiler output, not an instruction stream, so it would have to be rebuilt
+  alongside `sub_1004B750`, `sub_1004ACE0` (the archive builder), the fake-pak
+  vector's `operator new`/`delete` growth and the mount call -- a module of its
+  own, not a feature arm.
+- **Why the `E9` must wait for it.** The branch body's whole job is to re-compare
+  the game's script-resource check against the archive's magic `0x86723DFF`. With
+  no registered table nothing produces that magic, so the widened branch accepts
+  nothing while every other script-resource check keeps its original behaviour:
+  the write set would match the baseline (1 differing byte) and the feature would
+  do nothing. The wrapper has the same dependency: it mounts the archive the
+  missing builder returns.
+
+So the key stays open rather than shipping one half of a two-part feature.
+
+### The three loading keys closed in this pass
+
+`NewMemorySystem`, `NewFilesCompatibility` and `LoadDLCs` in `source/loading.ixx`.
+The first two are new arms; `LoadDLCs` is the earlier attempt's blocker resolved: its
+discovery pass is reimplemented, and the EDX contract the attempt could not verify
+turned out to be unobservable (measured below, not assumed).
+
+| key | writes on 1.0.8.0 (RVA) | bodies |
+|---|---|---|
+| `NewMemorySystem` | `E8` at `0x107A` retargeted to `0x10038670` (the opcode is already `E8`, so only the displacement changes), `E9` at `0x107F` to `0x108C` | vtable `0x100B5038`: eleven methods transcribed, three rebuilt |
+| `NewFilesCompatibility` | `E8` at `0x496149` and `0x496228` retargeted, `E9` at `0x70A970` | `sub_10051600` 4, transcribed; `sub_10051890` / `sub_100518D0` rebuilt |
+| `LoadDLCs` | six fixed-RVA writes per build: `E9` at `0x49040E`->`0x49042C`, `E8` at `0x49043A`->`0x48FBB0`, twelve `90`s at `0x49043F`, `E9` at `0x49035C`->`0x4903B8`, `E8` at `0x48F558`->body, `E9` at `0x4903D4`->body | `sub_10023480` 2, `sub_10023490` 19, transcribed; `sub_10023150` rebuilt |
+
+**`NewMemorySystem`.** The arm is the original handler's: the allocator-initialisation
+call at `0x107A` is retargeted to the vtable installer and a jump at `0x107F` skips
+the five-slot clear it replaces, resuming at `0x108C` (anchor
+`3D 80 99 99 59 73 05`, RVA `0x109C`). The singleton the installer writes into comes
+from the `6A 01 B9 00 00 40 06` anchor's `mov esi, <address>` operand at `+8`
+(`0x19CF9F0`), rebased through `GamePointer` like every other captured game pointer.
+The table is the original's 24-slot vtable at `0x100B5038`, read entry by entry:
+slots 10 and 12 point at the RGSC-login stub and the savegame null path, which this
+unit already owns, and slots 8/9/20/21 at the two-instruction MP-sync stub — the
+original's own table shares them, so the rebuild does too. `audio.ixx` owns that
+stub's body but keeps it internal to its unit, so the table gets a second copy with
+its own proof row. Eleven methods are transcribed (constructor 17 instructions,
+reject-pointer 2, self 2, null 2, no-op `ret 0` 1, paired no-op 1, reject 2, sync 2,
+slot-18 thunk 5, no-argument no-op 1, installer 5) and the three arena methods are
+rebuilt because they are compiled code with `/GS` frames and hash-map calls: the
+allocate slot is the original's alignment scheme instruction for instruction —
+`unit = max(0x10, align)`, `want = max(size, unit)`, `HeapAlloc(want + 2 * unit)`,
+align to `((base - 1) / unit + 2) * unit`, store the distance from the base at
+`[pointer - 4]`, fill `want` bytes with `0xCD`, register under the critical section at
+`0x101A0808` — free recovers the base from that distance and unregisters, and the
+membership slot queries the registry. Only membership is observable, so the registry
+is a plain set behind an equivalent lock. A failed allocation returns null exactly
+where the original's `test edx, edx` does; no guard was added.
+
+**`NewFilesCompatibility`.** Gated on the original's two refused neighbours
+(`GTAC.dll`, `JacksIVFixes.asi`), in both the publish and the install. The publish
+reads the registrar anchor's `call` operand (`68 64 28 C8 67 E8`, RVA `0x70A954`,
+`+6`) and computes the game's register entry (`match + 10 + displacement`,
+`0x625620` on 1.0.8.0); the install retargets the two file-type update calls and
+replaces the registrar's own `ret` at `0xB0A970`. The registration tail
+(`pushad`/`call`/`popad`/`ret`) is transcribed and proven; the two update bodies are
+compiled in the original and rebuilt with the same ABI (`__fastcall`, object in
+`ECX`, plain `ret`, the answer in `AL` — the site's caller at `0x89614E` overwrites
+`EAX`, so only `AL` is observed) and the same call order. They hash the file name
+through the transcribed resolver `sub_10003E50` (`Shared::ValueResolver()`), not a
+C++ hash, so a `hash:NNNN` name resolves as it does in the original, and the three
+scan-resolved helpers use the original's own signatures (`8B 35 …` for the
+container, `85 C9 53 55 56 57 74 40 …` / `53 55 8B 6C 24 0C 56 57 EB 06` for the
+membership query, `8B 0F 85 C9 74 ? 0F B7 41 0A 66 85 C0` minus `0x14` for the
+append). All three keep the original's unguarded behaviour: a scan miss reads or
+calls through the null it left.
+
+**`LoadDLCs`.** The original handler does not scan. It switches on the build id and,
+for each of 1.0.6.0, 1.0.7.0 and 1.0.8.0, stores three game entry points and rewrites
+six sites at fixed RVAs with instructions it computes in place. The rows below were
+read from the handler's own `cmp eax, 7/8/9` blocks (`lea edi,[eax+RVA]`,
+`lea ebx,[eax+RVA]`, `add esi,RVA`, and the body stores `mov eax, 0x10023480/90`)
+and the sites were checked against `GTAIV_1060.exe`, `GTAIV_1070.exe` and
+`GTAIV.exe`: each carries the shape its row replaces. The arm therefore writes at
+fixed RVAs rather than scanning — the reference tree's per-row signature scans would
+silently skip a write the original always performs — and the key's build mask is
+exactly those three builds.
+
+| build | register | apply | loader callback | sites |
+|---|---:|---:|---:|---|
+| 1.0.6.0 | `0x4136E0` | `0x414080` | `0x414560` | `0x41450E`, `0x41453A`, `0x41453F` (12 nops), `0x41445C`, `0x4137CD`, `0x4144D4` |
+| 1.0.7.0 | `0x413480` | `0x413E20` | `0x414300` | `0x4142AE`, `0x4142DA`, `0x4142DF` (12 nops), `0x4141FC`, `0x41356D`, `0x414274` |
+| 1.0.8.0 | `0x48F440` | `0x48FE00` | `0x490460` | `0x49040E`, `0x49043A`, `0x49043F` (12 nops), `0x49035C`, `0x48F558`, `0x4903D4` |
+
+Four of the twelve filled bytes are inside a `BRANCH` classification in the scoreboard
+(the pristine bytes under the fill contain `E8`s), so `parity_report` compares seven of
+the key's bytes; all twelve are written.
+
+The two bodies are transcribed and proven: the loader-callback replacement
+(`0x10023480`, 2 instructions, `mov al,1 / ret 8`) and the DLC manager's
+initialisation tail (`0x10023490`, 19). The tail clears five request slots, and on
+the first call runs the loader callback and the discovery pass before setting the
+loaded byte at `+0xA4`; its epilogue is the game function's own, so it returns to
+that function's caller. The discovery (`sub_10023150`) is compiled code — a `/GS`
+frame, TLS static-init guards and 32 calls — and is rebuilt in C++ with the
+original's call sequence: the `0x104`-byte module-path buffer allocated unchecked and
+never freed, `GetModuleFileNameA` + `PathRemoveFileSpecA`, the two named folders
+(TLaD id 2, TBoGT id 4, the `\dlc\…\content\` layout first and the legacy `\TLAD\` /
+`\TBoGT\` fallback second, with the second `PathFileExistsA` probe the original makes
+even when the primary existed), then 252 probes `\Episode3\` … `\Episode254\` whose
+ids are `2n`, each registration building the `0x168`-byte request (path at `+0`, mode
+dword `1` at `+344`, flag `1` at `+358`) and calling the published register and apply
+entries, and finally the object's `+0x166` byte set to `2`.
+
+*The EDX contract, measured.* The earlier attempt refused the key because it could not
+verify what `sub_10023150` must leave in EDX. It leaves whatever its last callee left:
+after its final call the only instructions are `mov eax,[esp+0x10]`, three pops,
+`xor ecx,esp`, the `mov byte [eax+0x166],2` store, `call __security_check_cookie`
+(`cmp ecx,cookie / jne / ret` — ECX and flags only), `mov esp,ebp`, `pop ebp`, `ret`.
+The body passes EDX through untouched to its own `ret`, which returns to game
+`0x4931FF` — the instruction after the only call to the patched function
+(`call 0x890320` at `0x4931FA`). That instruction is `call 0x8CCCD0`: neither `EAX`
+nor `EDX` is read, and neither image mentions `0x890320` anywhere else (checked as a
+branch target and as a dword), so the value is unobservable. The rebuild nevertheless
+keeps the same call sequence, so it ends on the same value on every path (the game's
+apply entry on a hit path, `PathFileExistsA` on a miss path), and the formatter's own
+EDX is always overwritten by the `strcat_s`/`PathFileExistsA` that follow it. The one
+piece of the reference's model that can be checked statically is
+`sub_10001280`: it loads `edx = [ebp+0xC]` (its size argument, `0x40`) before its call
+and never reloads it, so if it ever were the last callee the value would be `0x40`.
+
+The register entry is a `__thiscall` that the original calls without setting `ECX`
+(left over from the preceding `strcpy_s`); with its flag argument non-zero it skips
+the only branch that would use `this`, and the one call that still reads it is the
+loader callback this key replaces. The rebuild reproduces that shape exactly
+(`__stdcall`, three stack arguments, `ECX` untouched) instead of inventing a `this`
+— recorded above under preserved faults.
+
 ### Still blocked
 
+- `OutOfCommissionFix` (the payload and the C++ path above);
+- `ForceCarHeadlightShadows`, `GarageModelFix`, `MovingPlaneParts`,
+  `MovingSteeringWheelSupport`, `ShakingEngineBlock`, `NoLiveryLimit` have baselines
+  but no arm here yet;
 - `GarageModelFix`, `NoLiveryLimit`, the steer/engine/plane trio and `FreezeCarFix`
   need `sub_10004C70` (the 1,343-byte steer consumer) and, for `FreezeCarFix`, the
   1,421-byte probe;
 - `HighQualityReflections` (~200 instructions) and `CutsceneFixes` (~100, with only
-  one real baseline byte) are over the transcription budget by design.
+  one real baseline byte) are over the transcription budget by design;
+- `NewSavesCompatibility` needs `sub_10051B30`, the save converter: compiled file-IO
+  code that reads the `0x110`-byte header, walks the 18 chunks and then patches three
+  game sites at conversion time (`0x872185`'s branch opcode, `0x7D8C50`'s read call
+  and read size, `0x8DA090`'s second `LoadData` call), plus `sub_10051FD0`'s save
+  directory/name path build (157 instructions with TLS guards). Its trampoline
+  (`0x100521E0`, 8 instructions) is transcribable, but it calls that prepare step, so
+  the trampoline alone would jump into an unimplemented converter; the key stays open
+  rather than shipping the write without the behaviour behind it. The arm itself is
+  already recovered for that pass: handler `0x10052200` scans
+  `68 ? ? ? ? E8 ? ? ? ? 8B 2D ? ? ? ? 83 C4 08` (the pushed operand at `+1` is the
+  game's save-name buffer, `dword_1015AD9C`) and
+  `89 84 24 E0 01 00 00 8B 45 08 53 33 DB`, publishes `match + 0xD` as the resume
+  (`dword_1015AD88`, game RVA `0x45B093`), and writes an `E9` at that match to
+  `0x100521E0` — which is exactly the five-byte write the baseline records.
 
 `ForceCarHeadlightShadows` has no arm in this tree yet; the published-pointer
 canonicalisation its baseline needs now exists (`Bodies::RegisterPublished` plus

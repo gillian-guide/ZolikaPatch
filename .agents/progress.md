@@ -161,3 +161,135 @@ six supported images also hit); misses substitute `0x62BFDB37` / `0x09399528` /
 against the real resolver need a running game; the input value and the body's
 slot operand are what were proven. `AGENTS.md` still says 73 bodies (now 72) and
 is outside this task's file scope.
+
+## 2026-11-06 — RestoreDeathMusic and MouseFix (audio.ixx)
+
+**Closed:** `MouseFix` (84 -> 85 keys on 1.0.8.0 in this module's share; the tree
+total was 88 after another pass closed three loading keys). `RestoreDeathMusic` was
+already *counted* closed — its whole baseline cell is branch displacements, which
+the scoreboard excludes — and now has its arm.
+
+**What was built (source/audio.ixx, 12 new proven bodies)**
+
+- `RestoreDeathMusic`: the gate body `0x10050A50` (41) transcribed, plus the three
+  native-script wrappers its calls need, transcribed here because the layer does
+  not export them: `0x1005B1E0` (48, two-argument, salt `0x10158054`),
+  `0x1005B490` (46, byte, salt `0x10158028`), `0x1005B360` (44, zero-argument
+  bool). They reach `0x100038C0`/`0x100038E0`/`0x1005DE40`/`0x1005DE80`/
+  `0x1005B150` through jmp forwarders filled from the body registry. The five salts
+  are copied from `Native::Salt(ref)` at registration, never literals. The install
+  body `0x10050AD0` is **rebuilt in C++** (no proof row): it is compiler output
+  with an EH4 frame (handler `0x100619C1`, scope table `0x10154384`) and a
+  clock/seed block calling CRT-internal helpers (`0x1005FFC3`, `0x1005FF77`) that
+  read `fs:[2Ch]` and the TLS index `dword_10159328`.
+- `MouseFix`: all eight pieces transcribed — `0x10024060` (30), `0x100240C0` (23),
+  `0x10024120` (22), `0x10024170` (28), `0x10024440` (62), `0x10024560` (25),
+  `0x100243A0` (23), `0x100241E0` (138). None carries an EH frame, and the advance
+  helper's only indirect call is the game's `VirtualProtect` through a published
+  slot (the original's `FF 15`). The arm writes the reference's 25-write set: five
+  `E9`s, two `E8`s, five NOP pairs and five 4-byte `movd` writes, at the ten
+  recorded sites.
+- `tests/bodies.tsv` +12 rows (96 total), `tests/signatures.tsv` +12 site rows (all
+  verified unique on `game_refs/GTAIV.exe`), `docs/parity.md` gets both key
+  sections and the `OutOfCommissionFix` blocker.
+
+**Measured correction to the brief**: `sub_10050A50` is 41 instructions and
+`sub_10050AD0` is **75** (0x10050AD0..0x10050BC8), not 91; 91 is the *handler*
+`0x10050BD0`'s count (0x10050BD0..0x10050D09), which is not a body.
+
+**Skipped — `OutOfCommissionFix`, exact blocker**: the payload is 163,796 bytes of
+`.rdata` at `0x100B6798` decoded into a 179,536-byte table; carrying it needs a new
+~1 MB recovered-data file outside this pass's edit set, and the code around it
+(`sub_1004C3F0`, 16,311 bytes; `sub_1004B750`; the archive builder) is C++ with EH4
+frames, `std::string` SSO temporaries and CRT import calls, i.e. a new module to
+rebuild. The `E9` was left uninstalled as instructed: it only widens the game's
+script check to accept the magic the missing table produces.
+
+**Gates (final runs)**: `cmake --build --preset release` success;
+`python tools/parity_report.py 9` -> `build 9: 88 key(s) closed, 11 open` (exit 1,
+`SkipLauncher` open by construction); `ctest --preset release` -> `100% tests
+passed out of 10`; `verify_bodies.py` -> `96 body(ies), 0 failure(s)`; the full
+1.0.8.0 cell still has `0 differing`.
+
+**Not verifiable here**: no game launch — the death-music gate's three native calls
+and the mouse axis arithmetic are proven at instruction level where transcribed, but
+the rebuilt install body's runtime scan/`rand()` and the in-game mouse feel are not
+executed. `AGENTS.md`'s "Current state" (84 keys / 72 bodies) is outside this task's
+file scope and is stale.
+
+## 2026-11-06 — the three loading keys: NewMemorySystem, NewFilesCompatibility, LoadDLCs
+
+**Closed:** three of the four remaining loading keys: 84 -> 87 keys on 1.0.8.0 from
+this pass (the gate reads 88 because `audio.ixx`'s MouseFix landed in the same
+window). Fourteen new proof rows of mine (72 -> 86); the tree's total at the final
+gate is 98 with the audio rows. The fourth key, `NewSavesCompatibility`, is reported
+below with its blocking condition named, not attempted.
+
+**What was built (source/loading.ixx)**
+
+- `NewMemorySystem`: the original handler's two writes (the allocator-init `call` at
+  RVA `0x107A` retargeted to the vtable installer, and a jump at `0x107F` skipping the
+  five-slot clear, resuming at `0x108C`), the singleton published from the
+  `6A 01 B9 00 00 40 06` anchor's `mov esi, <address>` operand (`0x19CF9F0`, rebased
+  through `GamePointer`), and the 24-slot vtable read entry by entry from the
+  original's `0x100B5038`. Eleven methods transcribed and proven (ctor 17,
+  reject-pointer 2, self 2, null 2, `ret 0` 1, paired no-op 1, reject 2, MP-sync 2,
+  slot-18 thunk 5, no-arg no-op 1, installer 5); the three arena methods rebuilt in
+  C++ with the original's alignment scheme (`unit = max(0x10, align)`,
+  `want = max(size, unit)`, `HeapAlloc(want + 2*unit)`, `((base-1)/unit + 2)*unit`,
+  the distance at `[p-4]`, `memset(0xCD)`, registry under a critical section; free
+  recovers the base; membership query). Slots 10/12 reuse the RGSC-login stub and the
+  savegame null path this unit already owns, as the original's table does; slots
+  8/9/20/21 get a second copy of the 2-instruction MP-sync stub because `audio.ixx`
+  keeps its body internal.
+- `NewFilesCompatibility`: the original's gate (`GTAC.dll` / `JacksIVFixes.asi`, in
+  both publish and install), the registrar's call operand published from
+  `68 64 28 C8 67 E8` (`match + 10 + disp` = `0x625620`), the two update-call
+  retargets and the registrar `ret` jump. The registration tail (`pushad/call/popad/
+  ret`, 4) is transcribed and proven; the two update bodies are rebuilt with the
+  original ABI and call order, hashing through `Shared::ValueResolver()`
+  (`sub_10003E50`), and the three helpers use the original's own signatures
+  (`8B 35 ? ? ? ? 6A 00 50 E8 …`, `85 C9 53 55 56 57 74 40 …` /
+  `53 55 8B 6C 24 0C 56 57 EB 06`, `8B 0F 85 C9 74 ? 0F B7 41 0A 66 85 C0` minus
+  `0x14`), unguarded on a miss as the original is.
+- `LoadDLCs`: the handler does not scan — it switches on the build id and writes six
+  fixed-RVA sites per build. The rows were read from the handler's own `cmp eax, 7/8/9`
+  blocks and checked in all three images (1060/1070/1080, both the site shapes and the
+  dump's write sets for builds 7 and 8). Three entry points published per build
+  (register/apply as RVAs, the loader callback absolute). Bodies `0x10023480` (2) and
+  `0x10023490` (19) transcribed and proven; `sub_10023150`, the discovery, rebuilt in
+  C++ with the original's call sequence (unchecked 0x104 module-path buffer,
+  GetModuleFileNameA + PathRemoveFileSpecA, the TLaD id-2 / TBoGT id-4 groups with the
+  content/legacy fallback and the original's second probe, 252 `\Episode3\`..`\Episode254\`
+  probes with id = 2n, the 0x168-byte request with mode at +344 and flag at +358, then
+  the object's +0x166 = 2).
+- **The EDX contract the earlier attempt refused is unobservable**, and that is
+  measured, not assumed: `sub_10023150` returns with EDX = its last callee's (the only
+  instructions after the last call are the object store, pops, `xor ecx,esp`,
+  `call __security_check_cookie` — ECX only — and the epilogue); the body passes it
+  through untouched; and its only caller (game `0x4931FA`) is immediately followed by
+  `call 0x8CCCD0`, which reads neither EAX nor EDX, while no other reference to
+  `0x890320` exists in either image (checked as branch targets and as a dword). The
+  rebuild keeps the same call sequence anyway, so EDX ends on the same value on every
+  path (the game's apply on a hit, `PathFileExistsA` on a miss).
+- `docs/parity.md`: status counts, two new preserved-fault rows (the file-registry
+  helpers' unguarded null on a scan miss; the DLC register call's undefined `this`),
+  the loading-keys section with the per-build table, and the `NewSavesCompatibility`
+  blocker.
+- `tests/bodies.tsv` (14 rows), `tests/signatures.tsv` (the three keys' anchors and the
+  LoadDLCs fixed-site table).
+
+**Gates (final runs)**: `cmake --build --preset release` success;
+`python tools/parity_report.py 9` -> `build 9: 88 key(s) closed, 11 open` (exit 1,
+`SkipLauncher` open by construction); `ctest --preset release` -> `100% tests passed
+out of 10`; `verify_bodies.py` -> `98 body(ies), 0 failure(s)`.
+
+**Not done / not verifiable here**: `NewSavesCompatibility` stays open. It needs
+`sub_10051B30` (the save converter: compiled file IO, the 18-chunk walk and three
+conversion-time site patches at `0x872185`, `0x7D8C50`, `0x8DA090`) plus
+`sub_10051FD0`'s save-directory path build; its trampoline (`0x100521E0`, 8
+instructions) is transcribable but calls that prepare step, so shipping the write
+without the converter would corrupt save loading. No game launch: the allocator
+vtable's live behaviour, the file-registry helpers' scans and the DLC discovery's
+folder probes are proven at instruction level (or rebuilt faithfully) but not executed
+against a running game.

@@ -100,3 +100,54 @@ copsirens_ide 100040E0 ?IdeHookBody@@YAXXZ 9
 # 125 instructions) is compiled C and is rebuilt.
 popup_headlights 10044530 ?PopupHeadlightsBodyA@@YAXXZ 10
 popup_headlights_edx 10044560 ?PopupHeadlightsBodyB@@YAXXZ 10
+# NewMemorySystem (source/loading.ixx): the ten methods of the allocator vtable
+# (original 0x100B5038) that are written as instruction streams. Its three arena
+# methods (0x10038360 allocate, 0x10038430 free, 0x100385A0 membership) carry the
+# compiler's frames, cmov sequences and hash-map code and are rebuilt in C++, so
+# they have no rows (docs/parity.md). nms_sync is the table's 0x100057F0 slot: the
+# same two instructions as audio.ixx's better_mp_sync row, duplicated because a
+# table in this unit cannot name a body internal to another unit.
+nms_ctor 10038640 ?NmsCtorBody@@YAPAXXZ 17
+nms_reject_ptr 10038350 ?NmsRejectPtrBody@@YAXXZ 2
+nms_self 10038540 ?NmsSelfBody@@YAPAXXZ 2
+nms_zero_ptr 10001950 ?NmsZeroBody@@YAPAXXZ 2
+nms_noop_ret0 10038560 ?NmsNoopRet0Body@@YAXXZ 1
+nms_noop_pair 10038580 ?NmsNoopPairBody@@YAXXZ 1
+nms_reject 10038590 ?NmsRejectBody@@YAXXZ 2
+nms_sync 100057F0 ?NmsSyncBody@@YAXXZ 2
+nms_thunk18 10038620 ?NmsThunk18Body@@YAXXZ 5
+nms_noop_arg 10038630 ?NmsNoopArgBody@@YAXXZ 1
+nms_apply 10038670 ?NmsApplyBody@@YAXXZ 5
+# NewFilesCompatibility (source/loading.ixx): the registrar's replacement tail.
+# Its two update bodies (0x10051890, 0x100518D0) are compiled in the original and
+# are rebuilt in C++, so they have no rows (docs/parity.md).
+newfiles_register 10051600 ?NewfilesRegisterBody@@YAXXZ 4
+# RestoreDeathMusic (source/audio.ixx): the gate body and the three native-script
+# wrappers it answers through, transcribed because the layer's own four pieces
+# (sub_100038C0/38E0, sub_1005DE40/DE80, sub_1005B150) are reached through
+# forwarders. The install body (sub_10050AD0, 75 instructions to its `ret`) is
+# rebuilt: it is compiler output with an EH4 frame whose clock/seed block calls the
+# CRT's image-internal helpers, so it has no row (docs/parity.md).
+death_music_gate 10050A50 ?DeathMusicGateBody@@YA_NXZ 41
+audio_call_two 1005B1E0 ?AudioCallTwoBody@@YIIII@Z 48
+audio_call_zero_bool 1005B360 ?AudioCallZeroBoolBody@@YIII@Z 44
+audio_call_byte 1005B490 ?AudioCallByteBody@@YIIII@Z 46
+# MouseFix (source/audio.ixx): all eight pieces are transcribed. The two site
+# bodies call their helpers directly (the call target is an immediate on both
+# sides, which is what the proof compares), and the advance helper's only indirect
+# call is the game's VirtualProtect through the published slot -- the original's
+# `FF 15` to its own IAT slot, compared as a memory operand.
+mf_axis_float 10024060 ?MfAxisFloatBody@@YAXXZ 30
+mf_axis_neg 100240C0 ?MfAxisNegBody@@YAXXZ 23
+mf_axis_int 10024120 ?MfAxisIntBody@@YAXXZ 22
+mf_axis_flag 10024170 ?MfAxisFlagBody@@YAXXZ 28
+mf_angle_step 10024440 ?MfAngleStepBody@@YAXXZ 62
+mf_angle 10024560 ?MfAngleBody@@YAXXZ 25
+mf_advance 100243A0 ?MfAdvanceBody@@YAXXZ 23
+mf_advance_windows 100241E0 ?MfAdvanceWindowsBody@@YAXXZ 138
+# LoadDLCs (source/loading.ixx): the loader callback's replacement and the DLC
+# manager's initialisation tail. The discovery pass the tail calls (0x10023150) is
+# a rebuild - compiled code with a /GS frame, TLS static-init guards and CRT calls -
+# so it has no row (docs/parity.md).
+load_dlcs_dummy 10023480 ?DlcDummyBody@@YAXXZ 2
+load_dlcs_struct_fixup 10023490 ?DlcStructFixupBody@@YAXXZ 19
