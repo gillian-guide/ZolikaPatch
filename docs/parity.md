@@ -34,14 +34,16 @@ CRLF folding (the original reads in text mode). The shipped INI's longest line i
 
 Measured on 1.0.8.0 with `tools/parity_report.py 9`:
 
-- **80 of 99 option keys closed**;
-- **67 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **84 of 99 option keys closed**;
+- **73 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
-  bodies are still to transcribe. The longest two are the `DualVehicleHeadlights`
-  pair at 78 instructions / 309 bytes each, which is what exposed the proof tool's
-  old 256-byte sweep window: it compared 64 of 78 and still reported PASS. The tool
-  now sweeps 4096 bytes and fails a row that decodes fewer instructions than its
-  budget, so a truncated sweep can never pass again;
+  bodies are still to transcribe, and the compiled-C bodies listed below are
+  rebuilt in C++ instead, with no proof row. The longest two are the
+  `DualVehicleHeadlights` pair at 78 instructions / 309 bytes each, which is what
+  exposed the proof tool's old 256-byte sweep window: it compared 64 of 78 and
+  still reported PASS. The tool now sweeps 4096 bytes and fails a row that
+  decodes fewer instructions than its budget, so a truncated sweep can never pass
+  again;
 - launcher: both arms implemented. `LaunchWithPlayGTAIV` rewrites the two launch
   slots and `zp_launcher_slots` verifies them per build; `SkipLauncher` carries the
   original's 25-row table, both collectors, the DFA file-API stage (IAT capture, six
@@ -238,7 +240,66 @@ the game's hash function at `0x45CF50`). The native-script call layer is
 `source/native.ixx` (above); its public surface is `Native::Call`, `CallBool`,
 `Resolve`, `Invoke`, `Resolver` and `Register`.
 
-Still blocked:
+### The misc keys closed in this pass
+
+Four keys in `source/misc.ixx` closed with their original arms and bodies. Six of
+the seven bodies are transcribed and proven whole; the heavy helpers are compiler
+output for C functions and are rebuilt with the same ABI, state words and unguarded
+lookups:
+
+| key | writes on 1.0.8.0 | bodies |
+|---|---|---|
+| `SpeedupBugFix` | `E9` at RVA `0x571B0` (game `0x4571B0`) | `sub_10050540`, 109 instructions, rebuilt in C++ |
+| `Patch4RemoveModChecks` | `E9` at RVA `0x3CBF70` (game `0x7CBF70`) | `sub_100054E0`, 8, transcribed |
+| `CopSirensFlag` | `E9` at RVAs `0x4FABE6`, `0x4FEBD3`, `0x646546` | `sub_10006310` 8, `sub_10006330` 8, `sub_100040E0` 9, transcribed |
+| `PopupHeadlightsFlag` | `E9` at `0x653A64`, `EB` at `0x653A6E`, the `fld` operand at `0x653AB6` (our pi/2 float, the baseline's `0xD0000000` placeholder), `E9` at `0x646546` | `sub_10044530` 10, `sub_10044560` 10, `sub_100040E0` 9, transcribed |
+
+`SpeedupBugFix` is the one key whose body has **no proof row**: `sub_10050540`
+(109 instructions) is an SEH frame, a /GS cookie, the MSVC thread-safe static
+guard for its one-time clock scan and SSE arithmetic, so it is reimplemented in
+C++ rather than transcribed -- the same call the tree makes for the launcher's
+DFA helpers. The arm publishes the eight absolute float pointers the original
+handler reads from the site's operands (`+26, +165, +188, +226, +234, +249, +264,
++276`: `dword_18CAE9C`, `flt_18CAEA0`, `dword_18CAEA4`, `dword_1752078` and their
+four copies), rebased through the image's preferred base as every captured game
+pointer is. The arithmetic is the original's: `scale = 1000.0 /
+QueryPerformanceFrequency`, then `(float)scale`, `(float)(scale * 1000.0)`,
+`(float)(scale * 0.0010000000474974513)` and
+`(float)(0.0010000000474974513 / scale)` written to the four pairs, then the
+game's own clock function -- found by the original's one-time scan
+`1B D9 89 5C 24 24 0F 88`, game `0x456F93` -- called at `match - 51` and its
+64-bit result stored in `*self`. A missing scan leaves the slot zero, so the call
+faults on `0xFFFFFFCD` exactly where the original's does.
+
+`Patch4RemoveModChecks` and `RemoveGFWLUpdatePopup` are the two flags of the
+original's one shared handler (the stub `sub_100054E0` plus the helper
+`sub_10005340`, 145 instructions). `loading.ixx` owns the GFWL branch; `misc.ixx`
+owns the Patch4 branch: a one-time scan for
+`33 C4 89 84 24 A8 01 00 00 53 8B 5D 08 56 57`, then a zero store to the dword
+the matched code points at (`site + 30`). **That signature has no hit on
+1.0.8.0**, so on the user's build the branch is the scan and nothing else -- the
+key's visible effect there is the stub install, which is what the original does
+too. Recorded split: the original has one helper reading both flags, while this
+tree has one helper per module; only one body can sit at the site and the misc
+arm installs later, so a run with *both* keys enabled performs the Patch4 branch
+and not the GFWL writes. Each key alone is 1:1, and the shipped INI has both off.
+
+The `CopSirensFlag` checkers (`sub_10005F70`, 191 instructions;
+`sub_10006260`, 53) and the `PopupHeadlightsFlag` checker (`sub_10044310`, 125)
+are compiled C and rebuilt in C++ against the same state words: a 512-slot
+model-hash list per category, filled by the shared IDE hook (`sub_100040E0` plus
+the rebuilt `sub_10003FA0`, 92) when the game's parser stores a `popuplights`,
+`siren` or `wheelangle:<degrees>` entry. Both keys install that same IDE body at
+the same site, as the original's two handlers do. The lookups go through
+`dword_10159C0C` and the names through the transcribed `sub_10003E50`, both
+unguarded, so a missing resolver faults where the original's indirect call does.
+The popup shims' second (EDX) pattern has no hit on 1.0.8.0; its body is still
+transcribed and proven. The `[PopupLightAngles]` / `[HeadlightConeOffsets]` INI
+tables that the original's loader preamble parses are not parsed by this tree
+yet; the shipped INI's two sections are empty, so the checker's default pi/2 is
+exactly what the original uses there.
+
+### Still blocked
 
 - `GarageModelFix`, `NoLiveryLimit`, the steer/engine/plane trio and `FreezeCarFix`
   need `sub_10004C70` (the 1,343-byte steer consumer) and, for `FreezeCarFix`, the
@@ -246,9 +307,10 @@ Still blocked:
 - `HighQualityReflections` (~200 instructions) and `CutsceneFixes` (~100, with only
   one real baseline byte) are over the transcription budget by design.
 
-`ForceCarHeadlightShadows` cannot match while its baseline cell carries the
-reference dump's `0xD0000000` placeholder for a published float pointer; closing it
-needs that canonicalisation in `tests/dump_main.cpp`.
+`ForceCarHeadlightShadows` has no arm in this tree yet; the published-pointer
+canonicalisation its baseline needs now exists (`Bodies::RegisterPublished` plus
+`tests/dump_main.cpp`'s rewrite to the baseline's `0xD0000000` placeholder) and
+`PopupHeadlightsFlag` is closed through it.
 
 ## Transcribing a body
 
@@ -263,7 +325,10 @@ A body-bearing key is committed only when all four parts exist:
 3. **The registry entry** `Bodies::Register(&body, recoveredVa)`, so the dump can
    express the branch in the original's coordinates.
 4. **The proof row** in `tests/bodies.tsv` — name, recovered VA, symbol resolved from
-   the linker map, instruction budget — and `zp_body_proof` must PASS.
+   the linker map, instruction budget — and `zp_body_proof` must PASS. A body that is
+   compiler output for a C function (an SEH frame, a /GS cookie, the thread-safe
+   static-init protocol) is rebuilt in C++ instead, and then has no proof row:
+   `SpeedupBugFix` is the current example.
 
 ## What the scoreboard can and cannot compare
 

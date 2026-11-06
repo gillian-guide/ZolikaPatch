@@ -83,3 +83,20 @@ bad_player_model_check 10037AC0 ?BpmCheckBody@@YAXXZ 65
 bad_player_model_who 1005B290 ?BpmWhoBody@@YAXXZ 61
 bad_player_model_print 1005B530 ?BpmPrintBody@@YAXXZ 45
 bad_player_model_call_bool 1005B3F0 ?BpmCallBoolBody@@YAXXZ 46
+# Patch4RemoveModChecks (source/misc.ixx): the shared GFWL/Patch4 stub. Its
+# helper (sub_10005340, 145 instructions) is compiler output and is rebuilt; the
+# same recovered VA is already proven for loading.ixx's RemoveGFWLUpdatePopup arm.
+patch4_stub 100054E0 ?Patch4StubBody@@YAXXZ 8
+# CopSirensFlag (source/misc.ixx): the two model-check shims and the shared IDE
+# parser hook. The checkers they call (sub_10005F70, 191 instructions;
+# sub_10006260, 53; sub_10003FA0, 92) are compiled C and are rebuilt, so they have
+# no rows (docs/parity.md).
+copsirens_shim_a 10006310 ?CopSirensShimABody@@YAXXZ 8
+copsirens_shim_b 10006330 ?CopSirensShimBBody@@YAXXZ 8
+copsirens_ide 100040E0 ?IdeHookBody@@YAXXZ 9
+# PopupHeadlightsFlag (source/misc.ixx): the EAX site's shim and its EDX twin.
+# The twin's pattern is absent on 1.0.8.0 (the original's own second site is a
+# build-specific row) but the body is still proven. The checker (sub_10044310,
+# 125 instructions) is compiled C and is rebuilt.
+popup_headlights 10044530 ?PopupHeadlightsBodyA@@YAXXZ 10
+popup_headlights_edx 10044560 ?PopupHeadlightsBodyB@@YAXXZ 10

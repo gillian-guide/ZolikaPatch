@@ -170,3 +170,22 @@ DrivebyFOVFix	0x85031F	F3 0F 10 46 60 F3 0F 5C CA	10
 # key): the original's own loader preamble scans for this and takes the target of the
 # call at +5 (match + 10 + the dword at +6), which is 0x626AF0 on 1.0.8.0.
 # native.resolver	0x625300	08 0B C2 8B F0 E8	6
+# misc module (source/misc.ixx), confirmed with a byte scan of game_refs/GTAIV.exe
+# (1.0.8.0, base 0x400000): exactly one hit at each recorded VA. SpeedupBugFix's
+# anchor is the function prologue the arm jumps 21 bytes before; the body's own
+# one-time clock scan is recorded separately. Patch4RemoveModChecks and
+# RemoveGFWLUpdatePopup share one site (the same shared original stub).
+SpeedupBugFix	0x4571C5	50 64 89 25 00 00 00 00 83 EC 34	11
+SpeedupBugFix.clock	0x456F93	1B D9 89 5C 24 24 0F 88	8
+Patch4RemoveModChecks	0x7CBF70	2B C1 1B D6 89 44 24 0C 89 54 24 10 DF 6C 24 0C D8 0D ? ? ? ? D9 5C 24 08	26
+CopSirensFlag.a	0x8FEBD3	E8 ? ? ? ? C0 E0 ? 32 86 6F 0F 00	13
+CopSirensFlag.b	0x8FABD0	0F BF 41 2E 39 05	7
+# The shared IDE hook: CopSirensFlag and PopupHeadlightsFlag both install the
+# same body at the anchor's -10 (the parser's seven-byte compare).
+CopSirensFlag.ide	0xA46550	0C 83 88 94 00 00 00 04	8
+PopupHeadlightsFlag	0xA53A64	0F BF 46 2E 3B 05 ? ? ? ? 75 ? A1	13
+PopupHeadlightsFlag.ide	0xA46550	0C 83 88 94 00 00 00 04	8
+# Absent on 1.0.8.0 (no site VA to record): PopupHeadlightsFlag's EDX twin
+# (0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1) and Patch4RemoveModChecks' Patch4 scan
+# (33 C4 89 84 24 A8 01 00 00 53 8B 5D 08 56 57), which the helper runs once at
+# run time and which matches nothing on this image.

@@ -1,6 +1,8 @@
 module;
 
 #include <common.hxx>
+#include <cstdlib>
+#include <cstring>
 
 export module misc;
 
@@ -11,6 +13,7 @@ import game;
 import loader;
 import native;
 import patch;
+import shared;
 
 // The remaining fixes: the bundled MiscFixes table, the mod-check stubs and the
 // drive-by FOV. One arm per key, each anchored to its own recovered signature (or,
@@ -33,6 +36,25 @@ extern "C"
 
     // The native layer's resolve entry (source/native.ixx), for the helper's call.
     extern uintptr_t zpatch_native_resolve_entry;
+
+    // SpeedupBugFix: the eight game timing floats the handler publishes, in its
+    // own read order (the last four repeat the first four for the episode path).
+    // The pointers are game addresses read from the site's operands; the body
+    // writes through them.
+    float* zpatch_speedup_t4c = nullptr;  // dword_1015934C: copy of dword_18CAEB0
+    float* zpatch_speedup_t50 = nullptr;  // dword_10159350: dword_18CAE9C, seconds per tick
+    float* zpatch_speedup_t54 = nullptr;  // dword_10159354: copy of dword_18CAE9C
+    float* zpatch_speedup_t58 = nullptr;  // dword_10159358: copy of dword_1752074
+    float* zpatch_speedup_t5c = nullptr;  // dword_1015935C: dword_1752078, 1 / milliseconds
+    float* zpatch_speedup_t60 = nullptr;  // dword_10159360: dword_18CAEA4, milliseconds * dword_FF2014
+    float* zpatch_speedup_t64 = nullptr;  // dword_10159364: flt_18CAEA0, milliseconds per tick
+    float* zpatch_speedup_t68 = nullptr;  // dword_10159368: copy of flt_18CAEA0
+
+    // Patch4RemoveModChecks: dword_10159C18, the continuation (match + 12) of the
+    // game's date arithmetic. loading.ixx owns the same original slot for its
+    // RemoveGFWLUpdatePopup arm; each arm publishes its own copy because the two
+    // arms live in different modules.
+    uint32_t zpatch_patch4_resume = 0;
 }
 
 // The helper's call target. The original's helper does `call sub_10003980` (E8), so
@@ -353,22 +375,690 @@ namespace
     }
 }
 
-// Four of this module's keys are deliberately not installed:
+// SpeedupBugFix: the game's timer-init function (1.0.8.0 game 0x4571B0, the
+// `50 64 89 25 00 00 00 00 83 EC 34` prologue's match - 21) is replaced by the
+// original's sub_10050540. That body is compiled C -- an SEH frame, a /GS
+// cookie, the MSVC thread-safe static guard for its one-time signature scan and
+// SSE double arithmetic -- so this is a C++ reimplementation of the same
+// behaviour, not a transcription (docs/parity.md records the split).
 //
-//   * SpeedupBugFix: the body is sub_10050540 (109 instructions) -- compiled code
-//     that fills the game's eight timing floats from QueryPerformanceFrequency and
-//     stores a 64-bit timestamp -- and the arm has to publish eight absolute float
-//     pointers (the anchor's +26 .. +276 operands) for it.
-//   * Patch4RemoveModChecks: the 8-instruction stub sub_100054E0 calls
-//     sub_10005340 (145 instructions), the flag-gated helper that does the scans
-//     and writes.
-//   * PopupHeadlightsFlag: the two 43/44-byte shims call sub_10044310 (125
-//     instructions), the popuplights checker.
-//   * CopSirensFlag: its three shims call sub_10005F70 (191 instructions),
-//     sub_10006260 (53) and the IDE parser sub_10003FA0 (92).
+// It fills the game's eight timing floats from QueryPerformanceFrequency, then
+// stores the game clock's 64-bit stamp in *self and answers self. The clock
+// function is found by the original's own one-time scan ("1B D9 89 5C 24 24 0F
+// 88", 1.0.8.0 site 0x456F93) and is called at match - 51 = 0x456F60.
+static std::atomic<uint32_t> zpatch_speedup_scan_done{ 0 };
+static uint32_t zpatch_speedup_clock = 0;
+
+static void* __fastcall SpeedupBugFixBody(void* self, int)
+{
+    // sub_10050587's MSVC static-init guard: the scan runs once per process. A
+    // miss leaves the clock at zero, and the faithful `0 - 51` call below faults
+    // on 0xFFFFFFCD exactly as the original's does.
+    if (zpatch_speedup_scan_done.exchange(1u, std::memory_order_acq_rel) == 0)
+    {
+        auto pattern = find_pattern("1B D9 89 5C 24 24 0F 88");
+        if (!pattern.empty())
+            zpatch_speedup_clock = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)));
+    }
+
+    // The original tests the float, not the pointer: a null published pointer
+    // faults here exactly as its own dereference does.
+    if (*zpatch_speedup_t50 == 0.0f)
+    {
+        LARGE_INTEGER frequency{};
+        QueryPerformanceFrequency(&frequency);
+
+        // 0x10152380 is 1000.0 and 0x10152300 is 0.0010000000474974513; the
+        // original divides, multiplies and truncates to float in this order.
+        const double scale = 1000.0 / static_cast<double>(frequency.QuadPart);
+        const float perTickMilliseconds = static_cast<float>(scale);
+        const float millisecondsProduct = static_cast<float>(scale * 1000.0);
+        const float perTickSeconds = static_cast<float>(scale * 0.0010000000474974513);
+        const float reciprocal = static_cast<float>(0.0010000000474974513 / scale);
+
+        *zpatch_speedup_t64 = perTickMilliseconds;
+        *zpatch_speedup_t60 = millisecondsProduct;
+        *zpatch_speedup_t50 = perTickSeconds;
+        *zpatch_speedup_t5c = reciprocal;
+        *zpatch_speedup_t68 = perTickMilliseconds;
+        *zpatch_speedup_t4c = millisecondsProduct;
+        *zpatch_speedup_t54 = perTickSeconds;
+        *zpatch_speedup_t58 = reciprocal;
+    }
+
+    using ClockFunction = __int64(__cdecl*)(void);
+    const __int64 stamp = reinterpret_cast<ClockFunction>(
+        static_cast<uintptr_t>(zpatch_speedup_clock) - 51u)();
+    *reinterpret_cast<__int64*>(self) = stamp;
+    return self;
+}
+
+namespace
+{
+    // A captured pattern operand is an address in the image's own coordinate
+    // system. The dump places that image at a heap address, so the operand is
+    // rebased through the image's preferred base; in the game the two are equal.
+    template <typename T>
+    T* GameImagePointer(uint32_t value)
+    {
+        const auto host = Game::Get().ImageBase();
+        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(host);
+        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(host + dos->e_lfanew);
+        return reinterpret_cast<T*>(host + (value - static_cast<uint32_t>(nt->OptionalHeader.ImageBase)));
+    }
+
+    // SpeedupBugFix: the handler's eight operands, in its read order, are the
+    // absolute addresses of the floats the replacement body computes. Publishing
+    // them before the install is what keeps the body's writes on the game's own
+    // words; the install only replaces the function's entry.
+    void PublishSpeedupBugFix()
+    {
+        if (!Loader::Enabled("SpeedupBugFix"))
+            return;
+
+        auto pattern = find_pattern("50 64 89 25 00 00 00 00 83 EC 34");
+        if (pattern.empty())
+            return;
+
+        struct TimingOperand final
+        {
+            ptrdiff_t offset;
+            float** slot;
+        };
+        constexpr TimingOperand kTimingOperands[] = {
+            { 26, &zpatch_speedup_t50 },   // dword_18CAE9C: seconds per tick
+            { 165, &zpatch_speedup_t64 },  // flt_18CAEA0: milliseconds per tick
+            { 188, &zpatch_speedup_t60 },  // dword_18CAEA4: milliseconds * dword_FF2014
+            { 226, &zpatch_speedup_t5c },  // dword_1752078: 1 / milliseconds per tick
+            { 234, &zpatch_speedup_t68 },  // dword_18CAEAC: copy of flt_18CAEA0
+            { 249, &zpatch_speedup_t4c },  // dword_18CAEB0: copy of dword_18CAEA4
+            { 264, &zpatch_speedup_t54 },  // dword_18CAEA8: copy of dword_18CAE9C
+            { 276, &zpatch_speedup_t58 },  // dword_1752074: copy of dword_1752078
+        };
+        for (const TimingOperand& operand : kTimingOperands)
+            *operand.slot = GameImagePointer<float>(*pattern.get_first<uint32_t>(operand.offset));
+    }
+
+    void InstallSpeedupBugFix()
+    {
+        if (!Loader::Enabled("SpeedupBugFix"))
+            return;
+
+        auto pattern = find_pattern("50 64 89 25 00 00 00 00 83 EC 34");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(-21),
+                reinterpret_cast<void*>(&SpeedupBugFixBody), true);
+    }
+}
+
+// Patch4RemoveModChecks: the game's date arithmetic at 1.0.8.0 game 0x7CBF70
+// (the `2B C1 1B D6 ...` anchor) is replaced by the original's sub_100054E0, an
+// 8-instruction stub that runs the shared flag-gated helper between pusha/popa,
+// replays the 64-bit subtraction and its two stack stores, and resumes at
+// match + 12.
 //
-// Each stays open rather than being stubbed. DrivebyFOVFix used to be here too:
-// it needed the ASI's native-call layer, which source/native.ixx now provides.
+// The helper (sub_10005340, 145 instructions) has two branches. The GFWL one is
+// RemoveGFWLUpdatePopup's and already lives in loading.ixx; this module owns the
+// Patch4 one: a one-time scan for "33 C4 89 84 24 A8 01 00 00 53 8B 5D 08 56 57"
+// (the original's own scanner call), then a zero store to the dword the matched
+// code points at (site + 30). That signature has no hit on 1.0.8.0, so on the
+// user's build the branch is a scan and nothing else -- the key's visible effect
+// there is the stub install itself, exactly as in the original. The scan is kept
+// so builds where the target exists behave the same.
+//
+// The helper is compiler output for a C function (a thread-safe static guard and
+// VirtualProtect calls), so it is rebuilt, not transcribed; the stub is
+// transcribed and proven whole.
+static std::atomic<uint32_t> zpatch_patch4_scan_done{ 0 };
+static uint32_t zpatch_patch4_site = 0;
+
+static void Patch4Step()
+{
+    if (zpatch_patch4_scan_done.exchange(1u, std::memory_order_acq_rel) == 0)
+    {
+        auto pattern = find_pattern("33 C4 89 84 24 A8 01 00 00 53 8B 5D 08 56 57");
+        if (!pattern.empty())
+            zpatch_patch4_site = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)));
+    }
+
+    if (zpatch_patch4_site != 0)
+    {
+        // 0x10005427 reads *[site + 30] without a null check; the zero store goes
+        // through the injector, which is the original's VirtualProtect/write/restore.
+        uint32_t target = 0;
+        std::memcpy(&target,
+            reinterpret_cast<const void*>(static_cast<uintptr_t>(zpatch_patch4_site) + 30u),
+            sizeof(target));
+        injector::WriteMemory<uint32_t>(target, 0u, true);
+    }
+}
+
+// sub_100054E0, recovered VA 0x100054E0 (8 instructions). `pusha`/`popa` are
+// emitted as bytes: the inline assembler renders both with a 0x66 operand-size
+// prefix, which the original does not have.
+static __declspec(naked) void Patch4StubBody()
+{
+    __asm
+    {
+        __emit 0x60  // pusha
+        call Patch4Step
+        __emit 0x61  // popa
+        sub eax, ecx
+        sbb edx, esi
+        mov DWORD PTR [esp + 0Ch], eax
+        mov DWORD PTR [esp + 10h], edx
+        jmp DWORD PTR [zpatch_patch4_resume]
+    }
+}
+
+namespace
+{
+    // Patch4RemoveModChecks: the anchor's first twelve bytes are the subtraction
+    // and the two stores; the stub replays them and resumes at match + 12.
+    void PublishPatch4RemoveModChecks()
+    {
+        if (!Loader::Enabled("Patch4RemoveModChecks"))
+            return;
+
+        auto pattern = find_pattern(
+            "2B C1 1B D6 89 44 24 0C 89 54 24 10 DF 6C 24 0C D8 0D ? ? ? ? D9 5C 24 08");
+        if (!pattern.empty())
+            zpatch_patch4_resume = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first(12)));
+    }
+
+    void InstallPatch4RemoveModChecks()
+    {
+        if (!Loader::Enabled("Patch4RemoveModChecks"))
+            return;
+
+        auto pattern = find_pattern(
+            "2B C1 1B D6 89 44 24 0C 89 54 24 10 DF 6C 24 0C D8 0D ? ? ? ? D9 5C 24 08");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(0),
+                reinterpret_cast<void*>(&Patch4StubBody), true);
+    }
+}
+
+// CopSirensFlag: the two model checks (sub_10005F70 and sub_10006260) and the
+// shared IDE hook (sub_100040E0), which fills the 512-slot model-hash tables the
+// checks walk from the game's IDE parser entries.
+extern "C"
+{
+    // dword_10159C0C, defined in source/shared.ixx: the game's model-index lookup,
+    // `int lookup(uint32_t nameHash, int32_t *index)`.
+    extern uintptr_t zpatch_model_lookup;
+
+    // dword_1015937C / dword_10159374 (the resumes), dword_10159370 and
+    // dword_1015936C (the two model indices the sites computed), dword_10159B80 /
+    // dword_10159378 (the two flags), and the IDE parser's arguments and resume
+    // (dword_1015BE08 the string, dword_1015BE0C the model object, dword_1015BE10
+    // the continuation).
+    uint32_t zpatch_copsirens_resume = 0;
+    uint32_t zpatch_copsirens_resume_b = 0;
+    uint32_t zpatch_copsirens_index = 0;
+    uint32_t zpatch_copsirens_index_b = 0;
+    uint32_t zpatch_copsirens_flag = 0;
+    uint32_t zpatch_copsirens_flag_b = 0;
+    uint32_t zpatch_ide_string = 0;
+    uint32_t zpatch_ide_model = 0;
+    uint32_t zpatch_ide_hook_slot = 0;
+
+    // The 512-slot tables sub_10003FA0 fills: dword_10159380 (sirens),
+    // dword_1015CE28 (popuplights), and dword_1015A538 / dword_10159D38
+    // (wheelangle models and the float bits of their angles).
+    uint32_t zpatch_copsirens_models[512] = {};
+    uint32_t zpatch_popuplights_models[512] = {};
+    uint32_t zpatch_wheelangle_models[512] = {};
+    uint32_t zpatch_wheelangle_angles[512] = {};
+}
+
+namespace
+{
+    constexpr uint32_t kVehicleLightSlots = 512;
+
+    // dword_10159C0C's call shape: __cdecl, the name hash then the index
+    // out-parameter. A null slot faults, as the original's indirect call does.
+    int LookupModel(uint32_t nameHash, int32_t* index)
+    {
+        return reinterpret_cast<int(__cdecl*)(uint32_t, int32_t*)>(zpatch_model_lookup)(nameHash, index);
+    }
+
+    // sub_10003E50 (source/shared.ixx), the original's own name resolver/hasher.
+    // The checks call it rather than a C++ hash, so the "hash:" and quoted forms
+    // resolve exactly as in the original.
+    uint32_t ResolveModelName(const char* name)
+    {
+        return reinterpret_cast<uint32_t(__cdecl*)(const char*)>(Shared::ValueResolver())(name);
+    }
+
+    // _strnicmp(text, prefix, length) with the CRT's stop-at-NUL rule.
+    bool CaseInsensitivePrefix(const char* text, const char* prefix, size_t length)
+    {
+        for (size_t i = 0; i < length; ++i)
+        {
+            unsigned char left = static_cast<unsigned char>(text[i]);
+            unsigned char right = static_cast<unsigned char>(prefix[i]);
+            if (left == 0 || right == 0)
+                return left == right;
+            if (left >= 'A' && left <= 'Z')
+                left = static_cast<unsigned char>(left + ('a' - 'A'));
+            if (right >= 'A' && right <= 'Z')
+                right = static_cast<unsigned char>(right + ('a' - 'A'));
+            if (left != right)
+                return false;
+        }
+        return true;
+    }
+
+    // sub_10005F70 (191 instructions), rebuilt: the first siren check. The
+    // thirteen built-in police model names are resolved and looked up in the
+    // original's order; a match sets the flag. Otherwise the +siren list the IDE
+    // parser filled is walked the same way. Every lookup is unguarded, as the
+    // original's `call dword_10159C0C` is.
+    void CopSirensCheckA()
+    {
+        constexpr const char* kPoliceModels[] = {
+            "police", "police2", "police3", "police4", "noose", "pstockade",
+            "nstockade", "polpatriot", "fbi", "n_police", "n_police2",
+            "n_polpatriot", "n_pstockade",
+        };
+        const int32_t index = static_cast<int32_t>(zpatch_copsirens_index);
+        zpatch_copsirens_flag = 0;
+        for (const char* name : kPoliceModels)
+        {
+            int32_t found = -1;
+            LookupModel(ResolveModelName(name), &found);
+            if (found == index)
+            {
+                zpatch_copsirens_flag = 1;
+                return;
+            }
+        }
+        for (uint32_t slot = 0; slot < kVehicleLightSlots; ++slot)
+        {
+            const uint32_t model = zpatch_copsirens_models[slot];
+            if (model == 0)
+                break;
+            int32_t found = -1;
+            LookupModel(model, &found);
+            if (found == index)
+                zpatch_copsirens_flag = 1;
+        }
+    }
+
+    // sub_10006260 (53 instructions), rebuilt: "police2" always matches; every
+    // other model goes through the +siren list.
+    void CopSirensCheckB()
+    {
+        const int32_t index = static_cast<int32_t>(zpatch_copsirens_index_b);
+        zpatch_copsirens_flag_b = 0;
+        int32_t found = -1;
+        LookupModel(ResolveModelName("police2"), &found);
+        if (found != index)
+        {
+            for (uint32_t slot = 0; slot < kVehicleLightSlots; ++slot)
+            {
+                const uint32_t model = zpatch_copsirens_models[slot];
+                if (model == 0)
+                    return;
+                found = -1;
+                LookupModel(model, &found);
+                if (found == index)
+                {
+                    zpatch_copsirens_flag_b = 1;
+                    return;
+                }
+            }
+            return;
+        }
+        zpatch_copsirens_flag_b = 1;
+    }
+
+    // Appends the model's name hash to a 512-slot IDE table, deduplicating; a full
+    // table stores nothing, as the original's `result > 0x7FC` return does.
+    void AppendModel(uint32_t* slots, uint32_t model)
+    {
+        for (uint32_t slot = 0; slot < kVehicleLightSlots; ++slot)
+        {
+            if (slots[slot] == model)
+                return;
+            if (slots[slot] == 0)
+            {
+                slots[slot] = model;
+                return;
+            }
+        }
+    }
+
+    // sub_10003FA0 (92 instructions), rebuilt: the IDE parser hook's payload. The
+    // three arms are independent `if`s on the same string (the popuplights block
+    // falls through to the siren check). The object read is unguarded, as the
+    // original's `dword_1015BE0C + 60` is.
+    void IdeParse()
+    {
+        const auto* text = reinterpret_cast<const char*>(static_cast<uintptr_t>(zpatch_ide_string));
+        const auto* object = reinterpret_cast<const std::byte*>(static_cast<uintptr_t>(zpatch_ide_model));
+        const uint32_t model = *reinterpret_cast<const uint32_t*>(object + 60);
+
+        if (std::strcmp(text, "popuplights") == 0)
+            AppendModel(zpatch_popuplights_models, model);
+        if (std::strcmp(text, "siren") == 0)
+            AppendModel(zpatch_copsirens_models, model);
+        if (CaseInsensitivePrefix(text, "wheelangle:", 11))
+        {
+            const float angle = std::strtof(text + 11, nullptr);
+            uint32_t bits = 0;
+            std::memcpy(&bits, &angle, sizeof(bits));
+            for (uint32_t slot = 0; slot < kVehicleLightSlots; ++slot)
+            {
+                if (zpatch_wheelangle_models[slot] == model)
+                    return;
+                if (zpatch_wheelangle_models[slot] == 0)
+                {
+                    zpatch_wheelangle_models[slot] = model;
+                    zpatch_wheelangle_angles[slot] = bits;
+                    return;
+                }
+            }
+        }
+    }
+}
+
+// sub_10006310, recovered VA 0x10006310 (8 instructions): the first siren shim.
+// It stores the site's model index (EDX), runs the check between pusha/pushfd and
+// popa/popfd, and resumes with EAX = the flag, which the site's `shl al, 6;
+// xor al, [esi+0F6Fh]` continues on. pusha/popa are emitted as bytes: the inline
+// assembler renders both with a 0x66 operand-size prefix.
+static __declspec(naked) void CopSirensShimABody()
+{
+    __asm
+    {
+        mov DWORD PTR [zpatch_copsirens_index], edx
+        __emit 0x60  // pusha
+        __emit 0x9C  // pushfd
+        call CopSirensCheckA
+        __emit 0x9D  // popfd
+        __emit 0x61  // popa
+        mov eax, DWORD PTR [zpatch_copsirens_flag]
+        jmp DWORD PTR [zpatch_copsirens_resume]
+    }
+}
+
+// sub_10006330, recovered VA 0x10006330 (8 instructions): the second siren shim.
+// It is installed at the anchor's +22 over the first five bytes of a six-byte
+// `cmp`, and its own `cmp [flag], 1` is what the resumed `je` at the anchor's +28
+// consumes; the replaced comparison's sixth byte is dead.
+static __declspec(naked) void CopSirensShimBBody()
+{
+    __asm
+    {
+        mov DWORD PTR [zpatch_copsirens_index_b], eax
+        __emit 0x60  // pusha
+        __emit 0x9C  // pushfd
+        call CopSirensCheckB
+        __emit 0x9D  // popfd
+        __emit 0x61  // popa
+        cmp DWORD PTR [zpatch_copsirens_flag_b], 1
+        jmp DWORD PTR [zpatch_copsirens_resume_b]
+    }
+}
+
+// sub_100040E0, recovered VA 0x100040E0 (9 instructions): the shared IDE hook.
+// After the payload it replays the site's `mov ecx,7; xor edx,edx; repe cmpsb`
+// (the in-place copies are skipped by the resume at the anchor's -1), so the
+// resumed `jne` still sees the compare's flags. `repe cmpsb` is emitted as bytes
+// so the assembler cannot choose another form.
+static __declspec(naked) void IdeHookBody()
+{
+    __asm
+    {
+        __emit 0x60  // pusha
+        mov DWORD PTR [zpatch_ide_string], edi
+        mov DWORD PTR [zpatch_ide_model], eax
+        call IdeParse
+        __emit 0x61  // popa
+        mov ecx, 7
+        xor edx, edx
+        __emit 0xF3
+        __emit 0xA6  // repe cmpsb
+        jmp DWORD PTR [zpatch_ide_hook_slot]
+    }
+}
+
+namespace
+{
+    // CopSirensFlag's three sites: the two model checks and the shared IDE hook,
+    // installed at the parser anchor's -10 (the seven-byte compare).
+    void PublishCopSirensFlag()
+    {
+        if (!Loader::Enabled("CopSirensFlag"))
+            return;
+
+        auto pattern = find_pattern("E8 ? ? ? ? C0 E0 ? 32 86 6F 0F 00");
+        if (!pattern.empty())
+            zpatch_copsirens_resume = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first(5)));
+
+        pattern = find_pattern("0F BF 41 2E 39 05");
+        if (!pattern.empty())
+            zpatch_copsirens_resume_b = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first(28)));
+
+        pattern = find_pattern("0C 83 88 94 00 00 00 04");
+        if (!pattern.empty())
+            zpatch_ide_hook_slot = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first(-1)));
+    }
+
+    void InstallCopSirensFlag()
+    {
+        if (!Loader::Enabled("CopSirensFlag"))
+            return;
+
+        auto pattern = find_pattern("E8 ? ? ? ? C0 E0 ? 32 86 6F 0F 00");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(0),
+                reinterpret_cast<void*>(&CopSirensShimABody), true);
+
+        pattern = find_pattern("0F BF 41 2E 39 05");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(22),
+                reinterpret_cast<void*>(&CopSirensShimBBody), true);
+
+        pattern = find_pattern("0C 83 88 94 00 00 00 04");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(-10),
+                reinterpret_cast<void*>(&IdeHookBody), true);
+    }
+}
+
+// PopupHeadlightsFlag: the checkbox that makes a vehicle's pop-up headlights
+// deserve their own light cone. The two shims (sub_10044530 and its EDX twin
+// sub_10044560) run the popuplights checker (sub_10044310) and continue into the
+// site's own headlight test.
+extern "C"
+{
+    // dword_1015BE20 (the site's model word), dword_1015BE24 (the check's flag),
+    // dword_1015BE1C (the popuplights model index), dword_101580CC (the angle the
+    // site's `fld` loads), and dword_1015D628 / dword_1015D62C (the two resumes).
+    uint32_t zpatch_popup_model = 0;
+    uint32_t zpatch_popup_flag = 0;
+    uint32_t zpatch_popup_index = 0;
+    float zpatch_popup_angle = 1.57079632679489661923f;  // pi/2, dword_101580CC
+    uint32_t zpatch_popup_resume_a = 0;
+    uint32_t zpatch_popup_resume_b = 0;
+
+    // The two 512-slot tables the original's loader preamble fills from
+    // [PopupLightAngles]. This tree does not parse that section yet
+    // (docs/parity.md); the shipped INI's section is empty, so both stay zero and
+    // the checker's default pi/2 is the original's own value there.
+    uint32_t zpatch_popup_hashes[512] = {};
+    float zpatch_popup_angles[512] = {};
+}
+
+namespace
+{
+    // sub_10044310 (125 instructions), rebuilt: reset the angle to pi/2, resolve
+    // "popuplights" (hash 0xEB9F21D3) and compare the model against it, then walk
+    // the +popuplights list the IDE parser filled. On a match the angle is the
+    // last matching [PopupLightAngles] row, as in the original's eight interleaved
+    // 64-entry columns (flattened here to 512 slots). The lookup is unguarded.
+    void PopupHeadlightsCheck()
+    {
+        constexpr uint32_t kPopupLightsHash = 0xEB9F21D3u;
+
+        zpatch_popup_angle = 1.57079632679489661923f;  // 0x3FC90FDB
+        zpatch_popup_flag = 0;
+
+        int32_t found = -1;
+        LookupModel(kPopupLightsHash, &found);
+        zpatch_popup_index = static_cast<uint32_t>(found);
+        if (found == static_cast<int32_t>(zpatch_popup_model))
+        {
+            zpatch_popup_flag = 1;
+            return;
+        }
+
+        if (zpatch_popuplights_models[0] == 0)
+            return;
+
+        uint32_t slot = 0;
+        for (;;)
+        {
+            found = -1;
+            LookupModel(zpatch_popuplights_models[slot], &found);
+            if (found == static_cast<int32_t>(zpatch_popup_model))
+                break;
+            ++slot;
+            if (slot >= kVehicleLightSlots || zpatch_popuplights_models[slot] == 0)
+                return;
+        }
+
+        zpatch_popup_flag = 1;
+        for (uint32_t i = 0; i < kVehicleLightSlots; ++i)
+        {
+            if (zpatch_popup_hashes[i] != 0 &&
+                zpatch_popup_hashes[i] == zpatch_popuplights_models[slot])
+                zpatch_popup_angle = zpatch_popup_angles[i];
+        }
+    }
+}
+
+// sub_10044530, recovered VA 0x10044530 (10 instructions): the EAX site's shim.
+// It stores the site's model word, runs the check between pusha/popa, then takes
+// the site's second branch when the model is a popuplights model, or falls into
+// the anchor's +10 short jump (which the arm rewrites to unconditional) with the
+// site's own `cmp eax, [index]` replayed first. pusha/popa are emitted as bytes
+// because the inline assembler adds a 0x66 prefix.
+static __declspec(naked) void PopupHeadlightsBodyA()
+{
+    __asm
+    {
+        movsx eax, WORD PTR [esi + 2Eh]
+        __emit 0x60  // pusha
+        mov DWORD PTR [zpatch_popup_model], eax
+        call PopupHeadlightsCheck
+        __emit 0x61  // popa
+        cmp DWORD PTR [zpatch_popup_flag], 1
+        je popup_body_a_resume_a
+        cmp eax, DWORD PTR [zpatch_popup_index]
+        jmp DWORD PTR [zpatch_popup_resume_b]
+    popup_body_a_resume_a:
+        jmp DWORD PTR [zpatch_popup_resume_a]
+    }
+}
+
+// sub_10044560, recovered VA 0x10044560 (10 instructions): the EDX twin for the
+// second site pattern, absent on 1.0.8.0 but present on the builds the key was
+// gated for.
+static __declspec(naked) void PopupHeadlightsBodyB()
+{
+    __asm
+    {
+        movsx edx, WORD PTR [esi + 2Eh]
+        __emit 0x60  // pusha
+        mov DWORD PTR [zpatch_popup_model], edx
+        call PopupHeadlightsCheck
+        __emit 0x61  // popa
+        cmp DWORD PTR [zpatch_popup_flag], 1
+        je popup_body_b_resume_a
+        cmp edx, DWORD PTR [zpatch_popup_index]
+        jmp DWORD PTR [zpatch_popup_resume_b]
+    popup_body_b_resume_a:
+        jmp DWORD PTR [zpatch_popup_resume_a]
+    }
+}
+
+namespace
+{
+    // PopupHeadlightsFlag's sites: the EAX anchor (jump, its +10 branch forced to
+    // a short jump, and the `fld` operand at +82 retargeted to our pi/2 float),
+    // the shared IDE hook, and the EDX twin when the image has it.
+    void PublishPopupHeadlightsFlag()
+    {
+        if (!Loader::Enabled("PopupHeadlightsFlag"))
+            return;
+
+        auto pattern = find_pattern("0F BF 46 2E 3B 05 ? ? ? ? 75 ? A1");
+        if (!pattern.empty())
+        {
+            zpatch_popup_resume_b = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first(10)));
+            zpatch_popup_resume_a = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first(12)));
+        }
+
+        pattern = find_pattern("0C 83 88 94 00 00 00 04");
+        if (!pattern.empty())
+            zpatch_ide_hook_slot = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first(-1)));
+
+        pattern = find_pattern("0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1");
+        if (!pattern.empty())
+        {
+            zpatch_popup_resume_b = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first(10)));
+            zpatch_popup_resume_a = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first(12)));
+        }
+    }
+
+    void InstallPopupHeadlightsFlag()
+    {
+        if (!Loader::Enabled("PopupHeadlightsFlag"))
+            return;
+
+        auto pattern = find_pattern("0F BF 46 2E 3B 05 ? ? ? ? 75 ? A1");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            injector::MakeJMP(match, reinterpret_cast<void*>(&PopupHeadlightsBodyA), true);
+            injector::WriteMemory<std::byte>(match + 10, Bytes::ShortJmp, true);
+            injector::WriteMemory<uint32_t>(match + 82,
+                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&zpatch_popup_angle)), true);
+            Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(match + 82));
+        }
+
+        pattern = find_pattern("0C 83 88 94 00 00 00 04");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(-10),
+                reinterpret_cast<void*>(&IdeHookBody), true);
+
+        pattern = find_pattern("0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            injector::MakeJMP(match, reinterpret_cast<void*>(&PopupHeadlightsBodyB), true);
+            injector::WriteMemory<std::byte>(match + 10, Bytes::ShortJmp, true);
+            injector::WriteMemory<uint32_t>(match + 82,
+                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&zpatch_popup_angle)), true);
+            Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(match + 82));
+        }
+    }
+}
 
 // Registered like every other arm: the publish tier reads the site's original
 // bytes, the install tier owns the gate.
@@ -377,6 +1067,10 @@ export void RegisterMisc()
     Loader::PublishEvent() += []
     {
         PublishDrivebyFOVFix();
+        PublishSpeedupBugFix();
+        PublishPatch4RemoveModChecks();
+        PublishCopSirensFlag();
+        PublishPopupHeadlightsFlag();
     };
 
     Loader::InstallEvent() += []
@@ -384,5 +1078,29 @@ export void RegisterMisc()
         InstallMiscFixes();
         InstallPatch6and7RemoveModChecks();
         InstallDrivebyFOVFix();
+        InstallSpeedupBugFix();
+        InstallPatch4RemoveModChecks();
+        InstallCopSirensFlag();
+        InstallPopupHeadlightsFlag();
+    };
+
+    // The bodies' recovered VAs, so the dump expresses each arm's branch in the
+    // original's coordinates.
+    Bodies::Register(reinterpret_cast<uintptr_t>(&SpeedupBugFixBody), 0x10050540u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&Patch4StubBody), 0x100054E0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&CopSirensShimABody), 0x10006310u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&CopSirensShimBBody), 0x10006330u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&IdeHookBody), 0x100040E0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&PopupHeadlightsBodyA), 0x10044530u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&PopupHeadlightsBodyB), 0x10044560u);
+
+    // Each stub's inline `call` is invisible to C++; naming the helper here keeps
+    // its out-of-line definition in the image.
+    [[maybe_unused]] const uintptr_t helpers[] = {
+        reinterpret_cast<uintptr_t>(&Patch4Step),
+        reinterpret_cast<uintptr_t>(&CopSirensCheckA),
+        reinterpret_cast<uintptr_t>(&CopSirensCheckB),
+        reinterpret_cast<uintptr_t>(&IdeParse),
+        reinterpret_cast<uintptr_t>(&PopupHeadlightsCheck),
     };
 }
