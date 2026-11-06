@@ -2,14 +2,35 @@ module;
 
 #include <common.hxx>
 
+// Declares the /GS cookie the transcribed prologues read and the check their
+// epilogues call (`__security_cookie`, `__security_check_cookie` in vcruntime.h),
+// the variadic list BadPlayerModelCrashFix's rebuilt formatter takes, and the CRT
+// calls BpmFormat and BpmZeroBlock make.
+#include <intrin.h>
+#include <cstdarg>
+#include <cstdio>
+#include <cstring>
+
 export module stability;
 
 import bodies;
 import bytes;
 import common;
+import game;
 import loader;
 import patch;
 import shared;
+
+// BadPlayerModelCrashFix's diagnostic hashes the model it could not resolve
+// against the original ASI's own 38,455-entry name table (0x100DE770) and prints
+// the matching name, so the names are behaviour. The list is recovered data in the
+// table's own order; source/model_names.inc carries the provenance and the
+// extraction recipe.
+static const char* const kBadPlayerModelNames[] = {
+#include "model_names.inc"
+};
+static_assert(sizeof(kBadPlayerModelNames) / sizeof(kBadPlayerModelNames[0]) == 0x9637,
+    "the recovered model-name table is the original's 38455 entries");
 
 // Crash fixes. One arm per key, each anchored to its own recovered signature.
 // Registration is explicit: the driver calls Register(), so the arm cannot be
@@ -41,6 +62,55 @@ extern "C"
     uint32_t zpatch_smpa60_resume_a = 0;          // dword_10159C70
     uint32_t zpatch_smpa60_resume_b = 0;          // dword_10159C68
     uint32_t zpatch_smpa60_resume_c = 0;          // dword_10159C6C
+
+    // BadPlayerModelCrashFix: the trampoline's saved object and model index, the
+    // resume the arm publishes (dword_10159CB8 = match+10) and the two game
+    // pointers the original's loader preamble resolves on every run -- the ped
+    // model array (dword_1015AD78) and the model-class lookup the fallback calls
+    // (dword_10159C74).
+    uint32_t zpatch_bpm_obj = 0;            // dword_10159C8C
+    uint32_t zpatch_bpm_model_index = 0;    // dword_10159CA4
+    uint32_t zpatch_bpm_resume = 0;         // dword_10159CB8
+    uint32_t zpatch_bpm_ped_array = 0;      // dword_1015AD78 (a game address)
+    uint32_t zpatch_bpm_fn_59c74 = 0;       // dword_10159C74 (a game address)
+
+    // The three hash salts the bodies read. These are the original's on-disk
+    // .data values, which are also its runtime values on every build whose build
+    // probe hits (1.0.8.0 included); the probe-miss branch of the original's
+    // loader preamble substitutes the fallback set, reproduced by the arm.
+    uint32_t zpatch_bpm_salt_c8 = 0x570F5725u;  // dword_101580C8
+    uint32_t zpatch_bpm_salt_b8 = 0x4E61480Au;  // dword_101580B8
+    uint32_t zpatch_bpm_salt_40 = 0x4BF36A32u;  // dword_10158040
+
+    // The original's IAT slot for GetModuleHandleW (0x10063074), which its
+    // GTAC.dll test calls through.
+    uint32_t zpatch_bpm_getmodulehandle = 0;
+
+    // The pieces of the native-call layer the transcribed wrappers call: their
+    // addresses are published here by the arm, because a module interface cannot
+    // export a naked function (see RegisteredBody).
+    uint32_t zpatch_bpm_context_init = 0;   // sub_100038C0 (source/native.ixx)
+    uint32_t zpatch_bpm_cleanup_bool = 0;   // sub_1005DE80 (source/native.ixx)
+    uint32_t zpatch_bpm_cleanup_dword = 0;  // sub_1005DE40 (source/native.ixx)
+    uint32_t zpatch_bpm_call_hash = 0;      // sub_1005B150 (source/native.ixx)
+    uint32_t zpatch_bpm_resolver = 0;       // sub_10003E50 (source/shared.ixx)
+
+    // The entries those two modules already publish: the guarded resolve-and-invoke
+    // entry (sub_100038E0) and the game's model-index lookup (dword_10159C0C).
+    extern uintptr_t zpatch_native_invoke_entry;
+    extern uintptr_t zpatch_model_lookup;
+}
+
+// The literals the transcribed bodies push, at the original's own text: the wide
+// module name the GTAC.dll test asks for (0x1012C71C), the diagnostic format
+// (0x1012CDD8), the fallback model name the payload hashes (0x100A0E78) and the
+// name table's miss answer (0x10128D20).
+extern "C"
+{
+    const wchar_t zpatch_bpm_gtac[] = L"GTAC.dll";
+    const char zpatch_bpm_format[] = "%s used a non-ped model (%s)";
+    const char zpatch_bpm_multiplayer[] = "m_y_multiplayer";
+    const char zpatch_bpm_unknown[] = "**UNKNOWN**";
 }
 
 // abi_aim_projectile_crash_fix, recovered VA 0x10005590 (sub_10005590): a
@@ -383,6 +453,454 @@ static __declspec(naked) void FreezeGunShim()
         xor eax, eax
         pop esi
         ret 8
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BadPlayerModelCrashFix
+//
+// The game resolves a model index at 0x7CF803, three bytes into a function whose
+// frame is already open (so EBP is live). The original replaces that entry with a
+// 16-instruction trampoline (0x10037BA0) over a 65-instruction payload
+// (0x10037AC0): when the model the caller named is not a ped (class id 6), the
+// payload hashes "m_y_multiplayer", asks the game which model that is and writes
+// the answer back into the caller's own argument slot, so the game never resolves
+// a model that does not exist.
+//
+// Everything the hook runs is transcribed here: the trampoline, the payload, the
+// two native wrappers of its GTAC.dll diagnostic (0x1005B290, 0x1005B530) and the
+// one-argument wrapper its fallback calls (0x1005B3F0). The pieces those wrappers
+// share with the native-call layer stay where they are transcribed, in
+// source/native.ixx and source/shared.ixx, and are reached through the six-byte
+// forwarders below. Two pieces are rebuilt rather than transcribed, both compiler
+// output whose instruction stream cannot be proved here: the model-name lookup
+// (0x10003F00, whose only data operand is an indexed absolute address) and the
+// bounded formatter (0x10001280 over the static CRT's formatter). docs/parity.md
+// records both.
+// ---------------------------------------------------------------------------
+
+// The block zeroing the wrappers open with. The original calls the CRT `memset`
+// through its IAT thunk (0x10060D6E) with the same argument order; the inline
+// assembler rejects a direct call to the intrinsic's name, so the call names this
+// cdecl forwarder, which is still one `E8`.
+static void __cdecl BpmZeroBlock(void* destination, int value, unsigned int count)
+{
+    std::memset(destination, value, count);
+}
+
+// sub_10001280, rebuilt: the original's bounded `vsnprintf` wrapper. Its callee
+// (0x10001240) is compiler output that reaches the UCRT's printf engine
+// (`__stdio_common_vsprintf`, imported at the slot 0x1006336C, with the standard
+// snprintf option bit), so there is no hand-written instruction stream to
+// transcribe: `_vsnprintf_s` with `_TRUNCATE` is the same bound and the same
+// truncate-and-terminate result, and the arg list is the original's
+// `(char* buffer, unsigned size, const char* format, ...)`.
+static int __cdecl BpmFormat(char* buffer, unsigned int size, const char* format, ...)
+{
+    va_list arguments;
+    va_start(arguments, format);
+    const int written = _vsnprintf_s(buffer, size, _TRUNCATE, format, arguments);
+    va_end(arguments);
+    return written;
+}
+
+// sub_10003F00, rebuilt: walk the original's 38,455-name table from index 0,
+// hash each name with the transcribed resolver (sub_10003E50) and answer the
+// first match, or "**UNKNOWN**" on a miss -- exactly the original's loop. It is
+// rebuilt rather than transcribed because its only data operand is an indexed
+// absolute address (`push [esi*4 + 0x100DE770]`): a rebuilt module cannot place
+// its table at that VA, and the whole-body comparator compares such an operand's
+// displacement literally, so the loop is written in C++ instead (docs/parity.md).
+// The original takes its argument in ECX.
+static const char* __fastcall BpmModelName(uint32_t hash) noexcept
+{
+    const auto resolve =
+        reinterpret_cast<uint32_t(__cdecl*)(const char*)>(Shared::ValueResolver());
+    for (const char* name : kBadPlayerModelNames)
+    {
+        if (resolve(name) == hash)
+            return name;
+    }
+    return zpatch_bpm_unknown;
+}
+
+// The forwarders into the layer's transcribed pieces. A module interface cannot
+// export a naked function and a C entry's decorated name is not nameable from
+// inline asm, so each call names a six-byte `jmp` through a slot the arm fills from
+// the body registry by the piece's recovered VA. The stack and registers reach the
+// piece untouched: these instructions touch nothing.
+static __declspec(naked) void BpmContextInitEntry()
+{
+    __asm
+    {
+        jmp DWORD PTR [zpatch_bpm_context_init]
+    }
+}
+
+static __declspec(naked) void BpmInvokeEntry()
+{
+    __asm
+    {
+        jmp DWORD PTR [zpatch_native_invoke_entry]
+    }
+}
+
+static __declspec(naked) void BpmCleanupBoolEntry()
+{
+    __asm
+    {
+        jmp DWORD PTR [zpatch_bpm_cleanup_bool]
+    }
+}
+
+static __declspec(naked) void BpmCleanupDwordEntry()
+{
+    __asm
+    {
+        jmp DWORD PTR [zpatch_bpm_cleanup_dword]
+    }
+}
+
+static __declspec(naked) void BpmCallHashEntry()
+{
+    __asm
+    {
+        jmp DWORD PTR [zpatch_bpm_call_hash]
+    }
+}
+
+static __declspec(naked) void BpmResolverEntry()
+{
+    __asm
+    {
+        jmp DWORD PTR [zpatch_bpm_resolver]
+    }
+}
+
+// sub_1005B290, recovered VA 0x1005B290 (61 instructions): build the 0xA0-byte
+// native call block, call the native whose hash is dword_101580C8 with the one
+// argument the caller passed in EDX, copy every pending output record out and
+// answer args[0] (the "who" name the diagnostic prints). __fastcall-shaped: the
+// first register argument is unused and the payload travels in EDX. The /GS frame
+// is the original's.
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void BpmWhoBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        and esp, 0FFFFFFF8h
+        sub esp, 0ACh
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, esp
+        mov DWORD PTR [esp + 0A8h], eax
+        mov eax, DWORD PTR [zpatch_bpm_salt_c8]
+        push ebx
+        push esi
+        push edi
+        push 0A0h
+        mov DWORD PTR [esp + 10h], eax
+        mov ebx, edx
+        lea eax, [esp + 14h]
+        push 0
+        push eax
+        call BpmZeroBlock
+        add esp, 0Ch
+        lea esi, [esp + 30h]
+        mov edi, 4
+    bpm_who_records:
+        mov ecx, esi
+        call BpmContextInitEntry
+        add esi, 10h
+        sub edi, 1
+        jnz bpm_who_records
+        mov ecx, DWORD PTR [esp + 0Ch]
+        lea eax, [esp + 70h]
+        lea edx, [esp + 10h]
+        mov DWORD PTR [esp + 18h], eax
+        mov DWORD PTR [esp + 10h], eax
+        mov DWORD PTR [esp + 1Ch], edi
+        mov DWORD PTR [esp + 70h], ebx
+        mov DWORD PTR [esp + 14h], 1
+        call BpmInvokeEntry
+        mov edx, DWORD PTR [esp + 1Ch]
+        test edx, edx
+        je bpm_who_done
+    bpm_who_copy:
+        dec edx
+        mov DWORD PTR [esp + 1Ch], edx
+        mov ecx, DWORD PTR [esp + edx * 4 + 20h]
+        add edx, edx
+        mov eax, DWORD PTR [esp + edx * 8 + 30h]
+        mov DWORD PTR [ecx], eax
+        mov eax, DWORD PTR [esp + edx * 8 + 34h]
+        mov DWORD PTR [ecx + 4], eax
+        mov eax, DWORD PTR [esp + edx * 8 + 38h]
+        mov DWORD PTR [ecx + 8], eax
+        mov edx, DWORD PTR [esp + 1Ch]
+        test edx, edx
+        jne bpm_who_copy
+    bpm_who_done:
+        mov ecx, DWORD PTR [esp + 0B4h]
+        mov eax, DWORD PTR [esp + 70h]
+        pop edi
+        pop esi
+        pop ebx
+        xor ecx, esp
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
+// sub_1005B530, recovered VA 0x1005B530 (45 instructions): the chat print. Same
+// block, fixed native hash 0x79023CFC, the message pointer from EDX as its one
+// argument, and the dword cleanup (0x1005DE40) instead of the inline copy-out.
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void BpmPrintBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        and esp, 0FFFFFFF8h
+        sub esp, 0ACh
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, esp
+        mov DWORD PTR [esp + 0A8h], eax
+        push ebx
+        push esi
+        push edi
+        push 0A0h
+        lea eax, [esp + 14h]
+        mov ebx, edx
+        push 0
+        push eax
+        call BpmZeroBlock
+        add esp, 0Ch
+        lea edi, [esp + 30h]
+        mov esi, 4
+        // The original's loop alignment (0F 1F 40 00), emitted as bytes so the
+        // assembler cannot choose a shorter nop.
+        __emit 0x0F
+        __emit 0x1F
+        __emit 0x40
+        __emit 0x00
+    bpm_print_records:
+        mov ecx, edi
+        call BpmContextInitEntry
+        add edi, 10h
+        sub esi, 1
+        jnz bpm_print_records
+        lea eax, [esp + 70h]
+        mov DWORD PTR [esp + 1Ch], esi
+        lea edx, [esp + 10h]
+        mov DWORD PTR [esp + 18h], eax
+        mov ecx, 79023CFCh
+        mov DWORD PTR [esp + 10h], eax
+        mov DWORD PTR [esp + 70h], ebx
+        mov DWORD PTR [esp + 14h], 1
+        call BpmInvokeEntry
+        lea ecx, [esp + 10h]
+        call BpmCleanupDwordEntry
+        mov ecx, DWORD PTR [esp + 0B4h]
+        pop edi
+        pop esi
+        pop ebx
+        xor ecx, esp
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
+// sub_1005B3F0, recovered VA 0x1005B3F0 (46 instructions): build the block, call
+// the fixed native dword_101580B8 with the model hash the caller passed in EDX
+// and answer its low byte. It is transcribed here rather than called through
+// source/native.ixx because that module's slot holds 0x62BFDB37, which is the
+// original's probe-MISS constant: on 1.0.8.0 the loader's build probe hits, so its
+// salt block at 0x10052E1E..0x10052E78 is skipped and the shipped slot keeps
+// 0x4E61480A (docs/parity.md). Native::CallBool stays as it is for its own users.
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void BpmCallBoolBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        and esp, 0FFFFFFF8h
+        sub esp, 0ACh
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, esp
+        mov DWORD PTR [esp + 0A8h], eax
+        mov eax, DWORD PTR [zpatch_bpm_salt_b8]
+        push ebx
+        push esi
+        push edi
+        push 0A0h
+        mov DWORD PTR [esp + 10h], eax
+        mov ebx, edx
+        lea eax, [esp + 14h]
+        push 0
+        push eax
+        call BpmZeroBlock
+        add esp, 0Ch
+        lea edi, [esp + 30h]
+        mov esi, 4
+    bpm_bool_records:
+        mov ecx, edi
+        call BpmContextInitEntry
+        add edi, 10h
+        sub esi, 1
+        jnz bpm_bool_records
+        mov ecx, DWORD PTR [esp + 0Ch]
+        lea eax, [esp + 70h]
+        lea edx, [esp + 10h]
+        mov DWORD PTR [esp + 18h], eax
+        mov DWORD PTR [esp + 10h], eax
+        mov DWORD PTR [esp + 1Ch], esi
+        mov DWORD PTR [esp + 70h], ebx
+        mov DWORD PTR [esp + 14h], 1
+        call BpmInvokeEntry
+        lea ecx, [esp + 10h]
+        call BpmCleanupBoolEntry
+        mov ecx, DWORD PTR [esp + 0B4h]
+        pop edi
+        pop esi
+        pop ebx
+        xor ecx, esp
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
+// sub_10037AC0, recovered VA 0x10037AC0 (65 instructions): the payload. It reads
+// the model the caller named through the ped array, asks the model's own class id
+// (the vtable slot at +0Ch) and returns when it is a ped. Otherwise: when GTAC.dll
+// is loaded it prints the diagnostic (name lookup, "who" call, formatter, chat
+// print -- all behind the original's own module test), then it asks the fixed
+// native whether the fallback is needed, calls the model-class lookup when it is
+// not, and resolves "m_y_multiplayer" through the shared model lookup, writing the
+// index back into the trampoline's slot. Every read is as unguarded as the
+// original's; the /GS prologue and epilogue are its own.
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void BpmCheckBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        sub esp, 48h
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, ebp
+        mov DWORD PTR [ebp - 4], eax
+        mov ecx, DWORD PTR [zpatch_bpm_ped_array]
+        mov eax, DWORD PTR [zpatch_bpm_model_index]
+        push esi
+        mov esi, DWORD PTR [ecx + eax * 4]
+        test esi, esi
+        je bpm_check_done
+        mov eax, DWORD PTR [esi]
+        mov eax, DWORD PTR [eax + 0Ch]
+        call eax
+        cmp al, 6
+        je bpm_check_done
+        push OFFSET zpatch_bpm_gtac
+        call DWORD PTR [zpatch_bpm_getmodulehandle]
+        test eax, eax
+        je bpm_check_multiplayer
+        mov ecx, DWORD PTR [esi + 3Ch]
+        call BpmModelName
+        mov edx, DWORD PTR [zpatch_bpm_obj]
+        mov esi, eax
+        call BpmWhoBody
+        push esi
+        push eax
+        push OFFSET zpatch_bpm_format
+        lea eax, [ebp - 44h]
+        push 40h
+        push eax
+        call BpmFormat
+        add esp, 14h
+        lea edx, [ebp - 44h]
+        call BpmPrintBody
+    bpm_check_multiplayer:
+        push OFFSET zpatch_bpm_multiplayer
+        call BpmResolverEntry
+        add esp, 4
+        mov esi, eax
+        mov edx, esi
+        call BpmCallBoolBody
+        test al, al
+        jne bpm_check_lookup
+        push 0
+        push esi
+        call DWORD PTR [zpatch_bpm_fn_59c74]
+        mov ecx, DWORD PTR [zpatch_bpm_salt_40]
+        add esp, 8
+        call BpmCallHashEntry
+    bpm_check_lookup:
+        lea eax, [ebp - 48h]
+        mov DWORD PTR [ebp - 48h], 0FFFFFFFFh
+        push eax
+        push esi
+        call DWORD PTR [zpatch_model_lookup]
+        mov eax, DWORD PTR [ebp - 48h]
+        add esp, 8
+        mov DWORD PTR [zpatch_bpm_model_index], eax
+    bpm_check_done:
+        mov ecx, DWORD PTR [ebp - 4]
+        xor ecx, ebp
+        pop esi
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
+// tramp_BadPlayerModelCrashFix, recovered VA 0x10037BA0 (16 instructions): the
+// site's trampoline. The arm's jump replaces the game's `and esp,0FFFFFFF0h`, so
+// the body saves the caller's two arguments (entity at [EBP+0Ch], model index at
+// [EBP+10h]), runs the payload, writes the possibly-corrected index back into the
+// caller's argument slot, replays the prologue the jump overwrote and tail-jumps
+// to the published resume (match+10, the `mov ebx,[ebp+0Ch]`).
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void BpmTrampoline()
+{
+    __asm
+    {
+        push edi
+        mov edi, DWORD PTR [ebp + 0Ch]
+        mov DWORD PTR [zpatch_bpm_obj], edi
+        mov edi, DWORD PTR [ebp + 10h]
+        mov DWORD PTR [zpatch_bpm_model_index], edi
+        __emit 0x60  // pushad (pushal)
+        call BpmCheckBody
+        __emit 0x61  // popad (popal)
+        mov edi, DWORD PTR [zpatch_bpm_model_index]
+        mov DWORD PTR [ebp + 10h], edi
+        pop edi
+        and esp, 0FFFFFFF0h
+        sub esp, 54h
+        xorps xmm0, xmm0
+        push ebx
+        jmp DWORD PTR [zpatch_bpm_resume]
     }
 }
 
@@ -791,21 +1309,6 @@ namespace
             reinterpret_cast<void*>(Shared::PlayerPedComponentsShim()), true);
     }
 
-    // BadPlayerModelCrashFix is deliberately not installed: it cannot be reproduced
-    // faithfully without the original's script-native library. Its trampoline
-    // (0x10037BA0, 16 instructions) is a plain transcription, but its helper
-    // sub_10037AC0 (65 instructions) reads the game's ped model array through
-    // dword_1015AD78 and, on the path that matters - the object is not a ped class -
-    // calls the native wrappers sub_1005B3F0 (46) and sub_1005B150 (44). Those build
-    // a 0xA0-byte native context (sub_100038C0 (5); sub_100038E0 (59), an SEH frame
-    // around a call through the game pointer dword_1015BDE0) and invoke it through
-    // sub_1005DE40/80 (21 each), and the path also calls the game function
-    // dword_10159C74. The GTAC.dll branch needs more of the same (sub_1005B290 (61),
-    // sub_1005B530 (45), the sub_10001280 sprintf chain) plus sub_10003F00 (21),
-    // which hashes against the original's own 38,455-entry model-name table at
-    // 0x100DE770. That library is a workstream of its own; approximating it would be
-    // a stub, so the key stays open (docs/parity.md).
-
     // SCOSignatureFix: the instruction 32 bytes before the anchor becomes a short
     // jump, so the signature check that follows is skipped.
     void InstallSCOSignatureFix()
@@ -895,6 +1398,115 @@ namespace
                 true);
         }
     }
+
+    // A captured pattern operand is an address in the image's own coordinate
+    // system. The dump places that image at a heap address, so the operand is
+    // rebased through the image's preferred base; in the game the two are equal.
+    uint32_t GameAddress(uint32_t value)
+    {
+        const auto host = Game::Get().ImageBase();
+        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(host);
+        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(host + dos->e_lfanew);
+        return static_cast<uint32_t>(
+            host + (value - static_cast<uint32_t>(nt->OptionalHeader.ImageBase)));
+    }
+
+    // The address of a body another module transcribed, by its recovered VA. The
+    // native-call layer publishes only its C entries, and a module interface cannot
+    // export a naked function, so the body registry is what makes its pieces
+    // reachable from here.
+    uint32_t RegisteredBody(uint32_t reference)
+    {
+        for (const auto& entry : Bodies::All())
+        {
+            if (entry.reference == reference)
+                return static_cast<uint32_t>(entry.address);
+        }
+        return 0;
+    }
+
+    // BadPlayerModelCrashFix's published state, read before the install overwrites
+    // the site: the resume is the site's +10 (the `mov ebx,[ebp+0Ch]` the jump
+    // covers). The rest is what the original's unconditional loader preamble
+    // resolves on every run and this key's bodies read -- the ped array, the
+    // model-class lookup, and the three hash salts whose build probe decides - plus
+    // the addresses of the layer pieces the transcribed wrappers call.
+    void PublishBadPlayerModelCrashFix()
+    {
+        if (!Loader::Enabled("BadPlayerModelCrashFix"))
+            return;
+
+        auto pattern = find_pattern("83 E4 F0 83 EC 54 0F 57 C0 53 8B 5D 0C");
+        if (pattern.empty())
+            return;
+
+        zpatch_bpm_resume = static_cast<uint32_t>(
+            reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 10);
+
+        // dword_1015AD78: the ped-model object array, the absolute operand four
+        // bytes before the original's own anchor (game 0x49EC0F).
+        pattern = find_pattern("85 C0 C6 44 24 0C 00 C6 44 24 0D 00 75 07");
+        if (!pattern.empty())
+            zpatch_bpm_ped_array = GameAddress(*pattern.get_first<uint32_t>(-4));
+
+        // dword_10159C74: the model-class lookup the fallback calls, the
+        // original's anchor - 42 (game 0xB191D0).
+        pattern = find_pattern("85 F6 74 30 8B 16 8B 42 0C 8B CE FF D0 3C 02 75 23");
+        if (!pattern.empty())
+        {
+            zpatch_bpm_fn_59c74 = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) - 42);
+        }
+
+        // The build probe. The original's loader installs its ten fallback hash
+        // salts only when this pattern is absent (0x10052E1A jumps the ten stores
+        // on a hit), so on 1.0.8.0 the shipped .data values stand. The three this
+        // key reads are seeded with those; a missed probe substitutes the recovered
+        // fallback set.
+        pattern = find_pattern("68 ? ? ? ? 68 A9 54 14 51 E8");
+        if (pattern.empty())
+        {
+            zpatch_bpm_salt_c8 = 0x406B4B20u;
+            zpatch_bpm_salt_b8 = 0x62BFDB37u;
+            zpatch_bpm_salt_40 = 0xC9DBDA90u;
+        }
+
+        // 0x10063074: the original's GetModuleHandleW slot, which its GTAC.dll
+        // test calls through.
+        zpatch_bpm_getmodulehandle = static_cast<uint32_t>(
+            reinterpret_cast<uintptr_t>(&GetModuleHandleW));
+
+        // The layer's transcribed pieces, by their recovered VAs.
+        zpatch_bpm_context_init = RegisteredBody(0x100038C0u);
+        zpatch_bpm_cleanup_bool = RegisteredBody(0x1005DE80u);
+        zpatch_bpm_cleanup_dword = RegisteredBody(0x1005DE40u);
+        zpatch_bpm_call_hash = RegisteredBody(0x1005B150u);
+        zpatch_bpm_resolver = static_cast<uint32_t>(Shared::ValueResolver());
+    }
+
+    // BadPlayerModelCrashFix: the game's model-resolution entry becomes a jump to
+    // the trampoline. The jump is made only after the resume above is published,
+    // because the resume is read from the site the jump overwrites.
+    void InstallBadPlayerModelCrashFix()
+    {
+        if (!Loader::Enabled("BadPlayerModelCrashFix"))
+            return;
+
+        auto pattern = find_pattern("83 E4 F0 83 EC 54 0F 57 C0 53 8B 5D 0C");
+        if (pattern.empty())
+            return;
+
+        Bodies::Register(reinterpret_cast<uintptr_t>(&BpmTrampoline), 0x10037BA0u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&BpmCheckBody), 0x10037AC0u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&BpmWhoBody), 0x1005B290u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&BpmPrintBody), 0x1005B530u);
+        // The same recovered VA as source/native.ixx's copy: this one reads the
+        // shipped salt slot, that one the layer's fixed constant (see the body).
+        Bodies::Register(reinterpret_cast<uintptr_t>(&BpmCallBoolBody), 0x1005B3F0u);
+
+        injector::MakeJMP(pattern.get_first<std::byte>(0),
+            reinterpret_cast<void*>(&BpmTrampoline), true);
+    }
 }
 
 // Registered like every other arm: the publish tier reads every site the install
@@ -913,6 +1525,7 @@ export void RegisterStability()
         PublishEpisodeSwitchFreezeFix();
         PublishSMPA60Fix();
         PublishPlayerAsPedComponentsFix();
+        PublishBadPlayerModelCrashFix();
     };
     Loader::InstallEvent() += []
     {
@@ -932,5 +1545,6 @@ export void RegisterStability()
         InstallRemoveAllWeaponsProtection();
         InstallHighFPSSpeedupFix();
         InstallAimProjectileCrashFix();
+        InstallBadPlayerModelCrashFix();
     };
 }

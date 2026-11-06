@@ -34,8 +34,8 @@ CRLF folding (the original reads in text mode). The shipped INI's longest line i
 
 Measured on 1.0.8.0 with `tools/parity_report.py 9`:
 
-- **79 of 99 option keys closed**;
-- **62 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **80 of 99 option keys closed**;
+- **67 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe. The longest two are the `DualVehicleHeadlights`
   pair at 78 instructions / 309 bytes each, which is what exposed the proof tool's
@@ -105,6 +105,89 @@ forwarder through the layer's published resolve entry instead of the original's
 direct `E8` to `0x10003980`, because a module interface cannot export a naked
 target and the C entry's decorated name is not nameable from inline asm.
 
+### `BadPlayerModelCrashFix`, closed on the same layer
+
+The key had been reverted as blocked on that library. Its remaining pieces turned
+out to be transcribable: every call the installed code makes lands on a piece the
+tree already carries or on a piece small enough to transcribe here, and the two
+that are not instruction streams are rebuilt with their behaviour intact.
+
+| piece | VA | instructions | how |
+|---|---:|---:|---|
+| the site's trampoline | `0x10037BA0` | 16 | transcribed |
+| the payload it calls | `0x10037AC0` | 65 | transcribed |
+| the GTAC.dll "who" call | `0x1005B290` | 61 | transcribed |
+| the GTAC.dll chat print | `0x1005B530` | 45 | transcribed |
+| its one-argument native wrapper | `0x1005B3F0` | 46 | transcribed |
+| the model-name lookup | `0x10003F00` | 21 | rebuilt |
+| the bounded formatter | `0x10001280` (`0x10001240`) | 13 | rebuilt |
+
+The arm jumps to the trampoline at the game's model-resolution entry (game
+`0x7CF803`, three bytes into the function, so `EBP` is live) and publishes the
+resume `match+10` before the jump, because the resume is the instruction the jump
+covers. What the bodies read from the tree is unchanged: `sub_100038C0`,
+`sub_1005DE40`/`DE80` and `sub_1005B150` come from `source/native.ixx`,
+`sub_10003E50` from `source/shared.ixx`, `sub_100038E0` through the layer's
+published invoke entry and `dword_10159C0C` through `source/shared.ixx`'s slot. The
+six `jmp` forwarders (one instruction each) exist for the same reason
+`DrivebyFOVFix`'s does: a module interface cannot export a naked function, so the
+arm fills each slot from the body registry by the piece's recovered VA.
+
+**The two rebuilds, and why they are not transcriptions.**
+
+- `0x10003F00` walks the original's 38,455-entry name table and hashes each name
+  with `sub_10003E50`. Its only data operand is an *indexed* absolute address
+  (`push dword ptr [esi*4 + 0x100DE770]`), and the whole-body comparator compares an
+  indexed absolute operand's displacement literally -- unlike a plain absolute
+  operand, which it reduces to "abs" (below). A rebuilt module cannot place its
+  table at the original's VA, and normalising the operand would be a change to the
+  comparator, so the loop is written in C++ instead: the same table order, the same
+  resolver, the same first-match result and the same `"**UNKNOWN**"` miss answer.
+  The table itself is recovered data, not a rebuild: `source/model_names.inc` holds
+  the 38,455 names in the table's own order with the extraction recipe and the
+  pinned image's SHA-256 in its header.
+- `0x10001280` is compiler output for a `vsnprintf`-shaped wrapper, and its callee
+  reaches the UCRT's own printf engine -- the `FF 15` at `0x1000125E` goes through
+  the IAT slot `0x1006336C`, which imports `__stdio_common_vsprintf`, with the
+  `STANDARD_SNPRINTF_BEHAVIOR` option bit (`or ecx, 2`) -- so the rebuild is
+  `_vsnprintf_s` with `_TRUNCATE`: the same bound, the same truncate-and-terminate
+  result for this `%s ... %s` format. The payload's call to it compares as a call
+  immediate either way.
+
+**A layer constant this key must not inherit.** `Native::CallBool`'s body reads the
+salt `source/native.ixx` seeds with `0x62BFDB37`. That is the original's
+*probe-miss* constant: the loader's ten salt stores sit at `0x10052E1E` ..
+`0x10052E78`, after the `jne 0x10052E82` at `0x10052E1C`, so they run only when the
+build probe (signature `68 ? ? ? ? 68 A9 54 14 51 E8`, the ASI's own string at
+`0x1012B710`) misses. On 1.0.8.0 the probe hits (`0xB3878C`), and
+`game_refs/ZolikaPatch.log` -- the reconstruction's 1.0.8.0 run, `compact=1080 id=9`
+at line 9 -- records `phase=preamble resolved=7 missing=0` (lines 115-116) with no
+salt-probe-miss line, so `dword_101580B8` keeps its shipped `.data` value
+`0x4E61480A` and the three salts this key reads are `0x570F5725` (`c8`),
+`0x4E61480A` (`b8`) and `0x4BF36A32` (`40`).
+The key therefore carries its own transcription of `0x1005B3F0` with a slot seeded
+from the shipped values, and reproduces the original's probe-miss substitution (the
+recovered fallback set) for the builds whose probe misses -- measured on 1.0.0.0 and
+1.0.4.0, where the salts become `0x406B4B20` / `0x62BFDB37` / `0xC9DBDA90`. The
+layer's own copy is untouched; `Native::CallBool` is unchanged.
+
+The same constant is the wrong one in `source/misc.ixx`'s `DrivebyFOVFix` helper,
+which seeds `0x09399528` -- the `dword_101580D4` fallback, not the shipped
+`0x75E005F1` -- so on 1.0.8.0 that helper asks the game's resolver for a hash the
+build does not define instead of the drive-by handle the original resolves. What the
+resolver answers decides the consequence (the helper dereferences the answer at
+`0x1000646E` without a guard, so a null answer faults where the original finds the
+entry), but either way the input is not the original's. That is the other arm's file
+and its owner's call; recorded here because the evidence is this same probe branch.
+
+**The fault these bodies keep.** On a build whose ped-array anchor is absent, the
+original's preamble skips the store into `dword_1015AD78` and leaves it zero, and
+the payload's first array read (`mov esi,[ecx+eax*4]`) dereferences it. 1.0.0.0 is
+such a build: the anchor `85 C0 C6 44 24 0C 00 C6 44 24 0D 00 75 07` has no hit
+there, while the site itself does (`0x89AE53`). The arm keeps the original's shape --
+no guard, and the store is skipped when the scan misses -- so it faults in the same
+place; the offline dump cannot see it, because nothing dereferences the slot there.
+
 ### The vehicle arms closed in this pass
 
 - `IncreaseVehicleModelLimit` (anchor `0x8DD143`): writes the dword `0x400` through
@@ -157,11 +240,6 @@ the game's hash function at `0x45CF50`). The native-script call layer is
 
 Still blocked:
 
-- `BadPlayerModelCrashFix` now has the native-call layer it was waiting for, but
-  still needs the GTAC.dll branch (`sub_1005B290`, `sub_1005B530`, the sprintf
-  chain) and the original's own 38,455-entry model-name table at `0x100DE770`;
-  its remaining callers are `sub_10037AC0` and the model-name lookup, not the
-  layer itself;
 - `GarageModelFix`, `NoLiveryLimit`, the steer/engine/plane trio and `FreezeCarFix`
   need `sub_10004C70` (the 1,343-byte steer consumer) and, for `FreezeCarFix`, the
   1,421-byte probe;
@@ -226,6 +304,11 @@ call our equivalent helper instead of the original's compiled target:
 - `driveby_fov_helper` calls `DrivebyResolveEntry`, a six-byte `jmp` through the
   native layer's published resolve entry, because the layer's C entry is not
   nameable from inline asm in another module unit.
+- the `BadPlayerModelCrashFix` bodies call `BpmZeroBlock` (a cdecl forwarder to the
+  CRT `memset`), `BpmFormat` (the rebuilt `0x10001280`), `BpmModelName` (the rebuilt
+  `0x10003F00`) and five one-instruction `jmp` forwarders into the layer's pieces.
+  The forwarders are the same shape as `DrivebyResolveEntry` and for the same
+  reason; the two rebuilt helpers are named in the section above.
 
 The stored baselines have one gap of their own: they were produced by the
 reference tree, whose `ApplyCarDynamicShadowFixNoE` pass is defined but never
