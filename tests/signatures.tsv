@@ -205,6 +205,41 @@ DrivebyFOVFix	0x85031F	F3 0F 10 46 60 F3 0F 5C CA	10
 # RemoveGFWLUpdatePopup share one site (the same shared original stub).
 SpeedupBugFix	0x4571C5	50 64 89 25 00 00 00 00 83 EC 34	11
 SpeedupBugFix.clock	0x456F93	1B D9 89 5C 24 24 0F 88	8
+# SpeedupBugFix is the one key whose original handler has no build gate: the loader
+# calls 0x100506B0 whenever the key is on (`cmp esi,1; jnz; call sub_100506B0`), and
+# the handler reads its eight operands at fixed site-relative displacements
+# (`lea ebx,[eax-15h]`, then `mov eax,[ebx+2Fh]` .. `mov eax,[ebx+129h]`), so its row
+# is the same on every build: a hit installs `E9` at match-21, a miss is the
+# handler's own `test eax,eax; jz 0x1005077D` return. Per-build match VAs (byte scan
+# of every image in game_refs; the arm jumps to match-21):
+#   build 1  1.0.0.0   no hit (the original's clean skip)
+#   build 5  1.0.4.0   0x4544C5
+#   build 6  1.0.0.4   0x457395
+#   build 7  1.0.6.0   0x5AFBF5
+#   build 8  1.0.7.0   0x5AFDD5
+#   build 9  1.0.8.0   0x4571C5
+#   build 11 1.1.1.0   0x454BC5
+#   build 12 1.1.2.0   0x454C05
+#   build 13 1.1.3.0   0x5AD565
+#   builds 15 (1.0.6.1), 10 (1.1.0.0) and 18 (1.2.0.43) have no image in game_refs,
+#   so no site is verified for them (unverified, not absent).
+# On every build above, match-21 is `55 8B EC 6A FF` and the eight operands are the
+# disp32 fields of the same eight `movss` instructions: the four bytes before each
+# field (the instruction's opcode+ModRM) are identical on all of them, and every
+# target is a writable .data word. That identity is what the arm checks before it
+# publishes. The 1.0.8.0 rows, in the handler's read order ([ebx+disp], slot, the
+# instruction whose disp32 it is):
+#   0x02F  dword_10159350  F3 0F 10 05  movss xmm0,[0x18CAE9C]
+#   0x0BA  dword_10159364  F3 0F 11 0D  movss [0x18CAEA0],xmm1
+#   0x0D1  dword_10159360  F3 0F 11 05  movss [0x18CAEA4],xmm0
+#   0x0F7  dword_1015935C  F3 0F 11 1D  movss [0x1752078],xmm3
+#   0x0FF  dword_10159368  F3 0F 11 0D  movss [0x18CAEAC],xmm1
+#   0x10E  dword_1015934C  F3 0F 11 1D  movss [0x18CAEB0],xmm3
+#   0x11D  dword_10159354  F3 0F 11 15  movss [0x18CAEA8],xmm2
+#   0x129  dword_10159358  F3 0F 11 05  movss [0x1752074],xmm0
+# The body's clock scan hits once per build as well, and match-51 is the clock
+# function's own `55 8B EC 83 E4 F8` prologue on all nine: 5 0x454293, 6 0x457163,
+# 7 0x5AF9C3, 8 0x5AFBA3, 9 0x456F93, 11 0x454993, 12 0x4549D3, 13 0x5AD333.
 Patch4RemoveModChecks	0x7CBF70	2B C1 1B D6 89 44 24 0C 89 54 24 10 DF 6C 24 0C D8 0D ? ? ? ? D9 5C 24 08	26
 CopSirensFlag.a	0x8FEBD3	E8 ? ? ? ? C0 E0 ? 32 86 6F 0F 00	13
 CopSirensFlag.b	0x8FABD0	0F BF 41 2E 39 05	7

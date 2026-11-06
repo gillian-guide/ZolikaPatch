@@ -662,3 +662,54 @@ file walk was replayed offline against the two real saves in
 `game_refs/saves/GTA IV/savegames/user_ee000000deadc0de` (`SGTA400`/`SGTA401`: `SAVE`
 at `0x0C`, eighteen `BLOCK` chunks, sizes `0x3AB1`/`0x1729`/`0x0CC7`, i.e. the older
 layout), which validates the walk and the size conditions only.
+
+## 2026-11-06 — SpeedupBugFix: per-build recovery, and the fault that was not this key
+
+**The reported bug was misattributed.** `zp_dump --exe ..\game_refs\GTAIV_1000.exe
+--build 1 out.txt build\win-x86\only-speedup.ini` does fault `0xC0000005`, but not
+in `SpeedupBugFix`. A one-line INI is not a single-key document: every absent key
+keeps its default (mostly `1`), so that run executes nearly the whole catalogue. A
+per-key bisect on 1.0.0.0 (99 keys, each alone) finds exactly one faulting key:
+`NoImpostorHeightCutoff`, the documented preserved original fault (its pattern
+hits once on 1.0.0.0 and `graphics.ixx` indexes `pattern.get(1)`, i.e. reads past
+the hit vector). Adding `NoImpostorHeightCutoff=0` to the same INI makes build 1
+exit 0 (433 bytes). `SpeedupBugFix` alone on 1.0.0.0 is 0 bytes / exit 0: its
+signature has no hit in `GTAIV_1000.exe`, which is the original handler's own
+clean skip (`test eax,eax; jz 0x1005077D`).
+
+**Recovered from the IDB (`ZolikaPatch.asi.i64`).** Handler `sub_100506B0` is
+reached from one call site (`cmp esi,1; jnz; call sub_100506B0` at `0x10055A5D`
+.. `0x10055A62`) with **no build gate**. It reads its eight operands at fixed
+site-relative displacements (`lea ebx,[eax-15h]`, then `mov eax,[ebx+2Fh]` ..
+`[ebx+129h]`), writes `E9` at `ebx` and `sub_10050540-ebx-5` at `ebx+1`. So the
+original's row is identical on every build; only the match VA differs. The eight
+displacements are the disp32 fields of eight `movss` in the game's timer-init
+function, with the same opcode bytes on every image.
+
+**Sites recovered** by byte scan of all nine images: 1.0.0.0 none; 1.0.4.0
+`0x4544C5`, 1.0.0.4 `0x457395`, 1.0.6.0 `0x5AFBF5`, 1.0.7.0 `0x5AFDD5`, 1.0.8.0
+`0x4571C5`, 1.1.1.0 `0x454BC5`, 1.1.2.0 `0x454C05`, 1.1.3.0 `0x5AD565`. All eight
+operands validate on every one (same encodings, writable `.data` targets), and the
+body's clock scan `1B D9 89 5C 24 24 0F 88` hits once per build with `-51`
+landing on the clock function's `55 8B EC 83 E4 F8` prologue. 1.0.6.1, 1.1.0.0 and
+1.2.0.43 have no image here: unverified, not verified.
+
+**What changed.** `source/misc.ixx`: `ResolveSpeedupBugFix` validates each of the
+eight operand fields (four recovered opcode bytes before the field + a writable
+in-image target) before publishing any of them, and the install only runs for a
+resolved site; a site that fails is a clean skip. `tools/single_key_matrix.py`
+(new): the true single-key matrix, every key `0` and one `1`, one subprocess per
+key, per-build exit-code table, with the 1.0.0.0 `NoImpostorHeightCutoff` cell
+recorded as the expected fault. `tests/signatures.tsv` and `docs/parity.md`: the
+per-build rows, the quoted handler/body instructions, the validation rule and the
+one recorded divergence (an image whose signature matched another function would
+be a skip here, where the original would install and its body would store through
+the operands).
+
+**Gates (final runs).** `cmake --build --preset release` exit 0;
+`python tools/parity_report.py 9` -> `build 9: 98 key(s) closed, 1 open` (the
+open key is still `SkipLauncher`); `ctest --preset release` -> 11/11;
+`python tools/verify_bodies.py ...` -> `119 body(ies), 0 failure(s)`;
+`python tools/single_key_matrix.py` -> 891 cells, 890 exit 0, one expected fault
+(`NoImpostorHeightCutoff` on 1.0.0.0). SpeedupBugFix's per-key dump is
+byte-identical to the pre-change dump on all nine images (build 9: 4 bytes).

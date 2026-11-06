@@ -387,6 +387,12 @@ namespace
 // SSE double arithmetic -- so this is a C++ reimplementation of the same
 // behaviour, not a transcription (docs/parity.md records the split).
 //
+// The original's handler has no build gate and reads its eight float pointers
+// from fixed site-relative operands, so the row is the same on every build that
+// carries the signature (0x4544B0 on 1.0.4.0 through 0x5AD550 on 1.1.3.0) and
+// 1.0.0.0, which has no hit, is a clean skip. tests/signatures.tsv records the
+// per-build sites and the eight operand encodings.
+//
 // It fills the game's eight timing floats from QueryPerformanceFrequency, then
 // stores the game clock's 64-bit stamp in *self and answers self. The clock
 // function is found by the original's own one-time scan ("1B D9 89 5C 24 24 0F
@@ -407,8 +413,9 @@ static void* __fastcall SpeedupBugFixBody(void* self, int)
                 reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)));
     }
 
-    // The original tests the float, not the pointer: a null published pointer
-    // faults here exactly as its own dereference does.
+    // The original tests the float, not the pointer, so the dereference stays
+    // unguarded; the arm installs this body only after all eight pointers were
+    // published.
     if (*zpatch_speedup_t50 == 0.0f)
     {
         LARGE_INTEGER frequency{};
@@ -453,36 +460,108 @@ namespace
         return reinterpret_cast<T*>(host + (value - static_cast<uint32_t>(nt->OptionalHeader.ImageBase)));
     }
 
-    // SpeedupBugFix: the handler's eight operands, in its read order, are the
-    // absolute addresses of the floats the replacement body computes. Publishing
-    // them before the install is what keeps the body's writes on the game's own
-    // words; the install only replaces the function's entry.
+    // SpeedupBugFix: the handler's eight operands, in its read order
+    // (`mov eax,[ebx+2Fh]` .. `mov eax,[ebx+129h]`, ebx = match - 21), are the
+    // absolute addresses of the floats the replacement body computes. Each one is
+    // the disp32 field of a `movss` in the timer-init function, so the four bytes
+    // before the field are that instruction's opcode and ModRM. Those bytes are the
+    // per-build evidence that the dword really is one of the timing floats and not
+    // something that happens to sit at the same distance from a coincidental
+    // signature match: they are identical on every image that carries the
+    // signature (tests/signatures.tsv records the recovered values).
+    struct TimingOperand final
+    {
+        ptrdiff_t offset;               // the handler's [ebx+disp], from the site
+        std::array<uint8_t, 4> opcode;  // the instruction bytes that precede it
+        float** slot;
+    };
+
+    constexpr TimingOperand kTimingOperands[] = {
+        { 0x02F, { 0xF3, 0x0F, 0x10, 0x05 }, &zpatch_speedup_t50 },  // movss xmm0,[dword_18CAE9C]
+        { 0x0BA, { 0xF3, 0x0F, 0x11, 0x0D }, &zpatch_speedup_t64 },  // movss [flt_18CAEA0],xmm1
+        { 0x0D1, { 0xF3, 0x0F, 0x11, 0x05 }, &zpatch_speedup_t60 },  // movss [dword_18CAEA4],xmm0
+        { 0x0F7, { 0xF3, 0x0F, 0x11, 0x1D }, &zpatch_speedup_t5c },  // movss [dword_1752078],xmm3
+        { 0x0FF, { 0xF3, 0x0F, 0x11, 0x0D }, &zpatch_speedup_t68 },  // movss [dword_18CAEAC],xmm1
+        { 0x10E, { 0xF3, 0x0F, 0x11, 0x1D }, &zpatch_speedup_t4c },  // movss [dword_18CAEB0],xmm3
+        { 0x11D, { 0xF3, 0x0F, 0x11, 0x15 }, &zpatch_speedup_t54 },  // movss [dword_18CAEA8],xmm2
+        { 0x129, { 0xF3, 0x0F, 0x11, 0x05 }, &zpatch_speedup_t58 },  // movss [dword_1752074],xmm0
+    };
+
+    constexpr size_t kTimingOperandCount = sizeof(kTimingOperands) / sizeof(kTimingOperands[0]);
+
+    // The body writes through all eight pointers, so every one of them has to be a
+    // writable word of the image in use before any of them is published: a
+    // signature that matched a different function would otherwise hand the body a
+    // code address or a constant to store floats into.
+    bool WritableImageWord(uint32_t value)
+    {
+        const auto host = Game::Get().ImageBase();
+        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(host);
+        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(host + dos->e_lfanew);
+        const auto preferred = static_cast<uint32_t>(nt->OptionalHeader.ImageBase);
+        if (value < preferred ||
+            value - preferred > nt->OptionalHeader.SizeOfImage - sizeof(uint32_t))
+            return false;
+
+        const auto rva = value - preferred;
+        const auto* section = IMAGE_FIRST_SECTION(nt);
+        for (WORD index = 0; index < nt->FileHeader.NumberOfSections; ++index, ++section)
+        {
+            if (rva < section->VirtualAddress || rva - section->VirtualAddress >= section->Misc.VirtualSize)
+                continue;
+            return (section->Characteristics & IMAGE_SCN_MEM_WRITE) != 0;
+        }
+        return false;
+    }
+
+    // SpeedupBugFix's site, validated. The original's handler has no build gate --
+    // the loader calls it whenever the key is on (`cmp esi,1; jnz; call
+    // sub_100506B0`) and reads its eight operands at fixed site-relative offsets,
+    // so its row is the same on every build: a hit installs `E9` at match-21 and a
+    // miss is the handler's own `test eax,eax; jz` return. Reproducing that means
+    // reproducing it only where the site is really the timer-init function; the
+    // operand encodings and their writable targets are what say so, and a site that
+    // fails either test is not this build's layout, so nothing is published and
+    // nothing is installed.
+    std::byte* ResolveSpeedupBugFix()
+    {
+        auto pattern = find_pattern("50 64 89 25 00 00 00 00 83 EC 34");
+        if (pattern.empty())
+            return nullptr;
+
+        auto* site = pattern.get_first<std::byte>(-21);
+        uint32_t targets[kTimingOperandCount];
+        for (size_t index = 0; index < kTimingOperandCount; ++index)
+        {
+            const TimingOperand& operand = kTimingOperands[index];
+            const auto* field = site + operand.offset;
+            if (std::memcmp(field - operand.opcode.size(), operand.opcode.data(),
+                    operand.opcode.size()) != 0)
+                return nullptr;
+
+            targets[index] = *reinterpret_cast<const uint32_t*>(field);
+            if (!WritableImageWord(targets[index]))
+                return nullptr;
+        }
+
+        for (size_t index = 0; index < kTimingOperandCount; ++index)
+            *kTimingOperands[index].slot = GameImagePointer<float>(targets[index]);
+        return site;
+    }
+
+    // The publish tier runs before the install tier, so the site resolved there is
+    // the one the install patches; a null one keeps the install off.
+    std::byte* zpatch_speedup_site = nullptr;
+
+    // Publishing the eight floats before the install is what keeps the body's
+    // writes on the game's own words; the install only replaces the function's
+    // entry.
     void PublishSpeedupBugFix()
     {
         if (!Loader::Enabled("SpeedupBugFix"))
             return;
 
-        auto pattern = find_pattern("50 64 89 25 00 00 00 00 83 EC 34");
-        if (pattern.empty())
-            return;
-
-        struct TimingOperand final
-        {
-            ptrdiff_t offset;
-            float** slot;
-        };
-        constexpr TimingOperand kTimingOperands[] = {
-            { 26, &zpatch_speedup_t50 },   // dword_18CAE9C: seconds per tick
-            { 165, &zpatch_speedup_t64 },  // flt_18CAEA0: milliseconds per tick
-            { 188, &zpatch_speedup_t60 },  // dword_18CAEA4: milliseconds * dword_FF2014
-            { 226, &zpatch_speedup_t5c },  // dword_1752078: 1 / milliseconds per tick
-            { 234, &zpatch_speedup_t68 },  // dword_18CAEAC: copy of flt_18CAEA0
-            { 249, &zpatch_speedup_t4c },  // dword_18CAEB0: copy of dword_18CAEA4
-            { 264, &zpatch_speedup_t54 },  // dword_18CAEA8: copy of dword_18CAE9C
-            { 276, &zpatch_speedup_t58 },  // dword_1752074: copy of dword_1752078
-        };
-        for (const TimingOperand& operand : kTimingOperands)
-            *operand.slot = GameImagePointer<float>(*pattern.get_first<uint32_t>(operand.offset));
+        zpatch_speedup_site = ResolveSpeedupBugFix();
     }
 
     void InstallSpeedupBugFix()
@@ -490,10 +569,9 @@ namespace
         if (!Loader::Enabled("SpeedupBugFix"))
             return;
 
-        auto pattern = find_pattern("50 64 89 25 00 00 00 00 83 EC 34");
-        if (!pattern.empty())
-            injector::MakeJMP(pattern.get_first<std::byte>(-21),
-                reinterpret_cast<void*>(&SpeedupBugFixBody), true);
+        if (zpatch_speedup_site != nullptr)
+            injector::MakeJMP(zpatch_speedup_site, reinterpret_cast<void*>(&SpeedupBugFixBody),
+                true);
     }
 }
 

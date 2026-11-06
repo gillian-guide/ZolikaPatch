@@ -570,22 +570,133 @@ lookups:
 | `CopSirensFlag` | `E9` at RVAs `0x4FABE6`, `0x4FEBD3`, `0x646546` | `sub_10006310` 8, `sub_10006330` 8, `sub_100040E0` 9, transcribed |
 | `PopupHeadlightsFlag` | `E9` at `0x653A64`, `EB` at `0x653A6E`, the `fld` operand at `0x653AB6` (our pi/2 float, the baseline's `0xD0000000` placeholder), `E9` at `0x646546` | `sub_10044530` 10, `sub_10044560` 10, `sub_100040E0` 9, transcribed |
 
+#### `SpeedupBugFix`: an ungated handler, so the row differs per build only in where it matches
+
 `SpeedupBugFix` is the one key whose body has **no proof row**: `sub_10050540`
 (109 instructions) is an SEH frame, a /GS cookie, the MSVC thread-safe static
 guard for its one-time clock scan and SSE arithmetic, so it is reimplemented in
 C++ rather than transcribed -- the same call the tree makes for the launcher's
-DFA helpers. The arm publishes the eight absolute float pointers the original
-handler reads from the site's operands (`+26, +165, +188, +226, +234, +249, +264,
-+276`: `dword_18CAE9C`, `flt_18CAEA0`, `dword_18CAEA4`, `dword_1752078` and their
-four copies), rebased through the image's preferred base as every captured game
-pointer is. The arithmetic is the original's: `scale = 1000.0 /
+DFA helpers.
+
+The handler is `sub_100506B0`, reached from the dispatcher at `0x10055A62` and
+**not build-gated** -- the option's value alone decides whether it runs:
+
+```
+push  offset aSpeedupbugfix ; "SpeedupBugFix"   0x10055A23
+call  sub_1005C160                              0x10055A35
+...
+cmp   esi, 1                                    0x10055A5D
+jnz   short loc_10055A67                        0x10055A60
+call  sub_100506B0                              0x10055A62
+```
+
+So its row is the same on every build. The handler scans, and on a hit it reads
+the eight operands at fixed **site-relative** displacements before overwriting
+the site; a miss is its own `test eax,eax; jz` return, with no write at all:
+
+```
+mov   ecx, offset "50 64 89 25 00 00 00 00 83 EC 34"   0x100506CD
+call  sub_10003830                                     0x100506D2
+test  eax, eax                                         0x100506D7
+jz    loc_1005077D                                     0x100506D9
+lea   ebx, [eax-15h]      ; site = match - 21          0x100506DF
+mov   eax, [ebx+2Fh]      ; -> dword_10159350          0x100506E8
+mov   eax, [ebx+0BAh]     ; -> dword_10159364          0x100506F0
+mov   eax, [ebx+0D1h]     ; -> dword_10159360          0x100506FB
+mov   eax, [ebx+0F7h]     ; -> dword_1015935C          0x10050706
+mov   eax, [ebx+0FFh]     ; -> dword_10159368          0x10050711
+mov   eax, [ebx+10Eh]     ; -> dword_1015934C          0x1005071C
+mov   eax, [ebx+11Dh]     ; -> dword_10159354          0x10050727
+mov   eax, [ebx+129h]     ; -> dword_10159358          0x10050732
+mov   byte ptr [ebx], 0E9h                             0x1005074B
+mov   [esi], eax          ; esi = ebx+1, eax = sub_10050540-ebx-5   0x1005076F
+```
+
+**How the eight pointers are obtained on each build: from the matched site's own
+operands, at fixed displacements.** Not from a per-build table, not scanned
+separately, not computed. Each displacement is the disp32 field of one `movss`
+in the game's timer-init function, so the four bytes before the field are that
+instruction's opcode and ModRM -- and those bytes are identical on every image
+that carries the signature:
+
+| `[ebx+disp]` | 1.0.8.0 slot | 1.0.8.0 instruction |
+|---|---|---|
+| `+0x02F` | `dword_10159350` | `0x4571DB` `F3 0F 10 05` `movss xmm0,dword ptr [0x18CAE9C]` |
+| `+0x0BA` | `dword_10159364` | `0x457266` `F3 0F 11 0D` `movss dword ptr [0x18CAEA0],xmm1` |
+| `+0x0D1` | `dword_10159360` | `0x45727D` `F3 0F 11 05` `movss dword ptr [0x18CAEA4],xmm0` |
+| `+0x0F7` | `dword_1015935C` | `0x4572A3` `F3 0F 11 1D` `movss dword ptr [0x1752078],xmm3` |
+| `+0x0FF` | `dword_10159368` | `0x4572AB` `F3 0F 11 0D` `movss dword ptr [0x18CAEAC],xmm1` |
+| `+0x10E` | `dword_1015934C` | `0x4572BA` `F3 0F 11 1D` `movss dword ptr [0x18CAEB0],xmm3` |
+| `+0x11D` | `dword_10159354` | `0x4572C9` `F3 0F 11 15` `movss dword ptr [0x18CAEA8],xmm2` |
+| `+0x129` | `dword_10159358` | `0x4572D5` `F3 0F 11 05` `movss dword ptr [0x1752074],xmm0` |
+
+**The sites, per build** (byte scan of every image in `game_refs`; the arm jumps
+to `match - 21`):
+
+| build | version | match | site | the eight operands |
+|---|---|---|---|---|
+| 1 | 1.0.0.0 | **no hit** | -- | the handler returns at `test eax,eax; jz` |
+| 5 | 1.0.4.0 | `0x4544C5` | `0x4544B0` | all eight, same encodings, writable `.data` |
+| 6 | 1.0.0.4 | `0x457395` | `0x457380` | same |
+| 7 | 1.0.6.0 | `0x5AFBF5` | `0x5AFBE0` | same |
+| 8 | 1.0.7.0 | `0x5AFDD5` | `0x5AFDC0` | same |
+| 9 | 1.0.8.0 | `0x4571C5` | `0x4571B0` | same |
+| 11 | 1.1.1.0 | `0x454BC5` | `0x454BB0` | same |
+| 12 | 1.1.2.0 | `0x454C05` | `0x454BF0` | same |
+| 13 | 1.1.3.0 | `0x5AD565` | `0x5AD550` | same |
+
+On every one of those sites `match - 21` is `55 8B EC 6A FF` (`push ebp; mov
+ebp,esp; push -1`, the SEH prologue), the eight operand encodings are the table
+above, and every target is a writable `.data` word. 1.0.0.0 is the original's own
+clean skip. The three builds with **no image** in `game_refs` -- 1.0.6.1 (15),
+1.1.0.0 (10) and 1.2.0.43 (18) -- are *unverified*, not verified: neither this
+tree nor the IDB says where their signature matches or whether their timer-init
+function has the same layout.
+
+The body reads its clock through its own one-time scan
+(`1B D9 89 5C 24 24 0F 88`) and calls `match - 51`:
+
+```
+mov  ecx, dword_101A849C                                0x10050683
+add  ecx, 0FFFFFFCDh                                    0x10050689
+call ecx                                                0x1005068C
+mov  [esi], eax / mov [esi+4], edx                      0x1005068E / 0x10050692
+```
+
+That pattern also hits once on every image above, and `match - 51` is the clock
+function's own `55 8B EC 83 E4 F8` prologue on all nine (`0x456F60` on 1.0.8.0).
+The arithmetic is the original's: `scale = 1000.0 /
 QueryPerformanceFrequency`, then `(float)scale`, `(float)(scale * 1000.0)`,
 `(float)(scale * 0.0010000000474974513)` and
 `(float)(0.0010000000474974513 / scale)` written to the four pairs, then the
-game's own clock function -- found by the original's one-time scan
-`1B D9 89 5C 24 24 0F 88`, game `0x456F93` -- called at `match - 51` and its
-64-bit result stored in `*self`. A missing scan leaves the slot zero, so the call
+64-bit stamp stored in `*self`. A missing scan leaves the slot zero, so the call
 faults on `0xFFFFFFCD` exactly where the original's does.
+
+**What this tree does.** `ResolveSpeedupBugFix` (`source/misc.ixx`) scans the same
+signature and then validates the site *before it publishes anything*: for each of
+the eight operands the four bytes before the field must be the recovered encoding
+and the dword must be a writable word of the image in use. Only when all eight
+pass are they published, and only a resolved site is installed -- a site that
+fails either test publishes nothing and installs nothing. On every image that
+carries the signature all eight pass, so the published pointers and the `E9` are
+the original's row, and the per-key cell is byte-identical to the pre-guard dump
+on all nine images (build 9: 4 bytes, the `E9` at `0x571B0` plus three canonical
+displacement bytes; the second displacement byte is already the prologue's `8B`).
+The guard is measured, not asserted: with the first operand's `F3` replaced by
+`F4`, or its dword replaced by `0x10003E50` (a module-coordinate address), the
+same run writes **0 bytes** -- a clean skip instead of a store through a value
+that is not a timing float.
+
+**The one divergence this records.** On an image where the 11-byte sequence
+matched some *other* function, the original would still publish the eight dwords
+and install, and the rebuilt body would then store floats through them -- the
+fault a guard-free port inherits. This tree skips instead. No image in
+`game_refs` has such a site (all eight matches are the timer-init function), so
+the divergence is unreachable with the images that can be tested; the rule
+applied on an inapplicable build is the original's own clean-skip path, not a
+fault we introduce. `tests/signatures.tsv` records the per-build sites, the eight
+displacements and their encodings.
+
 
 `Patch4RemoveModChecks` and `RemoveGFWLUpdatePopup` are the two flags of the
 original's one shared handler (the stub `sub_100054E0` plus the helper
@@ -1446,3 +1557,18 @@ run after it. That is the fault being faithful, not the tree being broken; the
 reference tree guards it, which is why its baseline carries only the first pair.
 Guarding it here to make a tool happy would be the fault-avoidance divergence the
 policy forbids.
+
+`tools/single_key_matrix.py` measures the fault as a recorded outcome instead of
+an abort. It writes every catalogue key `0` and exactly one key `1`, one
+subprocess per key, and prints the exit code of every key on every image (9 builds
+x 99 keys); the 1.0.0.0 `NoImpostorHeightCutoff` cell prints
+`AV [expected, preserved original fault]` and every other cell prints `ok`.
+
+That shape matters for attribution. A one-line INI
+(`[Options]\nSpeedupBugFix=1`) is **not** a single-key document: every key it
+omits keeps its default, and most defaults are `1`, so such a run executes almost
+the whole catalogue. The 1.0.0.0 fault above therefore surfaces from a
+"SpeedupBugFix only" INI without SpeedupBugFix being involved at all --
+`SpeedupBugFix`'s own signature has no hit on 1.0.0.0, so that arm is the
+original's clean skip there. Only the explicit all-`0` document isolates a key.
+
