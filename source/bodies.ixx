@@ -74,6 +74,45 @@ export namespace Bodies
         return PublishedImageRegistry();
     }
 
+    // The tables a transcribed body reads through an indexed absolute operand
+    // (`push ds:off_100DE770[esi*4]`, `movss xmm0, ds:[esi*4+0x1015B5C0]`). The
+    // original keeps such a table in its own .data, at a VA this module cannot
+    // place its copy at, so the offline proof compared the displacement literally
+    // and such a body could never pass. Registering the table names it: the call
+    // here is mirrored by a `table` row in tests/bodies.tsv (the offline
+    // projection - a 32-bit module's runtime vector is not readable from the file,
+    // and the linker map is the only offline symbol-to-address bridge), and
+    // tools/verify_bodies.py resolves the operand through that row, comparing
+    // `table:<content hash>` instead of the address. The question it then answers is
+    // the one that matters - "does the body read the same table?" - and not "does
+    // the table sit at the same VA?".
+    //
+    // `bytes` is the table's length in the original ASI, and the hash covers
+    // exactly those bytes. A table that is not registered keeps the literal
+    // comparison, so nothing is relaxed by accident.
+    struct Table
+    {
+        uintptr_t address;   // where the table lives in this process
+        uint32_t reference;  // the VA it has in the original ASI
+        size_t bytes;        // its length there
+    };
+
+    inline std::vector<Table>& TableRegistry()
+    {
+        static std::vector<Table> tables;
+        return tables;
+    }
+
+    inline void RegisterTable(uintptr_t ourTable, uint32_t originalVa, size_t bytes)
+    {
+        TableRegistry().push_back({ ourTable, originalVa, bytes });
+    }
+
+    inline std::span<const Table> Tables()
+    {
+        return TableRegistry();
+    }
+
     inline std::span<const Entry> All()
     {
         return Registry();

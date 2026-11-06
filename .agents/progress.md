@@ -836,3 +836,54 @@ close-handle.
 
 **Open, not mine to edit.** `readable-fusion/AGENTS.md` line 11 still says "125 hook
 bodies transcribed"; it is 131 now. That file belongs to the keeper.
+
+## 2026-11-06 - the table registry: the first class-A piece transcribed
+
+`source/bodies.ixx` gained a table registry beside the body one:
+`Bodies::RegisterTable(uintptr_t ourTable, uint32_t originalVa, size_t bytes)` and
+`Bodies::Tables()`. `tools/verify_bodies.py` gained the matching resolution: an
+operand with an index and no base register, whose displacement is exactly a
+registered table on that side, is compared as `[<index>*<scale>+table:<content
+hash>]` instead of as a displacement. The index and scale are still compared, an
+unregistered displacement keeps the literal comparison, and a table that resolves on
+both sides with different contents fails as `table contents differ` (not as an
+instruction difference). The hash covers the registered length; a 4-byte word that
+addresses the image is replaced by the bytes it names, so a pointer table compares
+its strings, not its two string-pool layouts.
+
+The registration's offline projection is a `table <VA> <symbol> <bytes>` row in
+`tests/bodies.tsv`: a 32-bit module's runtime vector is not in the file, and the
+linker map is the only offline symbol-to-address bridge. `--selftest` gained four
+table cases (registered PASS, changed contents FAIL, operand moved to another
+registered table FAIL, unregistered operand FAIL literally).
+
+The piece: `0x10003F00`, the model-name lookup (21 instructions, 62 bytes), row
+`bpm_model_name`. The body keeps the original's absolute indexed operand shape and
+the 10-byte `66 66 0F 1F 84 00 00 00 00 00` loop padding; 17 of 21 instructions are
+byte-identical, the four differences are two table displacements, the resolver
+`call` (a forwarder) and the `mov eax, offset` of our `**UNKNOWN**` literal. The
+C++ rebuild (`BpmModelName`) is gone and `BpmCheckBody` now calls the transcribed
+body. The arm registers the table next to its `Bodies::Register` calls; both sides
+of the proof hash to `57ad8796b1b2652c` although their entries point at
+`0x100651e0` and `0x10117bdc`.
+
+**Gates (final runs).** `cmake --build --preset release` exit 0 (Trace also builds);
+`ctest --preset release` 12/12; `python tools/parity_report.py 9` ->
+`build 9: 98 key(s) closed, 0 open, 1 oracle-verified (baseline incomplete)`;
+`python tools/verify_bodies.py ...` -> `132 body(ies), 0 failure(s)` with
+`PASS bpm_model_name (21 instruction(s), 0 absolute operand(s), 2 table operand(s))`;
+`zp_dump --ooc-selftest` -> `ooc selftest: PASS`; `.scratch/branch_targets.py` ->
+`132 row(s), 208 internal branch target(s), 0 failure(s)`.
+
+**Docs.** `docs/rebuilt.md`: §1's operand table and class A rewritten around the
+registry, new §2b (the piece, the mechanism, the hash, the recipe for the remaining
+class-A pieces), §3 class A loses the model-name row, §4 item 3 rewritten, §5 item 2
+extended, §6 counts 131 -> 132 and the table rows. `docs/parity.md`: 131 -> 132
+bodies, the `BadPlayerModelCrashFix` section rewritten (the name table is no longer
+a rebuild), "Transcribing a body" gains the table registration as its fifth part, the
+call-target list names `BpmModelNameBody`.
+
+**Open, not mine to edit.** `readable-fusion/AGENTS.md` line 11 still says "131 hook
+bodies transcribed"; it is 132 now. `docs/review.md` still lists the DLC discovery,
+the model-name lookup and the bounded formatter as rebuilt-in-C++; the first two were
+already transcribed before this pass.

@@ -45,9 +45,13 @@ CRLF folding (the original reads in text mode). The shipped INI's longest line i
 ## Rebuilt pieces
 
 Not every body is transcribed. A piece is rebuilt in C++ when its original stream
-cannot be compared under `verify_bodies.py`'s operand-slot rule -- an indexed absolute
-table access, an exception frame, a TLS static-init guard -- or when every call it
-makes lands in another rebuild. [`rebuilt.md`](rebuilt.md) is the catalogue: recovered
+cannot be compared under `verify_bodies.py`'s operand-slot rule -- an exception frame
+or a TLS static-init guard -- or when every call it makes lands in another rebuild.
+An indexed absolute table access used to be on that list and no longer is: the tree
+registers the table (`Bodies::RegisterTable`) and the proof compares the operand's
+table *contents* instead of its displacement, so a body that reads a registered table
+is transcribed like any other (`rebuilt.md` §1 and §2b; the model-name lookup
+`0x10003F00` is the first). [`rebuilt.md`](rebuilt.md) is the catalogue: recovered
 VA and size, the exact instruction pattern that blocks each one, what the rebuild
 reproduces, how that was verified, the residual risk, and the order to check them in
 play. This file stays the record of *behaviour* and *faults*; the rebuild reasons are
@@ -62,7 +66,7 @@ feature key, is closed by the converter recorded in its own section below;
 `HighQualityReflections` closed with the site-arithmetic resolution recorded below.
 
 - **98 of 99 option keys closed**;
-- **131 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **132 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe, and the compiled bodies listed in
   [`rebuilt.md`](rebuilt.md) are rebuilt in C++ instead, with no proof row. That file
@@ -76,7 +80,10 @@ feature key, is closed by the converter recorded in its own section below;
   256-byte sweep window: it compared 64 of 78 and still reported PASS. The tool
   now sweeps 4096 bytes and fails a row that decodes fewer instructions than its
   budget, so a truncated sweep can never pass again. This pass added
-  `NewSavesCompatibility`'s trampoline; the pass before it added the
+  `BadPlayerModelCrashFix`'s model-name lookup (`0x10003F00`, 21 instructions), the
+  first class-A piece transcribed: its table is registered and the proof compares the
+  table's contents (`rebuilt.md` §2b). Before it came
+  `NewSavesCompatibility`'s trampoline; the pass before that added the
   `HighQualityReflections` detour; before that the cutscene body and
   `OutOfCommissionFix`'s two (the branch body at 7 instructions and the mounting
   wrapper at 41; see that key's section), and `ForceCarHeadlightShadows`' hook
@@ -156,8 +163,9 @@ target and the C entry's decorated name is not nameable from inline asm.
 
 The key had been reverted as blocked on that library. Its remaining pieces turned
 out to be transcribable: every call the installed code makes lands on a piece the
-tree already carries or on a piece small enough to transcribe here, and the one
-piece that is not (the name-table walk) is rebuilt with its behaviour intact.
+tree already carries or on a piece small enough to transcribe here, and the last
+piece — the name-table walk — is now the original's instructions too, with its table
+registered.
 
 | piece | VA | instructions | how |
 |---|---:|---:|---|
@@ -166,7 +174,7 @@ piece that is not (the name-table walk) is rebuilt with its behaviour intact.
 | the GTAC.dll "who" call | `0x1005B290` | 61 | transcribed |
 | the GTAC.dll chat print | `0x1005B530` | 45 | transcribed |
 | its one-argument native wrapper | `0x1005B3F0` | 46 | the layer's copy, called through a forwarder |
-| the model-name lookup | `0x10003F00` | 21 | rebuilt: indexed absolute table read (`rebuilt.md` §3 class A) |
+| the model-name lookup | `0x10003F00` | 21 | transcribed, row `bpm_model_name`; the table it walks is registered (`Bodies::RegisterTable`, `0x100DE770`, 153820 bytes) and the proof compares the table's contents (`rebuilt.md` §2b) |
 | the bounded formatter | `0x10001280` (`0x10001240`, `0x10001230`) | 13 + 21 + 2 | transcribed and proven (rows `bpm_format`, `bpm_format_engine`, `bpm_format_options`) |
 
 The arm jumps to the trampoline at the game's model-resolution entry (game
@@ -181,14 +189,18 @@ exist for the same reason `DrivebyFOVFix`'s does: a module interface cannot expo
 a naked function, so the arm fills each slot from the body registry by the piece's
 recovered VA.
 
-**The one rebuild left in this key.** `0x10003F00` walks the original's
-38,455-entry name table and hashes each name with `sub_10003E50`. Its only data
-operand is an *indexed* absolute address (`push dword ptr [esi*4 + 0x100DE770]`),
-which the comparator compares literally, so the loop stays C++: the same table
-order, the same resolver, the same first-match result and the same `"**UNKNOWN**"`
-miss answer. The table is recovered data, not a rebuild: `source/model_names.inc`
-holds the 38,455 names in the table's own order with the extraction recipe and the
-pinned image's SHA-256 in its header. `rebuilt.md` records the residual risk.
+**The name table is no longer a rebuild.** `0x10003F00` walks the original's
+38,455-entry name table and hashes each name with `sub_10003E50`; its two data
+operands are *indexed* absolute addresses (`push dword ptr [esi*4 + 0x100DE770]` and
+`mov eax, dword ptr [esi*4 + 0x100DE770]`), which is exactly the operand the proof
+could not compare. The tree now names the table instead of avoiding it:
+`Bodies::RegisterTable` records the module's copy, the original's VA and the table's
+length, `tests/bodies.tsv` carries the matching `table` row, and the comparator
+canonicalises those two displacements to `table:<content hash>`. The body is the
+original's instruction stream, including the 10-byte loop padding; the table is the
+recovered `source/model_names.inc` in the table's own order, with the extraction
+recipe and the pinned image's SHA-256 in its header. What stays unproven is the
+`call` to the resolver: it goes through a forwarder, like the five beside it.
 
 The formatter used to be the key's second rebuild (`_vsnprintf_s` with `_TRUNCATE`).
 It is now the original's own instructions: the wrapper, the engine call with the
@@ -1321,7 +1333,8 @@ an in-game save load.
 
 ## Transcribing a body
 
-A body-bearing key is committed only when all four parts exist:
+A body-bearing key is committed only when all four parts exist — plus a fifth when the
+body reads a table through an indexed absolute operand:
 
 1. **The body's asm**, transcribed into the owning module's tail, with the recovered
    VA in a comment. A naked function in a module interface unit must be `static` at
@@ -1334,17 +1347,29 @@ A body-bearing key is committed only when all four parts exist:
 4. **The proof row** in `tests/bodies.tsv` — name, recovered VA, symbol resolved from
    the linker map, instruction budget — and `zp_body_proof` must PASS. A body whose
    stream cannot be compared under the proof's operand-slot rule is rebuilt in C++
-   instead, and then has no proof row: an *indexed absolute* table access, an
-   exception frame or a TLS static-init guard. `[rebuilt.md](rebuilt.md)` lists every
-   such piece with its blocking instruction pattern; the steer consumer `sub_10004C70`,
-   `ForceCarHeadlightShadows`' offset check, `SpeedupBugFix`'s body and
-   `OutOfCommissionFix`'s init, archive builder and handler are the current
-   examples. A `/GS` cookie is **not** a blocker: the tree transcribes those. A rebuilt
+   instead, and then has no proof row: an exception frame or a TLS static-init guard.
+   `[rebuilt.md](rebuilt.md)` lists every such piece with its blocking instruction
+   pattern; `SpeedupBugFix`'s body, `OutOfCommissionFix`'s init, archive builder and
+   handler and the steer consumer `sub_10004C70` are the current examples. A `/GS`
+   cookie is **not** a blocker: the tree transcribes those. A rebuilt
    piece whose result is data rather than a side effect can be pinned a second way,
    without the game: `OutOfCommissionFix`'s decode and archive build run from
    `zp_dump --ooc-selftest` and are compared with the fingerprints the recovered
    bytes carry (that key's section). The decode half is now the original's own
    instructions, so that selftest also proves the transcription.
+
+**An indexed absolute table read is no longer a rebuild reason.** If the body reads a
+table through `[table + reg*4]` (or another indexed absolute form), the fifth part is
+the registration, and the body is transcribed with the operand absolute:
+
+5. **The table registration** — `Bodies::RegisterTable(&table, originalVa, sizeof
+   table)` next to the arm's `Bodies::Register` calls, the table's recovered contents
+   in the module in the original's order, and the matching `table <VA> <symbol>
+   <bytes>` row in `tests/bodies.tsv`. The comparator then compares the operand as
+   `table:<content hash>`, so the row proves the body reads the *same table*; a
+   transcription that reads a different registered table fails with
+   `table contents differ`, and a displacement no row names still compares literally.
+   `0x10003F00`'s `bpm_model_name` row is the worked example (`rebuilt.md` §2b).
 
 ## What the scoreboard can and cannot compare
 
@@ -1387,10 +1412,11 @@ call our equivalent helper instead of the original's compiled target:
   nameable from inline asm in another module unit.
 - the `BadPlayerModelCrashFix` bodies call `BpmZeroBlock` (a cdecl forwarder to the
   CRT `memset`), `BpmFormat` (the transcribed `0x10001280`, row `bpm_format`),
-  `BpmModelName` (the rebuilt `0x10003F00`) and five one-instruction `jmp` forwarders
+  `BpmModelNameBody` (the transcribed `0x10003F00`, row `bpm_model_name`, through the
+  `BpmResolverEntry` forwarder) and five one-instruction `jmp` forwarders
   into the layer's pieces. The forwarders are the same shape as `DrivebyResolveEntry`
-  and for the same reason; the formatter is proven and the name lookup is the key's one
-  rebuilt piece (`rebuilt.md` §3 class A);
+  and for the same reason; both the formatter and the name lookup are proven, and the
+  name lookup's table is registered (`rebuilt.md` §2b);
 - `cutscene_chain_b` calls `CutsceneResolveEntry`, the same six-byte forwarder shape
   into the native layer's resolve entry (the original's `E8` to `sub_10003980`), and
   its two epilogues call the CRT's `__security_check_cookie`, which is the function

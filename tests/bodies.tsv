@@ -2,6 +2,12 @@
 # body's exact instruction count. verify_bodies.py resolves the symbol in
 # ZolikaPatch.map and sweeps that many instructions linearly on both sides, so a
 # row is a whole-body proof; a short decode on either side fails the row.
+#
+# Table rows are `table <recovered VA> <candidate symbol> <bytes>`: they name a
+# table an arm registers with Bodies::RegisterTable, so an indexed absolute operand
+# whose displacement is that table is compared as `table:<content hash>` on both
+# sides instead of as a displacement. A displacement no row names keeps the literal
+# comparison (docs/rebuilt.md §1).
 value_resolver 10003E50 ?ValueResolverBody@@YAXXZ 67
 aim_projectile_crash_fix 10005590 ?AimProjectileShim@@YAXXZ 11
 borderless_window_w 10005890 ?BorderlessWindowBodyW@@YAXXZ 39
@@ -91,13 +97,20 @@ driveby_fov_shim 100064B0 ?DrivebyFovShimBody@@YAXXZ 5
 # shared pieces (sub_100038C0/DE40, sub_1005B150, sub_1005B3F0, sub_10003E50,
 # sub_100038E0) are transcribed in source/native.ixx and source/shared.ixx and
 # proved by their own rows above; the payload's fallback calls the layer's copy of
-# sub_1005B3F0 through a forwarder, so there is no second row for it. The
-# model-name lookup (0x10003F00) and the bounded formatter (0x10001280) are
-# rebuilt, so they have no row (docs/parity.md).
+# sub_1005B3F0 through a forwarder, so there is no second row for it.
 bad_player_model_tramp 10037BA0 ?BpmTrampoline@@YAXXZ 16
 bad_player_model_check 10037AC0 ?BpmCheckBody@@YAXXZ 65
 bad_player_model_who 1005B290 ?BpmWhoBody@@YAXXZ 61
 bad_player_model_print 1005B530 ?BpmPrintBody@@YAXXZ 45
+# The model-name lookup (0x10003F00): 21 instructions, two indexed absolute table
+# operands (`push [table + esi*4]`, `mov eax, [table + esi*4]`). The arm registers
+# the 38,455-entry table with Bodies::RegisterTable (0x100DE770, 153820 bytes), so
+# the comparator resolves both operands through the registry and compares the
+# table's contents instead of its displacement. The table row below is the offline
+# projection of that registration: recovered VA, the candidate symbol the linker map
+# resolves, and the registered length. docs/rebuilt.md §2b.
+table 100DE770 ?kBadPlayerModelNames@@3QBQBDB 153820
+bpm_model_name 10003F00 ?BpmModelNameBody@@YAXXZ 21
 # Patch4RemoveModChecks (source/misc.ixx): the shared GFWL/Patch4 stub. Its
 # helper (sub_10005340, 145 instructions) is compiler output and is rebuilt; the
 # same recovered VA is already proven for loading.ixx's RemoveGFWLUpdatePopup arm.

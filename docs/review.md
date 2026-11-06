@@ -83,7 +83,7 @@ single-key matrix: 891 cell(s): 890 exit 0, 1 expected fault (NoImpostorHeightCu
 
 - Rebuilt-in-C++ bodies (no proof row, named in `docs/parity.md`): the steer consumer,
   `SpeedupBugFix`, the misc checkers, the save converter, the ROM service, the DLC
-  discovery, the model-name lookup and the bounded formatter. Each is compiler output,
+  discovery, the two guarded native calls. Each is compiler output,
   and each is documented with the call sequence it reproduces.
 - Published addresses: the mod writes real addresses; the *tools* substitute the
   baseline's placeholder, so the arms carry no knowledge of the harness.

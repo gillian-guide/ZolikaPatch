@@ -4,7 +4,10 @@ Every other piece of this module is **transcribed**: a body is written instructi
 instruction from the original ASI, and `tools/verify_bodies.py` decodes the same
 instruction count on both sides and compares mnemonic, registers, memory shape and
 immediate *class*. That proof is what `tests/bodies.tsv` is for, and it currently
-covers **131 bodies**.
+covers **132 bodies**. A transcribed body whose original stream reads a table through
+an indexed absolute operand is provable too, because the tree registers the table and
+the comparator compares its *contents*: §1 and §2b describe that, and the model-name
+lookup (`0x10003F00`) is the first piece transcribed that way.
 
 This file is about the pieces that are **not** in that file. They are rebuilt in C++
 because their original instruction stream cannot be compared under the proof's rules,
@@ -21,16 +24,16 @@ The catalogue of preserved faults and per-key behaviour stays in
 
 The comparator (`tools/verify_bodies.py::summarise`) reduces each instruction to
 
-    mnemonic  reg:<name>…  imm  [base+index*scale+disp]  abs
+    mnemonic  reg:<name>…  imm  [base+index*scale+disp]  abs  [index*scale+table:<hash>]
 
-with three consequences that decide every case below:
+with four consequences that decide every case below:
 
 | operand form | compared as | consequence |
 |---|---|---|
 | register, or `[ebp+disp]` / `[esp+disp]` / `[reg+disp]` | the displacement **literally** | a transcription must use the same frame offsets, which it does because it writes the same instructions |
 | memory with **no base and no index** (`[0x1015AD94]`) | `abs` — a slot | the module may point it at its own global or slot |
 | `call`/`jmp`/`push` immediate | `imm` — a slot | the module may name its own function or literal |
-| memory **with an index and no base** (`[esi*4 + 0x1015A538]`) | the displacement **literally** | the module cannot match it: the table lives at the original's VA inside the original ASI |
+| memory **with an index and no base** (`[esi*4 + 0x1015A538]`) | the displacement **literally**, unless a manifest table row names it | the module cannot match the original's VA; if the table is registered the displacement becomes `table:<content hash>` and the body is provable (§2b) |
 
 So the blockers are mechanical, and there are exactly four kinds in this tree:
 
@@ -40,6 +43,14 @@ So the blockers are mechanical, and there are exactly four kinds in this tree:
   module cannot place a table at the original's VA, and the comparator compares that
   displacement literally, so the walk cannot be proved — and writing it as
   `[base + reg*4]` would change the instruction shape and fail for a different reason.
+  **This is now solvable per table.** `Bodies::RegisterTable` names a table (its
+  address here, the original's VA and its length) and `tests/bodies.tsv` carries the
+  offline projection of that call as a `table` row; the comparator then canonicalises
+  only that displacement to `table:<content hash>` and compares the two tables'
+  contents. `0x10003F00` is transcribed that way (§2b). A table no row names keeps the
+  literal comparison, so the proof is not relaxed by accident, and a body that reads a
+  *different* registered table fails with `table contents differ` rather than as an
+  instruction difference.
 - **B · exception frame.** A body wrapped in `__try/__except` (`__except_handler4`) or
   in a C++ static-local initialisation (`__CxxFrameHandler3`) is two or three code
   fragments: the registration prologue writes `fs:[0]`, the handler lives in a
@@ -128,7 +139,7 @@ six rows §2a adds bring the current total to 206). That check lives in
 
 1. **Proof rows.** `python tools/verify_bodies.py --original … --candidate … --bodies
    tests/bodies.tsv --map …` → `125 body(ies), 0 failure(s)` for the row set of that
-   pass (131 today), including
+   pass (131 after §2a), including
    `PASS dlc_discovery (223 instruction(s), 23 absolute operand(s))`. The count is the
    body's exact count, so a missing or extra instruction fails the row.
 2. **Byte comparison.** The table above: every difference is an absolute operand or a
@@ -183,7 +194,8 @@ six rows §2a adds bring the current total to 206). That check lives in
    from the body start on both sides (`.scratch/branch_targets.py`, now inside
    `tools/verify_bodies.py`). This is the check that caught the first DLC
    transcription's mis-attached label (§2); it passes for the 125 rows of that pass
-   (154 internal targets) and for the 131 rows of today's set (206).
+   (154 internal targets), for the 131 rows of §2a (206) and for today's 132 rows
+   (208).
 
 **What remains unproven even for these six.** The bodies now execute only on the
 game's own calls, and no offline harness can make the game call them:
@@ -282,6 +294,141 @@ offline (item 5), which is more than any other body here; the DFA forwarders are
 shape-proven — they run when the game opens a file through its DFA layer, and a wrong
 argument order would show as a file-open failure in play, not as a proof failure.
 
+### 2b. This pass: the model-name lookup, and the table registry
+
+The first class-A piece is transcribed. `0x10003F00` is the smallest of the seven
+(62 bytes, 21 instructions) and its blocker is exactly one table: the original ASI's
+38,455-entry `char*` name table at `0x100DE770`, read twice through
+`push ds:[table + esi*4]` and `mov eax, ds:[table + esi*4]`.
+
+| piece | recovered VA | size | insns | row | byte-identical | differs only in |
+|---|---|---:|---:|---|---:|---|
+| model-name lookup | `0x10003F00` | `0x3E` | 21 | `bpm_model_name` | 17/21 | 2 table displacements + 1 `call` immediate + 1 `mov eax, offset` immediate |
+
+**The registry.** `source/bodies.ixx` gained a second registry beside the body one:
+
+```cpp
+struct Table { uintptr_t address; uint32_t reference; size_t bytes; };
+void RegisterTable(uintptr_t ourTable, uint32_t originalVa, size_t bytes);
+std::span<const Table> Tables();
+```
+
+`address` is where the table lives in this process, `reference` the VA it has in the
+original ASI, `bytes` its length there. The arm that owns the table registers it at
+startup next to its `Bodies::Register` calls; `BadPlayerModelCrashFix` does, because
+the lookup is its piece:
+
+```cpp
+Bodies::RegisterTable(reinterpret_cast<uintptr_t>(kBadPlayerModelNames),
+    0x100DE770u, sizeof(kBadPlayerModelNames));   // 38455 * 4 = 153820
+```
+
+The body keeps the original's operand shape — `push DWORD PTR [kBadPlayerModelNames +
+esi*4]`, `mov eax, DWORD PTR [kBadPlayerModelNames + esi*4]` — so the instruction
+stream is the original's, including the 10-byte `66 66 0F 1F 84 00 00 00 00 00` loop
+padding (emitted as bytes: the inline assembler's `nop` is one byte, and the body's
+internal branch targets are compared by offset).
+
+**The offline projection.** A 32-bit module's runtime registry is a vector in the
+candidate's memory; the proof is an offline file comparison, and the only offline
+bridge from a symbol to its address is the linker map. So the registration has a
+manifest twin — `tests/bodies.tsv`:
+
+```
+table 100DE770 ?kBadPlayerModelNames@@3QBQBDB 153820
+```
+
+recovered VA, the candidate symbol the map resolves, the registered length. It is the
+same three facts as the `RegisterTable` call; the comparator reads the row, resolves
+the symbol to this module's own copy, and never needs the runtime vector.
+
+**What the comparator does with it.** `summarise()` takes the table registry for its
+side of the comparison. An operand that has an index and **no base register** is an
+indexed absolute; if its displacement is exactly a registered VA on that side, the
+displacement becomes `table:<content hash>` and the index register and scale are still
+compared (reading the same table through a different register still fails). A
+displacement that is not registered keeps today's literal comparison. When the two
+sides differ, `table_mismatch()` names the finding:
+
+- both sides resolve, hashes differ → `FAIL … (table contents differ: 0x100de770
+  (57ad8796b1b2652c) against 0x100de770 (3d5b51a4a421d49c))`
+- one side resolves → `table 0x… is registered on the original side only`
+
+**What the content hash covers, and why it is not the raw bytes.** The hash is over
+exactly the registered length, but a 4-byte word that addresses that side's image is
+replaced by the bytes it names (a C string, NUL included). The name table is an array
+of pointers: hashing the pointer values would compare the two images' string-pool
+layouts, which is the same mistake as comparing the table's address. Hashing the
+pointed-to strings compares the table's *contents* — the names, in the table's order.
+Every other word is hashed as it stands, so a table of hashes, floats or ints (the
+512-slot model tables) compares by value. The two sides here hash to the same
+`57ad8796b1b2652c` although their entries point at `0x100651e0` and `0x10117bdc`
+respectively — that equality is the proof that all 38,455 names are present, in order.
+
+**How this pass was verified**
+
+1. **Proof row.** `PASS bpm_model_name (21 instruction(s), 0 absolute operand(s), 2
+   table operand(s))`, and `python tools/verify_bodies.py …` →
+   `132 body(ies), 0 failure(s)`.
+2. **Byte comparison.** 17 of 21 instructions are byte-identical and the body is 62
+   bytes on both sides, so every instruction sits at the same relative offset; the four
+   differences are the two table displacements, the resolver `call` (which lands on a
+   six-byte `jmp` forwarder, because a module interface cannot export a naked function)
+   and the `mov eax, offset` of the module's own `"**UNKNOWN**"` literal.
+3. **The table is checked, not assumed.** The candidate table's content hash equals the
+   original's (above), over the full registered length. The names themselves are the
+   recovered `source/model_names.inc`; the array is `static_assert`ed to 38,455 entries,
+   and `.scratch/table_contents.py` compares every include name with the string the
+   original's entry points at (`38455 name(s), 0 mismatch(es)`).
+4. **The comparator proves its own mechanism.** `--selftest` gained four table cases:
+   registered and identical → PASS; one name byte changed → FAIL as
+   `table contents differ`; the body's operand moved to a *different* registered table
+   → FAIL as a content difference (not an instruction one); and the same moved operand
+   with nothing registered → FAIL literally, which is the opt-in guarantee. The
+   selftest's full verdict is quoted in §6.
+5. **The branch targets.** The body has two internal branches; `132 row(s), 208
+   internal branch target(s), 0 failure(s)`.
+6. **The surrounding behaviour is unchanged.** `ctest --preset release` is 12/12,
+   `python tools/parity_report.py 9` is `98 key(s) closed, 0 open, 1 oracle-verified`,
+   and `zp_dump --ooc-selftest` still passes.
+
+**What is proven and what is not.** The body's instructions and its table are proven;
+the *call* is not — it goes through `BpmResolverEntry`, a six-byte `jmp` through
+`zpatch_bpm_resolver`, because `ValueResolverBody` is `static` in `source/shared.ixx`
+and cannot be named from another unit's inline asm. That is the same
+call-as-immediate gap as every other forwarded call in the tree (`parity.md`
+lists them). The lookup itself only runs on a BadPlayerModel miss with GTAC.dll
+loaded, so in play the diagnostic's text is the observable.
+
+**The recipe for the remaining class-A pieces.** For each one:
+
+1. Transcribe the body with the table operand absolute (`[table + reg*4]`), keeping
+   every instruction's size — the branch check compares offsets.
+2. Recover the table's contents (or reuse the arm's published copy), put them in the
+   module in the original's order, and `static_assert` the entry count.
+3. `Bodies::RegisterTable(&table, originalVa, sizeof table)` next to the arm's
+   `Bodies::Register` calls, and add the `table` row to `tests/bodies.tsv` with the
+   symbol the map resolves.
+4. Add the body row with the exact instruction count, remove the C++ rebuild, and run
+   the proof. A content mismatch is reported as `table contents differ`, which means
+   the table, not the body, is wrong.
+
+Two caveats for the next piece. The registry resolves only operands with **no base
+register**; the copsirens checkers read `push ds:[edi+0x10159380]` and
+`cmp ds:[edi+0x10159380],0`, which is an absolute *with* a base and no index, and needs
+the same canonicalisation extended deliberately (a base register plus a registered
+displacement) — that is a separate, narrow change, not a relaxation of this one. And a
+table whose entries are pointers needs the pointer-dereference hash above; a table of
+plain 4-byte values compares by value already.
+
+The headlight-cone check (`0x1001AD20`, class A) is the next piece the current rule
+covers — `[esi*4+0x1015ADBC]` and `[esi*4+0x1015B5C0]` are both indexed absolutes with
+no base — but it carries a *behavioural* caveat the registry does not solve: its walk
+reads one word past the 512-entry hash table, into whatever `.data` follows it in the
+original. A transcription reads our array, so the word after it has to be the
+original's next word for that pathological case to match; the registered length covers
+the table, not its neighbour.
+
 ---
 
 ## 3. Every piece that is still rebuilt
@@ -294,9 +441,13 @@ is IDA's function size.
 
 ### Class A — indexed absolute table operand
 
+The model-name lookup (`0x10003F00`) has left this class: it is transcribed, its table
+is registered and its operand is compared by content (§2b). What remains is the same
+mechanical blocker on tables that are not yet registered, or whose operand carries a
+base register (`[edi+0x10159380]`, which the current registry rule does not cover).
+
 | piece | VA | bytes | insns | the operand that blocks it | what the rebuild reproduces | how that was verified | residual risk |
 |---|---|---:|---:|---|---|---|---|
-| model-name lookup | `0x10003F00` | `0x3E` | 21 | `push ds:off_100DE770[esi*4]` (`0x10003F10`) and `mov eax, ds:off_100DE770[esi*4]` (`0x10003F34`) — the 38,455-entry name table in the ASI's `.data` | walk index 0 → 0x9637, hash each name with the transcribed resolver `0x10003E50`, answer the first match or `"**UNKNOWN**"`; the table order is the recovered `source/model_names.inc` | the table and the loop are exercised by `zp_model_tables` (the shipped INI's 78 offset rows resolve through the same resolver); the *lookup* itself only runs on a BadPlayerModel miss | a name in the table that the original would answer but the rebuild skips (or the reverse) would change only the diagnostic text; low impact |
 | steer/render consumer | `0x10004C70` | `0x53F` | 320 | `mov eax, ds:[esi*4+0x1015A538]` (`0x10004CD0`) and `movss xmm0, ds:[esi*4+0x10159D38]` (`0x10004E00`) — the wheelangle model/angle tables | the five keys behind it: steer lock → wheel angle, steering-wheel bone transform, engine-block shake, plane parts, plus the `GarageModelFix`/`NoLiveryLimit` call paths. Every game entry is a published slot, every constant a `.rdata` qword; the rebuild keeps the statement order, the state words and the unguarded reads | the five keys' per-option cells are byte-identical to their baselines on all nine images (`parity_report`, `dump_matrix`); the tables it walks are the ones the transcribed IDE hook fills (`zp_model_tables`) | **highest in this class**: it runs on every frame the player drives, and a wrong wheel-angle index or unit conversion would show as a wrong-looking steering wheel, not a crash; nothing offline pins its arithmetic |
 | copsirens checker, first siren | `0x10005F70` | `0x2EE` | 191 | `push ds:[edi+0x10159380]` (`0x100061FA`), `cmp ds:[edi+0x10159380],0` (`0x1000622B`) | 14 hard-coded model names hashed in order, each looked up through `dword_10159C0C`; the tunable list walked slot by slot; `dword_10159B80` set to 1 on the first hit | `CopSirensFlag`'s cell is closed on every image; the hook sites it shares with the IDE hook are transcribed | moderate: a miss leaves siren flags off (cosmetic) or on (cosmetic), it does not fault |
 | copsirens checker, second siren | `0x10006260` | `0xAE` | 53 | `push ds:[esi+0x10159380]` (`0x100062BC`), `cmp ds:[esi+0x10159380],0` (`0x100062DB`) | `"police2"` always matches (that is the key), then the same list walk; `dword_10159378` is the result the other checker reads | as above | low |
@@ -351,19 +502,22 @@ the registrar alone would prove nothing about the service.
    entry above changes from "blocked" to "proven caller, rebuilt callees".
 2. **NMS arena methods** (`0x10038360`/`0x10038430`/`0x100385A0`). Transcribable in
    shape; only worth it together with the CRT allocator helpers they call.
-3. **The comparator, and why not to relax it.** Six class-A pieces would become
-   transcribable if `summarise()` treated an indexed absolute displacement as a slot
-   too. That is a one-line change and it is **not** made here, deliberately: it would
-   stop the proof distinguishing `[esi*4+0x1015A538]` from `[esi*4+0x10159D38]`, i.e. a
-   transcription could read the wrong table and still pass. The class-A rebuilds are
-   the price of keeping table identity inside the proof. If it is ever wanted, the
-   honest form is a per-row opt-in flag ("this displacement is a slot") in
-   `tests/bodies.tsv`, not a global relaxation.
+3. **The comparator, and how far to extend it.** The global relaxation is still
+   **not** made, deliberately: treating every indexed absolute displacement as a slot
+   would stop the proof distinguishing `[esi*4+0x1015A538]` from `[esi*4+0x10159D38]`,
+   i.e. a transcription could read the wrong table and still pass. What replaced it is
+   the per-table opt-in §2b describes: `Bodies::RegisterTable` plus a `table` row in
+   `tests/bodies.tsv`. A table that is not named still compares literally, and two
+   registered tables with different contents fail as `table contents differ`. The next
+   step for class A is to extend the resolution to operands that carry a **base**
+   register and no index (`[edi+0x10159380]`, the copsirens checkers): same rule, same
+   content hash, but the base register has to keep being compared and the extension has
+   to be made deliberately, not folded into the current one.
 4. **The internal-branch-target check** (the previous revision's item 1) is **done**:
    it is `tools/verify_bodies.py::internal_branch_mismatch`, it runs on every row, and
    it is what §2a's six transcriptions were proved with. `.scratch/branch_targets.py`
-   stays as the independent reference implementation; the two agree at
-   `131 row(s), 206 internal branch target(s), 0 failure(s)`.
+   stays as the independent reference implementation (it skips the `table` rows); the
+   two agree at `132 row(s), 208 internal branch target(s), 0 failure(s)`.
 
 ---
 
@@ -384,6 +538,10 @@ deliberately after any change to the modules above.
    that has not resolved — the audio wrappers, `DrivebyFOVFix`, `BadPlayerModelCrashFix`
    on a non-ped model. What to look for: a clean no-op (original: answered 0), not a
    crash; and the reverse — a genuine game fault must still crash in the same place.
+   With GTAC.dll loaded, the same path prints the diagnostic, whose model name now comes
+   from the transcribed `0x10003F00` walking the registered table (§2b): a wrong name in
+   that text is the visible symptom of a bad table, and the proof already compares the
+   table's contents.
 3. **`0x10004C70`, the steer/render consumer** (class A, runs every frame). Exercise:
    drive a car with `MovingSteeringWheelSupport`, then a plane with
    `MovingPlaneParts`, then a car with `ShakingEngineBlock`. What to look for: the
@@ -417,18 +575,33 @@ deliberately after any change to the modules above.
 
 ## 6. Where the numbers live
 
-- `tests/bodies.tsv` — the 131 proof rows; a row's count is the body's exact
-  instruction count, so it cannot silently shrink.
+- `tests/bodies.tsv` — the 132 proof rows; a row's count is the body's exact
+  instruction count, so it cannot silently shrink. Its `table` rows are the offline
+  projection of the arms' `Bodies::RegisterTable` calls (recovered VA, candidate
+  symbol, registered length), one per table a transcribed body reads.
 - `tools/verify_bodies.py` — the comparator, including the internal-branch-target
-  check; `--selftest` proves it against the original and against a one-byte
-  corruption and a moved branch target.
-- `.scratch/byte_compare.py` — the byte-level comparison quoted in §2 and §2a
+  check and the table registry (`Tables`, `table_content_hash`, `table_mismatch`);
+  `--selftest` proves it against the original, against a one-byte corruption, against a
+  moved branch target, and against the four table cases (registered → PASS, changed
+  contents → FAIL as a content difference, operand moved to another registered table →
+  FAIL as a content difference, unregistered operand → FAIL literally). Its verdict:
+  `selftest: identical PASS, corrupted opcode FAIL, moved branch target FAIL, registered
+  table PASS (2 operands resolved), changed table contents FAIL, moved table operand
+  FAIL, unregistered table operand FAIL`.
+- `.scratch/byte_compare.py` — the byte-level comparison quoted in §2, §2a and §2b
   (absolute operands and `call`/`push` immediates are the only differences, by
   construction). Run it with body names to select rows; with no arguments it prints
-  the six of the first pass.
+  the six of the first pass. It classifies a table displacement as `other`, because it
+  has no registry; §2b's 17/21 is that comparison with the two table displacements read
+  as such.
 - `.scratch/branch_targets.py` — the internal-branch-target check over every row, the
-  independent reference implementation of what `verify_bodies.py` now does.
+  independent reference implementation of what `verify_bodies.py` now does (it skips
+  the `table` rows).
 - `.scratch/resolve_calls.py` — the call/operand-to-symbol check quoted in §2 and §2a
   (what the proof's call-as-immediate rule cannot see).
+- `.scratch/table_contents.py` — the registered table checked on its own (§2b): both
+  sides' content hash over the registered length, the first and last entry of each, and
+  every name in `source/model_names.inc` against the string the original's entry points
+  at. It prints `38455 name(s) in the include, 0 mismatch(es)` and the two hashes above.
 - `docs/parity.md` — per-key behaviour, the preserved faults, and the oracle-verified
   class; its rebuild notes now point here instead of repeating the reasons.

@@ -25,7 +25,10 @@ import shared;
 // against the original ASI's own 38,455-entry name table (0x100DE770) and prints
 // the matching name, so the names are behaviour. The list is recovered data in the
 // table's own order; source/model_names.inc carries the provenance and the
-// extraction recipe.
+// extraction recipe. The transcribed lookup (BpmModelNameBody, 0x10003F00) reads
+// this array through the original's indexed absolute operand, and the arm registers
+// the array with Bodies::RegisterTable so the whole-body proof compares the table's
+// contents instead of its displacement.
 static const char* const kBadPlayerModelNames[] = {
 #include "model_names.inc"
 };
@@ -487,14 +490,18 @@ static __declspec(naked) void FreezeGunShim()
 // a model that does not exist.
 //
 // Everything the hook runs is transcribed here: the trampoline, the payload, the
-// two native wrappers of its GTAC.dll diagnostic (0x1005B290, 0x1005B530) and the
-// one-argument wrapper its fallback calls (0x1005B3F0). The pieces those wrappers
-// share with the native-call layer stay where they are transcribed, in
-// source/native.ixx and source/shared.ixx, and are reached through the six-byte
-// forwarders below. The bounded formatter (0x10001280 over 0x10001240/0x10001230)
-// is transcribed as well, so one piece here stays rebuilt: the model-name lookup
-// (0x10003F00), whose only data operand is an indexed absolute address, which the
-// whole-body comparator compares literally. docs/rebuilt.md records it.
+// two native wrappers of its GTAC.dll diagnostic (0x1005B290, 0x1005B530), the
+// one-argument wrapper its fallback calls (0x1005B3F0) and the model-name lookup
+// (0x10003F00). The pieces those wrappers share with the native-call layer stay
+// where they are transcribed, in source/native.ixx and source/shared.ixx, and are
+// reached through the six-byte forwarders below. The bounded formatter
+// (0x10001280 over 0x10001240/0x10001230) is transcribed as well.
+//
+// The name lookup is the one piece here with an indexed absolute table operand.
+// It is transcribed rather than rebuilt because the tree's body registry now names
+// such tables (Bodies::RegisterTable): the operand keeps the original's
+// `[table + esi*4]` shape and the proof compares the table's *contents* through
+// the registration instead of its displacement. docs/rebuilt.md §2b records it.
 // ---------------------------------------------------------------------------
 
 // The block zeroing the wrappers open with. The original calls the CRT `memset`
@@ -592,27 +599,6 @@ static __declspec(naked) void BpmFormat()
     }
 }
 
-// sub_10003F00, rebuilt: walk the original's 38,455-name table from index 0,
-// hash each name with the transcribed resolver (sub_10003E50) and answer the
-// first match, or "**UNKNOWN**" on a miss -- exactly the original's loop. It is
-// rebuilt rather than transcribed because its only data operand is an indexed
-// absolute address (`push [esi*4 + 0x100DE770]`): a rebuilt module cannot place
-// its table at that VA, and the whole-body comparator compares such an operand's
-// displacement literally, so the loop is written in C++ instead (docs/rebuilt.md).
-// Every other instruction in it is transcribable; the indexed table read is the
-// whole blocker. The original takes its argument in ECX.
-static const char* __fastcall BpmModelName(uint32_t hash) noexcept
-{
-    const auto resolve =
-        reinterpret_cast<uint32_t(__cdecl*)(const char*)>(Shared::ValueResolver());
-    for (const char* name : kBadPlayerModelNames)
-    {
-        if (resolve(name) == hash)
-            return name;
-    }
-    return zpatch_bpm_unknown;
-}
-
 // The forwarders into the layer's transcribed pieces. A module interface cannot
 // export a naked function and a C entry's decorated name is not nameable from
 // inline asm, so each call names a six-byte `jmp` through a slot the arm fills from
@@ -669,6 +655,66 @@ static __declspec(naked) void BpmResolverEntry()
     __asm
     {
         jmp DWORD PTR [zpatch_bpm_resolver]
+    }
+}
+
+// sub_10003F00, recovered VA 0x10003F00 (62 bytes, 21 instructions): the
+// name-table walk behind the GTAC.dll diagnostic. The hash arrives in ECX; the body
+// scans the original ASI's own 38,455-entry `char*` table (0x100DE770) from index
+// 0, hashes each name with sub_10003E50 and answers the first match, or
+// "**UNKNOWN**" on a miss.
+//
+// The two table operands keep the original's absolute indexed shape
+// (`push [table + esi*4]`, `mov eax, [table + esi*4]`): the table is recovered
+// data (source/model_names.inc, in the table's own order) and this module reads
+// its copy. The whole-body proof resolves such an operand through
+// Bodies::RegisterTable - registered below with the original's VA and length -
+// and compares the table's contents instead of its displacement. Every other
+// instruction is the original's; the body has no frame and no /GS cookie.
+//
+// The 10-byte `nop word ptr [eax+eax+0]` at 0x10003F06 (`66 66 0F 1F 84 00 00 00
+// 00 00`) is the original's loop padding. The inline assembler's `nop` is one byte,
+// and the body's internal branch targets are proved by their offset from the body
+// start, so the original's bytes are emitted.
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void BpmModelNameBody()
+{
+    __asm
+    {
+        push esi
+        push edi
+        mov edi, ecx
+        xor esi, esi
+        __emit 0x66
+        __emit 0x66
+        __emit 0x0F
+        __emit 0x1F
+        __emit 0x84
+        __emit 0x00
+        __emit 0x00
+        __emit 0x00
+        __emit 0x00
+        __emit 0x00
+    bpm_name_walk:
+        push DWORD PTR [kBadPlayerModelNames + esi * 4]
+        call BpmResolverEntry
+        add esp, 4
+        cmp eax, edi
+        jz bpm_name_found
+        inc esi
+        cmp esi, 9637h
+        jb bpm_name_walk
+        pop edi
+        mov eax, OFFSET zpatch_bpm_unknown
+        pop esi
+        ret
+    bpm_name_found:
+        mov eax, DWORD PTR [kBadPlayerModelNames + esi * 4]
+        pop edi
+        pop esi
+        ret
     }
 }
 
@@ -854,7 +900,7 @@ static __declspec(naked) void BpmCheckBody()
         test eax, eax
         je bpm_check_multiplayer
         mov ecx, DWORD PTR [esi + 3Ch]
-        call BpmModelName
+        call BpmModelNameBody
         mov edx, DWORD PTR [zpatch_bpm_obj]
         mov esi, eax
         call BpmWhoBody
@@ -1533,6 +1579,16 @@ namespace
         Bodies::Register(reinterpret_cast<uintptr_t>(&BpmCheckBody), 0x10037AC0u);
         Bodies::Register(reinterpret_cast<uintptr_t>(&BpmWhoBody), 0x1005B290u);
         Bodies::Register(reinterpret_cast<uintptr_t>(&BpmPrintBody), 0x1005B530u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&BpmModelNameBody), 0x10003F00u);
+
+        // The 38,455-entry name table the transcribed lookup reads. Its operand is
+        // the original's `[table + esi*4]`, so the table is named here (the
+        // original's VA and its length in that image) and the offline proof
+        // compares the table's contents through the registration instead of the
+        // displacement. Nothing at run time reads this entry; it is what makes the
+        // operand provable (docs/rebuilt.md).
+        Bodies::RegisterTable(reinterpret_cast<uintptr_t>(kBadPlayerModelNames),
+            0x100DE770u, sizeof(kBadPlayerModelNames));
 
         injector::MakeJMP(pattern.get_first<std::byte>(0),
             reinterpret_cast<void*>(&BpmTrampoline), true);
