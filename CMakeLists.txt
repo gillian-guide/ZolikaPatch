@@ -134,6 +134,19 @@ target_link_libraries(zp_model_tables PRIVATE zp_modules)
 add_test(NAME zp_model_tables COMMAND zp_model_tables)
 set_tests_properties(zp_model_tables PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
+# The save converter's behavioural test: the eighteen-chunk walk and the three patch
+# values it selects, on every real save under game_refs/saves and on synthetic layouts,
+# with the test's own parser as the oracle. Offline: no game image, no ASI load, and the
+# walk it calls patches nothing.
+add_executable(zp_save_walk tests/save_walk.cpp)
+set_target_properties(zp_save_walk PROPERTIES CXX_SCAN_FOR_MODULES ON)
+target_link_libraries(zp_save_walk PRIVATE zp_modules)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/saves)
+  add_test(NAME zp_save_walk
+    COMMAND zp_save_walk ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/saves)
+  set_tests_properties(zp_save_walk PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+endif()
+
 add_executable(zp_dump tests/dump_main.cpp)
 set_target_properties(zp_dump PROPERTIES CXX_SCAN_FOR_MODULES ON)
 target_link_libraries(zp_dump PRIVATE zp_modules)

@@ -1477,6 +1477,52 @@ namespace
     }
 }
 
+// The test-only seam over the converter's walk (tests/save_walk.cpp). It answers what
+// sub_10051B30 decides from the file - the eighteen chunk headers in file order, the
+// three size flags and the three patch values those flags choose - and does nothing
+// else: no site is patched, no hook is installed and the converter's published state
+// is not touched, so calling it cannot change the game image or the module.
+// `NewSavesConvert` runs the same walk (`NewSavesWalkFile`) and the same choice
+// (`NewSavesChoosePatch`), so a test that calls this observes the production decision
+// rather than a copy of it. The shipped ASI never calls it: the conversion happens
+// behind the savegame-load trampoline, which no offline harness can reach.
+//
+// The faults are the original's, unchanged: a chunk size below nine underflows the
+// `operator new` operand and `std::bad_alloc` leaves through this call, and a file
+// shorter than its header leaves the magic test reading the stack buffer's tail.
+export namespace Loading
+{
+    // One 9-byte chunk header: the five-byte tag (which the walk never tests) and the
+    // dword at +5, the chunk's total size.
+    struct SaveWalkChunk
+    {
+        char id[5];
+        uint32_t size;
+    };
+
+    enum class SaveWalkEnd : uint8_t
+    {
+        noFile,    // fopen_s answered non-zero
+        notASave,  // the dword at +0xC is not "SAVE"
+        walked,    // all eighteen chunk headers were read
+    };
+
+    struct SaveWalkDecision
+    {
+        SaveWalkEnd end = SaveWalkEnd::noFile;
+        uint32_t chunkCount = 0;                      // eighteen when walked
+        SaveWalkChunk chunks[kNewSavesChunkCount]{};  // in file order
+        uint8_t forceRead = 0;                        // byte_1015AD98: chunk 9 is 4C45h
+        uint8_t extraBlock = 0;                       // byte_1015AD99: chunk 13 is 1741h
+        uint8_t newChunk16 = 0;                       // byte_1015AD9A: chunk 16 is 0E77h
+        uint8_t branchOpcode = 0;                     // site 872185h: EBh, else 74h
+        uint32_t readSize = 0;                        // site 7D8C50h: 0E6Eh, else 0CBEh
+        uint16_t readBranch = 0;                      // site 7D8C50h: 9090h, else 2675h
+    };
+
+    export SaveWalkDecision WalkSaveFile(const char* path);
+}
+
 // sub_10051A90, recovered VA 0x10051A90 (20 instructions): the read at game
 // 0x7D8C50. It reads into its own 0xE78-byte local - the caller's buffer,
 // `[ebp+8]`, is deliberately left untouched - and answers the read's value; an
@@ -1568,16 +1614,42 @@ static __declspec(naked) void NewSavesSecondLoadHook()
 
 namespace
 {
+    // The three values the patch step writes, chosen from the walk's flags by the two
+    // conditions the original's `cmovne`s test: the branch opcode at 0x872185 from
+    // chunk 9 (`mov ecx,0EBh` / `mov eax,74h` / `cmovnz eax,ecx` / `mov [esi],al`,
+    // 0x10051D35-0x10051D42), and the pushed read size (`mov ecx,0E6Eh` /
+    // `mov eax,0CBEh` / `cmovnz`, 0x10051E3B-0x10051E4A) with the branch in front of
+    // it (`mov ecx,9090h` / `mov eax,2675h` / `cmovnz`, 0x10051E6E-0x10051E7B) from
+    // chunk 16. Both callers of this - the patch step and the test seam - go through
+    // it, so the value a test reads cannot drift from the value that is written.
+    struct NewSavesPatchValues
+    {
+        std::byte branchOpcode;
+        uint32_t readSize;
+        uint16_t readBranch;
+    };
+
+    NewSavesPatchValues NewSavesChoosePatch(uint8_t forceRead, uint8_t newChunk16)
+    {
+        return {
+            forceRead != 0 ? Bytes::ShortJmp : kNewSavesJumpIfZero,
+            newChunk16 != 0 ? kNewSavesReadSizeNew : kNewSavesReadSizeOld,
+            newChunk16 != 0 ? kNewSavesBranchNop : kNewSavesBranchJne,
+        };
+    }
+
     // The three site patches, in the original's order and with its exact writes.
     // A site whose pattern is absent is skipped and the others still run.
     void NewSavesPatchSites()
     {
+        const NewSavesPatchValues values =
+            NewSavesChoosePatch(zpatch_new_saves_force_read, zpatch_new_saves_new_chunk16);
+
         // 0x872185's branch: `jz rel8` unless the save has the newer chunk 9, where
         // it becomes `jmp rel8`, forcing the longer path.
         if (const uintptr_t site = NewSavesBranchSite(); site != 0)
         {
-            injector::WriteMemory<std::byte>(site,
-                zpatch_new_saves_force_read != 0 ? Bytes::ShortJmp : kNewSavesJumpIfZero, true);
+            injector::WriteMemory<std::byte>(site, values.branchOpcode, true);
         }
 
         // 0x7D8C50: `jne +0x26; push 0xCBE; push eax; call LoadData`. The call
@@ -1597,10 +1669,8 @@ namespace
             if (zpatch_new_saves_loaddata == 0)
                 zpatch_new_saves_loaddata = originalTarget;
 
-            injector::WriteMemory<uint32_t>(site + kNewSavesReadSizeOperand,
-                zpatch_new_saves_new_chunk16 != 0 ? kNewSavesReadSizeNew : kNewSavesReadSizeOld, true);
-            injector::WriteMemory<uint16_t>(site + kNewSavesBranchSite,
-                zpatch_new_saves_new_chunk16 != 0 ? kNewSavesBranchNop : kNewSavesBranchJne, true);
+            injector::WriteMemory<uint32_t>(site + kNewSavesReadSizeOperand, values.readSize, true);
+            injector::WriteMemory<uint16_t>(site + kNewSavesBranchSite, values.readBranch, true);
         }
 
         // 0x8DA090: the second LoadData call becomes the plugin's hook, and the
@@ -1627,17 +1697,19 @@ namespace
         }
     }
 
-    // sub_10051B30, recovered VA 0x10051B30: the converter. The call sequence is
-    // the original's, faults included: an unchecked header read, an unchecked
-    // `operator new` per chunk (freed with `free`, exactly as the original mixes
-    // the two), an unchecked payload read, and the patches only after the file is
-    // closed. A chunk whose size is below nine underflows the payload, which makes
-    // the allocation throw, as the original's does.
-    void NewSavesConvert(const std::string& path)
+    // sub_10051B30's first half: open the file, check the header's magic, then walk the
+    // eighteen 9-byte chunk headers. The original's call sequence is kept, faults
+    // included: the header read is unchecked (a short file leaves the buffer's tail as
+    // the stack held it, and the magic test reads it), and `operator new(size - 9)` is
+    // unchecked (a size below nine underflows the operand, which throws).
+    //
+    // What the walk decides lands in `walk`; it touches no module state, so the test
+    // seam can call it without publishing anything.
+    Loading::SaveWalkEnd NewSavesWalkFile(const char* path, Loading::SaveWalkDecision& walk)
     {
         std::FILE* stream = nullptr;
-        if (fopen_s(&stream, path.c_str(), "rb") != 0 || stream == nullptr)
-            return;
+        if (fopen_s(&stream, path, "rb") != 0 || stream == nullptr)
+            return Loading::SaveWalkEnd::noFile;
 
         uint8_t header[kNewSavesHeaderSize];
         (void)std::fread(header, kNewSavesHeaderSize, 1, stream);
@@ -1647,7 +1719,7 @@ namespace
         if (magic != kNewSavesMagic)
         {
             std::fclose(stream);
-            return;
+            return Loading::SaveWalkEnd::notASave;
         }
 
         // One stack header for all eighteen reads: a short read leaves the previous
@@ -1664,22 +1736,49 @@ namespace
             (void)std::fread(payloadBlock, 1, payload, stream);
             std::free(payloadBlock);
 
+            std::memcpy(walk.chunks[index].id, chunkHeader, sizeof(walk.chunks[index].id));
+            walk.chunks[index].size = size;
+            walk.chunkCount = static_cast<uint32_t>(index) + 1;
+
             switch (index)
             {
             case 9:
-                zpatch_new_saves_force_read = size == kNewSavesChunk9Size ? 1 : 0;
+                walk.forceRead = size == kNewSavesChunk9Size ? 1 : 0;
                 break;
             case 13:
-                zpatch_new_saves_extra_block = size == kNewSavesChunk13Size ? 1 : 0;
+                walk.extraBlock = size == kNewSavesChunk13Size ? 1 : 0;
                 break;
             case 16:
-                zpatch_new_saves_new_chunk16 = size == kNewSavesChunk16Size ? 1 : 0;
+                walk.newChunk16 = size == kNewSavesChunk16Size ? 1 : 0;
                 break;
             default:
                 break;
             }
         }
         std::fclose(stream);
+
+        return Loading::SaveWalkEnd::walked;
+    }
+
+    // sub_10051B30, recovered VA 0x10051B30: the converter. The call sequence is
+    // the original's, faults included: an unchecked header read, an unchecked
+    // `operator new` per chunk (freed with `free`, exactly as the original mixes
+    // the two), an unchecked payload read, and the patches only after the file is
+    // closed. A chunk whose size is below nine underflows the payload, which makes
+    // the allocation throw, as the original's does.
+    void NewSavesConvert(const std::string& path)
+    {
+        Loading::SaveWalkDecision walk;
+        if (NewSavesWalkFile(path.c_str(), walk) != Loading::SaveWalkEnd::walked)
+            return;
+
+        // The original stores each flag as it walks its chunk (0x1015AD98/99/9A);
+        // here they become module state once the walk is over, before the patch step
+        // that reads them. A walk that throws leaves them alone, and nothing can read
+        // that difference: the throw leaves the converter.
+        zpatch_new_saves_force_read = walk.forceRead;
+        zpatch_new_saves_extra_block = walk.extraBlock;
+        zpatch_new_saves_new_chunk16 = walk.newChunk16;
 
         NewSavesPatchSites();
     }
@@ -1716,6 +1815,22 @@ namespace
         path += name;
         NewSavesConvert(path);
     }
+}
+
+// The test seam: the walk, plus the three values the patch step would write, which
+// are a pure function of the two flags that decide them. Nothing is patched, no hook
+// is installed, and the converter's published state is untouched.
+Loading::SaveWalkDecision Loading::WalkSaveFile(const char* path)
+{
+    Loading::SaveWalkDecision decision;
+    decision.end = NewSavesWalkFile(path, decision);
+
+    const NewSavesPatchValues values =
+        NewSavesChoosePatch(decision.forceRead, decision.newChunk16);
+    decision.branchOpcode = static_cast<uint8_t>(values.branchOpcode);
+    decision.readSize = values.readSize;
+    decision.readBranch = values.readBranch;
+    return decision;
 }
 
 // sub_100521E0, recovered VA 0x100521E0 (8 instructions): the savegame-load

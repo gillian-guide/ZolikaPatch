@@ -15,6 +15,7 @@ fix.
 | Option catalogue: 99 keys with the shipped value, the absent-key default and the build mask | `source/options.inc` (generated), `zp_tests` |
 | The loader preamble's ten salt words: the shipped `.data` values when its probe hits, the recovered fallback set when it misses | `zp_salt_probe` (1.0.8.0 hit; 1.0.0.0 and 1.0.4.0 miss) |
 | With no arm installed the pipeline changes nothing on any supported image | `zp_dump_empty` (9 images) |
+| The save converter's walk (`sub_10051B30`): `SAVE` at `+0xC`, eighteen 9-byte chunk headers in file order, the three size tests (`4C45`/`1741`/`0E77`) and the three patch values they select (`74`/`EB`, `0CBE`/`0E6E`, `75 26`/`90 90`), on both real saves and on synthetic new/old layouts; a chunk size below nine throws `std::bad_alloc`; a header shorter than `0x110` is not rejected on its header when the file itself carries the magic, and a file shorter than the magic offset is decided by a fresh process's stack | `zp_save_walk` (258 checks; every expected value is recomputed from the file by the test's own parser, not by the converter) |
 | The generated catalogue and INI cannot drift from their sources | `zp_catalogue_drift`, `zp_ini_drift` |
 
 ## Preserved faults
@@ -34,7 +35,7 @@ fix.
 | the cutscene chain faults on an unresolved native or a missed camera site | the game's native resolver answers null (`dword_1015BDE0` unresolved, or the resolver faults and the layer answers zero), or chain B's first scan matched nothing so `dword_1015BDE4` / `dword_1015BDF0` are still zero | `sub_100388C0` reads the resolver's answer unguarded (`mov ecx,[eax+0Eh]`, `0x100388EE`) and writes through the published poke (`dec esi` / `mov byte [esi],1`, `0x10038913`-`0x10038935`); the transcription keeps every hop and both stores unguarded, so it faults at the same instruction on the same condition. All nine stored baselines record both chain B installs, so every supported image matches both patterns; the resolver scan is the native layer's, measured on 1.0.8.0 |
 | the payload init re-runs on every call and leaks its archive | every call of the wrapper the second `E8` installs | the original's one-shot guard `dword_10159C00` is read at `0x1004B77B` and never written anywhere in the image, so `sub_1004B750` decodes, registers and builds again each time, hands the game a fresh archive and never frees the previous one. The rebuild keeps that structure -- no writer, no free -- so the behaviour is the same |
 | the decoded payload is registered and mounted even when its own checks fail | a resource whose decode does not end on `05 FA`, does not fill exactly 179,536 bytes, or does not match its Adler-32 trailer | `sub_1004B570` answers 179,536 or 0 and `sub_1004B750` discards the answer (`call sub_1004B570` at `0x1004B798`, no test of `EAX`), so the partially decoded buffer is registered and archived as it stands. The rebuild discards it the same way. Unreachable with the pinned resource, which passes all three checks |
-| a corrupt save makes the converter throw or check uninitialised bytes | a save whose 9-byte chunk header carries a size below 9, or a file shorter than its header | `sub_10051B30`'s `add eax,0FFFFFFF7h` (`0x10051C14`) feeds `operator new` (`0x100603F1`) unchecked, so the underflowed payload throws `std::bad_alloc` out of the trampoline; a short header read leaves the `cmp dword ptr [eax],45564153h` (`0x10051BD1`) reading the uninitialised stack buffer. The rebuild keeps the same `operator new` / `fread` / `free` sequence and the same unchecked header read, so the same input faults at the same step |
+| a corrupt save makes the converter throw or check uninitialised bytes | a save whose 9-byte chunk header carries a size below 9, or a file shorter than its header | `sub_10051B30`'s `add eax,0FFFFFFF7h` (`0x10051C14`) feeds `operator new` (`0x100603F1`) unchecked, so the underflowed payload throws `std::bad_alloc` out of the trampoline; a short header read leaves the `cmp dword ptr [eax],45564153h` (`0x10051BD1`) reading the uninitialised stack buffer. The rebuild keeps the same `operator new` / `fread` / `free` sequence and the same unchecked header read, so the same input faults at the same step, and `zp_save_walk` asserts both: the size-underflow throw by type, in-process, at chunk 0 and at chunk 9; the short-header case as "not rejected on the header" in-process and as a fresh process's answer for a file shorter than the magic offset |
 | the load trampoline stores an unspecified EAX in the game's frame | every savegame load | the replayed `mov [esp+1E0h],eax` (`0x100521E7`) stores the prepare step's return value although `sub_10051FD0` is `void`. The transcription keeps the instruction, so the slot receives whatever EAX the compiled prepare leaves; the original's receives whatever its own prepare left. Both are unspecified and the game's own store at the site wrote a defined value, so the original already replaces it with an undefined one - the rebuild keeps that fault, and only the undefined value itself differs |
 
 Two of these remain assumptions, not measurements: feather 1.41's non-advancing
@@ -1364,7 +1365,7 @@ when the block is present). Both were C++ rebuilds until they were proven
 | --- | ---: | ---: | --- |
 | load trampoline | `0x100521E0` | 8 | transcribed, row `new_saves_tramp` |
 | prepare step | `0x10051FD0` | 157 | rebuilt: TLS static guards, `std::string`, EH frame (`rebuilt.md` §3 class B) |
-| converter | `0x10051B30` | 337 (IDA's total 363 with the out-of-line EH blocks) | rebuilt: CRT file IO, `operator new`, TLS guards (`rebuilt.md` §3 class B) |
+| converter | `0x10051B30` | 337 (IDA's total 363 with the out-of-line EH blocks) | rebuilt: CRT file IO, `operator new`, TLS guards (`rebuilt.md` §3 class B); its walk, three flags and three patch values are behaviourally proven by `zp_save_walk` (`rebuilt.md` §2i), its writes are not |
 | read hook | `0x10051A90` | 20 | transcribed, row `new_saves_read_hook` |
 | second-load hook | `0x10051AD0` | 33 | transcribed, row `new_saves_second_hook` |
 
@@ -1376,17 +1377,30 @@ branch anchor from 1.0.0.0, 1.0.4.0 and 1.0.0.4, which is why 1.0.0.4.0 writes
 nothing while the older builds still write the jump. The scoreboard cell is the
 five bytes at `0x45B093` (`E9` plus the four displacement bytes the report
 excludes): `missing 0, extra 0, differing 0`, and the other eight stored builds
-keep the key closed too. The converter's walk was replayed against the two real
-saves in `game_refs/saves/GTA IV/savegames/user_ee000000deadc0de` (`SGTA400`,
-`SGTA401`): both carry `SAVE` at `0x0C`, all eighteen `BLOCK` chunk headers parse,
-and chunks 9 / 13 / 16 measure `0x3AB1` / `0x1729` / `0x0CC7` - the older layout, so
-the converter restores the `jz` and the `jne +0x26` and writes `0xCBE`, exactly as
-the original does.
+keep the key closed too.
+
+The converter's walk is no longer replayed by a script: it is `zp_save_walk`
+(`tests/save_walk.cpp`, `rebuilt.md` §2i), 258 assertions. On both real saves in
+`game_refs/saves/GTA IV/savegames/user_ee000000deadc0de` (`SGTA400`, `SGTA401`) the
+test's own parser reads `SAVE` at `0x0C` and the eighteen `BLOCK` headers, and the
+walk answers the same eighteen tags and sizes at the same file offsets; chunks 9 /
+13 / 16 measure `0x3AB1` / `0x1729` / `0x0CC7`, so the three flags are `0` and the
+converter restores `74`, `0CBEh` and `75 26` - the older layout, exactly what the
+original's three `cmovne` pairs produce. A synthetic newer layout (chunk 9 `0x4C45`,
+13 `0x1741`, 16 `0x0E77`) answers `EB`, `0E6Eh`, `90 90`; a synthetic save built
+from the real one's ids and sizes answers the old triple again; and a save whose only
+newer chunk is 13 answers the old triple too, which is what keeps chunk 13's flag
+from moving the three values. Both preserved faults are asserted (see the table
+above): the size-underflow `std::bad_alloc` by type, in-process, at chunk 0 and at
+chunk 9, and the unchecked header read as "a file carrying the magic is not rejected
+on its header" plus a fresh process's answer for a file shorter than the magic offset.
 
 **What is not measured.** The conversion path runs only when the game loads a
-savegame, so no offline harness executes the three patch writes or the two hooks.
-The replay above validates the walk and the size conditions; the writes still need
-an in-game save load.
+savegame, so no offline harness executes the three patch writes or the two hooks. The
+test proves the *decision* — which of the three values a given file selects — and not
+the writes: that `0CBEh`/`75 26`/`74` land at game `0x7D8C50`/`0x872185` is the
+scoreboard cell's and the body proof's business, and the two hooks' frames and the
+prepare step's path building still need an in-game save load.
 
 ### Still blocked
 

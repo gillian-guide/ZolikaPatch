@@ -1056,6 +1056,138 @@ element layout is a model — the 44-byte struct keeps the original's field offs
 including the `std::string` header the destroy loop touches — and its `push_back` is
 the rebuilt init's, not a transcribed one.
 
+### 2i. This pass: the save converter, behaviourally
+
+The converter (`0x10051B30`, class B) was this catalogue's highest-risk entry and its
+weakest evidence: the walk had been replayed once by a throwaway script, nothing in the
+tree executed it, and its only measurement was that the key's cell writes the right five
+bytes. It is a test now. `tests/save_walk.cpp` (`zp_save_walk`, the third ctest entry)
+runs the walk the production path runs and asserts, per file, what it decided — against
+the file re-read by the test's own parser.
+
+**The seam.** `source/loading.ixx` grew one exported, test-only entry,
+`Loading::WalkSaveFile`. It is not a second implementation: the converter is split into
+`NewSavesWalkFile` (open the file, check the magic at `+0xC`, walk the eighteen 9-byte
+headers with the original's `fread` / `operator new(size - 9)` / `fread` / `free`
+sequence, record the three size tests) and the patch step it already had, and the seam
+calls the first of those and then `NewSavesChoosePatch` — the same function the patch
+step uses to select its three values, so the choice a test reads cannot drift from the
+value that is written. The seam patches nothing, installs nothing and touches none of the
+module's published state (`byte_1015AD98/99/9A`), so calling it cannot change the image
+or the module. The one production-path difference is *when* the three flags become module
+state: after the walk, instead of inside its loop. Nothing can observe it — the throw
+that ends a bad walk leaves the converter — and the write set is unchanged
+(`parity_report.py 9` is the same line, `ctest`'s dump baseline is unchanged).
+
+**The real saves.** Two, in one account:
+`game_refs/saves/GTA IV/savegames/user_ee000000deadc0de/SGTA400` (1,977,934 bytes) and
+`SGTA401` (1,978,282). The test finds saves by *content* — any regular file under the
+given root whose bytes at `+0xC` are `SAVE` — so a second account would be converted too;
+the two accounts under `game_refs/saves` that carry no save (`user_e0001c4aabed3e68`,
+`user_invalid`) are `ControlMap.dat` only and are correctly not discovered. Both saves
+have the same eighteen chunk headers, read by the test's own `std::ifstream` parser and
+answered identically by the walk:
+
+| # | file offset | tag | size | | # | file offset | tag | size |
+|---:|---|---|---:|---|---:|---|---|---:|
+| 0 | `+0x110` | `BLOCK` | `0xB9` | | 9 | `+0x1D3585` | `BLOCK` | `0x3AB1` |
+| 1 | `+0x1C9` | `BLOCK` | `0xD9` | | 10 | `+0x1D7036` | `BLOCK` | `0x2F55` |
+| 2 | `+0x2A2` | `BLOCK` | `0x1051` | | 11 | `+0x1D9F8B` | `BLOCK` | `0xF9` |
+| 3 | `+0x12F3` | `BLOCK` | `0x1C2B23` | | 12 | `+0x1DA084` | `BLOCK` | `0x549` |
+| 4 | `+0x1C3E16` | `BLOCK` | `0x10F8` | | 13 | `+0x1DA5CD` | `BLOCK` | `0x1729` |
+| 5 | `+0x1C4F0E` | `BLOCK` | `0xF` | | 14 | `+0x1DBCF6` | `BLOCK` | `0x200` |
+| 6 | `+0x1C4F1D` | `BLOCK` | `0xC8D` | | 15 | `+0x1DBEF6` | `BLOCK` | `0x1916` |
+| 7 | `+0x1C5BAA` | `BLOCK` | `0xD55A` | | 16 | `+0x1DD80C` | `BLOCK` | `0xCC7` |
+| 8 | `+0x1D3104` | `BLOCK` | `0x481` | | 17 | `+0x1DE4D3` | `BLOCK` | `0x34F1` |
+
+The walk's own answers for the same eighteen offsets agree with that table tag for tag and
+size for size (36 assertions per save). The three size tests then measure
+`0x3AB1`/`0x1729`/`0xCC7` against `0x4C45`/`0x1741`/`0x0E77`, i.e. the *older* layout:
+`forceRead=0`, `extraBlock=0`, `newChunk16=0`, so the converter restores `74` at
+`0x872185` and writes `0CBEh` and `75 26` at `0x7D8C50` — the three values the patch
+step would write, and exactly what the original's three `cmovne` pairs produce. Each
+assertion prints its value and its source: the file offset for the chunk table, the
+`byte_1015AD9x` slot and the compared size for a flag, the game site for a patch value.
+
+**The synthetic layouts.** Three images written by the test itself (a zeroed 0x110-byte
+header with `SAVE` at `+0xC`, then `BLOCK` headers whose sizes the test chooses):
+
+| image | chunk 9 / 13 / 16 | flags | `0x872185` | `0x7D8C50` size | `0x7D8C50` branch |
+|---|---|---|---|---|---|
+| `new_layout.bin` (every other chunk `0x9`) | `0x4C45` / `0x1741` / `0x0E77` | 1 / 1 / 1 | `EB` | `0E6Eh` | `90 90` |
+| `chunk13_only.bin` (every other chunk `0x9`) | `0x9` / `0x1741` / `0x9` | 0 / 1 / 0 | `74` | `0CBEh` | `75 26` |
+| `old_layout.bin` (the real save's ids and sizes) | `0x3AB1` / `0x1729` / `0xCC7` | 0 / 0 / 0 | `74` | `0CBEh` | `75 26` |
+
+`chunk13_only.bin` is the extra image, and the reason is worth keeping: chunk 13's flag
+decides the second-load hook's twelve-byte block and *must not* move any of the three
+patch values, so a rebuild that crossed the two flags would fail there while
+`new_layout.bin` and the real saves still passed.
+
+**The faults, and what each one needs.**
+
+- **A chunk size below nine** (`size_zero.bin`: a valid header and one chunk header whose
+  size field is 0; `size_eight.bin`: nine good chunks and then a size of 8). The
+  original's `add eax,0FFFFFFF7h` (`0x10051C14`) feeds `operator new` (`0x100603F1`)
+  unchecked, so the payload underflows and the allocation throws. This is deterministic
+  and is asserted **in this process**, with the original's own type: both answer
+  `bad_alloc`, and any other exception type (or none) fails the check. The second file
+  is the one that matters — it proves the fault is per chunk, not a header check.
+- **A truncated header** (0x20 bytes). The `fread(header, 0x110, 1)` at `0x10051BB3` is
+  unchecked, so the bytes past the file are whatever the stack held, and the magic test
+  reads them. Two consequences, and the test states each as the behaviour it is:
+  - a 0x20-byte file *carrying* `SAVE` at `+0xC` is **not** rejected on its header —
+    observed answer `bad_alloc` (the chunk it then reads from the stack underflows), and
+    either `walked` or `bad_alloc` would satisfy the check, because both are "the header
+    was not validated";
+  - a 0x20-byte file *without* `SAVE` at `+0xC` is rejected on the magic, deterministically,
+    because the bytes the test reads lie inside the file.
+- **A file shorter than the magic offset** (4 bytes). Here the magic itself is
+  uninitialised, so which of the original's three paths runs is a property of the
+  *process*, not of the file. That is the one case a **subprocess** has to carry: the
+  test starts itself twice (`--child <file> <report>`), once per 4-byte file, and
+  requires the two answers to be equal and to be one of `walked` / `notASave` /
+  `bad_alloc` — equal because the two files differ only in bytes the walk never reads.
+  Observed: `notASave` in both, i.e. this build's child stack does not spell `SAVE`.
+
+So: the `bad_alloc` fault is expressible as an in-process, typed assertion; the
+uninitialised-magic fault is not — not because the throw is uncatchable (it is, and the
+test catches it) but because *which* branch runs is not a function of the input, so the
+assertion that survives is over a fresh process, and over two inputs that must agree.
+
+**The test can fail.** It was checked against a mutated converter: with chunk 9's size
+comparison changed to `0x1741`, `zp_save_walk` fails exactly two lines and no others —
+`new_layout.bin: forceRead=0 (byte_1015AD98; chunk 9 size 0x4C45 vs 0x4C45)` and
+`new_layout.bin: branch opcode 0x74 at site 872185h (chunk 9 size 0x4C45; newer layout
+-> 0xEB)`. The real saves do *not* fail under that mutation (their chunk 9 is `0x3AB1`,
+which matches neither constant), which is precisely why the synthetic newer layout
+exists. The three file shapes are therefore not redundant: the real saves pin the walk
+and the old layout, `new_layout` pins the new one, `chunk13_only` pins the flags'
+independence.
+
+The expectations themselves are the test's, not the converter's: a real save's three
+values are derived from the sizes the test's parser read (so a newer-layout save dropped
+into `game_refs/saves` is converted against the newer triple instead of failing the
+build), while each synthetic file names the layout it was written for, so its three
+literals are asserted *and* the file's own chunks 9 and 16 have to prove it is that
+layout.
+
+**Gates.** `cmake --build --preset release` exit 0; `ctest --preset release` 13/13 (the
+new test is `zp_save_walk`, 258 checks, 0 failures); `python tools/parity_report.py 9` →
+`build 9: 98 key(s) closed, 0 open, 1 oracle-verified (baseline incomplete)`;
+`python tools/verify_bodies.py …` → `151 body(ies), 0 failure(s)`;
+`zp_dump --ooc-selftest` → `ooc selftest: PASS`.
+
+**What stays unproven, and it is still most of the risk.** The test proves the *decision*,
+not the *writes*. The three site patches and the two hooks behind them run only when the
+game loads a savegame, so no offline harness executes them: the test shows the converter
+would choose `74`/`0CBEh`/`75 26` for both real saves, and nothing shows those bytes
+landing at game `0x872185`/`0x7D8C50` correctly, the two hooks' frames behaving, or the
+prepare step building the right path — the destination of the write is the key's cell and
+the body proof's business, not this test's. Also unproven here: what the game does with
+the converted save (whether the walk's answer is the *right* answer for the data behind
+each chunk is a game-side question), and the `std::bad_alloc`'s path through the game's
+frames, which is only reachable in play. §5 item 1 keeps the in-game exercise.
+
 ---
 
 ## 3. Every piece that is still rebuilt
@@ -1091,8 +1223,8 @@ unregistered indexed absolute keeps the literal comparison.
 | DFA close-handle body | `0x10004790` | `0x81` | 45 | `__try/__except` around `CloseHandle`: `push -2; push 0x10153FC0; push __except_handler4 (0x1005FE4C); … mov fs:[0], eax`, with the filter (`or eax, -1; ret` at `0x100047EC`) and the unwind continuation (`0x100047F0`) inside the same byte range | `CloseHandle` behind the guard, answering `-1` when the call faults | the DFA stage's write set and the launcher cell (`oracle-verified`); the body runs when the game closes a file through DFA | low: a close that faults is caught either way. The frame is the feature, so it stays rebuilt; the four forwarders beside it are transcribed (§2a) |
 | SpeedupBugFix body | `0x10050540` | `0x16F` | 93 (+funclet at `0x10061981`) | C++ static-init EH: `push -1; push SEH_10050540; … fs:[0]`, funclet `jmp __CxxFrameHandler3` with throw info `0x10154358`, plus the `_Init_thread_header/footer` TLS guard (`0x1005FFC3`/`0x1005FF77`) around the one-time QPC/scan | the clock fix: QPC frequency → one-over-frequency into eight published float slots, then tail-call `sub_10003830`'s resolver result − 0x33 (the game's timer getter) and return its `(eax,edx)` pair in a 64-bit answer | the arm's eight operands are validated per site and the per-key dump is byte-identical to the pre-change dump on all nine images; the *body* never runs offline | moderate: the eight timer slots are the whole fix. A wrong slot or a float/double mix-up would show as a broken game clock, not a crash |
 | audio install body | `0x10050AD0` | `0xF9` | 75 | EH4 (`push __except_handler4`, scope `0x10154384`, funclet `0x100619C1`) + the CRT clock/seed block through `fs:[2Ch]` and `TlsIndex` | resolve the `6A 06 68 ? ? ? ? 8D 8C` site once and write `rand() % 5 + 1` into its `push` immediate, gated on the transcribed `0x10050A50` gate | `RestoreDeathMusic`'s cell is closed; the gate and the three native wrappers around it are transcribed and proven | **the one recorded 1:1 divergence in that key**: the original's guard compares `dword_101A84C0` with the CRT per-thread word and may skip the whole block on a fresh process; the rebuild always writes. Recorded in `parity.md` §RestoreDeathMusic |
-| save converter | `0x10051B30` | `0x489` | 337 | EH registration (`fs:[0]`) + three `_Init_thread_header/footer` TLS guards + CRT file API (`fopen_s`, `fread`, `fclose`, `operator new`, `free`) + `std::string` (IDA's per-function total is 363: 337 plus the out-of-line funclet/abort blocks) | open the save, check `SAVE` at +0xC, walk eighteen chunks with `fread(9)` / `operator new(size-9)` / `fread(payload)` / `free`, remember chunks 9/13/16 (`0x4C45`/`0x1741`/`0x0E77`), then patch the three sites (`0x872185`, `0x7D8C50`, `0x8DA090`) | the file walk was replayed offline against the two real saves in `game_refs/saves/…` (`SGTA400`/`SGTA401`: `SAVE` at +0xC, 18 `BLOCK` chunks, sizes `0x3AB1`/`0x1729`/`0x0CC7`); the three sites' writes are what the key's cell measures | **high**: a corrupt save already faults (preserved), and the chunk-size conditions decide whether the new-format hooks are installed. A wrong condition converts a save wrongly instead of failing |
-| save prepare | `0x10051FD0` | `0x202` | 157 | same EH/TLS + `std::string` construction + the game's save-directory call | ask the game for the save directory, build `"<dir>\\<save name>"` as a `std::string`, call the converter | the directory call site is one of the key's six recovered scans; the *string* shape is not measured offline | moderate: a wrong path means the converter opens nothing (silent no-convert) or the wrong file |
+| save converter | `0x10051B30` | `0x489` | 337 | EH registration (`fs:[0]`) + three `_Init_thread_header/footer` TLS guards + CRT file API (`fopen_s`, `fread`, `fclose`, `operator new`, `free`) + `std::string` (IDA's per-function total is 363: 337 plus the out-of-line funclet/abort blocks) | open the save, check `SAVE` at +0xC, walk eighteen chunks with `fread(9)` / `operator new(size-9)` / `fread(payload)` / `free`, remember chunks 9/13/16 (`0x4C45`/`0x1741`/`0x0E77`), then patch the three sites (`0x872185`, `0x7D8C50`, `0x8DA090`) | the walk, the three flag tests and the three patch values are pinned by `zp_save_walk` on both real saves and on three synthetic layouts, against the file re-read by the test's own parser (§2i); its two faults are asserted too — `std::bad_alloc` in-process, the uninitialised magic in a child process. What the test cannot run is anything but the decision: the three writes and the two hooks still need a save load | **high**: a corrupt save already faults (preserved), and the chunk-size conditions decide whether the new-format hooks are installed. A wrong condition converts a save wrongly instead of failing |
+| save prepare | `0x10051FD0` | `0x202` | 157 | same EH/TLS + `std::string` construction + the game's save-directory call | ask the game for the save directory, build `"<dir>\\<save name>"` as a `std::string`, call the converter | the directory call site is one of the key's six recovered scans; the *string* shape is not measured offline (§2i ends on it: `zp_save_walk` takes a path, so the prepare step is not in its reach) | moderate: a wrong path means the converter opens nothing (silent no-convert) or the wrong file |
 | OOC init (decode → register → build) | `0x1004B750` | `0xBFF` | 991 | EH (`fs:[0]`) + C++ container helpers (`0x10058620`, `0x1005CF20`) + `operator new` | decode the pinned resource, register it as the single fake-pak entry in the module's own table (`0x1016E43C`), then call the transcribed builder (§2h) for the 182,272-byte archive and read its write cursor back as the byte count | **proven end to end offline**: `zp_dump --ooc-selftest` checks the stream's Adler-32 trailer, the decoded table's `fnv1a 0xC883859F`, the archive's 182,272 bytes and `fnv1a 0xB5AF7B10`, and the header's `16`/`0xE9` words → PASS | low for the transform (fingerprints), **high** for when it runs: the original re-runs it on every call and leaks the previous archive; the rebuild keeps that |
 | OOC handler (the key's arm) | `0x1004C3F0` | `0x3FB7` | 4185 (IDA's total 4199) | EH4 + a 16 KB C++ string builder (digit loops, `strtol`, `toupper`) | scan the branch anchor, publish four words, `VirtualProtect` and write the `E9`; scan the wrapper anchor, publish the mount/original call targets and write the `E8` | the arm's four published words and two writes are what the key's cell measures; both written bodies (`0x1004C3C0` 7, `0x1004C350` 41) are transcribed and proven | low: the handler only publishes and writes; a wrong word would show as a wrong mount target |
 
@@ -1183,11 +1315,14 @@ loosely the surrounding proofs pin it*. The first three are the ones to exercise
 deliberately after any change to the modules above.
 
 1. **`0x10051B30`/`0x10051FD0`, the save converter and prepare** (class B, high
-   impact, no behaviour proof). Exercise: load a save, save a game, then load the
-   save just written, in a new session. What to look for: the save loads at all
-   (chunk walk and the three site patches), the HUD/clock restored, no "corrupt save"
+   impact; the converter's *decision* is now behaviourally proven, §2i, its writes are
+   not). Exercise: load a save, save a game, then load the save just written, in a new
+   session. What to look for: the save loads at all (the three site patches and the two
+   hooks, which `zp_save_walk` cannot reach), the HUD/clock restored, no "corrupt save"
    dialog, and the file mtime/size changing exactly once. This is the only piece whose
-   failure destroys user data rather than a session.
+   failure destroys user data rather than a session. A newer-layout save (a FusionFix-era
+   savegame with chunk 9 `0x4C45`, 16 `0x0E77`) is the case the synthetic images cover
+   offline and only play can confirm end to end.
 2. **`0x100038E0`/`0x10003980`, the guarded native calls** (class B, high impact,
    fault-parity is the feature). Exercise: any path that calls a native with a slot
    that has not resolved — the audio wrappers, `DrivebyFOVFix`, `BadPlayerModelCrashFix`
@@ -1250,6 +1385,12 @@ deliberately after any change to the modules above.
   C++ (`?name@@…`) or C (`_name`), a table may live in a section's uninitialised tail
   (its bytes read as zeros, what the loader maps there), and a registered range may
   extend past the array's last slot to cover the word the body reads there (§2g).
+- `tests/save_walk.cpp` — the rebuilt converter's behavioural test (§2i), ctest entry
+  `zp_save_walk`: the walk's chunk table, the three flags and the three patch values
+  against the file re-read by the test's own parser; three synthetic layouts; and the
+  two faults (typed `std::bad_alloc` in-process, the uninitialised magic in a child
+  process). It reads saves from `../game_refs/saves` and writes its synthetic inputs
+  under `<build>/save_walk_inputs`.
 - `tools/verify_bodies.py` — the comparator, including the internal-branch-target
   check and the table registry (`Tables`, `table_content_hash`, `table_mismatch`,
   `table_read`, `read_table`, `read_map`); `table_read` is the one place that decides

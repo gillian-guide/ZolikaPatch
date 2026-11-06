@@ -1,4 +1,4 @@
-﻿# Progress â€” readable-fusion
+# Progress â€” readable-fusion
 
 Newest last. One entry per work session; the exact gate output is what counts.
 
@@ -1030,3 +1030,83 @@ walk-end-divergence note removed.
 bodies transcribed"; it is 151 now (and the twelve helpers are not "hook bodies",
 they are the builder's own helpers - the sentence's "hook bodies" now covers
 transcribed internals too).
+
+## 2026-11-07 - the save converter's behaviour test: 258 assertions, and the two faults it can now assert
+
+**What changed.** `sub_10051B30` (337 instructions) was the tree's highest-risk rebuilt
+piece and its only *unexecuted* one: its evidence was a throwaway replay, a shape
+argument (EH frame + TLS guards) and the five bytes its key's cell measures. It now has a
+behavioural test, and the test runs the production code's own walk.
+
+- `source/loading.ixx` - one new exported, test-only entry, `Loading::WalkSaveFile`
+  (`Loading::SaveWalkDecision`: the 18 chunk tags and sizes in file order, the three flag
+  bytes `byte_1015AD98/99/9A`, and the three patch values those flags select). It is not a
+  second implementation: the converter is split into `NewSavesWalkFile` (open, the
+  unchecked 0x110-byte header read, the magic at +0xC, the eighteen
+  `fread(9)` / `operator new(size-9)` / `fread(payload)` / `free` iterations, the three
+  size tests) plus the patch step it already had, and the new
+  `NewSavesChoosePatch(forceRead, newChunk16)` is what *both* the patch step and the seam
+  use to pick `74`/`EB`, `0CBEh`/`0E6Eh`, `75 26`/`90 90`. The seam patches nothing,
+  installs nothing and writes none of the module's globals. The only production-path
+  difference is *when* the three flags become module state (after the walk instead of
+  inside its loop); the throw that ends a bad walk leaves the converter, so nothing can
+  read the difference, and the write set is unchanged.
+- `tests/save_walk.cpp` (new) + `CMakeLists.txt` (`zp_save_walk`, ctest entry 3). The
+  oracle is the test's own parser (`std::ifstream`, written from the recovered format):
+  it re-reads every file and computes the expected flags and the expected patch values
+  from the literals recovered off the original's instructions.
+- `docs/rebuilt.md` §2i (what is now proven and what is not), §3 class B's converter and
+  prepare rows, §5 item 1, §6; `docs/parity.md`'s contracts table (one new row), the
+  preserved-fault row for the corrupt save, and the NewSavesCompatibility section.
+
+**The real data.** Two saves, one account
+(`game_refs/saves/GTA IV/savegames/user_ee000000deadc0de`, `SGTA400` 1,977,934 bytes and
+`SGTA401` 1,978,282); discovery is by content (`SAVE` at +0xC), so a second account is
+covered. Both: `SAVE` at `0x0C`, eighteen `BLOCK` headers at `+0x110`, sizes `0xB9`,
+`0xD9`, `0x1051`, `0x1C2B23`, `0x10F8`, `0xF`, `0xC8D`, `0xD55A`, `0x481`, `0x3AB1`,
+`0x2F55`, `0xF9`, `0x549`, `0x1729`, `0x200`, `0x1916`, `0xCC7`, `0x34F1` (last chunk ends
+at `+0x1E19C4`; both files are larger, which the walk never reads). Chunks 9/13/16 are
+`0x3AB1`/`0x1729`/`0xCC7`, so the flags are `0/0/0` and the patch values are `74`,
+`0CBEh`, `75 26` - the older layout, what the original's three `cmovne` pairs produce.
+
+**The synthetic images.** `new_layout.bin` (9/13/16 = `0x4C45`/`0x1741`/`0x0E77`, rest 9)
+-> flags 1/1/1, values `EB`, `0E6Eh`, `90 90`. `chunk13_only.bin` (only 13 = `0x1741`)
+-> flags 0/1/0, values `74`, `0CBEh`, `75 26` (chunk 13's flag must not move the three
+values; it only gates the second-load hook's twelve bytes). `old_layout.bin` (built from
+the real save's own ids and sizes) -> flags 0/0/0, values `74`, `0CBEh`, `75 26`.
+
+**The faults.** (a) A chunk size below 9 (`0` at chunk 0, `8` at chunk 9) reaches the
+original's unchecked `add eax,0FFFFFFF7h` (`0x10051C14`) -> `operator new` and throws
+`std::bad_alloc`; asserted in-process by type, so a different exception type fails. This
+is the one expressible as an ordinary test. (b) A truncated header: the 0x110-byte read is
+unchecked, so with `SAVE` at +0xC in the file the header is *not* rejected - observed
+`bad_alloc` from the stale chunk header it then reads - and without the magic it is
+rejected deterministically (both asserted in-process). (c) A file shorter than the magic
+offset: the magic itself is uninitialised, so which branch runs is a property of the
+*process*; that one runs in a child process (`--child <file> <report>`, `CreateProcessW`,
+no shell), two 4-byte files that differ only in bytes the walk never reads, and the two
+answers must be equal and one of `walked`/`notASave`/`bad_alloc` (observed `notASave` in
+both). Also asserted: a missing path -> `noFile`, a 0x110-byte zero header -> `notASave`.
+
+**The test can fail.** Mutating chunk 9's comparison to `0x1741` in `loading.ixx` fails
+exactly two of the 258 checks and no others - `new_layout.bin: forceRead=0
+(byte_1015AD98; chunk 9 size 0x4C45 vs 0x4C45)` and `new_layout.bin: branch opcode 0x74 at
+site 872185h (chunk 9 size 0x4C45; newer layout -> 0xEB)`. The real saves stay green under
+that mutation (their chunk 9 is `0x3AB1`), which is why the synthetic newer layout exists.
+
+**Gates (final runs).** `cmake --build --preset release` exit 0; `ctest --preset release`
+13/13 (was 12; the new test is `zp_save_walk`, 258 checks, 0 failures);
+`python tools/parity_report.py 9` -> `build 9: 98 key(s) closed, 0 open, 1
+oracle-verified (baseline incomplete)`; `python tools/verify_bodies.py ...` ->
+`151 body(ies), 0 failure(s)`; `zp_dump --ooc-selftest` -> `ooc selftest: PASS`.
+
+**What the test cannot express offline.** It proves the *decision*, not the writes: the
+three site patches and the two hooks run only on a savegame load, so nothing here writes
+the image; the prepare step (`0x10051FD0`, the `"<dir>\<name>"` path build and the game's
+save-directory call) is not in reach either, since the seam takes a path; and whether the
+walk's answer is the *right* answer for the data behind each chunk is a game-side
+question. §5 item 1 keeps the in-game exercise.
+
+**Open, not mine to edit.** `docs/review.md` still says "12 tests" and
+`ctest --preset release # 12/12`; it is 13. `readable-fusion/AGENTS.md` line 11's body
+count is still stale at 138/151 from the previous pass.
