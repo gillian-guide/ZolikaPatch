@@ -343,6 +343,9 @@ namespace
 
 int main(int argc, char** argv)
 {
+    // A faulting body is a test outcome here, never a message box on the
+    // desktop of whoever runs the suite.
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
     std::setvbuf(stdout, nullptr, _IONBF, 0);
 
     TestConfigGrammar();

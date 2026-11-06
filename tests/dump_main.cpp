@@ -143,6 +143,11 @@ namespace
 
 int main(int argc, char** argv)
 {
+    // A faulting cell is data, not an interruption: a fault here must not raise a
+    // Windows "Application Error" dialog on the machine that is running the harness
+    // (the 1.0.0.0 cell faults on purpose, and a scan that writes through a stale
+    // pointer must fail loudly in the log, not in a message box).
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
     std::filesystem::path executable = "..\\game_refs\\GTAIV.exe";
     std::string build = "9";
     std::filesystem::path output;
