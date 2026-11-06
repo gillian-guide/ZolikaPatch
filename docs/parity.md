@@ -34,8 +34,8 @@ CRLF folding (the original reads in text mode). The shipped INI's longest line i
 
 Measured on 1.0.8.0 with `tools/parity_report.py 9`:
 
-- **78 of 99 option keys closed**;
-- **55 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **79 of 99 option keys closed**;
+- **62 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe. The longest two are the `DualVehicleHeadlights`
   pair at 78 instructions / 309 bytes each, which is what exposed the proof tool's
@@ -51,6 +51,59 @@ Measured on 1.0.8.0 with `tools/parity_report.py 9`:
   OPEN only because the stored baseline is a partial recording of this feature;
 - the 18 full/per-option per-build dump hashes and the oracle differential are not
   yet produced.
+
+### The native-script call layer, and the key it closed
+
+`DrivebyFOVFix` was blocked on the ASI's own scripting layer: its helper resolves
+the drive-by FOV native through the game's native-handle resolver. That layer now
+exists as `source/native.ixx`, and the key is closed with it.
+
+| piece | VA | instructions | how |
+|---|---:|---:|---|
+| zero a pending output record | `0x100038C0` | 5 | transcribed |
+| one-argument call, fixed hash `0x62BFDB37` | `0x1005B3F0` | 46 | transcribed |
+| zero-argument call, hash from `ECX` | `0x1005B150` | 44 | transcribed |
+| copy pending records out, dword result | `0x1005DE40` | 21 | transcribed |
+| copy pending records out, byte result | `0x1005DE80` | 21 | transcribed |
+| guarded resolve-and-invoke | `0x100038E0` | 59 | rebuilt as C |
+| guarded resolve-only | `0x10003980` | 52 | rebuilt as C |
+
+The last two are compiler output for a C function with `__try`/`__except`
+(`GuardedInvoke` / `GuardedResolve`): their frames carry a cookie-xored scope table
+whose handler fields are addresses inside the original image, so there is no
+instruction stream to transcribe -- the same reason the launcher's DFA helpers are
+rebuilt. Both keep the original ABI and behaviour: on the normal path the invoke
+entry answers `1` (a null resolver skips the handler call at `0x10003937`), a fault
+anywhere inside the guarded region -- the resolver call or the handler call -- is
+caught and answers `0`, and when the resolver answers null the *caller* then faults
+on the unresolved handler. That is the original's split, preserved.
+
+The resolver is not invented. The original's loader preamble fills `dword_1015BDE0`
+at `0x10052E88..0x10052E9E` by scanning the game module for `08 0B C2 8B F0 E8`
+(1.0.8.0 site `0x625300`) and taking the target of the call whose opcode is the
+pattern's last byte, `match + 10 + [match + 6]`. That is `0x626AF0`, the game's
+native-handle resolver, and `Native::Register()` reproduces the scan with
+`find_pattern` at startup. A missing pattern skips the store exactly as the
+original's `jz` does, so the preserved fault is a null resolver: the layer's SEH
+catches the call and answers zero, then the caller (for `DrivebyFOVFix`, the
+`[eax+0Eh]` read at `0x1000646E`) faults where the original faults.
+
+Two ABI details the transcribed pieces rely on. The game resolver reads the hash
+from **ESI**, not from the argument registers (`0x626AF0` opens `mov eax, esi`), and
+both original entries move the `ECX` argument there around the call, saving and
+restoring the register; the C entries call a naked `ResolveInEsi` for that, because
+C++ cannot ask for a register. And the one-argument wrapper's first register
+argument is unused -- its payload travels in `EDX` -- so `Native::CallBool` is
+declared with a discarded `ECX` parameter to make the compiler place the value
+there.
+
+Two call targets differ from the original's, both inside the proof's
+call-is-an-immediate rule (below): the two wrappers call a local `NativeZeroBlock`
+instead of the CRT `memset`, because the inline assembler rejects the intrinsic's
+name in a direct call (C2420), and `DrivebyFOVFix`'s helper calls a six-byte `jmp`
+forwarder through the layer's published resolve entry instead of the original's
+direct `E8` to `0x10003980`, because a module interface cannot export a naked
+target and the C entry's decorated name is not nameable from inline asm.
 
 ### The vehicle arms closed in this pass
 
@@ -98,15 +151,17 @@ Transcribed and available for the arms that need it (`source/shared.ixx`):
 `sub_10003E50` (the `hash:`/quote config-value resolver, 67 instructions) and the
 1.0.8.0 `CModelInfoStore::getModelByKey` lookup (`dword_10159C0C`, resolved with the
 original's own pattern). `AllowHashesForIDE` needs exactly that resolver (its site is
-the game's hash function at `0x45CF50`).
+the game's hash function at `0x45CF50`). The native-script call layer is
+`source/native.ixx` (above); its public surface is `Native::Call`, `CallBool`,
+`Resolve`, `Invoke`, `Resolver` and `Register`.
 
 Still blocked:
 
-- `BadPlayerModelCrashFix` needs the ASI's **native-call layer**, not the shared
-  helpers: `sub_1005B3F0`/`sub_1005B150`, `sub_100038E0` (an SEH frame around a call
-  through `dword_1015BDE0`), `sub_1005DE40`/`80`, plus the GTAC.dll branch
-  (`sub_1005B290`, `sub_1005B530`, the sprintf chain) and the original's own
-  38,455-entry model-name table at `0x100DE770`;
+- `BadPlayerModelCrashFix` now has the native-call layer it was waiting for, but
+  still needs the GTAC.dll branch (`sub_1005B290`, `sub_1005B530`, the sprintf
+  chain) and the original's own 38,455-entry model-name table at `0x100DE770`;
+  its remaining callers are `sub_10037AC0` and the model-name lookup, not the
+  layer itself;
 - `GarageModelFix`, `NoLiveryLimit`, the steer/engine/plane trio and `FreezeCarFix`
   need `sub_10004C70` (the 1,343-byte steer consumer) and, for `FreezeCarFix`, the
   1,421-byte probe;
@@ -154,7 +209,7 @@ fails if either side decodes fewer instructions), which is why the number is par
 of the evidence rather than a hint.
 
 Body identity is instruction-level except for a call's target: the proof compares
-a `call` as an immediate, not as the function it names. Four implemented bodies
+a `call` as an immediate, not as the function it names. Several implemented bodies
 call our equivalent helper instead of the original's compiled target:
 
 - `ped_models_in_cutscenes` calls audio's `ValueResolverThunk`, a
@@ -164,7 +219,13 @@ call our equivalent helper instead of the original's compiled target:
   emit the original's direct `E8` to it;
 - `local_settings_detour` and `local_settings_fallback_detour` call our
   `LocalSettingsStep`, a reimplementation of the original's compiled helper;
-- `savegame_fix_copy` calls `SavegameCopyBlock`, which forwards to `std::memcpy`.
+- `savegame_fix_copy` calls `SavegameCopyBlock`, which forwards to `std::memcpy`;
+- `native_call_bool` and `native_call_hash` call `NativeZeroBlock`, a cdecl
+  forwarder to the CRT `memset`, because the inline assembler rejects the intrinsic
+  name in a direct call (C2420);
+- `driveby_fov_helper` calls `DrivebyResolveEntry`, a six-byte `jmp` through the
+  native layer's published resolve entry, because the layer's C entry is not
+  nameable from inline asm in another module unit.
 
 The stored baselines have one gap of their own: they were produced by the
 reference tree, whose `ApplyCarDynamicShadowFixNoE` pass is defined but never

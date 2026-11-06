@@ -9,11 +9,104 @@ import bytes;
 import common;
 import game;
 import loader;
+import native;
 import patch;
 
-// The remaining fixes: the bundled MiscFixes table and the mod-check stubs. One
-// arm per key, each anchored to its own recovered signature (or, for the stubs, to
-// the recovered per-build site table).
+// The remaining fixes: the bundled MiscFixes table, the mod-check stubs and the
+// drive-by FOV. One arm per key, each anchored to its own recovered signature (or,
+// for the stubs, to the recovered per-build site table).
+
+// The DrivebyFOVFix published state, in C linkage because the transcribed bodies
+// name the slots directly (the original keeps them in its own .bss beside its
+// bodies). The values are the original's own: dword_101580D4 is the native hash the
+// helper resolves (the loader preamble writes 0x09399528 at 0x10052E6E),
+// dword_101580C4 is the FOV it caches (45.0f, the .data value and the helper's own
+// first instruction), dword_1015BDF8 the cached entry pointer, byte_1015AD4A the
+// one-shot flag, and dword_1015BDF4 the resume the arm publishes.
+extern "C"
+{
+    uint32_t zpatch_driveby_salt = 0x09399528u;
+    float zpatch_driveby_fov = 45.0f;
+    uint32_t zpatch_driveby_cached = 0;
+    uint8_t zpatch_driveby_done = 0;
+    uint32_t zpatch_driveby_resume = 0;
+
+    // The native layer's resolve entry (source/native.ixx), for the helper's call.
+    extern uintptr_t zpatch_native_resolve_entry;
+}
+
+// The helper's call target. The original's helper does `call sub_10003980` (E8), so
+// ours must be a direct call; a module interface cannot name an imported function
+// from inline asm, so this six-byte forwarder jumps through the entry the native
+// layer publishes. ECX (the hash) and the stack reach the layer untouched, and the
+// layer's __try/__except frame is the one the original's SEH entry installs.
+static __declspec(naked) void DrivebyResolveEntry()
+{
+    __asm
+    {
+        jmp DWORD PTR [zpatch_native_resolve_entry]
+    }
+}
+
+// sub_10006450, recovered VA 0x10006450 (20 instructions): computes the drive-by
+// FOV once and caches the entry it reads it from. It resolves the native hash
+// dword_101580D4 through the call layer, walks the handler's two structures at
+// +0Eh/+0Fh/+14h, stores the entry in dword_1015BDF8 and reads the float at +60h
+// into dword_101580C4. The one-shot flag makes every later call only refresh the
+// default. The resolver result and the cached entry are dereferenced unguarded --
+// the same faults the original has (0x1000646E and 0x10006490) -- and 45.0f is
+// stored on every call, its own first instruction.
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void DrivebyFovHelperBody()
+{
+    __asm
+    {
+        cmp BYTE PTR [zpatch_driveby_done], 0
+        mov DWORD PTR [zpatch_driveby_fov], 42340000h  // 45.0f
+        jne driveby_have
+        mov ecx, DWORD PTR [zpatch_driveby_salt]
+        call DrivebyResolveEntry
+        mov ecx, DWORD PTR [eax + 0Eh]
+        add eax, 0Eh
+        add ecx, eax
+        mov BYTE PTR [zpatch_driveby_done], 1
+        mov eax, DWORD PTR [ecx + 0Fh]
+        mov eax, DWORD PTR [eax + ecx + 14h]
+        mov DWORD PTR [zpatch_driveby_cached], eax
+        jmp driveby_read
+    driveby_have:
+        mov eax, DWORD PTR [zpatch_driveby_cached]
+    driveby_read:
+        mov eax, DWORD PTR [eax]
+        test eax, eax
+        je driveby_done
+        movss xmm0, DWORD PTR [eax + 60h]
+        movss DWORD PTR [zpatch_driveby_fov], xmm0
+    driveby_done:
+        ret
+    }
+}
+
+// sub_100064B0, recovered VA 0x100064B0 (5 instructions): the site's shim. It saves
+// every general register (the site resumes with its own GPRs and flags intact),
+// computes the FOV, restores them, loads the value into xmm0 and tail-jumps to the
+// site's own remaining `subss xmm1, xmm2` at the published resume.
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void DrivebyFovShimBody()
+{
+    __asm
+    {
+        __emit 0x60  // pushad (pushal)
+        call DrivebyFovHelperBody
+        __emit 0x61  // popad (popal)
+        movss xmm0, DWORD PTR [zpatch_driveby_fov]
+        jmp DWORD PTR [zpatch_driveby_resume]
+    }
+}
 
 // `mov eax, imm32`: the MiscFixes token-activation row writes it. bytes.ixx does
 // not carry it, and that module is outside this task's edit scope, so the opcode
@@ -225,9 +318,42 @@ namespace
             }
         }
     }
+
+    // DrivebyFOVFix: the site is the `movss xmm0,[esi+60h]` in front of the
+    // per-frame drive-by FOV subtraction. The publish reads the site's own next
+    // instruction (the `subss xmm1, xmm2` at the anchor's +5) for the resume before
+    // the install overwrites the five bytes the jump lands on.
+    void PublishDrivebyFOVFix()
+    {
+        if (!Loader::Enabled("DrivebyFOVFix"))
+            return;
+
+        auto pattern = find_pattern("F3 0F 10 46 60 F3 0F 5C CA");
+        if (!pattern.empty())
+            zpatch_driveby_resume = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first(5)));
+    }
+
+    void InstallDrivebyFOVFix()
+    {
+        if (!Loader::Enabled("DrivebyFOVFix"))
+            return;
+
+        auto pattern = find_pattern("F3 0F 10 46 60 F3 0F 5C CA");
+        if (!pattern.empty())
+        {
+            Bodies::Register(reinterpret_cast<uintptr_t>(&DrivebyFovShimBody), 0x100064B0u);
+            Bodies::Register(reinterpret_cast<uintptr_t>(&DrivebyFovHelperBody), 0x10006450u);
+            // The helper's call names the original's guarded resolve entry; recording
+            // that VA keeps every registered branch in the original's coordinates.
+            Bodies::Register(reinterpret_cast<uintptr_t>(&DrivebyResolveEntry), 0x10003980u);
+            injector::MakeJMP(pattern.get_first(0),
+                reinterpret_cast<void*>(&DrivebyFovShimBody), true);
+        }
+    }
 }
 
-// Five of this module's keys are deliberately not installed:
+// Four of this module's keys are deliberately not installed:
 //
 //   * SpeedupBugFix: the body is sub_10050540 (109 instructions) -- compiled code
 //     that fills the game's eight timing floats from QueryPerformanceFrequency and
@@ -240,18 +366,23 @@ namespace
 //     instructions), the popuplights checker.
 //   * CopSirensFlag: its three shims call sub_10005F70 (191 instructions),
 //     sub_10006260 (53) and the IDE parser sub_10003FA0 (92).
-//   * DrivebyFOVFix: the 5-instruction shim sub_100064B0 calls sub_10006450 (20),
-//     which calls sub_10003980 (52) -- an SEH frame around the game's
-//     native-invoke pointer dword_1015BDE0, i.e. the ASI's own call layer.
 //
-// Each stays open rather than being stubbed.
+// Each stays open rather than being stubbed. DrivebyFOVFix used to be here too:
+// it needed the ASI's native-call layer, which source/native.ixx now provides.
 
-// Registered like every other arm: the install tier owns the gate.
+// Registered like every other arm: the publish tier reads the site's original
+// bytes, the install tier owns the gate.
 export void RegisterMisc()
 {
+    Loader::PublishEvent() += []
+    {
+        PublishDrivebyFOVFix();
+    };
+
     Loader::InstallEvent() += []
     {
         InstallMiscFixes();
         InstallPatch6and7RemoveModChecks();
+        InstallDrivebyFOVFix();
     };
 }

@@ -70,6 +70,7 @@ target_sources(zp_modules PUBLIC
     source/options.ixx
     source/loader.ixx
     source/shared.ixx
+    source/native.ixx
     source/stability.ixx
     source/vehicles.ixx
     source/useless_checks.ixx

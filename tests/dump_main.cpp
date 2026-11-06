@@ -8,6 +8,7 @@ import game;
 import loader;
 import options;
 import shared;
+import native;
 import stability;
 import vehicles;
 import useless_checks;
@@ -162,6 +163,9 @@ int main(int argc, char** argv)
         return 1;
 
     Shared::Register();
+    // The same layer registration the ASI performs: it only resolves a pointer
+    // and publishes body addresses, so it changes no byte of the image.
+    Native::Register();
     RegisterStability();
     RegisterVehicles();
     RegisterUselessChecks();

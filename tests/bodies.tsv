@@ -57,3 +57,17 @@ savegame_fix_mutex 100455E0 ?SavegameMutexBody@@YAXXZ 19
 rom_set 10004610 ?RomSetBody@@YAXXZ 4
 rom_reset 10004570 ?RomResetBody@@YAXXZ 28
 dfa_init 10004780 ?DfaInitBody@@YAXXZ 2
+# The native-script call layer (source/native.ixx). Its two SEH entries,
+# sub_100038E0 (59 instructions) and sub_10003980 (52), are compiler output for a
+# C function with __try/__except and are rebuilt rather than transcribed; their
+# frames name image-specific handler addresses and cannot be compared this way.
+native_context_init 100038C0 ?NativeContextInit@@YAXXZ 5
+native_call_bool 1005B3F0 ?NativeCallBoolBody@@YIIII@Z 46
+native_call_hash 1005B150 ?NativeCallHashBody@@YIII@Z 44
+native_cleanup_dword 1005DE40 ?NativeCleanupDwordBody@@YAIXZ 21
+native_cleanup_bool 1005DE80 ?NativeCleanupBoolBody@@YAIXZ 21
+# DrivebyFOVFix (source/misc.ixx): the shim and the FOV helper it calls. The helper
+# calls the native layer's resolve entry instead of the original's sub_10003980;
+# the proof compares a call as an immediate, so the body is whole.
+driveby_fov_helper 10006450 ?DrivebyFovHelperBody@@YAXXZ 20
+driveby_fov_shim 100064B0 ?DrivebyFovShimBody@@YAXXZ 5

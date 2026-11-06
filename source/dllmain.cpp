@@ -6,6 +6,7 @@ import game;
 import loader;
 import options;
 import shared;
+import native;
 import stability;
 import vehicles;
 import useless_checks;
@@ -51,6 +52,9 @@ namespace
 
         FusionFix::onInitEvent().executeAll();
         Shared::Register();
+        // The native-call layer resolves the game's native-handle pointer and
+        // publishes its entries before any arm can install a body that uses them.
+        Native::Register();
         RegisterStability();
         RegisterVehicles();
         RegisterUselessChecks();

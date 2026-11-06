@@ -154,3 +154,10 @@ SkipIntro	0x4A347E	89 91 ? ? ? ? 8D 44 24 ? 68 ? ? ? ? 50	16
 SkipMenu	0x47D240	83 F8 03 75 ? A1 ? ? ? ? 80 88 ? ? ? ? ? 84 DB 74 0A 6A 00 E8 ? ? ? ? 83 C4 04 5F 5E	33
 SavegameFix.a	0x61EDB5	75 ? 83 C1 01 83 C0 01 83 F9 04	10
 SavegameFix.b	0x61EBA1	8D 4C 24 18 51 6A 00 6A 0C 57	10
+# DrivebyFOVFix: the site's `movss xmm0,[esi+60h]`; the install is the five-byte jump
+# that replaces it and the resume is the `subss xmm1, xmm2` at the anchor's +5.
+DrivebyFOVFix	0x85031F	F3 0F 10 46 60 F3 0F 5C CA	10
+# The native-script call layer's resolver scan (source/native.ixx, not a catalogue
+# key): the original's own loader preamble scans for this and takes the target of the
+# call at +5 (match + 10 + the dword at +6), which is 0x626AF0 on 1.0.8.0.
+# native.resolver	0x625300	08 0B C2 8B F0 E8	6
