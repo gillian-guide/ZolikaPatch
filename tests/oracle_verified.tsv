@@ -1,0 +1,6 @@
+# Keys whose measured difference is the *baseline's* incompleteness, not ours.
+#
+# One row per key: key <TAB> why <TAB> the anchor in docs/parity.md <TAB> how it was measured.
+# The scoreboard reports these apart from the open keys and never counts them as closed:
+# a key leaves this file only when a baseline produced by the original ASI exists.
+SkipLauncher	the stored baseline records the reference tree's 7-row arm, which nothing in that tree calls, while the original scans all 25 rows and runs the DFA and ROM stages	docs/parity.md	the recovered rows replay to an identical write set on all nine images (0 missing / 0 extra / 0 differing)

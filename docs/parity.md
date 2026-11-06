@@ -1582,7 +1582,10 @@ the comparison and misleading about the work. The intended fix is a sidecar
 scoreboard reports *apart* from the open keys and never counts as closed, so the line
 reads `98 closed, 0 open, 1 oracle-verified (baseline incomplete)`.
 
-An attempt at that change mangled `tools/parity_report.py` (a scripted edit split a
-line), so it was reverted rather than left half-applied - the scoreboard is the tool
-every other number depends on. The change is small and the design is above; it needs
-a careful edit, not a scripted one.
+Implemented in `tests/oracle_verified.tsv` (key, why, doc anchor, how it was
+measured) and reported by the scoreboard as
+`98 key(s) closed, 0 open, 1 oracle-verified (baseline incomplete)`. It never counts
+as closed, and `tools/check_oracle_verified.py` (ctest `zp_oracle_verified`) keeps
+the class honest: every entry must name a catalogue key, a document that exists, a real
+justification and a real measurement, and the list may not exceed the two keys the
+project has evidence for.
