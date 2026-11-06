@@ -35,10 +35,19 @@ car_decals_selector 1001B2E0 ?CarDecalsSelectorShim@@YAXXZ 13
 car_parts_shadow 10006880 ?CarPartsShadowShim@@YAXXZ 13
 car_dynamic_shadow 100068A0 ?CarDynamicShadowShim@@YAXXZ 26
 car_dynamic_shadow_b 100068D0 ?CarDynamicShadowShimB@@YAXXZ 27
-# ForceCarHeadlightShadows (source/vehicles.ixx): the shadow function's hook body.
-# The per-model offset check it calls (sub_1001AD20, 139 bytes) is compiler output
-# and is rebuilt, so it has no row (docs/parity.md).
+# ForceCarHeadlightShadows (source/vehicles.ixx): the shadow function's hook body and
+# the per-model offset check it calls. The check (sub_1001AD20, 46 instructions, 139
+# bytes) is transcribed; it walks the [HeadlightConeOffsets] hash table with
+# `mov eax,[esi*4+0x1015ADBC]`, so ESI=511 reads the word immediately after the
+# 512-slot table in the original's .data (dword_1015B5B8, CarDynamicShadowFix's
+# published shadow-function slot). The table registration is the extended 2,052-byte
+# range so that read is compared too, and this tree reproduces the word as the same
+# slot rather than a placeholder: it is defined immediately after the array, with the
+# check's own resume word after it, in source/config.ixx. docs/rebuilt.md §2g.
+table 1015ADB8 _zpatch_headlight_cone_hashes 2052
+table 1015B5C0 _zpatch_headlight_cone_values 2048
 force_headlight_shadows_shim 1001ADB0 ?FchsShimBody@@YAXXZ 9
+force_headlight_shadows_check 1001AD20 ?FchsCheckBody@@YAXXZ 46
 collision_deadlock_walk 10005D80 ?CollisionDeadlockShim@@YAXXZ 56
 bike_physics_detour 1001EF60 ?BikePhysicsDetour@@YAXXZ 14
 dual_headlights_new 100064F0 ?DualHeadlightsNewBody@@YAXXZ 78
@@ -119,21 +128,40 @@ patch4_stub 100054E0 ?Patch4StubBody@@YAXXZ 8
 # parser hook and both model checks. The checks read the +siren table as a plain
 # absolute (slot 0) and as `[esi/edi + 0x10159380]`, a base-plus-displacement
 # absolute the registry canonicalises with the base register still compared. The
-# table row is the offline projection of the arm's RegisterTable call. The IDE
-# payload (sub_10003FA0, 92) is compiled C and stays rebuilt, so it has no row
-# (docs/rebuilt.md §2d).
+# table row is the offline projection of the arm's RegisterTable call.
 table 10159380 _zpatch_copsirens_models 2048
 copsirens_check_a 10005F70 ?CopSirensCheckABody@@YAXXZ 191
 copsirens_check_b 10006260 ?CopSirensCheckBBody@@YAXXZ 53
 copsirens_shim_a 10006310 ?CopSirensShimABody@@YAXXZ 8
 copsirens_shim_b 10006330 ?CopSirensShimBBody@@YAXXZ 8
 copsirens_ide 100040E0 ?IdeHookBody@@YAXXZ 9
-# PopupHeadlightsFlag (source/misc.ixx): the EAX site's shim and its EDX twin.
-# The twin's pattern is absent on 1.0.8.0 (the original's own second site is a
-# build-specific row) but the body is still proven. The checker (sub_10044310,
-# 125 instructions) is compiled C and is rebuilt.
+# The IDE parser payload (sub_10003FA0, 92 instructions, 314 bytes) is transcribed.
+# It fills four 512-slot tables and touches three registered ones: the +siren list
+# above, the wheelangle model/angle pair below, and the +popuplights list here. It
+# reads each list through `[eax+table]` (a base plus displacement, the §2d shape) and
+# writes it through `[ecx*4+table]` (an indexed absolute, the §2b shape); the slot-0
+# entry check is a plain absolute and compares as an `abs` slot. The table row is the
+# offline projection of the arm's RegisterTable call; the table is all-zero at load in
+# both images. docs/rebuilt.md §2e.
+table 1015CE28 _zpatch_popuplights_models 2048
+copsirens_ide_parse 10003FA0 ?IdeParseBody@@YAXXZ 92
+# PopupHeadlightsFlag (source/misc.ixx): the EAX site's shim, its EDX twin and the
+# checker itself. The twin's pattern is absent on 1.0.8.0 (the original's own second
+# site is a build-specific row) but the body is still proven.
 popup_headlights 10044530 ?PopupHeadlightsBodyA@@YAXXZ 10
 popup_headlights_edx 10044560 ?PopupHeadlightsBodyB@@YAXXZ 10
+# The checker (sub_10044310, 125 instructions, 534 bytes) is transcribed. It reads
+# the [PopupLightAngles] tables as eight interleaved 64-row columns, so seven of each
+# eight displacements are four bytes into the array rather than at its base: the
+# registry resolves a displacement *inside* a registered table to that table plus the
+# offset, and the offset is still compared (a changed column is an instruction
+# difference). The two table rows are the offline projection of the arm's
+# RegisterTable calls -- Config's own arrays, which the loader preamble's reader
+# fills, not copies. The +popuplights list it walks is the table row above.
+# docs/rebuilt.md §2f.
+table 1015C628 _zpatch_popup_angle_hashes 2048
+table 1015BE28 _zpatch_popup_angle_values 2048
+popup_headlights_check 10044310 ?PopupHeadlightsCheckBody@@YAXXZ 125
 # NewMemorySystem (source/loading.ixx): the ten methods of the allocator vtable
 # (original 0x100B5038) that are written as instruction streams. Its three arena
 # methods (0x10038360 allocate, 0x10038430 free, 0x100385A0 membership) carry the

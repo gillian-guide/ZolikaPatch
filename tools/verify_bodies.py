@@ -22,11 +22,13 @@ whose displacement is that table (`push ds:off_100DE770[esi*4]`) is compared as
 asks "does this read the same table?" and not "does the table sit at the same
 address?". A displacement that is not a registered table keeps the literal
 comparison: the relaxation is opt-in, per table, and an unregistered one behaves
-exactly as before. The symbol may be C++ (`?name@@...`) or C (`_name`): a table can
-belong to another module and carry only a C name. The content hash covers the bytes
-the *loaded* image holds, so a table in a section's uninitialised tail (the original
-keeps every 512-slot model table past `.data`'s raw size) reads as zeros, which is
-what the loader maps there.
+exactly as before. A displacement *inside* a registered table (the popup checker's
+eight interleaved columns, `[eax+0x1015C628]` through `[eax+0x1015C644]`) names that
+table plus the offset, and the offset is still compared. The symbol may be C++
+(`?name@@...`) or C (`_name`): a table can belong to another module and carry only a
+C name. The content hash covers the bytes the *loaded* image holds, so a table in a
+section's uninitialised tail (the original keeps every 512-slot model table past
+`.data`'s raw size) reads as zeros, which is what the loader maps there.
 
     --selftest   the comparator against the original itself (must pass) and
                  against a one-byte corruption (must fail), plus the table path:
@@ -35,6 +37,8 @@ what the loader maps there.
                  compares literally, a table in the uninitialised `.data` tail
                  resolves by content, a base-plus-displacement table read passes
                  with its base compared (a changed base is an instruction
+                 difference), a displacement inside a registered table resolves
+                 to that table plus its offset (a changed offset is an instruction
                  difference), and the map reader resolves both symbol decorations
 
 Exit status: 0 proved, 1 a body differs, 2 inputs or capstone missing.
@@ -229,16 +233,30 @@ class Tables:
         self._hashes = {}
 
     def resolve(self, displacement: int):
-        """The content hash of the registered table at `displacement`, or None.
+        """The (content hash, offset) of the registered table a displacement names.
 
-        Only an exact registered VA resolves: a displacement that is merely near a
-        table is not that table, and an operand the registry does not name keeps
-        the literal comparison.
+        A displacement that is *exactly* a registered VA names that table at offset 0.
+        A displacement that falls **inside** one names the same table at that offset:
+        the popup-headlights checker reads its 512-slot hash and angle tables as eight
+        interleaved 64-row columns (`mov ecx,[eax+0x1015C628]`, `+0x1015C62C`, …,
+        `+0x1015C644`, with EAX stepping 0x20), and a 32-bit module cannot make the
+        linker emit a symbol four bytes into an array -- the map's only name for the
+        storage is the array's base. The offset stays part of the comparison, so a
+        transcription that read the wrong column is an *instruction* difference and
+        not a match. A displacement outside every registered table resolves to
+        nothing and keeps the literal comparison, so the relaxation is still opt-in
+        per table and per shape.
         """
         va = displacement & 0xFFFFFFFF
         size = self.entries.get(va)
-        if size is None:
-            return None
+        if size is not None:
+            return self._digest(va, size), 0
+        for base, extent in self.entries.items():
+            if base < va < base + extent:
+                return self._digest(base, extent), va - base
+        return None
+
+    def _digest(self, va: int, size: int):
         if va not in self._hashes:
             digest = table_content_hash(self.image, va, size)
             if digest is None:
@@ -272,10 +290,12 @@ def summarise(instruction, tables=None):
             index = instruction.reg_name(operand.mem.index) if operand.mem.index else ""
             table = table_read(operand, tables)
             if table is not None:
+                digest, offset = table
+                named = f"table:{digest}" + (f"+{offset}" if offset else "")
                 if index:
-                    parts.append(f"[{index}*{operand.mem.scale}+table:{table}]")
+                    parts.append(f"[{index}*{operand.mem.scale}+{named}]")
                 else:
-                    parts.append(f"[{base}+table:{table}]")
+                    parts.append(f"[{base}+{named}]")
                 continue
             if not base and not index:
                 parts.append("abs")
@@ -322,8 +342,10 @@ def table_mismatch(left, right, left_tables, right_tables):
     Two registered tables whose contents differ is not an instruction difference:
     the transcription reads a different table. A table that resolves on one side
     and not the other is the registration (or the displacement) being wrong, and is
-    reported as such. A base-register difference is *not* a table finding -- the
-    instruction differs -- so that case is left to the caller's instruction report.
+    reported as such. Two reads of the *same* table at *different* offsets are an
+    instruction difference too -- the operand changed, the table did not -- so that
+    case is left to the caller's instruction report. A base-register difference is
+    likewise not a table finding.
     """
     for left_operand, right_operand in zip(left.operands, right.operands):
         if (left_operand.type != capstone.x86.X86_OP_MEM
@@ -338,15 +360,15 @@ def table_mismatch(left, right, left_tables, right_tables):
         if left_operand.mem.base and (left.reg_name(left_operand.mem.base)
                                       != right.reg_name(right_operand.mem.base)):
             continue
-        left_hash = table_read(left_operand, left_tables)
-        right_hash = table_read(right_operand, right_tables)
-        if left_hash is not None and right_hash is not None:
-            if left_hash != right_hash:
+        left_table = table_read(left_operand, left_tables)
+        right_table = table_read(right_operand, right_tables)
+        if left_table is not None and right_table is not None:
+            if left_table[0] != right_table[0]:
                 return (f"table contents differ: {left_operand.mem.disp & 0xFFFFFFFF:#x} "
-                        f"({left_hash}) against {right_operand.mem.disp & 0xFFFFFFFF:#x} "
-                        f"({right_hash})")
-        elif left_hash is not None or right_hash is not None:
-            side, va = ((("original", left_operand.mem.disp) if left_hash is not None
+                        f"({left_table[0]}) against {right_operand.mem.disp & 0xFFFFFFFF:#x} "
+                        f"({right_table[0]})")
+        elif left_table is not None or right_table is not None:
+            side, va = ((("original", left_operand.mem.disp) if left_table is not None
                          else ("candidate", right_operand.mem.disp)))
             return f"table {va & 0xFFFFFFFF:#x} is registered on the {side} side only"
     return None
@@ -668,22 +690,67 @@ def main() -> int:
         contents_named = any("table contents differ" in detail
                              for _, _, detail in thirteenth_results)
 
+        # The in-table column offset. sub_10044310 (the popup-headlights checker, 125
+        # instructions) reads its 512-slot hash and angle tables as eight interleaved
+        # columns -- `mov ecx,[eax+0x1015C628]` through `[eax+0x1015C644]`, the same
+        # eight at 0x1015BE28, with EAX stepping 0x20 over 64 rows -- so only the first
+        # column's displacement *is* the table's VA and the other seven sit four bytes
+        # into it. The registry resolves a displacement inside a registered table to
+        # that table plus the offset, so all sixteen columns compare as
+        # `table:<hash>+<offset>` while the eight model reads at 0x1015CE28 compare
+        # exactly. Two cases: registered -> PASS with all 26 operands resolved, and one
+        # column moved by eight bytes -> FAIL as an *instruction* difference (the same
+        # table at a different offset), which is what keeps the offset compared.
+        popup_body = IMAGE_BASE + 0x44310
+        popup_rows = [("selftest-in-table", popup_body, popup_body, 125)]
+        popup_symbols = {popup_body: popup_body}
+        popup_tables = {IMAGE_BASE + 0x15CE28: 2048, IMAGE_BASE + 0x15C628: 2048,
+                        IMAGE_BASE + 0x15BE28: 2048}
+        fourteenth_results = compare(original, original, popup_rows, popup_symbols,
+                                     Tables(original, popup_tables, "original"),
+                                     Tables(original, popup_tables, "candidate"))
+        fourteenth = report(fourteenth_results)
+        columns_resolved = any("26 table operand" in detail
+                               for _, _, detail in fourteenth_results)
+
+        moved_column = bytearray(original)
+        column_spot = image_offset(original, IMAGE_BASE + 0x443F2)
+        if (column_spot is None
+                or moved_column[column_spot:column_spot + 4]
+                != struct.pack("<I", IMAGE_BASE + 0x15C628)):
+            raise SystemExit("selftest: the popup column at 0x100443F2 is not a disp32")
+        struct.pack_into("<I", moved_column, column_spot, IMAGE_BASE + 0x15C630)
+        fifteenth_results = compare(original, bytes(moved_column), popup_rows,
+                                    popup_symbols,
+                                    Tables(original, popup_tables, "original"),
+                                    Tables(bytes(moved_column), popup_tables, "candidate"))
+        fifteenth = report(fifteenth_results)
+        offset_is_instruction = all(detail.startswith("instruction ")
+                                    for _, status, detail in fifteenth_results
+                                    if status == "FAIL")
+
         ok = (first == 0 and second == 1 and third == 1 and fourth == 0 and resolved
               and fifth == 1 and sixth == 1 and seventh == 1
               and eighth == 0 and tail_resolved and ninth == 1 and tenth == 0
               and eleventh == 0 and base_resolved and twelfth == 1 and base_is_instruction
-              and thirteenth == 1 and contents_named)
+              and thirteenth == 1 and contents_named
+              and fourteenth == 0 and columns_resolved
+              and fifteenth == 1 and offset_is_instruction)
         print("selftest: identical PASS, corrupted opcode FAIL, moved branch target FAIL, "
               "registered table PASS (2 operands resolved), changed table contents FAIL, "
               "moved table operand FAIL, unregistered table operand FAIL, "
               "uninitialised-tail table PASS (2 operands resolved), "
               "one-side-only tail table FAIL, map C and C++ symbols PASS, "
               "base+disp table PASS (2 operands resolved), changed base register FAIL "
-              "(instruction), base+disp contents differ FAIL (table)"
+              "(instruction), base+disp contents differ FAIL (table), "
+              "in-table column offset PASS (26 operands resolved), changed column offset "
+              "FAIL (instruction)"
               if ok else f"selftest: BROKEN ({first}, {second}, {third}, {fourth}, "
                          f"{resolved}, {fifth}, {sixth}, {seventh}, {eighth}, "
                          f"{tail_resolved}, {ninth}, {tenth}, {eleventh}, {base_resolved}, "
-                         f"{twelfth}, {base_is_instruction}, {thirteenth}, {contents_named})")
+                         f"{twelfth}, {base_is_instruction}, {thirteenth}, {contents_named}, "
+                         f"{fourteenth}, {columns_resolved}, {fifteenth}, "
+                         f"{offset_is_instruction})")
         return 0 if ok else 2
 
     if not (args.original and args.candidate and args.bodies and args.map):

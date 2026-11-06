@@ -887,3 +887,72 @@ call-target list names `BpmModelNameBody`.
 bodies transcribed"; it is 132 now. `docs/review.md` still lists the DLC discovery,
 the model-name lookup and the bounded formatter as rebuilt-in-C++; the first two were
 already transcribed before this pass.
+
+## 2026-11-06 (later) — class A closed: the IDE payload, the popup checker, the cone check
+
+**Closed:** the last three rebuilt class-A pieces are transcribed. 135 -> 138 proof
+rows; 98 keys closed / 0 open / 1 oracle-verified unchanged.
+
+| piece | VA | insns | bytes | row | byte-identical |
+|---|---|---:|---:|---|---:|
+| IDE parser payload | `0x10003FA0` | 92 | 314 | `copsirens_ide_parse` | 72/92 |
+| popup-headlights checker | `0x10044310` | 125 | 534 | `popup_headlights_check` | 77/125 |
+| headlight-cone check | `0x1001AD20` | 46 | 139 | `force_headlight_shadows_check` | 36/46 |
+
+Every difference is an absolute operand, a table displacement, a `call`/`push`
+immediate or a string offset; no mnemonic, register, frame offset, size or branch form
+differs, and each body is the original's exact size, so every internal branch sits at
+the same relative offset (`138 row(s), 292 internal branch target(s), 0 failures`).
+
+**What changed besides the bodies**
+
+- `tools/verify_bodies.py`: `Tables.resolve` now also resolves a displacement that
+  falls *inside* a registered table to that table plus its offset, and the offset is
+  part of the compared operand (`[eax+table:<hash>+4]`). That is what the popup
+  checker's eight interleaved columns need — a 32-bit module cannot make the linker
+  emit a symbol four bytes into an array. A wrong column is an *instruction*
+  difference; the self-test gained the case (`in-table column offset PASS (26 operands
+  resolved), changed column offset FAIL (instruction)`) and the other thirteen cases
+  are unchanged.
+- `source/config.ixx`: `Config::ModelTable` is now a two-span *view* over four
+  C-linkage arrays (`zpatch_popup_angle_hashes`/`_values`,
+  `zpatch_headlight_cone_hashes`/`_values`), because the map names an object and never
+  a member at an offset inside one. Storage-neutral: `ReadModelTables` fills the same
+  arrays at the same slots. The cone block also holds, in the original's order, the
+  two words between its hashes and its offsets — `zpatch_carparts_shadow_fn`
+  (dword_1015B5B8) and `zpatch_fchs_resume` (dword_1015B5BC) — so the cone walk's read
+  past slot 511 lands on the same word the original's does.
+- Nine registered tables (up from six), all content-equal on both sides
+  (`.scratch/table_report.py`): `100DE770` `57ad8796b1b2652c` (real names), the cone
+  hash table `1015ADB8` `02610d9b8ad1da81` over its extended 2,052 bytes, and
+  `867e6dd4bf81dfd6` for every 2,048-byte all-zero table
+  (`1015A538`, `10159D38`, `10159380`, `1015CE28`, `1015C628`, `1015BE28`, `1015B5C0`).
+
+**The neighbour word.** `dword_1015B5B8` is zero in the shipped image (the `.data`
+tail past the file's raw `0x1000`) and is written before the check can run by the
+ASI's car-shadow code: `mov [0x1015B5B8],ecx` at `0x100128B5` with
+`ecx = eax+0xB+[eax+7]`, and `mov [0x1015B5B8],eax` at `0x10014F98`. It is
+`CarDynamicShadowFix`'s shadow-function pointer (six read sites, four of them the
+`call ds:[0x1015B5B8]` pairs in `detour_100068A0`). This tree already publishes that
+value into `zpatch_carparts_shadow_fn` by the same formula from the same recovered
+site, so the word is reproduced as **the same slot**, not a copy and not a zero
+placeholder.
+
+**Gates (final runs).** `cmake --build --preset release` exit 0;
+`ctest --preset release` 12/12; `python tools/parity_report.py 9` ->
+`build 9: 98 key(s) closed, 0 open, 1 oracle-verified (baseline incomplete)`;
+`python tools/verify_bodies.py ...` -> `138 body(ies), 0 failure(s)`;
+`python tools/verify_bodies.py --selftest ...` -> all fifteen cases behave;
+`zp_dump --ooc-selftest` -> `ooc selftest: PASS`; `.scratch/branch_targets.py` ->
+`138 row(s), 292 internal branch target(s), 0 failure(s)`.
+
+**Docs.** `docs/rebuilt.md`: new §2e/§2f/§2g, §2d's "what stays rebuilt" now points at
+§2e, §3 class A emptied, §4 item 3 gains the fourth registry property, §5 item 7
+rewritten, §6 counts 135 -> 138 and the new tools. `docs/parity.md`: 135 -> 138
+bodies, the `ForceCarHeadlightShadows` "what is transcribed" table and its
+"unavoidable divergence" paragraph rewritten (the divergence is gone),
+`CopSirensFlag`/`PopupHeadlightsFlag` note rewritten.
+
+**Open, not mine to edit.** `readable-fusion/AGENTS.md` line 11 still says "135 hook
+bodies transcribed"; it is 138 now, and "The pieces that are *not* transcribed are
+rebuilt in C++" no longer includes any class-A piece.

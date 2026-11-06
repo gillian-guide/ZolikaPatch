@@ -70,7 +70,7 @@ feature key, is closed by the converter recorded in its own section below;
 `HighQualityReflections` closed with the site-arithmetic resolution recorded below.
 
 - **98 of 99 option keys closed**;
-- **135 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **138 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe, and the compiled bodies listed in
   [`rebuilt.md`](rebuilt.md) are rebuilt in C++ instead, with no proof row. That file
@@ -85,12 +85,19 @@ feature key, is closed by the converter recorded in its own section below;
   bytes each (`DualVehicleHeadlights`) is what exposed the proof tool's old
   256-byte sweep window: it compared 64 of 78 and still reported PASS. The tool
   now sweeps 4096 bytes and fails a row that decodes fewer instructions than its
-  budget, so a truncated sweep can never pass again. This pass added
+  budget, so a truncated sweep can never pass again. This pass closed **class A**:
+  the IDE parser payload (`0x10003FA0`, 92), the popup-headlights checker
+  (`0x10044310`, 125) and the headlight-cone check (`0x1001AD20`, 46) are transcribed,
+  which needed one comparator extension (a displacement *inside* a registered table
+  resolves to that table plus its offset, for the popup checker's eight interleaved
+  columns) and one layout change (`Config::ModelTable` became a view over four
+  C-linkage arrays, because the map can only name an object, not a member at an offset
+  inside one). `rebuilt.md` §2e/§2f/§2g. The pass before added
   the steer consumer (`0x10004C70`, 320 instructions), the largest class-A piece,
   and both siren checks (`0x10005F70` 191, `0x10006260` 53), the first pieces
   transcribed through a base-plus-displacement table operand; the steer consumer's two
   wheelangle tables and the siren list are registered and the proof compares their
-  contents (`rebuilt.md` §2c/§2d). Before this pass came `BadPlayerModelCrashFix`'s
+  contents (`rebuilt.md` §2c/§2d). Before that came `BadPlayerModelCrashFix`'s
   model-name lookup (`0x10003F00`, 21 instructions), the first class-A piece
   transcribed: its table is
   registered and the proof compares the table's contents (`rebuilt.md` §2b). Before it
@@ -388,7 +395,7 @@ opcodes and the four placeholder bytes) plus seven displacement bytes it exclude
 | piece | VA | instructions/bytes | how |
 |---|---|---|---|
 | the hook thunk | `0x1001ADB0` | 9 instructions | transcribed and proven (`force_headlight_shadows_shim`) |
-| the offset check | `0x1001AD20` | 139 bytes, 46 instructions | rebuilt as C++: two indexed absolute table operands (`rebuilt.md` §3 class A) |
+| the offset check | `0x1001AD20` | 139 bytes, 46 instructions | transcribed and proven (`force_headlight_shadows_check`) |
 
 The shim is the whole body: store `ECX` into `dword_1015BDD0`, `pushad`, call the
 check, `popad`, replay the prologue the `E9` replaced (`push ebp` / `mov ebp,esp` /
@@ -397,25 +404,31 @@ why the resume has to be read from the site before the site is written: those tw
 bytes belong to the function the hook replaced, so the continuation must run with the
 frame already established.
 
-The check is **not** transcribed because it is compiler output: a `/GS` frame
+The check is the original's own instructions: a `/GS` frame
 (`mov eax,___security_cookie` / `xor eax,ebp`, `call __security_check_cookie` at
 `0x1005FE7B`), a tail-merged epilogue shared by its two returns, `movss` for the float
-store and a `nop dword ptr [eax]` loop alignment. Its behaviour is fixed by its own
-state words and by sitting between the shim's `pushad`/`popad`: seed
-`dword_101580C0` with 2.0f, walk the `dword_1015ADB8` hash table from slot 0
-(`hash = hashes[0]`, stop at the first zero), ask `dword_10159C0C` for each hash's
-model index and compare it with the object's signed word at `+0x2E`, and on the first
-hit store that slot's float from `dword_1015B5C0`. The lookup runs before the object
-is read and neither is guarded, so a null lookup faults on the call (`0x1001AD5C`) and
-a null object faults on the load (`0x1001AD62`), as in the original.
+store and a `nop dword ptr [eax]` loop alignment. Seed `dword_101580C0` with 2.0f, walk
+the `dword_1015ADB8` hash table from slot 0, ask `dword_10159C0C` for each hash's model
+index and compare it with the object's signed word at `+0x2E`, and on the first hit
+store that slot's float from `dword_1015B5C0`. The lookup runs before the object is
+read and neither is guarded, so a null lookup faults on the call (`0x1001AD5C`) and a
+null object faults on the load (`0x1001AD62`), as in the original.
 
-The one divergence, and why it is unavoidable: the original's walk runs past the end
-of its 512 hashes into the `.data` that follows its table (`0x1015B5B8`, its own
-`CarDynamicShadowFix` slot), which is a property of its layout and cannot be
-reproduced here. The rebuild stops at the 512th slot, so a section that fills all 512
-slots with resolvable names would walk out of the table in the original and stop here;
-no shipped or sample INI comes near that, and a table always stops at its first zero
-hash before it.
+**The walk past the table is no longer a divergence.** The original's walk reads one
+word past its 512 hashes (`0x1015B5B8`) when all 512 slots are filled. That word is
+zero in the shipped image (the `.data` tail past the file's raw size) and is written
+before the check can run by the ASI's own car-shadow code (`mov [0x1015B5B8],ecx` at
+`0x100128B5`, `mov [0x1015B5B8],eax` at `0x10014F98`) with the game's car-parts shadow
+function address — it is `CarDynamicShadowFix`'s published slot, read by six sites
+including the two `call ds:[0x1015B5B8]` pairs in `detour_100068A0`. This tree already
+publishes that value into `zpatch_carparts_shadow_fn` (same formula, same recovered
+site), so the transcription makes the word **the same slot** rather than a placeholder:
+the four objects sit in the original's order in `source/config.ixx` (hashes, the
+shadow pointer, the check's resume, the offsets) and the hash table is registered with
+the original's extended 2,052-byte range so the proof compares the read. The rebuild's
+old bound (stop at slot 512) is gone with it; `rebuilt.md` §2g carries the evidence and
+the one thing left unproven (that the two code paths really do produce the same
+address).
 
 **The two 512-slot tables, and the reader that fills them, are recovered.**
 `dword_1015ADB8` / `dword_1015B5C0` are filled by the loader preamble's
@@ -451,10 +464,13 @@ also runs the live `game_refs/ZolikaPatch.ini` through the transcribed resolver:
 78 offset rows → 78 slots, so the user's actual configuration is the one this
 reads.
 
-The walk's end is the divergence recorded above: `sub_1001AD20` reads past its
-512th hash in the original and stops there here, so a section that fills all 512
-slots with resolvable names is the one shape the reader can now produce that
-reaches it -- and only in the original does it differ.
+The walk's end is no longer a divergence: `sub_1001AD20` is transcribed, and its read
+past the 512th hash lands on the same word the original's does (the
+`CarDynamicShadowFix` shadow-function slot, reproduced as the same storage, with the
+check's own resume word after it — `rebuilt.md` §2g). A section that fills all 512
+slots with resolvable names therefore walks out of the table here exactly as it does
+there; the only thing that could still differ is the *value* of that slot, and both
+sides derive it from the same recovered site.
 
 ### The five keys behind `sub_10004C70`, closed
 
@@ -775,21 +791,22 @@ built-in police names and the `+siren` list are the original's own instructions,
 own `.rdata` name strings and its own resolver, and the table they walk is registered
 so the proof compares the operand by content with the base register still compared
 (`rebuilt.md` §2d). The `PopupHeadlightsFlag` checker (`sub_10044310`, 125) and the
-shared IDE payload (`sub_10003FA0`, 92) are still compiled C and rebuilt in C++
-against the same state words: a 512-slot
-model-hash list per category, filled by the shared IDE hook (`sub_100040E0` plus
-the rebuilt `sub_10003FA0`, 92) when the game's parser stores a `popuplights`,
-`siren` or `wheelangle:<degrees>` entry. Both keys install that same IDE body at
-the same site, as the original's two handlers do. The lookups go through
-`dword_10159C0C` and the names through the transcribed `sub_10003E50`, both
-unguarded, so a missing resolver faults where the original's indirect call does.
+shared IDE payload (`sub_10003FA0`, 92) are **transcribed** too (`rebuilt.md` §2f and
+§2e): the payload is the original's own three string tests, its two append walks and
+its `strtof`, filling a 512-slot model-hash list per category when the game's parser
+stores a `popuplights`, `siren` or `wheelangle:<degrees>` entry; the checker is its own
+lookup, its own bounded walk of the `+popuplights` list and its own eight-column scan
+of the `[PopupLightAngles]` tables. Both keys install that same IDE body at the same
+site, as the original's two handlers do. The lookups go through `dword_10159C0C` and
+the names through the transcribed `sub_10003E50`, both unguarded, so a missing
+resolver faults where the original's indirect call does.
 The popup shims' second (EDX) pattern has no hit on 1.0.8.0; its body is still
 transcribed and proven. The `[PopupLightAngles]` table the checker walks is filled
 from the INI by `Config::ReadModelTables` (`Config::PopupLightAngles()`); an empty
 section leaves every hash zero, which is what keeps the checker's own pi/2 default
 -- the shipped INI's shape. `ForceCarHeadlightShadows`' checker reads the
 `[HeadlightConeOffsets]` pair the same way; that key's section above records the
-recovered reader and its faults.
+recovered reader, its faults and the word its walk reads past the table.
 
 ### `RestoreDeathMusic`, closed on the native layer's wrappers
 

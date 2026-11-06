@@ -29,7 +29,12 @@ extern "C"
     uint32_t zpatch_carparts_resume_if = 0;    // dword_1015BDC8
     uint32_t zpatch_carparts_resume_else = 0;  // dword_1015BDC0
     uint32_t zpatch_carparts_resume_2 = 0;     // dword_1015BDCC
-    uint32_t zpatch_carparts_shadow_fn = 0;    // dword_1015B5B8
+
+    // dword_1015B5B8, defined in source/config.ixx: the original keeps it in `.data`
+    // immediately after the [HeadlightConeOffsets] hash array, and the cone check's
+    // walk reads it as the 513th hash, so this tree defines it as the next object after
+    // that array (docs/rebuilt.md §2g). This arm publishes the same value into it.
+    extern uint32_t zpatch_carparts_shadow_fn;
 
     // The collision body's node-walk test and the deadlock counter it compares.
     uint32_t zpatch_collision_should_walk = 0;  // dword_1015BDD4
@@ -40,12 +45,13 @@ extern "C"
     // stores it, the checker reads +0x2E of it). dword_101580C0: the offset float
     // the site's `movss xmm2, [0xD95B68]` is retargeted at; the original seeds its
     // copy with 2.0f on disk, so this one starts there too. dword_1015B5BC: the
-    // resume, published from the site's own prologue before the E9 replaces it.
-    // The two 512-slot [HeadlightConeOffsets] tables the checker walks
-    // (dword_1015ADB8 / dword_1015B5C0) live in Config::HeadlightConeOffsets().
+    // resume, published from the site's own prologue before the E9 replaces it, and
+    // defined in source/config.ixx as the second word of the [HeadlightConeOffsets]
+    // block (the original keeps it between the cone's hashes and its offsets, and the
+    // cone walk can read it -- docs/rebuilt.md §2g).
     uint32_t zpatch_fchs_param = 0;
     float zpatch_fchs_offset = 2.0f;
-    uint32_t zpatch_fchs_resume = 0;
+    extern uint32_t zpatch_fchs_resume;
 
     // The bike-physics detour's published state: the incoming value the clamp
     // rewrites, the caller's EAX saved across the clamp call, and the resume (the
@@ -365,61 +371,93 @@ static __declspec(naked) void CarDynamicShadowShimB()
     }
 }
 
-// abi_fchs_check, recovered VA 0x1001AD20 (139 bytes, 0x1001AD20..0x1001ADAA):
-// ForceCarHeadlightShadows' per-model offset check, rebuilt rather than
-// transcribed. It is compiler output for a C function -- a /GS frame
-// (`mov eax,___security_cookie` / `xor eax,ebp`, `call __security_check_cookie` at
-// 0x1005FE7B), a tail-merged epilogue shared by its two returns, and a
-// `nop dword ptr [eax]` loop alignment -- so a linear transcription would prove the
-// compiler's register allocation, not the feature. What it does is fixed by the
-// shim's `call` and by its own state words: seed the offset float with 2.0f, then
-// walk the [HeadlightConeOffsets] table Config::HeadlightConeOffsets() holds from
-// slot 0, stopping at the first zero hash, and on the first entry whose model-index
-// lookup answers the object's signed model word publish that entry's float. The
-// lookup slot and the object are read unguarded -- the original's `call
-// dword_10159C0C` (0x1001AD5C) and its `movsx eax, word [edi+2Eh]` (0x1001AD62)
-// are -- and the call comes first, so a null object faults on the load and a null
-// lookup faults on the call.
-namespace
+// abi_fchs_check, recovered VA 0x1001AD20 (46 instructions, 139 bytes,
+// 0x1001AD20..0x1001ADAA): ForceCarHeadlightShadows' per-model offset check,
+// transcribed instruction for instruction.
+//
+// It seeds the offset float (dword_101580C0) with 2.0f, then walks the
+// [HeadlightConeOffsets] hash table from slot 0: `mov eax,ds:[0x1015ADB8]` loads
+// slot 0, and each iteration asks the game's model store for that hash's model index
+// and compares it with the object's signed word at +0x2E (the object is read
+// unguarded, as the original's `movsx eax,word [edi+2Eh]` is). On a match it
+// publishes that slot's float; otherwise it loads the next slot with
+// `mov eax,ds:[esi*4+0x1015ADBC]` -- the table's base **plus four**, because ESI
+// counts the slot it just consumed -- and stops at the first zero word.
+//
+// The one-word-past read. With ESI at 511 that load is `ds:[0x1015B5B8]`, the word
+// immediately after the 512-slot table in the original's `.data`. It is *not* dead
+// space: it is CarDynamicShadowFix's published shadow-function pointer, written
+// before this check can run by the ASI's own car-shadow code (see the block comment
+// in source/config.ixx). Our layout reproduces it as the same slot, with the check's
+// own resume word (0x1015B5BC) after it, so the walk reads the value the original's
+// does rather than a placeholder -- which is what makes this transcription possible
+// instead of a bounded walk (docs/rebuilt.md §2g). The two arrays are registered with
+// their original VAs; the hash table's registration is the extended 2,052 bytes
+// (512 words + the neighbour).
+//
+// The /GS frame is the original's (cookie slot, check call slot) and the
+// `nop dword ptr [eax]` at 0x1001AD4D is emitted as bytes. No exception frame, no TLS
+// static-init guard.
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void FchsCheckBody()
 {
-    constexpr float kFchsDefaultOffset = 2.0f;  // dword_101580C0's on-disk seed
-    static_assert(std::bit_cast<uint32_t>(kFchsDefaultOffset) == 0x40000000u);
-
-    void FchsCheck()
+    __asm
     {
-        const auto lookup = reinterpret_cast<int(__cdecl*)(uint32_t, std::int32_t*)>(
-            static_cast<uintptr_t>(zpatch_model_lookup));
-        const auto* const object = reinterpret_cast<const std::byte*>(
-            static_cast<uintptr_t>(zpatch_fchs_param));
-        const auto& table = Config::HeadlightConeOffsets();
-
-        uint32_t hash = table.hashes[0];
-        zpatch_fchs_offset = kFchsDefaultOffset;
-        if (hash == 0u)
-            return;
-
-        for (uint32_t slot = 0;;)
-        {
-            std::int32_t index = -1;
-            lookup(hash, &index);
-            const auto model = *reinterpret_cast<const std::int16_t*>(object + 0x2E);
-            if (static_cast<std::int32_t>(model) == index)
-            {
-                zpatch_fchs_offset = table.values[slot];
-                return;
-            }
-
-            ++slot;
-            // The original walks off the end of its table into the .data that follows
-            // it; our module's layout differs, so the walk stops at the last slot
-            // (docs/parity.md). Unreachable with a section that holds fewer than 512
-            // rows, because the walk stops at the first zero hash instead.
-            if (slot == std::size(table.hashes))
-                return;
-            hash = table.hashes[slot];
-            if (hash == 0u)
-                return;
-        }
+        push ebp
+        mov ebp, esp
+        sub esp, 8
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, ebp
+        mov DWORD PTR [ebp - 4], eax
+        mov eax, DWORD PTR [zpatch_headlight_cone_hashes]
+        push esi
+        xor esi, esi
+        mov DWORD PTR [zpatch_fchs_offset], 40000000h   // 2.0f, the .data seed
+        push edi
+        mov edi, DWORD PTR [zpatch_fchs_param]
+        test eax, eax
+        je fchs_done
+        __emit 0x0F
+        __emit 0x1F
+        __emit 0x00                  // nop dword ptr [eax]
+    fchs_loop:
+        lea ecx, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push ecx
+        push eax
+        call DWORD PTR [zpatch_model_lookup]
+        movsx eax, WORD PTR [edi + 2Eh]
+        add esp, 8
+        cmp eax, DWORD PTR [ebp - 8]
+        je fchs_found
+        // The table's base plus four: ESI is the slot just consumed, so slot ESI+1 is
+        // at [esi*4+base+4], and at ESI=511 that is the word past the table.
+        mov eax, DWORD PTR [esi*4 + zpatch_headlight_cone_hashes + 4]
+        inc esi
+        test eax, eax
+        jne fchs_loop
+        pop edi
+        pop esi
+        mov ecx, DWORD PTR [ebp - 4]
+        xor ecx, ebp
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    fchs_found:
+        movss xmm0, DWORD PTR [esi*4 + zpatch_headlight_cone_values]
+        movss DWORD PTR [zpatch_fchs_offset], xmm0
+    fchs_done:
+        mov ecx, DWORD PTR [ebp - 4]
+        pop edi
+        xor ecx, ebp
+        pop esi
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
     }
 }
 
@@ -435,7 +473,7 @@ static __declspec(naked) void FchsShimBody()
     {
         mov DWORD PTR [zpatch_fchs_param], ecx
         __emit 0x60  // pushad
-        call FchsCheck
+        call FchsCheckBody
         __emit 0x61  // popad
         push ebp
         mov ebp, esp
@@ -2696,12 +2734,25 @@ export void RegisterVehicles()
     Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_wheelangle_angles),
         0x10159D38u, sizeof(zpatch_wheelangle_angles));   // 512 * 4 = 2048
 
+    // ForceCarHeadlightShadows' two [HeadlightConeOffsets] arrays: dword_1015ADB8 (the
+    // hashes) and dword_1015B5C0 (the offsets). The hash registration is the original's
+    // **extended** 2,052-byte range -- 512 words plus the one word the walk reads past
+    // slot 511 (dword_1015B5B8) -- so the proof compares that read too. The word is not
+    // a copy: it is CarDynamicShadowFix's published shadow-function slot, defined
+    // immediately after the array in source/config.ixx so the layout matches the
+    // original's .data (docs/rebuilt.md §2g). The offsets array is registered at its
+    // own base, which the original places 2,056 bytes into the block.
+    Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_headlight_cone_hashes),
+        0x1015ADB8u, sizeof(zpatch_headlight_cone_hashes) + sizeof(uint32_t));  // 2052
+    Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_headlight_cone_values),
+        0x1015B5C0u, sizeof(zpatch_headlight_cone_values));   // 512 * 4 = 2048
+
     // Each stub's inline `call` is invisible to C++; naming the forwarders here keeps
     // their out-of-line definitions in the image.
     [[maybe_unused]] const uintptr_t helpers[] = {
         reinterpret_cast<uintptr_t>(&NoliveryFormat),
         reinterpret_cast<uintptr_t>(&NoliveryResolve),
         reinterpret_cast<uintptr_t>(&SteerConsumerBody),
-        reinterpret_cast<uintptr_t>(&FchsCheck),
+        reinterpret_cast<uintptr_t>(&FchsCheckBody),
     };
 }

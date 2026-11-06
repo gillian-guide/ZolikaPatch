@@ -217,14 +217,22 @@ export namespace Config
     // [HeadlightConeOffsets]). Both start zeroed, as the original's .bss words do.
     inline constexpr size_t ModelTableSlots = 512;
 
+    // A *view* of one table's two arrays. The arrays themselves are four C-linkage
+    // objects of their own (declared below) rather than members of one struct: a
+    // transcribed body reads each through an absolute displacement, and the offline
+    // proof resolves that displacement through the linker map, which names an object
+    // and never a member at an offset inside one. That is what lets the popup checker
+    // and the cone check be proven at all -- they read the arrays as
+    // `[eax+0x1015C628]`-shaped operands, and `tests/bodies.tsv` pairs each array with
+    // the original's VA and length (docs/rebuilt.md §2f, §2g).
     struct ModelTable
     {
-        std::array<uint32_t, ModelTableSlots> hashes{};
-        std::array<float, ModelTableSlots> values{};
+        std::span<uint32_t> hashes;
+        std::span<float> values;
     };
 
-    ModelTable& PopupLightAngles();
-    ModelTable& HeadlightConeOffsets();
+    ModelTable PopupLightAngles();
+    ModelTable HeadlightConeOffsets();
 
     // sub_10003E50's shape: __cdecl, the name, the hash in EAX. The caller passes
     // the transcribed resolver; the reader never hashes a name itself.
@@ -236,6 +244,51 @@ export namespace Config
     void ReadModelTables(const Feather::Document& document, NameResolver resolve);
 }
 
+// The four recovered arrays, in C linkage because the transcribed bodies and the
+// proof's `table` rows name them: dword_1015C628 (popup angles' hashes),
+// dword_1015BE28 (their values), dword_1015ADB8 (the cone's hashes) and
+// dword_1015B5C0 (its values). The original keeps all four in `.data`'s
+// uninitialised tail, so the loader maps zeros and the shipped content is all-zero
+// on both sides; the reader above is what fills them, at the same slots and in the
+// same order as `sub_100523C0`.
+extern "C"
+{
+    uint32_t zpatch_popup_angle_hashes[Config::ModelTableSlots] = {};
+    float zpatch_popup_angle_values[Config::ModelTableSlots] = {};
+
+    // The [HeadlightConeOffsets] block, in the original's `.data` order:
+    // dword_1015ADB8's 512 hash slots, then **the two words the original keeps
+    // between them and the values**, then dword_1015B5C0's 512 offsets. The
+    // original's cone walk (`mov eax, ds:[esi*4+0x1015ADBC]`) runs with ESI up to
+    // 511 and therefore reads dword_1015B5B8 as its 513th entry when all 512 slots
+    // are filled; the word after that is dword_1015B5BC. Both are the *same slots the
+    // rest of the tree already publishes into*, which is why they are defined here
+    // rather than copied:
+    //
+    //   dword_1015B5B8  CarDynamicShadowFix's shadow-function pointer. It is zero in
+    //                   the shipped image (the original's `.data` tail past the
+    //                   file's raw size) and is written before this check can run by
+    //                   the ASI's own car-shadow code, `mov [0x1015B5B8],ecx` at
+    //                   0x100128B5 with `ecx = eax+0xB+[eax+7]` (the game call target
+    //                   of the recovered `56 6A 02 53 53 57 E8` site, whose resume is
+    //                   eax+0xB) and `mov [0x1015B5B8],eax` at 0x10014F98.
+    //                   `zpatch_carparts_shadow_fn` is this tree's slot for exactly
+    //                   that value, computed by the same formula from the same
+    //                   recovered site (source/vehicles.ixx), so the walk reads the
+    //                   value the original's does -- not a placeholder.
+    //   dword_1015B5BC  this check's own resume, published by its installer
+    //                   (`mov [0x1015B5BC],ecx` at 0x1001AEC2) and jumped through by
+    //                   the shim. `zpatch_fchs_resume` is that slot here.
+    //
+    // Laying the four out in the original's order is what makes the walk's first read
+    // past slot 511 land on the same word as the original's; the hash table is
+    // registered with the original's extended 2,052-byte range (docs/rebuilt.md §2g).
+    uint32_t zpatch_headlight_cone_hashes[Config::ModelTableSlots] = {};
+    uint32_t zpatch_carparts_shadow_fn = 0;   // dword_1015B5B8
+    uint32_t zpatch_fchs_resume = 0;          // dword_1015B5BC
+    float zpatch_headlight_cone_values[Config::ModelTableSlots] = {};
+}
+
 namespace
 {
     // The two recovered doubles: pi (0x400921FB54442D18 at 0x10152358) and 180.0
@@ -244,7 +297,7 @@ namespace
     constexpr double kDegreesPerHalfTurn = 180.0;
 
     void ReadModelTable(const Feather::Document& document, std::string_view section,
-        std::string_view valueSuffix, Config::ModelTable& table, bool degreesToRadians,
+        std::string_view valueSuffix, Config::ModelTable table, bool degreesToRadians,
         Config::NameResolver resolve)
     {
         // The original asks `setSection` for the section and jumps over the whole
@@ -283,25 +336,31 @@ namespace
 
 namespace Config
 {
-    ModelTable& PopupLightAngles()
+    ModelTable PopupLightAngles()
     {
-        static ModelTable table;
-        return table;
+        return { zpatch_popup_angle_hashes, zpatch_popup_angle_values };
     }
 
-    ModelTable& HeadlightConeOffsets()
+    ModelTable HeadlightConeOffsets()
     {
-        static ModelTable table;
-        return table;
+        return { zpatch_headlight_cone_hashes, zpatch_headlight_cone_values };
     }
 
     void ReadModelTables(const Feather::Document& document, NameResolver resolve)
     {
         // The original's tables are zero-filled .bss written once; a read starts
         // from zero so the caller sees exactly that, and a throw leaves the
-        // half-filled tables the original would leave.
-        PopupLightAngles() = ModelTable{};
-        HeadlightConeOffsets() = ModelTable{};
+        // half-filled tables the original would leave. The four arrays are
+        // zero-initialised globals, so this only matters if the reader ever runs
+        // twice; it does not reach the cone's extra word, which stays zero (it is not
+        // a table slot and the original never writes it).
+        for (auto table : { PopupLightAngles(), HeadlightConeOffsets() })
+        {
+            for (auto& hash : table.hashes)
+                hash = 0;
+            for (auto& value : table.values)
+                value = 0.0f;
+        }
 
         // The original's order: [PopupLightAngles] first (0x10052419), then
         // [HeadlightConeOffsets] (0x10052901). A throw in the first section leaves

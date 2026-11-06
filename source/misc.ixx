@@ -717,19 +717,17 @@ extern "C"
     const char zpatch_copsirens_n_police2[] = "n_police2";
     const char zpatch_copsirens_n_polpatriot[] = "n_polpatriot";
     const char zpatch_copsirens_n_pstockade[] = "n_pstockade";
+
+    // The IDE parser's third arm compares the site's string against this literal
+    // (original 0x10128DF4, "wheelangle:" and its NUL) and parses the degrees that
+    // follow it with the CRT's strtof (original IAT slot 0x100632D4, `call ds:[...]`,
+    // which stays a pointer slot because the original's call is memory indirect).
+    const char zpatch_ide_wheelangle_prefix[] = "wheelangle:";
+    uintptr_t zpatch_ide_strtof = 0;
 }
 
 namespace
 {
-    constexpr uint32_t kVehicleLightSlots = 512;
-
-    // dword_10159C0C's call shape: __cdecl, the name hash then the index
-    // out-parameter. A null slot faults, as the original's indirect call does.
-    int LookupModel(uint32_t nameHash, int32_t* index)
-    {
-        return reinterpret_cast<int(__cdecl*)(uint32_t, int32_t*)>(zpatch_model_lookup)(nameHash, index);
-    }
-
     // sub_10003E50 (source/shared.ixx), the original's own name resolver/hasher.
     // The checks call it rather than a C++ hash, so the "hash:" and quoted forms
     // resolve exactly as in the original.
@@ -737,73 +735,145 @@ namespace
     {
         return reinterpret_cast<uint32_t(__cdecl*)(const char*)>(Shared::ValueResolver())(name);
     }
+}
 
-    // _strnicmp(text, prefix, length) with the CRT's stop-at-NUL rule.
-    bool CaseInsensitivePrefix(const char* text, const char* prefix, size_t length)
+// sub_10003FA0, recovered VA 0x10003FA0 (92 instructions, 314 bytes): the IDE parser
+// hook's payload, transcribed instruction for instruction.
+//
+// Three independent tests on the site's string (dword_1015BE08), in the original's
+// order, each of which appends the model word (dword_1015BE0C + 60, read unguarded)
+// to a 512-slot table when it is not already there: "popuplights" by three dword
+// compares, "siren" by a dword and a word compare, and the "wheelangle:" prefix
+// through the CRT's _strnicmp followed by strtof of the text eleven bytes in. The
+// first two fall through to the next arm; the third ends the function.
+//
+// Every one of the four tables is a registered table (docs/rebuilt.md §2b-§2e): the
+// popuplights list at 0x1015CE28, the siren list at 0x10159380, and the wheelangle
+// model/angle pair at 0x1015A538 / 0x10159D38. Three of them are read through an
+// absolute *with* a base and no index (`cmp [eax+table],esi`, the §2d shape) and the
+// stores through an indexed absolute (`mov [ecx*4+table],eax`, the §2b shape); the
+// slot-0 entry check is a plain absolute and therefore an `abs` slot.
+//
+// The three loop paddings are emitted as bytes because the inline assembler picks
+// its own: `66 90` at 0x10003FDE, `0F 1F 00` at 0x1000402D and
+// `66 0F 1F 44 00 00` at 0x1000409A. No exception frame and no TLS static-init
+// guard, so nothing blocks the transcription.
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void IdeParseBody()
+{
+    __asm
     {
-        for (size_t i = 0; i < length; ++i)
-        {
-            unsigned char left = static_cast<unsigned char>(text[i]);
-            unsigned char right = static_cast<unsigned char>(prefix[i]);
-            if (left == 0 || right == 0)
-                return left == right;
-            if (left >= 'A' && left <= 'Z')
-                left = static_cast<unsigned char>(left + ('a' - 'A'));
-            if (right >= 'A' && right <= 'Z')
-                right = static_cast<unsigned char>(right + ('a' - 'A'));
-            if (left != right)
-                return false;
-        }
-        return true;
-    }
-
-    // Appends the model's name hash to a 512-slot IDE table, deduplicating; a full
-    // table stores nothing, as the original's `result > 0x7FC` return does.
-    void AppendModel(uint32_t* slots, uint32_t model)
-    {
-        for (uint32_t slot = 0; slot < kVehicleLightSlots; ++slot)
-        {
-            if (slots[slot] == model)
-                return;
-            if (slots[slot] == 0)
-            {
-                slots[slot] = model;
-                return;
-            }
-        }
-    }
-
-    // sub_10003FA0 (92 instructions), rebuilt: the IDE parser hook's payload. The
-    // three arms are independent `if`s on the same string (the popuplights block
-    // falls through to the siren check). The object read is unguarded, as the
-    // original's `dword_1015BE0C + 60` is.
-    void IdeParse()
-    {
-        const auto* text = reinterpret_cast<const char*>(static_cast<uintptr_t>(zpatch_ide_string));
-        const auto* object = reinterpret_cast<const std::byte*>(static_cast<uintptr_t>(zpatch_ide_model));
-        const uint32_t model = *reinterpret_cast<const uint32_t*>(object + 60);
-
-        if (std::strcmp(text, "popuplights") == 0)
-            AppendModel(zpatch_popuplights_models, model);
-        if (std::strcmp(text, "siren") == 0)
-            AppendModel(zpatch_copsirens_models, model);
-        if (CaseInsensitivePrefix(text, "wheelangle:", 11))
-        {
-            const float angle = std::strtof(text + 11, nullptr);
-            uint32_t bits = 0;
-            std::memcpy(&bits, &angle, sizeof(bits));
-            for (uint32_t slot = 0; slot < kVehicleLightSlots; ++slot)
-            {
-                if (zpatch_wheelangle_models[slot] == model)
-                    return;
-                if (zpatch_wheelangle_models[slot] == 0)
-                {
-                    zpatch_wheelangle_models[slot] = model;
-                    zpatch_wheelangle_angles[slot] = bits;
-                    return;
-                }
-            }
-        }
+        push ebp
+        mov ebp, esp
+        push ecx
+        mov edx, DWORD PTR [zpatch_ide_string]
+        mov eax, 75706F70h            // "popu"
+        push esi
+        push edi
+        mov edi, DWORD PTR [zpatch_ide_model]
+        cmp eax, DWORD PTR [edx]
+        jne ide_not_popuplights
+        mov eax, 67696C70h            // "plig"
+        cmp eax, DWORD PTR [edx + 4]
+        jne ide_not_popuplights
+        mov eax, 737468h              // "hts\0"
+        cmp eax, DWORD PTR [edx + 8]
+        jne ide_not_popuplights
+        xor ecx, ecx
+        cmp DWORD PTR [zpatch_popuplights_models], ecx
+        je ide_popuplights_append
+        mov esi, DWORD PTR [edi + 3Ch]
+        xor eax, eax
+        __emit 0x66
+        __emit 0x90                   // nop (the original's two-byte form)
+    ide_popuplights_walk:
+        cmp DWORD PTR [eax + zpatch_popuplights_models], esi
+        je ide_not_popuplights
+        add eax, 4
+        inc ecx
+        cmp eax, 7FCh
+        ja ide_done
+        cmp DWORD PTR [eax + zpatch_popuplights_models], 0
+        jne ide_popuplights_walk
+    ide_popuplights_append:
+        mov eax, DWORD PTR [edi + 3Ch]
+        mov DWORD PTR [ecx*4 + zpatch_popuplights_models], eax
+    ide_not_popuplights:
+        mov eax, 65726973h            // "sire"
+        cmp eax, DWORD PTR [edx]
+        jne ide_not_siren
+        mov eax, 6Eh                  // "n\0"
+        cmp ax, WORD PTR [edx + 4]
+        jne ide_not_siren
+        xor ecx, ecx
+        cmp DWORD PTR [zpatch_copsirens_models], ecx
+        je ide_siren_append
+        mov esi, DWORD PTR [edi + 3Ch]
+        xor eax, eax
+        __emit 0x0F
+        __emit 0x1F
+        __emit 0x00                  // nop dword ptr [eax]
+    ide_siren_walk:
+        cmp DWORD PTR [eax + zpatch_copsirens_models], esi
+        je ide_not_siren
+        add eax, 4
+        inc ecx
+        cmp eax, 7FCh
+        ja ide_done
+        cmp DWORD PTR [eax + zpatch_copsirens_models], 0
+        jne ide_siren_walk
+    ide_siren_append:
+        mov eax, DWORD PTR [edi + 3Ch]
+        mov DWORD PTR [ecx*4 + zpatch_copsirens_models], eax
+    ide_not_siren:
+        push 0Bh
+        push OFFSET zpatch_ide_wheelangle_prefix
+        push edx
+        call DWORD PTR [zpatch_resolver_strnicmp]
+        add esp, 0Ch
+        test eax, eax
+        jne ide_done
+        push eax                      // endptr = the null the compare left in EAX
+        mov eax, DWORD PTR [zpatch_ide_string]
+        add eax, 0Bh
+        push eax
+        call DWORD PTR [zpatch_ide_strtof]
+        mov esi, DWORD PTR [zpatch_ide_model]
+        xor ecx, ecx
+        add esp, 8
+        fstp DWORD PTR [ebp - 4]
+        cmp DWORD PTR [zpatch_wheelangle_models], ecx
+        je ide_wheelangle_append
+        mov edx, DWORD PTR [esi + 3Ch]
+        xor eax, eax
+        __emit 0x66
+        __emit 0x0F
+        __emit 0x1F
+        __emit 0x44
+        __emit 0x00
+        __emit 0x00                  // nop word ptr [eax+eax]
+    ide_wheelangle_walk:
+        cmp DWORD PTR [eax + zpatch_wheelangle_models], edx
+        je ide_done
+        add eax, 4
+        inc ecx
+        cmp eax, 7FCh
+        ja ide_done
+        cmp DWORD PTR [eax + zpatch_wheelangle_models], 0
+        jne ide_wheelangle_walk
+    ide_wheelangle_append:
+        movss xmm0, DWORD PTR [ebp - 4]
+        mov eax, DWORD PTR [esi + 3Ch]
+        mov DWORD PTR [ecx*4 + zpatch_wheelangle_models], eax
+        movss DWORD PTR [ecx*4 + zpatch_wheelangle_angles], xmm0
+    ide_done:
+        pop edi
+        pop esi
+        mov esp, ebp
+        pop ebp
+        ret
     }
 }
 
@@ -1163,7 +1233,7 @@ static __declspec(naked) void IdeHookBody()
         __emit 0x60  // pusha
         mov DWORD PTR [zpatch_ide_string], edi
         mov DWORD PTR [zpatch_ide_model], eax
-        call IdeParse
+        call IdeParseBody
         __emit 0x61  // popa
         mov ecx, 7
         xor edx, edx
@@ -1237,60 +1307,198 @@ extern "C"
     uint32_t zpatch_popup_resume_b = 0;
 
     // The two 512-slot [PopupLightAngles] tables the checker walks
-    // (dword_1015C628 / dword_1015BE28) are Config::PopupLightAngles(), filled by
-    // the loader preamble's reader. When the section is empty the hashes are all
-    // zero, so the checker keeps the pi/2 above -- the original's own default.
+    // (dword_1015C628 / dword_1015BE28) are Config::PopupLightAngles()'s arrays, filled
+    // by the loader preamble's reader and registered beside this arm. When the section
+    // is empty the hashes are all zero, so the checker keeps the pi/2 above -- the
+    // original's own default.
 }
 
-namespace
+// sub_10044310, recovered VA 0x10044310 (125 instructions, 534 bytes): the
+// popup-headlights checker, transcribed instruction for instruction.
+//
+// It seeds the site's angle slot (dword_101580CC) with pi/2 as a *dword* store
+// (`mov dword ptr [0x101580CC], 3FC90FDBh`), asks the game's model store for the
+// model the original names by the literal hash 0xEB9F21D3 (`push 0EB9F21D3h` at
+// 0x1004432E), and answers flag 1 when that is the site's model word. Otherwise it
+// walks the +popuplights list the IDE payload filled: the same lookup per slot, a
+// bounded `cmp edi,7FCh` walk that ends at the first zero word, and on a match flag 1
+// plus the column scan below. The lookup slot is unguarded, as the original's
+// `call dword_10159C0C` is.
+//
+// The column scan is the reason this body needed the table registry extended: it
+// reads the [PopupLightAngles] tables as **eight interleaved columns** of 64 rows,
+// `mov ecx,ds:[eax+0x1015C628]` through `[eax+0x1015C644]` and the same eight at
+// 0x1015BE28, with EAX stepping 0x20 (`add eax,20h` / `cmp eax,800h` / `jl`). Seven
+// of each eight displacements are therefore four bytes into the table rather than at
+// its base; the registry resolves a displacement inside a registered table to that
+// table plus the offset, and the offset is compared (docs/rebuilt.md §2f). Each column
+// keeps the last matching row's angle, which is what the original's in-place
+// overwrite does.
+//
+// The /GS frame is the original's (cookie slot, check call slot). The two loop
+// paddings are emitted as bytes because the inline assembler picks its own:
+// `66 0F 1F 84 00 00 00 00 00` at 0x10044387 and `0F 1F 80 00 00 00 00` at
+// 0x100443E9. No exception frame, no TLS static-init guard.
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void PopupHeadlightsCheckBody()
 {
-    // sub_10044310 (125 instructions), rebuilt: reset the angle to pi/2, ask the
-    // model store for the model the original names by the literal hash 0xEB9F21D3
-    // (`push 0EB9F21D3h` at 0x1004432E) and compare the model against it, then walk
-    // the +popuplights list the IDE parser filled. On a match the angle is the
-    // last matching [PopupLightAngles] row, as in the original's eight interleaved
-    // 64-entry columns (flattened here to 512 slots). The lookup is unguarded.
-    void PopupHeadlightsCheck()
+    __asm
     {
-        constexpr uint32_t kPopupLightsHash = 0xEB9F21D3u;
-
-        zpatch_popup_angle = 1.57079632679489661923f;  // 0x3FC90FDB
-        zpatch_popup_flag = 0;
-
-        int32_t found = -1;
-        LookupModel(kPopupLightsHash, &found);
-        zpatch_popup_index = static_cast<uint32_t>(found);
-        if (found == static_cast<int32_t>(zpatch_popup_model))
-        {
-            zpatch_popup_flag = 1;
-            return;
-        }
-
-        if (zpatch_popuplights_models[0] == 0)
-            return;
-
-        uint32_t slot = 0;
-        for (;;)
-        {
-            found = -1;
-            LookupModel(zpatch_popuplights_models[slot], &found);
-            if (found == static_cast<int32_t>(zpatch_popup_model))
-                break;
-            ++slot;
-            if (slot >= kVehicleLightSlots || zpatch_popuplights_models[slot] == 0)
-                return;
-        }
-
-        zpatch_popup_flag = 1;
-        // The original scans exactly 512 slots (eight 64-entry columns), no matter
-        // how many the section filled, and keeps the last match.
-        const auto& table = Config::PopupLightAngles();
-        for (uint32_t i = 0; i < kVehicleLightSlots; ++i)
-        {
-            if (table.hashes[i] != 0 &&
-                table.hashes[i] == zpatch_popuplights_models[slot])
-                zpatch_popup_angle = table.values[i];
-        }
+        push ebp
+        mov ebp, esp
+        sub esp, 8
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, ebp
+        mov DWORD PTR [ebp - 4], eax
+        lea eax, [ebp - 8]
+        mov DWORD PTR [zpatch_popup_angle], 3FC90FDBh   // pi/2, the .data seed
+        push eax
+        push 0EB9F21D3h
+        mov DWORD PTR [zpatch_popup_flag], 0
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        call DWORD PTR [zpatch_model_lookup]
+        mov eax, DWORD PTR [ebp - 8]
+        add esp, 8
+        mov DWORD PTR [zpatch_popup_index], eax
+        cmp eax, DWORD PTR [zpatch_popup_model]
+        jne popup_walk
+        mov DWORD PTR [zpatch_popup_flag], 1
+        mov ecx, DWORD PTR [ebp - 4]
+        xor ecx, ebp
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    popup_walk:
+        push esi
+        xor esi, esi
+        cmp DWORD PTR [zpatch_popuplights_models], esi
+        je popup_no_list
+        push edi
+        xor edi, edi
+        __emit 0x66
+        __emit 0x0F
+        __emit 0x1F
+        __emit 0x84
+        __emit 0x00
+        __emit 0x00
+        __emit 0x00
+        __emit 0x00
+        __emit 0x00                  // nop word ptr [eax+eax]
+    popup_search_loop:
+        lea eax, [ebp - 8]
+        mov DWORD PTR [ebp - 8], 0FFFFFFFFh
+        push eax
+        push DWORD PTR [edi + zpatch_popuplights_models]
+        call DWORD PTR [zpatch_model_lookup]
+        mov eax, DWORD PTR [zpatch_popup_model]
+        add esp, 8
+        cmp eax, DWORD PTR [ebp - 8]
+        je popup_search_hit
+        add edi, 4
+        inc esi
+        cmp edi, 7FCh
+        ja popup_walk_done
+        cmp DWORD PTR [edi + zpatch_popuplights_models], 0
+        jne popup_search_loop
+        pop edi
+        pop esi
+        mov ecx, DWORD PTR [ebp - 4]
+        xor ecx, ebp
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    popup_search_hit:
+        mov DWORD PTR [zpatch_popup_flag], 1
+        xor eax, eax
+        __emit 0x0F
+        __emit 0x1F
+        __emit 0x80
+        __emit 0x00
+        __emit 0x00
+        __emit 0x00
+        __emit 0x00                  // nop dword ptr [eax]
+    popup_column_0:
+        mov ecx, DWORD PTR [eax + zpatch_popup_angle_hashes]
+        test ecx, ecx
+        je popup_column_1
+        cmp DWORD PTR [esi*4 + zpatch_popuplights_models], ecx
+        jne popup_column_1
+        movss xmm0, DWORD PTR [eax + zpatch_popup_angle_values]
+        movss DWORD PTR [zpatch_popup_angle], xmm0
+    popup_column_1:
+        mov ecx, DWORD PTR [eax + zpatch_popup_angle_hashes + 4]
+        test ecx, ecx
+        je popup_column_2
+        cmp DWORD PTR [esi*4 + zpatch_popuplights_models], ecx
+        jne popup_column_2
+        movss xmm0, DWORD PTR [eax + zpatch_popup_angle_values + 4]
+        movss DWORD PTR [zpatch_popup_angle], xmm0
+    popup_column_2:
+        mov ecx, DWORD PTR [eax + zpatch_popup_angle_hashes + 8]
+        test ecx, ecx
+        je popup_column_3
+        cmp DWORD PTR [esi*4 + zpatch_popuplights_models], ecx
+        jne popup_column_3
+        movss xmm0, DWORD PTR [eax + zpatch_popup_angle_values + 8]
+        movss DWORD PTR [zpatch_popup_angle], xmm0
+    popup_column_3:
+        mov ecx, DWORD PTR [eax + zpatch_popup_angle_hashes + 0Ch]
+        test ecx, ecx
+        je popup_column_4
+        cmp DWORD PTR [esi*4 + zpatch_popuplights_models], ecx
+        jne popup_column_4
+        movss xmm0, DWORD PTR [eax + zpatch_popup_angle_values + 0Ch]
+        movss DWORD PTR [zpatch_popup_angle], xmm0
+    popup_column_4:
+        mov ecx, DWORD PTR [eax + zpatch_popup_angle_hashes + 10h]
+        test ecx, ecx
+        je popup_column_5
+        cmp DWORD PTR [esi*4 + zpatch_popuplights_models], ecx
+        jne popup_column_5
+        movss xmm0, DWORD PTR [eax + zpatch_popup_angle_values + 10h]
+        movss DWORD PTR [zpatch_popup_angle], xmm0
+    popup_column_5:
+        mov ecx, DWORD PTR [eax + zpatch_popup_angle_hashes + 14h]
+        test ecx, ecx
+        je popup_column_6
+        cmp DWORD PTR [esi*4 + zpatch_popuplights_models], ecx
+        jne popup_column_6
+        movss xmm0, DWORD PTR [eax + zpatch_popup_angle_values + 14h]
+        movss DWORD PTR [zpatch_popup_angle], xmm0
+    popup_column_6:
+        mov ecx, DWORD PTR [eax + zpatch_popup_angle_hashes + 18h]
+        test ecx, ecx
+        je popup_column_7
+        cmp DWORD PTR [esi*4 + zpatch_popuplights_models], ecx
+        jne popup_column_7
+        movss xmm0, DWORD PTR [eax + zpatch_popup_angle_values + 18h]
+        movss DWORD PTR [zpatch_popup_angle], xmm0
+    popup_column_7:
+        mov ecx, DWORD PTR [eax + zpatch_popup_angle_hashes + 1Ch]
+        test ecx, ecx
+        je popup_column_done
+        cmp DWORD PTR [esi*4 + zpatch_popuplights_models], ecx
+        jne popup_column_done
+        movss xmm0, DWORD PTR [eax + zpatch_popup_angle_values + 1Ch]
+        movss DWORD PTR [zpatch_popup_angle], xmm0
+    popup_column_done:
+        add eax, 20h
+        cmp eax, 800h
+        jl popup_column_0
+    popup_walk_done:
+        pop edi
+    popup_no_list:
+        mov ecx, DWORD PTR [ebp - 4]
+        xor ecx, ebp
+        pop esi
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
     }
 }
 
@@ -1307,7 +1515,7 @@ static __declspec(naked) void PopupHeadlightsBodyA()
         movsx eax, WORD PTR [esi + 2Eh]
         __emit 0x60  // pusha
         mov DWORD PTR [zpatch_popup_model], eax
-        call PopupHeadlightsCheck
+        call PopupHeadlightsCheckBody
         __emit 0x61  // popa
         cmp DWORD PTR [zpatch_popup_flag], 1
         je popup_body_a_resume_a
@@ -1328,7 +1536,7 @@ static __declspec(naked) void PopupHeadlightsBodyB()
         movsx edx, WORD PTR [esi + 2Eh]
         __emit 0x60  // pusha
         mov DWORD PTR [zpatch_popup_model], edx
-        call PopupHeadlightsCheck
+        call PopupHeadlightsCheckBody
         __emit 0x61  // popa
         cmp DWORD PTR [zpatch_popup_flag], 1
         je popup_body_b_resume_a
@@ -1451,13 +1659,36 @@ export void RegisterMisc()
     Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_copsirens_models),
         0x10159380u, sizeof(zpatch_copsirens_models));   // 512 * 4 = 2048
 
+    // The IDE payload's popuplights list, dword_1015CE28: the same 512 words the
+    // transcribed payload fills and the popup-headlights checker walks. It is the
+    // third of the four tables the payload touches (the siren list and the wheelangle
+    // pair are registered beside their own bodies' arms). All-zero at load, like the
+    // others, because the original keeps it in `.data`'s uninitialised tail.
+    Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_popuplights_models),
+        0x1015CE28u, sizeof(zpatch_popuplights_models));  // 512 * 4 = 2048
+
+    // The popup-headlights checker's two [PopupLightAngles] arrays: dword_1015C628
+    // (the hashes) and dword_1015BE28 (the angles). They are Config's own storage, not
+    // copies: the loader preamble's reader fills them, and the checker reads them
+    // through eight interleaved columns, which is why the registration names the
+    // array's base and the comparator resolves the seven column displacements inside
+    // it (docs/rebuilt.md §2f). Both are all-zero at load.
+    Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_popup_angle_hashes),
+        0x1015C628u, sizeof(zpatch_popup_angle_hashes));  // 512 * 4 = 2048
+    Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_popup_angle_values),
+        0x1015BE28u, sizeof(zpatch_popup_angle_values));  // 512 * 4 = 2048
+
+    // The IDE payload's third arm calls the CRT's strtof through the original's IAT
+    // slot shape; the static CRT has no IAT, so the call goes through this word.
+    zpatch_ide_strtof = reinterpret_cast<uintptr_t>(&strtof);
+
     // Each stub's inline `call` is invisible to C++; naming the helper here keeps
     // its out-of-line definition in the image.
     [[maybe_unused]] const uintptr_t helpers[] = {
         reinterpret_cast<uintptr_t>(&Patch4Step),
         reinterpret_cast<uintptr_t>(&CopSirensCheckABody),
         reinterpret_cast<uintptr_t>(&CopSirensCheckBBody),
-        reinterpret_cast<uintptr_t>(&IdeParse),
-        reinterpret_cast<uintptr_t>(&PopupHeadlightsCheck),
+        reinterpret_cast<uintptr_t>(&IdeParseBody),
+        reinterpret_cast<uintptr_t>(&PopupHeadlightsCheckBody),
     };
 }
