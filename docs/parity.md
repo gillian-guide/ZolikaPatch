@@ -42,28 +42,29 @@ CRLF folding (the original reads in text mode). The shipped INI's longest line i
 
 ## Status
 
-Measured on 1.0.8.0 with `tools/parity_report.py 9`: `build 9: 96 key(s) closed, 3
-open`. Of the 96, `CutsceneFixes` is this pass's and one is the `OutOfCommissionFix`
-pass that landed beside it; the three open keys are `HighQualityReflections`,
-`NewSavesCompatibility` and `SkipLauncher`, whose cell is the baseline's own gap
-(see below).
+Measured on 1.0.8.0 with `tools/parity_report.py 9`: `build 9: 97 key(s) closed, 2
+open`. The two open keys are `NewSavesCompatibility` and `SkipLauncher`, whose cell
+is the baseline's own gap (see below); `HighQualityReflections` closed with the
+site-arithmetic resolution recorded below.
 
-- **96 of 99 option keys closed**;
-- **117 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **97 of 99 option keys closed**;
+- **118 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe, and the compiled-C bodies listed below are
-  rebuilt in C++ instead, with no proof row. The longest is `CutsceneFixes` chain
-  B's body (`0x100388C0`, 146 instructions / 592 bytes; see the section below),
-  which displaced the livery counter (`0x1003D270`, 37 instructions) as the
-  longest row; the pair at 78 instructions / 309 bytes each
-  (`DualVehicleHeadlights`) is what exposed the proof tool's old 256-byte sweep
-  window: it compared 64 of 78 and still reported PASS. The tool now sweeps 4096
-  bytes and fails a row that decodes fewer instructions than its budget, so a
-  truncated sweep can never pass again. This pass added the cutscene body and
+  rebuilt in C++ instead, with no proof row. The longest is
+  `HighQualityReflections`' detour (`0x1001F030`, 157 instructions / 858 bytes;
+  see the section below), which displaced `CutsceneFixes` chain B's body
+  (`0x100388C0`, 146 instructions / 592 bytes); before that the livery counter
+  (`0x1003D270`, 37 instructions) held the row; the pair at 78 instructions / 309
+  bytes each (`DualVehicleHeadlights`) is what exposed the proof tool's old
+  256-byte sweep window: it compared 64 of 78 and still reported PASS. The tool
+  now sweeps 4096 bytes and fails a row that decodes fewer instructions than its
+  budget, so a truncated sweep can never pass again. This pass added the
+  `HighQualityReflections` detour; the passes before it added the cutscene body and
   `OutOfCommissionFix`'s two (the branch body at 7 instructions and the mounting
-  wrapper at 41; see that key's section); `ForceCarHeadlightShadows`' hook thunk
-  (`0x1001ADB0`, 9 instructions) was the one before them. The fifteen before that
-  were the vehicles
+  wrapper at 41; see that key's section), and `ForceCarHeadlightShadows`' hook
+  thunk (`0x1001ADB0`, 9 instructions) was the one before them. The fifteen before
+  that were the vehicles
   pass's: the steer trio's
   model-registry lookup and its two detour bodies, `GarageModelFix`'s two site bodies
   and two helpers, and `NoLiveryLimit`'s five site bodies and three helpers (see the
@@ -983,12 +984,101 @@ report excludes by design. Closure is therefore `missing 0, extra 0, differing 0
 on `0x89A840`'s `EB`, backed by the body proof for the behaviour behind it and by
 `tests/signatures.tsv` for the three anchors.
 
+### `HighQualityReflections`, and the site arithmetic that closed it
+
+The key had been recorded as self-contradictory: the handler publishes
+`resume = esi + 0x13` and `builder = esi + dword(esi + 0x0F) + 0x13`, and with
+`esi` read as the `E9` site the resume looked like the last byte of a five-byte
+`call` at `site + 0x0F` while the builder read the `E8` opcode as a displacement
+and wrapped. The bytes say that premise was one byte off: the call's opcode is at
+`site + 0x0E`, not `site + 0x0F`.
+
+The site, in the pristine 1.0.8.0 image at `0xC51311` (the only hit of
+`8B 87 38 09 00 00 6A 08 68 1D 13 00 00 50 E8`):
+
+```
+0C51311  8B 87 38 09 00 00    mov eax, [edi+938h]     ; 6 bytes, the E9 lands here
+0C51317  6A 08                push 8
+0C51319  68 1D 13 00 00       push 131Dh
+0C5131E  50                   push eax
+0C5131F  E8 4C EA F1 FF       call 0B6FD70h           ; 5 bytes, site+0x0E..site+0x12
+0C51324  6A 00                push 0                  ; site+0x13, an instruction boundary
+0C51326  6A 10                push 10h
+```
+
+So `site + 0x0F` is the call's first displacement byte (`4C`), not its opcode:
+`dword(site + 0x0F) = 0xFFF1EA4C`, and `site + 0x13 + 0xFFF1EA4C = 0xB6FD70`, the
+call's target. `site + 0x13` is the `push 0` after the call -- an instruction
+boundary -- while `site + 0x14` is the second byte of that `push`, mid-instruction.
+A scanner that returned match+1, making `esi` the `site + 1` and the resume
+`site + 0x14`, would therefore land the body in the middle of an instruction.
+
+The scanner settles it independently. `sub_1005B6A0(signature, module)` returns the
+first element of the hit vector, or zero when the scan is empty:
+
+```
+1005B6CC  mov eax, [ebp+Block+4]
+1005B6D2  mov edx, [ebp+Block]
+1005B6D5  sub eax, edx
+1005B6D7  sar eax, 2
+1005B6DA  test eax, eax
+1005B6DC  jz short loc_1005B6E2
+1005B6DE  mov esi, [edx]          ; the first vector element
+1005B6E2  xor esi, esi
+1005B71D  mov eax, esi
+1005B72A  retn
+```
+
+and the element the scan stores (`sub_10003290`, the parser/scanner reached from
+the constructor `sub_1005B7D0`) is the match start, not match+1:
+
+```
+1000357B  mov edx, 1
+10003580  sub edx, [ebp-74h]      ; 1 - pattern length
+10003583  mov [ebp-64h], edx
+...
+100035C1  lea eax, [edx+esi]      ; current byte - (length - 1) = first pattern byte
+100035CE  mov [ecx], eax          ; hits.push_back(hit)
+```
+
+So on a hit the helper answers the match pointer itself, `0xC51311`, not
+`match+1`.
+
+The handler E9s the same site the scanner returned (`sub_1005B5D0` writes the `E9`
+at `ESI`) and publishes:
+
+```
+10022C89  call sub_1005B6A0
+10022C8E  mov esi, eax
+10022CA0  call sub_1005B5D0       ; writes the E9 at ESI
+10022CA5  lea ecx, [esi+13h]      ; resume
+10022CA8  mov dword_10159CFC, ecx
+10022CAE  mov eax, [esi+0Fh]      ; the call's rel32
+10022CB1  add eax, 13h
+10022CB4  add eax, esi
+10022CB6  mov dword_10159D04, eax ; the call's target
+```
+
+The alternative was never needed: with `esi` = the match / `E9` site, the resume is
+match+0x13 (after the call at match+0x0E) and the builder is match + [match+0x0F]
++ 0x13 = the call target. The key is implemented that way: the arm scans the
+signature, publishes `match+0x13` and `match+0x13 + [match+0x0F]`, registers the
+detour at `0x1001F030`, and writes the `E9` at the match. The body (`0x1001F030`,
+157 instructions / 858 bytes) replays the block's twelve draw-command-builder calls
+with `(index, 0x11D, 0)` and tail-jumps through the published resume; its row is
+`hqr_body` in `tests/bodies.tsv`, and `tests/signatures.tsv` records the site.
+
+The shape mismatch that started the question is real but harmless: the `E9` covers
+five bytes of a six-byte `mov`, leaving the `mov`'s last operand byte at `site+5`
+unexecuted, exactly as the original leaves it. The scoreboard records the key's five
+changed bytes at `0x851311..0x851315`, but only the `E9` opcode counts: the other
+four are the displacement, which the report excludes. Closure is `missing 0,
+extra 0, differing 0`.
+
 ### Still blocked
 
 - `FreezeCarFix` needs its 1,421-byte probe and the spawn path around it; the steer
   consumer `sub_10004C70` it also touched is now in place (see the section above);
-- `HighQualityReflections` (~200 instructions) is over the transcription budget by
-  design;
 - `NewSavesCompatibility` needs `sub_10051B30`, the save converter: compiled file-IO
   code that reads the `0x110`-byte header, walks the 18 chunks and then patches three
   game sites at conversion time (`0x872185`'s branch opcode, `0x7D8C50`'s read call

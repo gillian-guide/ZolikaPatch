@@ -538,3 +538,55 @@ Adler-32 trailer). `sub_1004B750` = malloc(0x2BD50) + decode + push_back into th
 in-memory archive and loads `finale2.sco` from it is a runtime property. The artifact
 is 1,637,376 bytes (the resource is 163,796 of them). `AGENTS.md`'s "Current state"
 (94 keys / 114 bodies) is outside this pass's file scope and is stale.
+
+## 2026-11-06 — HighQualityReflections, and the site arithmetic
+
+**Closed:** `HighQualityReflections` (96 -> 97 keys on 1.0.8.0; the two remaining
+open keys are `NewSavesCompatibility` and `SkipLauncher`).
+
+**The question.** The triage recorded the handler's publish as
+`resume = esi + 0x13` and `builder = esi + dword(esi + 0x0F) + 0x13` and read `esi`
+as the `E9` site; that made the resume look like the last byte of a five-byte
+`call` at `site + 0x0F` and the builder wrap. The bytes show the premise was one
+byte off: on 1.0.8.0 the site is `0xC51311` (`8B 87 38 09 00 00 6A 08 68 1D 13 00 00
+50 E8`, one hit), the `E9` lands on the six-byte `mov eax,[edi+938h]`, and the
+site's own `E8` is at `site + 0x0E` (`E8 4C EA F1 FF`, target `0xB6FD70`), not
+`site + 0x0F`. So `site + 0x0F` is the rel32, `dword(site+0x0F) = 0xFFF1EA4C`,
+`builder = site + 0x13 + that = 0xB6FD70` (the call target), and `site + 0x13` is
+the `push 0` after the call -- an instruction boundary; `site + 0x14` is the second
+byte of that push, so the `esi = match+1` alternative would not resume at all.
+
+**Scanner convention.** `sub_1005B6A0` returns the first hit-vector element
+(`mov esi,[edx]` / `mov eax,esi` / `retn`), and the scanner stores the match start,
+not match+1: `sub_10003290` computes `edx = 1 - length`, then
+`lea eax,[edx+esi]` (current byte minus length-1) and writes it to the vector. So
+`esi` is the match / `E9` site and the original arithmetic is coherent as written.
+
+**What was built**
+
+- `source/graphics.ixx` — `HqrBody` (`sub_1001F030`, 157 instructions / 858 bytes,
+  static naked, the original's eight-register dump and twelve builder calls),
+  `PublishHighQualityReflections` (`match+0x13`, `match+0x13 + [match+0x0F]`) and
+  `InstallHighQualityReflections` (`Bodies::Register(..., 0x1001F030)`, `E9` at the
+  match).
+- `tests/bodies.tsv` — `hqr_body 1001F030 ?HqrBody@@YAXXZ 157`.
+- `tests/signatures.tsv` — the site row (`0xC51311`, the 15-byte signature).
+- `docs/parity.md` — the resolution section with the site and handler/scanner
+  instruction boundaries, the status line (`97 closed, 2 open`) and the blocked
+  list.
+
+**Gates (final runs)**
+
+- `cmake --build --preset release` — success (exit 0); `--preset trace` also built
+  and its suite passed.
+- `python tools/parity_report.py 9` — `build 9: 97 key(s) closed, 2 open`; the two
+  OPEN lines are `NewSavesCompatibility` and `SkipLauncher` (both known baseline
+  gaps), `HighQualityReflections` is not among them.
+- `ctest --preset release` — `100% tests passed out of 11`.
+- `python tools/verify_bodies.py …` — `118 body(ies), 0 failure(s)`
+  (`PASS hqr_body (157 instruction(s), 133 absolute operand(s))`).
+
+**Not verifiable here.** No game launch: the twelve draw-command-builder calls and
+the resume are transcribed/proven but not executed in the running game.
+`AGENTS.md`'s "Current state" (96 keys / 117 bodies) is outside this pass's file
+scope and is stale.

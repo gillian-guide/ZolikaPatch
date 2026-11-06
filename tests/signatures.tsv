@@ -125,6 +125,12 @@ ImprovedShaderStreaming	0xCB21F1	33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2
 CutsceneFixes.caller_a	0xA2362D	8B 4C 24 2C 5F 5E 5B 33 CC B0 01 E8	12
 CutsceneFixes.caller_b	0xC9AB20	8B CF 88 44 24 0F E8 ? ? ? ? A1	11
 CutsceneFixes.target_found	0xC9A840	74 24 8B 44 24 2C 83 F8 03	9
+# HighQualityReflections: the six-byte `mov eax,[edi+938h]` and the push block
+# that follows. The arm E9s the match; the site's own five-byte `call` is at
+# match+0x0E (`E8 4C EA F1 FF`, target 0xB6FD70), so the resume the handler
+# publishes is match+0x13 - the `push 0` after that call, not a byte inside it -
+# and the builder is match+0x13 + the rel32 at match+0x0F. One hit on 1.0.8.0.
+HighQualityReflections	0xC51311	8B 87 38 09 00 00 6A 08 68 1D 13 00 00 50 E8	15
 AllowHashesForIDE	0x45CF50	8B 4C 24 08 56 8B 74 24 08 80 3E 22	12
 CombinedRadioFreezeFix	0x895F59	E8 ? ? ? ? 8B 35 ? ? ? ? 3B F0	13
 BetterMPSync	0x6D9356	8B 90 E8 00 00 00 55 8B CE FF	10

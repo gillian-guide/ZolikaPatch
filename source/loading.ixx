@@ -1,6 +1,8 @@
 module;
 
 #include <common.hxx>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <shlwapi.h>
 #include <unordered_set>
@@ -1364,6 +1366,370 @@ namespace
 }
 
 // ---------------------------------------------------------------------------
+// NewSavesCompatibility, as the original handler sub_10052200 applies it: the
+// savegame-load entry is jumped to a trampoline that runs the prepare step, then
+// replays the thirteen bytes the jump swallowed and resumes at the entry's +0xD.
+//
+// The two steps behind the trampoline are compiled C in the original and are
+// rebuilt here with the same call sequence, the same conditions and the same
+// writes:
+//
+//   * sub_10051FD0 (prepare) asks the game's own save-directory function for the
+//     directory, builds "<directory>\<name>" from the buffer the handler captured,
+//     and hands that path to the converter;
+//   * sub_10051B30 (converter) opens the file, checks the 0x110-byte header's
+//     "SAVE" magic at +0xC, walks the eighteen 9-byte chunk headers (allocating,
+//     reading and freeing each payload), keeps three chunk sizes, and then patches
+//     the three game sites whose reads depend on the save layout: the branch
+//     opcode at 0x872185, the read call + pushed read size + branch at 0x7D8C50,
+//     and the second LoadData call at 0x8DA090.
+//
+// The converter takes from the game exactly what the original takes: the
+// directory function (called, not imitated) and the save-name buffer named by the
+// handler's first anchor. Everything else is the save file itself, so the three
+// writes are a deterministic function of the file's chunk sizes and of signatures
+// that occur exactly once wherever they exist (checked against every image in
+// game_refs).
+//
+// The two hooks the converter installs are compiled C in the original as well:
+// sub_10051A90 reads the caller's bytes into its own 0xE78-byte scratch and keeps
+// only the return value, and sub_10051AD0 consumes the newer save's extra twelve
+// bytes on both sides of the original LoadData call. Both are rebuilt here with
+// the same stack buffers and the same return-value rules.
+extern "C"
+{
+    // The published state, by the names the original keeps in its own .bss.
+    uint32_t zpatch_new_saves_src = 0;          // dword_1015AD9C: the game's save-name buffer
+    uint32_t zpatch_new_saves_resume = 0;       // dword_1015AD88: the load entry's +0xD
+    uint32_t zpatch_new_saves_loaddata = 0;     // dword_1015AD94: the game's LoadData entry
+    uint32_t zpatch_new_saves_p3_original = 0;  // dword_1015AD8C: the second LoadData call
+    uint8_t zpatch_new_saves_force_read = 0;    // byte_1015AD98: chunk 9 has the newer size
+    uint8_t zpatch_new_saves_new_chunk16 = 0;   // byte_1015AD9A: chunk 16 has the newer size
+    uint8_t zpatch_new_saves_extra_block = 0;   // byte_1015AD99: chunk 13 has the newer size
+}
+
+namespace
+{
+    // The save image: an 0x110-byte header whose dword at +0xC is "SAVE", then
+    // eighteen chunks of a 9-byte header whose dword at +5 is the chunk's total
+    // size, followed by that minus nine payload bytes.
+    constexpr uint32_t kNewSavesMagic = 0x45564153u;  // "SAVE"
+    constexpr std::size_t kNewSavesHeaderSize = 0x110;
+    constexpr std::size_t kNewSavesMagicOffset = 0x0C;
+    constexpr std::size_t kNewSavesChunkCount = 18;
+    constexpr std::size_t kNewSavesChunkHeaderSize = 9;
+    constexpr std::size_t kNewSavesChunkSizeOffset = 5;
+
+    // The three chunk sizes that identify the newer layout, and the read size the
+    // converter writes for it: 0xE77 is the newer chunk 16 and 0xE6E its payload,
+    // nine bytes less because the chunk header is not part of what the game reads.
+    constexpr uint32_t kNewSavesChunk9Size = 0x4C45;
+    constexpr uint32_t kNewSavesChunk13Size = 0x1741;
+    constexpr uint32_t kNewSavesChunk16Size = 0x0E77;
+    constexpr uint32_t kNewSavesReadSizeOld = 0x0CBE;
+    constexpr uint32_t kNewSavesReadSizeNew = 0x0E6E;
+
+    // The branch in front of the read site: `jne +0x26`, and the NOP pair that
+    // replaces it when the newer chunk 16 is present.
+    constexpr uint16_t kNewSavesBranchJne = 0x2675;
+    constexpr uint16_t kNewSavesBranchNop = 0x9090;
+
+    // The save-directory buffer (original byte_101A8308, 312 bytes up to the next
+    // .bss object) and the two scratch buffers inside the hooks: sub_10051A90's
+    // 0xE7C-byte frame minus its stack cookie, and sub_10051AD0's `push 0Ch`.
+    constexpr std::size_t kNewSavesDirectorySize = 312;
+    constexpr std::size_t kNewSavesReadScratchSize = 0x0E78;
+    constexpr std::size_t kNewSavesProbeSize = 12;
+
+    // Where the writes land inside their anchors: the read call and its operand,
+    // the pushed read size, the branch in front of the push, and the second
+    // LoadData call's operand.
+    constexpr std::ptrdiff_t kNewSavesCallSite = 6;
+    constexpr std::ptrdiff_t kNewSavesCallOperand = 7;
+    constexpr std::ptrdiff_t kNewSavesReadSizeOperand = 1;
+    constexpr std::ptrdiff_t kNewSavesBranchSite = -5;
+    constexpr std::ptrdiff_t kNewSavesLoadOperand = 0x1E;
+
+    // `jz rel8`: the branch opcode the first site is restored to when the save is
+    // not the newer layout (Bytes::ShortJmp is the other operand).
+    constexpr std::byte kNewSavesJumpIfZero{ 0x74 };
+
+    // The game's LoadData entry: (buffer, size), caller-cleaned, value in EAX.
+    using NewSavesLoadDataFn = uint32_t(__cdecl*)(void*, uint32_t);
+
+    // The original resolves each converter site once, through a function-local
+    // static whose initialisation the compiler guards with the TLS block (the
+    // `_Init_thread_header`/`_Init_thread_footer` pairs in sub_10051B30). A miss
+    // is cached as a null site, so a build without the pattern never scans again.
+    uintptr_t NewSavesBranchSite()
+    {
+        static const uintptr_t site = FirstMatch("74 37 80 3D ? ? ? ? 00 75 2E 8D 84 ? ? ? ? 00 6A 1E");
+        return site;
+    }
+
+    uintptr_t NewSavesReadSite()
+    {
+        static const uintptr_t site = FirstMatch("68 BE 0C 00 00 50 E8");
+        return site;
+    }
+
+    uintptr_t NewSavesLoadSite()
+    {
+        static const uintptr_t site =
+            FirstMatch("56 E8 ? ? ? ? E8 ? ? ? ? A1 ? ? ? ? 8D 0C 85 00 00 00 00");
+        return site;
+    }
+}
+
+// sub_10051A90, recovered VA 0x10051A90: the read at game 0x7D8C50. It reads into
+// its own 0xE78-byte local - the caller's buffer is deliberately left untouched -
+// and returns the read's value; an unpublished read entry returns 0.
+uint32_t __cdecl NewSavesReadHook(void* /*caller_buffer*/, uint32_t size)
+{
+    std::array<uint8_t, kNewSavesReadScratchSize> scratch;
+    if (zpatch_new_saves_loaddata == 0)
+        return 0;
+    return reinterpret_cast<NewSavesLoadDataFn>(
+        static_cast<uintptr_t>(zpatch_new_saves_loaddata))(scratch.data(), size);
+}
+
+// sub_10051AD0, recovered VA 0x10051AD0: the second LoadData call at game
+// 0x8DA090. When the save has the newer chunk 13, it consumes a twelve-byte block
+// before and after the original call - the original issues both reads and returns
+// the second one's value; otherwise the original call's value passes through. The
+// original call is unconditional (a call through an unpublished slot faults).
+uint32_t __cdecl NewSavesSecondLoadHook()
+{
+    std::array<uint8_t, kNewSavesProbeSize> probe;
+    if (zpatch_new_saves_extra_block != 0 && zpatch_new_saves_loaddata != 0)
+        static_cast<void>(reinterpret_cast<NewSavesLoadDataFn>(
+            static_cast<uintptr_t>(zpatch_new_saves_loaddata))(probe.data(), kNewSavesProbeSize));
+
+    const uint32_t result = reinterpret_cast<uint32_t(__cdecl*)()>(
+        static_cast<uintptr_t>(zpatch_new_saves_p3_original))();
+
+    if (zpatch_new_saves_extra_block != 0 && zpatch_new_saves_loaddata != 0)
+        return reinterpret_cast<NewSavesLoadDataFn>(
+            static_cast<uintptr_t>(zpatch_new_saves_loaddata))(probe.data(), kNewSavesProbeSize);
+    return result;
+}
+
+namespace
+{
+    // The three site patches, in the original's order and with its exact writes.
+    // A site whose pattern is absent is skipped and the others still run.
+    void NewSavesPatchSites()
+    {
+        // 0x872185's branch: `jz rel8` unless the save has the newer chunk 9, where
+        // it becomes `jmp rel8`, forcing the longer path.
+        if (const uintptr_t site = NewSavesBranchSite(); site != 0)
+        {
+            injector::WriteMemory<std::byte>(site,
+                zpatch_new_saves_force_read != 0 ? Bytes::ShortJmp : kNewSavesJumpIfZero, true);
+        }
+
+        // 0x7D8C50: `jne +0x26; push 0xCBE; push eax; call LoadData`. The call
+        // becomes the plugin's read hook; the pushed size and the branch follow the
+        // save's chunk 16 (`jne` and 0xCBE for the older layout, NOPs and 0xE6E for
+        // the newer one). The original target is read before the call is replaced.
+        if (const uintptr_t site = NewSavesReadSite(); site != 0)
+        {
+            int32_t displacement{};
+            std::memcpy(&displacement, reinterpret_cast<const void*>(site + kNewSavesCallOperand),
+                sizeof(displacement));
+            const uint32_t originalTarget = static_cast<uint32_t>(site + kNewSavesCallSite + 5) +
+                                            static_cast<uint32_t>(displacement);
+
+            injector::MakeCALL(reinterpret_cast<void*>(site + kNewSavesCallSite),
+                reinterpret_cast<void*>(&NewSavesReadHook), true);
+            if (zpatch_new_saves_loaddata == 0)
+                zpatch_new_saves_loaddata = originalTarget;
+
+            injector::WriteMemory<uint32_t>(site + kNewSavesReadSizeOperand,
+                zpatch_new_saves_new_chunk16 != 0 ? kNewSavesReadSizeNew : kNewSavesReadSizeOld, true);
+            injector::WriteMemory<uint16_t>(site + kNewSavesBranchSite,
+                zpatch_new_saves_new_chunk16 != 0 ? kNewSavesBranchNop : kNewSavesBranchJne, true);
+        }
+
+        // 0x8DA090: the second LoadData call becomes the plugin's hook, and the
+        // shared read entry is repointed at the function's own later call target
+        // (the `E8` at the anchor's +0x1D), which is the entry both hooks then use.
+        if (const uintptr_t site = NewSavesLoadSite(); site != 0)
+        {
+            int32_t displacement{};
+            std::memcpy(&displacement, reinterpret_cast<const void*>(site + kNewSavesCallOperand),
+                sizeof(displacement));
+            const uint32_t originalTarget = static_cast<uint32_t>(site + kNewSavesCallSite + 5) +
+                                            static_cast<uint32_t>(displacement);
+
+            injector::MakeCALL(reinterpret_cast<void*>(site + kNewSavesCallSite),
+                reinterpret_cast<void*>(&NewSavesSecondLoadHook), true);
+            if (zpatch_new_saves_p3_original == 0)
+                zpatch_new_saves_p3_original = originalTarget;
+
+            int32_t loadDisplacement{};
+            std::memcpy(&loadDisplacement, reinterpret_cast<const void*>(site + kNewSavesLoadOperand),
+                sizeof(loadDisplacement));
+            zpatch_new_saves_loaddata = static_cast<uint32_t>(site + kNewSavesLoadOperand + 4) +
+                                        static_cast<uint32_t>(loadDisplacement);
+        }
+    }
+
+    // sub_10051B30, recovered VA 0x10051B30: the converter. The call sequence is
+    // the original's, faults included: an unchecked header read, an unchecked
+    // `operator new` per chunk (freed with `free`, exactly as the original mixes
+    // the two), an unchecked payload read, and the patches only after the file is
+    // closed. A chunk whose size is below nine underflows the payload, which makes
+    // the allocation throw, as the original's does.
+    void NewSavesConvert(const std::string& path)
+    {
+        std::FILE* stream = nullptr;
+        if (fopen_s(&stream, path.c_str(), "rb") != 0 || stream == nullptr)
+            return;
+
+        uint8_t header[kNewSavesHeaderSize];
+        (void)std::fread(header, kNewSavesHeaderSize, 1, stream);
+
+        uint32_t magic = 0;
+        std::memcpy(&magic, header + kNewSavesMagicOffset, sizeof(magic));
+        if (magic != kNewSavesMagic)
+        {
+            std::fclose(stream);
+            return;
+        }
+
+        // One stack header for all eighteen reads: a short read leaves the previous
+        // iteration's bytes in it, which is what the original's reused slot does.
+        uint8_t chunkHeader[kNewSavesChunkHeaderSize];
+        for (std::size_t index = 0; index < kNewSavesChunkCount; ++index)
+        {
+            (void)std::fread(chunkHeader, kNewSavesChunkHeaderSize, 1, stream);
+            uint32_t size = 0;
+            std::memcpy(&size, chunkHeader + kNewSavesChunkSizeOffset, sizeof(size));
+
+            const uint32_t payload = size - static_cast<uint32_t>(kNewSavesChunkHeaderSize);
+            void* const payloadBlock = ::operator new(payload);
+            (void)std::fread(payloadBlock, 1, payload, stream);
+            std::free(payloadBlock);
+
+            switch (index)
+            {
+            case 9:
+                zpatch_new_saves_force_read = size == kNewSavesChunk9Size ? 1 : 0;
+                break;
+            case 13:
+                zpatch_new_saves_extra_block = size == kNewSavesChunk13Size ? 1 : 0;
+                break;
+            case 16:
+                zpatch_new_saves_new_chunk16 = size == kNewSavesChunk16Size ? 1 : 0;
+                break;
+            default:
+                break;
+            }
+        }
+        std::fclose(stream);
+
+        NewSavesPatchSites();
+    }
+
+    // sub_10051FD0, recovered VA 0x10051FD0: the prepare step the trampoline calls.
+    // The original's gate is the captured save-name buffer: when the handler never
+    // found its anchor, nothing runs. The directory comes from the game's own
+    // function (found by signature, called with the original's three arguments); a
+    // zero answer skips the conversion. The path is the original's std::string: the
+    // directory, one backslash, then the name.
+    void NewSavesPrepare()
+    {
+        const auto* const name = reinterpret_cast<const char*>(static_cast<uintptr_t>(zpatch_new_saves_src));
+        if (name == nullptr)
+            return;
+
+        // The original's lazily resolved directory function: one scan, cached with
+        // its null on a miss.
+        static const uintptr_t getDirectory = FirstMatch("55 8B EC 83 E4 F8 83 EC 4C 56 33 C0 8D 4C 24 28");
+        if (getDirectory == 0)
+            return;
+
+        // The original's buffer is the module's .bss object byte_101A8308 (312 bytes
+        // up to the next object): it persists across conversions and is zero before
+        // the first one.
+        static char directory[kNewSavesDirectorySize] = {};
+        char suffix = 0;
+        using GetSaveDirectoryFn = uint8_t(__cdecl*)(int, char*, char*);
+        if (reinterpret_cast<GetSaveDirectoryFn>(getDirectory)(0, directory, &suffix) == 0)
+            return;
+
+        std::string path(directory);
+        path += '\\';
+        path += name;
+        NewSavesConvert(path);
+    }
+}
+
+// sub_100521E0, recovered VA 0x100521E0 (8 instructions): the savegame-load
+// trampoline. pusha/popa keep the caller's registers across the prepare step; the
+// four instructions after them are the one the five-byte jump overwrote
+// (`mov [esp+0x1E0],eax`) and the three that follow it, and the tail jumps to the
+// entry's +0xD. `pusha`/`popa` are emitted as bytes: the assembler renders both
+// with a 0x66 operand-size prefix, which the original does not have.
+static __declspec(naked) void NewSavesTrampoline()
+{
+    __asm
+    {
+        __emit 0x60  // pusha
+        call NewSavesPrepare
+        __emit 0x61  // popa
+        mov dword ptr [esp + 1E0h], eax
+        mov eax, dword ptr [ebp + 8]
+        push ebx
+        xor ebx, ebx
+        jmp dword ptr [zpatch_new_saves_resume]
+    }
+}
+
+namespace
+{
+    // NewSavesCompatibility's first anchor: the `push <save-name buffer>` site.
+    // Its operand (the anchor's +1) is the game's buffer address, which is what the
+    // prepare step appends to the save directory. The second anchor publishes the
+    // load entry's continuation, +0xD.
+    void PublishNewSavesCompatibility()
+    {
+        if (!Loader::Enabled("NewSavesCompatibility"))
+            return;
+
+        auto primary = find_pattern("68 ? ? ? ? E8 ? ? ? ? 8B 2D ? ? ? ? 83 C4 08");
+        if (primary.empty())
+            return;
+        zpatch_new_saves_src = *primary.get_first<uint32_t>(1);
+
+        auto pattern = find_pattern("89 84 24 E0 01 00 00 8B 45 08 53 33 DB");
+        if (!pattern.empty())
+            zpatch_new_saves_resume = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(13)));
+    }
+
+    // The same load entry is the write. The original returns before this scan when
+    // the first pattern missed, so the write is gated on the first pattern as well:
+    // 1.0.0.4.0 carries the entry but not the name site, and the original writes
+    // nothing there.
+    void InstallNewSavesCompatibility()
+    {
+        if (!Loader::Enabled("NewSavesCompatibility"))
+            return;
+
+        auto primary = find_pattern("68 ? ? ? ? E8 ? ? ? ? 8B 2D ? ? ? ? 83 C4 08");
+        if (primary.empty())
+            return;
+
+        auto pattern = find_pattern("89 84 24 E0 01 00 00 8B 45 08 53 33 DB");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(0),
+                reinterpret_cast<void*>(&NewSavesTrampoline), true);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // LoadDLCs, as the original handler sub_100234E0 applies it.
 //
 // The handler does not scan: per build it stores three game entry points and then
@@ -1696,6 +2062,7 @@ export void RegisterLoading()
         CopyOverrideDatPath();
         PublishNewMemorySystem();
         PublishNewFilesCompatibility();
+        PublishNewSavesCompatibility();
         PublishLoadDLCs();
     };
     Loader::InstallEvent() += []
@@ -1714,6 +2081,7 @@ export void RegisterLoading()
         InstallSavegameFix();
         InstallNewMemorySystem();
         InstallNewFilesCompatibility();
+        InstallNewSavesCompatibility();
         InstallLoadDLCs();
     };
 
@@ -1754,6 +2122,15 @@ export void RegisterLoading()
     Bodies::Register(reinterpret_cast<uintptr_t>(&NewfilesRegisterBody), 0x10051600u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&NewfilesUpdateABody), 0x10051890u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&NewfilesUpdateBBody), 0x100518D0u);
+
+    // NewSavesCompatibility's trampoline (transcribed) and the four steps behind it
+    // (the original's compiled C, rebuilt, so they carry no proof row): the prepare
+    // step, the converter, and the two hooks it installs at conversion time.
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NewSavesTrampoline), 0x100521E0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NewSavesPrepare), 0x10051FD0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NewSavesConvert), 0x10051B30u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NewSavesReadHook), 0x10051A90u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NewSavesSecondLoadHook), 0x10051AD0u);
 
     // LoadDLCs' two bodies, and the discovery pass the fixup body calls (a rebuild,
     // so it carries no proof row).

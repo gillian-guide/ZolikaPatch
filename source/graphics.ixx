@@ -132,6 +132,192 @@ export void* EmissiveLerpShimAddress()
     return reinterpret_cast<void*>(&EmissiveLerpShim);
 }
 
+// HighQualityReflections: the published state its detour body reads. The original
+// keeps them as dword_10158060 (flags = 0x11D, in .data), dword_10159CE0 (mode, a
+// .bss word it never writes), the crash dump at dword_10159CE4..10159D0C,
+// dword_10159CFC (resume) and dword_10159D04 (builder). The transcribed asm names
+// the copies directly, so they carry C linkage.
+extern "C"
+{
+    uint32_t zpatch_hqr_dump[8] = {};    // the eight saved registers, never read
+    uint32_t zpatch_hqr_flags = 0x11Du;  // dword_10158060
+    uint32_t zpatch_hqr_mode = 0;        // dword_10159CE0
+    void* zpatch_hqr_resume = nullptr;   // dword_10159CFC = match + 0x13
+    void* zpatch_hqr_builder = nullptr;  // dword_10159D04 = match + [match+0x0F] + 0x13
+}
+
+// sub_1001F030, recovered VA 0x1001F030: the HighQualityReflections detour. It
+// dumps the eight registers the original saves, calls the game's draw-command
+// builder twelve times with (index 0..11, flags 0x11D, mode 0), restoring the
+// saved registers after every call but the last, and tail-jumps to the published
+// resume. The site is the six-byte `mov eax,[edi+938h]`; its own five-byte call
+// starts at match+0x0E, so the resume is match+0x13 (the instruction after that
+// call, `push 0` on 1.0.8.0) and the builder is the call's target, i.e.
+// match + 0x13 + the rel32 at match+0x0F.
+static __declspec(naked) void HqrBody()
+{
+    __asm
+    {
+        mov DWORD PTR [zpatch_hqr_dump], eax
+        mov DWORD PTR [zpatch_hqr_dump + 4], ebx
+        mov DWORD PTR [zpatch_hqr_dump + 8], ecx
+        mov DWORD PTR [zpatch_hqr_dump + 12], edx
+        mov DWORD PTR [zpatch_hqr_dump + 16], esi
+        mov DWORD PTR [zpatch_hqr_dump + 20], edi
+        mov DWORD PTR [zpatch_hqr_dump + 24], ebp
+        mov DWORD PTR [zpatch_hqr_dump + 28], esp
+        mov eax, 0
+        push DWORD PTR [zpatch_hqr_mode]
+        push DWORD PTR [zpatch_hqr_flags]
+        push eax
+        call DWORD PTR [zpatch_hqr_builder]
+        mov eax, DWORD PTR [zpatch_hqr_dump]
+        mov ebx, DWORD PTR [zpatch_hqr_dump + 4]
+        mov ecx, DWORD PTR [zpatch_hqr_dump + 8]
+        mov edx, DWORD PTR [zpatch_hqr_dump + 12]
+        mov esi, DWORD PTR [zpatch_hqr_dump + 16]
+        mov edi, DWORD PTR [zpatch_hqr_dump + 20]
+        mov ebp, DWORD PTR [zpatch_hqr_dump + 24]
+        mov esp, DWORD PTR [zpatch_hqr_dump + 28]
+        mov eax, 1
+        push DWORD PTR [zpatch_hqr_mode]
+        push DWORD PTR [zpatch_hqr_flags]
+        push eax
+        call DWORD PTR [zpatch_hqr_builder]
+        mov eax, DWORD PTR [zpatch_hqr_dump]
+        mov ebx, DWORD PTR [zpatch_hqr_dump + 4]
+        mov ecx, DWORD PTR [zpatch_hqr_dump + 8]
+        mov edx, DWORD PTR [zpatch_hqr_dump + 12]
+        mov esi, DWORD PTR [zpatch_hqr_dump + 16]
+        mov edi, DWORD PTR [zpatch_hqr_dump + 20]
+        mov ebp, DWORD PTR [zpatch_hqr_dump + 24]
+        mov esp, DWORD PTR [zpatch_hqr_dump + 28]
+        mov eax, 2
+        push DWORD PTR [zpatch_hqr_mode]
+        push DWORD PTR [zpatch_hqr_flags]
+        push eax
+        call DWORD PTR [zpatch_hqr_builder]
+        mov eax, DWORD PTR [zpatch_hqr_dump]
+        mov ebx, DWORD PTR [zpatch_hqr_dump + 4]
+        mov ecx, DWORD PTR [zpatch_hqr_dump + 8]
+        mov edx, DWORD PTR [zpatch_hqr_dump + 12]
+        mov esi, DWORD PTR [zpatch_hqr_dump + 16]
+        mov edi, DWORD PTR [zpatch_hqr_dump + 20]
+        mov ebp, DWORD PTR [zpatch_hqr_dump + 24]
+        mov esp, DWORD PTR [zpatch_hqr_dump + 28]
+        mov eax, 3
+        push DWORD PTR [zpatch_hqr_mode]
+        push DWORD PTR [zpatch_hqr_flags]
+        push eax
+        call DWORD PTR [zpatch_hqr_builder]
+        mov eax, DWORD PTR [zpatch_hqr_dump]
+        mov ebx, DWORD PTR [zpatch_hqr_dump + 4]
+        mov ecx, DWORD PTR [zpatch_hqr_dump + 8]
+        mov edx, DWORD PTR [zpatch_hqr_dump + 12]
+        mov esi, DWORD PTR [zpatch_hqr_dump + 16]
+        mov edi, DWORD PTR [zpatch_hqr_dump + 20]
+        mov ebp, DWORD PTR [zpatch_hqr_dump + 24]
+        mov esp, DWORD PTR [zpatch_hqr_dump + 28]
+        mov eax, 4
+        push DWORD PTR [zpatch_hqr_mode]
+        push DWORD PTR [zpatch_hqr_flags]
+        push eax
+        call DWORD PTR [zpatch_hqr_builder]
+        mov eax, DWORD PTR [zpatch_hqr_dump]
+        mov ebx, DWORD PTR [zpatch_hqr_dump + 4]
+        mov ecx, DWORD PTR [zpatch_hqr_dump + 8]
+        mov edx, DWORD PTR [zpatch_hqr_dump + 12]
+        mov esi, DWORD PTR [zpatch_hqr_dump + 16]
+        mov edi, DWORD PTR [zpatch_hqr_dump + 20]
+        mov ebp, DWORD PTR [zpatch_hqr_dump + 24]
+        mov esp, DWORD PTR [zpatch_hqr_dump + 28]
+        mov eax, 5
+        push DWORD PTR [zpatch_hqr_mode]
+        push DWORD PTR [zpatch_hqr_flags]
+        push eax
+        call DWORD PTR [zpatch_hqr_builder]
+        mov eax, DWORD PTR [zpatch_hqr_dump]
+        mov ebx, DWORD PTR [zpatch_hqr_dump + 4]
+        mov ecx, DWORD PTR [zpatch_hqr_dump + 8]
+        mov edx, DWORD PTR [zpatch_hqr_dump + 12]
+        mov esi, DWORD PTR [zpatch_hqr_dump + 16]
+        mov edi, DWORD PTR [zpatch_hqr_dump + 20]
+        mov ebp, DWORD PTR [zpatch_hqr_dump + 24]
+        mov esp, DWORD PTR [zpatch_hqr_dump + 28]
+        mov eax, 6
+        push DWORD PTR [zpatch_hqr_mode]
+        push DWORD PTR [zpatch_hqr_flags]
+        push eax
+        call DWORD PTR [zpatch_hqr_builder]
+        mov eax, DWORD PTR [zpatch_hqr_dump]
+        mov ebx, DWORD PTR [zpatch_hqr_dump + 4]
+        mov ecx, DWORD PTR [zpatch_hqr_dump + 8]
+        mov edx, DWORD PTR [zpatch_hqr_dump + 12]
+        mov esi, DWORD PTR [zpatch_hqr_dump + 16]
+        mov edi, DWORD PTR [zpatch_hqr_dump + 20]
+        mov ebp, DWORD PTR [zpatch_hqr_dump + 24]
+        mov esp, DWORD PTR [zpatch_hqr_dump + 28]
+        mov eax, 7
+        push DWORD PTR [zpatch_hqr_mode]
+        push DWORD PTR [zpatch_hqr_flags]
+        push eax
+        call DWORD PTR [zpatch_hqr_builder]
+        mov eax, DWORD PTR [zpatch_hqr_dump]
+        mov ebx, DWORD PTR [zpatch_hqr_dump + 4]
+        mov ecx, DWORD PTR [zpatch_hqr_dump + 8]
+        mov edx, DWORD PTR [zpatch_hqr_dump + 12]
+        mov esi, DWORD PTR [zpatch_hqr_dump + 16]
+        mov edi, DWORD PTR [zpatch_hqr_dump + 20]
+        mov ebp, DWORD PTR [zpatch_hqr_dump + 24]
+        mov esp, DWORD PTR [zpatch_hqr_dump + 28]
+        mov eax, 8
+        push DWORD PTR [zpatch_hqr_mode]
+        push DWORD PTR [zpatch_hqr_flags]
+        push eax
+        call DWORD PTR [zpatch_hqr_builder]
+        mov eax, DWORD PTR [zpatch_hqr_dump]
+        mov ebx, DWORD PTR [zpatch_hqr_dump + 4]
+        mov ecx, DWORD PTR [zpatch_hqr_dump + 8]
+        mov edx, DWORD PTR [zpatch_hqr_dump + 12]
+        mov esi, DWORD PTR [zpatch_hqr_dump + 16]
+        mov edi, DWORD PTR [zpatch_hqr_dump + 20]
+        mov ebp, DWORD PTR [zpatch_hqr_dump + 24]
+        mov esp, DWORD PTR [zpatch_hqr_dump + 28]
+        mov eax, 9
+        push DWORD PTR [zpatch_hqr_mode]
+        push DWORD PTR [zpatch_hqr_flags]
+        push eax
+        call DWORD PTR [zpatch_hqr_builder]
+        mov eax, DWORD PTR [zpatch_hqr_dump]
+        mov ebx, DWORD PTR [zpatch_hqr_dump + 4]
+        mov ecx, DWORD PTR [zpatch_hqr_dump + 8]
+        mov edx, DWORD PTR [zpatch_hqr_dump + 12]
+        mov esi, DWORD PTR [zpatch_hqr_dump + 16]
+        mov edi, DWORD PTR [zpatch_hqr_dump + 20]
+        mov ebp, DWORD PTR [zpatch_hqr_dump + 24]
+        mov esp, DWORD PTR [zpatch_hqr_dump + 28]
+        mov eax, 0Ah
+        push DWORD PTR [zpatch_hqr_mode]
+        push DWORD PTR [zpatch_hqr_flags]
+        push eax
+        call DWORD PTR [zpatch_hqr_builder]
+        mov eax, DWORD PTR [zpatch_hqr_dump]
+        mov ebx, DWORD PTR [zpatch_hqr_dump + 4]
+        mov ecx, DWORD PTR [zpatch_hqr_dump + 8]
+        mov edx, DWORD PTR [zpatch_hqr_dump + 12]
+        mov esi, DWORD PTR [zpatch_hqr_dump + 16]
+        mov edi, DWORD PTR [zpatch_hqr_dump + 20]
+        mov ebp, DWORD PTR [zpatch_hqr_dump + 24]
+        mov esp, DWORD PTR [zpatch_hqr_dump + 28]
+        mov eax, 0Bh
+        push DWORD PTR [zpatch_hqr_mode]
+        push DWORD PTR [zpatch_hqr_flags]
+        push eax
+        call DWORD PTR [zpatch_hqr_builder]
+        jmp DWORD PTR [zpatch_hqr_resume]
+    }
+}
+
 // The SuperLODFix pair's published state: the two resumes the shim tails into
 // (dword_101580AC and dword_101580B0) and the lookup the model helper calls
 // (dword_101580B4). The original keeps them in .bss beside its code; the
@@ -995,6 +1181,42 @@ namespace
             reinterpret_cast<void*>(&BuildingsDynamicShadowsShim), true);
     }
 
+    // HighQualityReflections' published state: the resume is the instruction after
+    // the site's own five-byte call, and the builder is that call's target. The
+    // scanned block is the six-byte `mov eax,[edi+938h]` then `push 8`,
+    // `push 131Dh`, `push eax` and `call`, so the E8 opcode is at match+0x0E and
+    // match+0x0F is its rel32: resume = match+0x13, builder = match+0x13 + the
+    // dword at match+0x0F.
+    void PublishHighQualityReflections()
+    {
+        if (!Loader::Enabled("HighQualityReflections"))
+            return;
+
+        auto pattern = find_pattern("8B 87 38 09 00 00 6A 08 68 1D 13 00 00 50 E8");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get_first<std::byte>(0);
+        zpatch_hqr_resume = match + 0x13;
+        zpatch_hqr_builder = match + 0x13 + *pattern.get_first<int32_t>(0x0F);
+    }
+
+    // HighQualityReflections: the original's handler E9s the match (the site's
+    // `mov eax,[edi+938h]`) to the detour; the body replays the twelve builder
+    // calls the block makes and tail-jumps to the resume published above.
+    void InstallHighQualityReflections()
+    {
+        if (!Loader::Enabled("HighQualityReflections"))
+            return;
+
+        auto pattern = find_pattern("8B 87 38 09 00 00 6A 08 68 1D 13 00 00 50 E8");
+        if (pattern.empty())
+            return;
+
+        Bodies::Register(reinterpret_cast<uintptr_t>(&HqrBody), 0x1001F030u);
+        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(&HqrBody), true);
+    }
+
     // EmissiveLerpFix's published state: match - 12 as the resume and match - 16 as
     // the float slot. Both published values are addresses, not values read out of
     // the game (see EmissiveLerpShim).
@@ -1188,6 +1410,7 @@ export void RegisterGraphics()
         PublishBuildingDynamicShadows();
         PublishCutsceneFixes();
         PublishEmissiveLerpFix();
+        PublishHighQualityReflections();
         PublishSuperLODFix();
     };
     Loader::InstallEvent() += [] { InstallBorderlessWindowed(); };
@@ -1197,6 +1420,7 @@ export void RegisterGraphics()
     Loader::InstallEvent() += [] { InstallEmissiveLerpFix(); };
     Loader::InstallEvent() += [] { InstallForceDynamicShadowsEverywhere(); };
     Loader::InstallEvent() += [] { InstallForceShadowsOnObjects(); };
+    Loader::InstallEvent() += [] { InstallHighQualityReflections(); };
     Loader::InstallEvent() += [] { InstallImprovedShaderStreaming(); };
     Loader::InstallEvent() += [] { InstallNoImpostorHeightCutoff(); };
     Loader::InstallEvent() += [] { InstallNoLODLightHeightCutoff(); };
