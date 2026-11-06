@@ -8,10 +8,15 @@ and EFLC. The oracle is `../game_refs/ZolikaPatch_original.asi.off`; the old
 
 Fourteen feature modules are in place (stability, vehicles, graphics, useless_checks,
 launcher, audio, misc, options, loader, pattern, shared, loading, native, ooc) and 98 of the 99
-catalogue keys are closed on 1.0.8.0, with 119 hook bodies transcribed and proven
+catalogue keys are closed on 1.0.8.0, with 125 hook bodies transcribed and proven
 instruction-for-instruction against the original ASI. The shipped-INI cell now shows
 zero differing and zero extra bytes: everything the tree writes agrees with the
-baseline, and what remains is unimplemented, not wrong.
+baseline, and what remains is unimplemented, not wrong. The pieces that are *not*
+transcribed are rebuilt in C++ instead, and `docs/rebuilt.md` is their catalogue: the
+recovered VA and size, the exact instruction pattern that blocks the transcription,
+what the rebuild reproduces, how that was verified and what stays unproven. A body is
+only rebuilt for an indexed absolute table access, an exception frame, a TLS
+static-init guard or a call graph of rebuilds - a `/GS` cookie is not a reason.
 
 One key is open by construction, not by omission, and it is recorded in
 `docs/parity.md`: `SkipLauncher` implements the original's full 25-row launcher stage

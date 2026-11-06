@@ -1435,11 +1435,10 @@ namespace
     constexpr uint16_t kNewSavesBranchNop = 0x9090;
 
     // The save-directory buffer (original byte_101A8308, 312 bytes up to the next
-    // .bss object) and the two scratch buffers inside the hooks: sub_10051A90's
-    // 0xE7C-byte frame minus its stack cookie, and sub_10051AD0's `push 0Ch`.
+    // .bss object). The two hooks' scratch is their own frames, so no constant here
+    // describes them: sub_10051A90's 0xE7C-byte frame and sub_10051AD0's `push 0Ch`
+    // are written into the transcriptions.
     constexpr std::size_t kNewSavesDirectorySize = 312;
-    constexpr std::size_t kNewSavesReadScratchSize = 0x0E78;
-    constexpr std::size_t kNewSavesProbeSize = 12;
 
     // Where the writes land inside their anchors: the read call and its operand,
     // the pushed read size, the branch in front of the push, and the second
@@ -1453,9 +1452,6 @@ namespace
     // `jz rel8`: the branch opcode the first site is restored to when the save is
     // not the newer layout (Bytes::ShortJmp is the other operand).
     constexpr std::byte kNewSavesJumpIfZero{ 0x74 };
-
-    // The game's LoadData entry: (buffer, size), caller-cleaned, value in EAX.
-    using NewSavesLoadDataFn = uint32_t(__cdecl*)(void*, uint32_t);
 
     // The original resolves each converter site once, through a function-local
     // static whose initialisation the compiler guards with the TLS block (the
@@ -1481,37 +1477,93 @@ namespace
     }
 }
 
-// sub_10051A90, recovered VA 0x10051A90: the read at game 0x7D8C50. It reads into
-// its own 0xE78-byte local - the caller's buffer is deliberately left untouched -
-// and returns the read's value; an unpublished read entry returns 0.
-uint32_t __cdecl NewSavesReadHook(void* /*caller_buffer*/, uint32_t size)
+// sub_10051A90, recovered VA 0x10051A90 (20 instructions): the read at game
+// 0x7D8C50. It reads into its own 0xE78-byte local - the caller's buffer,
+// `[ebp+8]`, is deliberately left untouched - and answers the read's value; an
+// unpublished read entry skips the call and leaves EAX at the zero the test just
+// saw, which is the value this returns. The /GS frame and the returned register are
+// the original's, so this replaces the C++ rebuild the tree carried (docs/rebuilt.md).
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void NewSavesReadHook()
 {
-    std::array<uint8_t, kNewSavesReadScratchSize> scratch;
-    if (zpatch_new_saves_loaddata == 0)
-        return 0;
-    return reinterpret_cast<NewSavesLoadDataFn>(
-        static_cast<uintptr_t>(zpatch_new_saves_loaddata))(scratch.data(), size);
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        sub esp, 0E7Ch
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, ebp
+        mov DWORD PTR [ebp - 4], eax
+        mov eax, DWORD PTR [zpatch_new_saves_loaddata]
+        test eax, eax
+        je newsaves_read_skip
+        push DWORD PTR [ebp + 0Ch]
+        lea ecx, [ebp - 0E7Ch]
+        push ecx
+        call eax
+        add esp, 8
+    newsaves_read_skip:
+        mov ecx, DWORD PTR [ebp - 4]
+        xor ecx, ebp
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    }
 }
 
-// sub_10051AD0, recovered VA 0x10051AD0: the second LoadData call at game
-// 0x8DA090. When the save has the newer chunk 13, it consumes a twelve-byte block
-// before and after the original call - the original issues both reads and returns
-// the second one's value; otherwise the original call's value passes through. The
-// original call is unconditional (a call through an unpublished slot faults).
-uint32_t __cdecl NewSavesSecondLoadHook()
+// sub_10051AD0, recovered VA 0x10051AD0 (33 instructions): the second LoadData call
+// at game 0x8DA090. When the save has the newer chunk 13 it consumes a twelve-byte
+// block before and after the original call - both reads run through the same slot
+// and the second one's value is what the body leaves in EAX - and otherwise the
+// original call's value passes through. The original call itself is unconditional
+// (a call through an unpublished slot faults), and it is the site's own target the
+// installer republished. Transcribed, so the C++ rebuild is gone (docs/rebuilt.md).
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void NewSavesSecondLoadHook()
 {
-    std::array<uint8_t, kNewSavesProbeSize> probe;
-    if (zpatch_new_saves_extra_block != 0 && zpatch_new_saves_loaddata != 0)
-        static_cast<void>(reinterpret_cast<NewSavesLoadDataFn>(
-            static_cast<uintptr_t>(zpatch_new_saves_loaddata))(probe.data(), kNewSavesProbeSize));
-
-    const uint32_t result = reinterpret_cast<uint32_t(__cdecl*)()>(
-        static_cast<uintptr_t>(zpatch_new_saves_p3_original))();
-
-    if (zpatch_new_saves_extra_block != 0 && zpatch_new_saves_loaddata != 0)
-        return reinterpret_cast<NewSavesLoadDataFn>(
-            static_cast<uintptr_t>(zpatch_new_saves_loaddata))(probe.data(), kNewSavesProbeSize);
-    return result;
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        sub esp, 10h
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, ebp
+        mov DWORD PTR [ebp - 4], eax
+        cmp BYTE PTR [zpatch_new_saves_extra_block], 0
+        je newsaves_second_before
+        mov eax, DWORD PTR [zpatch_new_saves_loaddata]
+        test eax, eax
+        je newsaves_second_before
+        lea ecx, [ebp - 10h]
+        push 0Ch
+        push ecx
+        call eax
+        add esp, 8
+    newsaves_second_before:
+        call DWORD PTR [zpatch_new_saves_p3_original]
+        cmp BYTE PTR [zpatch_new_saves_extra_block], 0
+        je newsaves_second_done
+        mov eax, DWORD PTR [zpatch_new_saves_loaddata]
+        test eax, eax
+        je newsaves_second_done
+        lea ecx, [ebp - 10h]
+        push 0Ch
+        push ecx
+        call eax
+        add esp, 8
+    newsaves_second_done:
+        mov ecx, DWORD PTR [ebp - 4]
+        xor ecx, ebp
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    }
 }
 
 namespace
@@ -1759,6 +1811,12 @@ extern "C"
     uint32_t zpatch_dlc_game_base = 0;
 }
 
+// The bounded formatter's entry, published by source/stability.ixx (sub_10001280).
+extern "C"
+{
+    extern uint32_t zpatch_format_entry;
+}
+
 namespace
 {
     constexpr std::size_t kDlcTailNopLength = 12;
@@ -1824,124 +1882,324 @@ namespace
     };
 }
 
-// The discovery pass's constants (original sub_10023150): the 0x104-byte path
-// buffers, the 0x168-byte request block with its flag at +358 and its mode dword
-// at +344, the two named DLC ids, the episode channel range and the object byte
-// the pass finishes with.
+// The discovery pass's data (original sub_10023150): the five imported entries it
+// calls through the original's own IAT slots, and the five literals it pushes. Each
+// IAT operand is an absolute address, so the transcription names these slots and the
+// instructions keep the original's `call ds:[...]` / `mov reg, ds:[...]` shapes.
+extern "C"
+{
+    uint32_t zpatch_dlc_get_module_file_name = 0;   // 0x10063004 GetModuleFileNameA
+    uint32_t zpatch_dlc_path_remove_file_spec = 0;  // 0x10063250 PathRemoveFileSpecA
+    uint32_t zpatch_dlc_path_file_exists = 0;       // 0x1006324C PathFileExistsA
+    uint32_t zpatch_dlc_strcpy_s = 0;               // 0x10063388 strcpy_s
+    uint32_t zpatch_dlc_strcat_s = 0;               // 0x100633A8 strcat_s
+
+    // The original's own text: the two "content" layouts at 0x1012BD08/0x1012BDB0,
+    // their legacy fallbacks at 0x1012BD60/0x1012BE08, and the episode format at
+    // 0x1012BE54.
+    const char zpatch_dlc_tlad_content[] = "\\dlc\\tlad\\content\\";
+    const char zpatch_dlc_tlad_legacy[] = "\\TLAD\\";
+    const char zpatch_dlc_tbogt_content[] = "\\dlc\\TBoGT\\content\\";
+    const char zpatch_dlc_tbogt_legacy[] = "\\TBoGT\\";
+    const char zpatch_dlc_episode_format[] = "\\Episode%d\\";
+}
+
 namespace
 {
-    constexpr std::size_t kDlcPathCapacity = 0x104;
-    constexpr std::size_t kDlcRequestCapacity = 0x168;
-    constexpr std::size_t kDlcRequestFlagOffset = 358;
-    constexpr std::size_t kDlcRequestModeOffset = 344;
-    constexpr std::size_t kDlcObjectFlagOffset = 0x166;
-    constexpr std::size_t kDlcSuffixCapacity = 0x40;
-    constexpr int kTladDlcId = 2;
-    constexpr int kTbogtDlcId = 4;
-    constexpr int kFirstEpisodeChannel = 3;
-    constexpr int kLastEpisodeChannel = 0xFF;  // one past 254
-    constexpr int kEpisodeChannelScale = 2;
-
-    // "\Episode<n>\": the original formats it with its bounded formatter at a
-    // 0x40-byte capacity; the text is what the game's path table is probed with.
-    void BuildEpisodeSuffix(char* out, int episode)
+    // The original's `call 0x100603F1` is the CRT's scalar `operator new`, called
+    // unchecked and never freed. The inline assembler cannot name it in a `call`, so
+    // the transcription calls this cdecl forwarder: one `E8`, the same argument and
+    // the same throwing allocator.
+    void* __cdecl DlcAlloc(unsigned int size)
     {
-        *out++ = '\\';
-        for (const char character : std::string_view("Episode"))
-            *out++ = character;
-        char digits[4];
-        int count = 0;
-        do
+        return ::operator new(size);
+    }
+
+    // The original's `call 0x10060D6E` is the CRT `memset` with the same order
+    // (destination, value, count).
+    void __cdecl DlcZeroBlock(void* destination, int value, unsigned int count)
+    {
+        std::memset(destination, value, count);
+    }
+
+    // sub_10001280, transcribed in source/stability.ixx (docs/rebuilt.md). The
+    // original's `call 0x10001280` is an immediate, so this six-byte forwarder keeps
+    // that shape while a module interface cannot export the naked body itself.
+    static __declspec(naked) void DlcFormat()
+    {
+        __asm
         {
-            digits[count++] = static_cast<char>('0' + episode % 10);
-            episode /= 10;
-        } while (episode != 0);
-        while (count > 0)
-            *out++ = digits[--count];
-        *out++ = '\\';
-        *out = '\0';
+            jmp DWORD PTR [zpatch_format_entry]
+        }
     }
 }
 
-// sub_10023150, recovered VA 0x10023150: the DLC discovery. For each of the two
-// named DLC folders it picks one path - the "content" layout if it exists, else
-// the legacy fallback - and probes \Episode3\ .. \Episode254\ next to the
-// executable, registering every folder that exists and applying it to the object
-// the body was entered with. Both calls go through the handler-published RVAs,
-// and the register call is the same call shape the original has (three stack
-// arguments; see the note on the undefined `this` below).
+// sub_10023150, recovered VA 0x10023150 (223 instructions to its `ret`): the DLC
+// discovery, transcribed instruction for instruction. For each of the two named DLC
+// folders it picks one path - the "content" layout if it exists, else the legacy
+// fallback - and probes \Episode3\ .. \Episode254\ next to the executable,
+// registering every folder that exists and applying it to the object the body was
+// entered with (`[ebp+8]`, the argument the fixup body pushes).
 //
-// The pass leaves EDX holding whatever its last callee left. That is not
-// observable: the only caller of the patched game function (game 0x4931FA) does
-// not read EDX or EAX - it calls 0x8CCCD0 straight after - and neither image
-// mentions 0x890320 anywhere else (checked as both a branch target and a dword).
-// The rebuild still performs the same calls in the same order, so EDX ends up the
-// same value on every path.
-static void* DlcDiscovery(void* object)
+// It is transcribable: unlike the rest of the rebuilt set its instruction stream has
+// no EH frame, no TLS static-init guard and no indexed absolute operand -- the
+// /GS cookie is ordinary instructions, every call is a direct `E8` or an absolute
+// IAT slot, and every buffer is ESP/EBP-relative. The proof row is why the C++ rebuild
+// is gone; docs/rebuilt.md records the evidence and what is left unproven.
+//
+// Two details are the original's and not the rebuild's invention:
+// - The register call is `call esi` with ESI = image base + the stored register RVA
+//   and ECX left over from the preceding `strcpy_s`; the callee uses ECX only through
+//   the loader callback this key replaces and a branch its non-zero flag skips, so
+//   the value is never dereferenced. The transcription leaves ECX alone, exactly as
+//   the original does, rather than inventing a `this`.
+// - The episode id pushed for the register call is `lea eax,[edi+edi]` -- twice the
+//   loop counter -- and the loop runs edi = 3 .. 254 inclusive, which is the original
+//   `inc edi / cmp edi,0FFh / jl`.
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void DlcDiscovery()
 {
-    // The original allocates this block unchecked and never frees it; owning it
-    // would only change its lifetime.
-    char* const modulePath = static_cast<char*>(::operator new(kDlcPathCapacity));
-    GetModuleFileNameA(nullptr, modulePath, static_cast<DWORD>(kDlcPathCapacity));
-    PathRemoveFileSpecA(modulePath);
-
-    using RegisterFn = bool(__stdcall*)(int, void*, int);
-    using ApplyFn = void(__thiscall*)(void*, void*);
-    const auto gameBase = static_cast<uintptr_t>(zpatch_dlc_game_base);
-
-    char path[kDlcPathCapacity];
-    char suffix[kDlcSuffixCapacity];
-
-    // The register entry is a __thiscall that the original calls without setting
-    // ECX: with the flag argument non-zero it skips the only branch that would use
-    // `this`, and the one call that still reads it is the loader callback this key
-    // replaces with the dummy body. Declaring it __stdcall keeps that contract -
-    // the callee pops the three arguments and ECX is left alone.
-    const auto registerDlc = reinterpret_cast<RegisterFn>(gameBase + zpatch_dlc_register_rva);
-    const auto applyDlc = reinterpret_cast<ApplyFn>(gameBase + zpatch_dlc_apply_rva);
-
-    const auto registerAndApply = [&](int id)
+    __asm
     {
-        char request[kDlcRequestCapacity] = {};
-        strcpy_s(request, kDlcPathCapacity, path);
-        request[kDlcRequestFlagOffset] = 1;
-        *reinterpret_cast<uint32_t*>(request + kDlcRequestModeOffset) = 1;
-        registerDlc(id, request, 1);
-        applyDlc(object, request);
-    };
-
-    // A named folder: the primary layout, else the fallback. The probe runs again
-    // on the substituted path (and again on the primary when it was the one that
-    // existed), exactly as the original's two PathFileExistsA calls do.
-    const auto tryNamed = [&](const char* primary, const char* fallback, int id)
-    {
-        strcpy_s(path, kDlcPathCapacity, modulePath);
-        strcat_s(path, kDlcPathCapacity, primary);
-        if (PathFileExistsA(path) == FALSE)
-        {
-            strcpy_s(path, kDlcPathCapacity, modulePath);
-            strcat_s(path, kDlcPathCapacity, fallback);
-        }
-        if (PathFileExistsA(path) == FALSE)
-            return;
-        registerAndApply(id);
-    };
-
-    tryNamed("\\dlc\\tlad\\content\\", "\\TLAD\\", kTladDlcId);
-    tryNamed("\\dlc\\TBoGT\\content\\", "\\TBoGT\\", kTbogtDlcId);
-
-    for (int episode = kFirstEpisodeChannel; episode < kLastEpisodeChannel; ++episode)
-    {
-        strcpy_s(path, kDlcPathCapacity, modulePath);
-        BuildEpisodeSuffix(suffix, episode);
-        strcat_s(path, kDlcPathCapacity, suffix);
-        if (PathFileExistsA(path) == FALSE)
-            continue;
-        registerAndApply(episode * kEpisodeChannelScale);
+        push ebp
+        mov ebp, esp
+        and esp, 0FFFFFFF8h
+        sub esp, 2C4h
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, esp
+        mov DWORD PTR [esp + 2C0h], eax
+        mov eax, DWORD PTR [ebp + 8]
+        push ebx
+        push esi
+        push edi
+        push 104h
+        mov DWORD PTR [esp + 14h], eax
+        call DlcAlloc
+        add esp, 4
+        mov esi, eax
+        mov DWORD PTR [esp + 14h], esi
+        push 104h
+        push esi
+        push 0
+        call DWORD PTR [zpatch_dlc_get_module_file_name]
+        push esi
+        call DWORD PTR [zpatch_dlc_path_remove_file_spec]
+        mov ebx, DWORD PTR [zpatch_dlc_strcpy_s]
+        lea eax, [esp + 180h]
+        push esi
+        push 104h
+        push eax
+        call ebx
+        mov edi, DWORD PTR [zpatch_dlc_strcat_s]
+        lea eax, [esp + 18Ch]
+        add esp, 0Ch
+        push OFFSET zpatch_dlc_tlad_content
+        push 104h
+        push eax
+        call edi
+        add esp, 0Ch
+        lea eax, [esp + 180h]
+        push eax
+        call DWORD PTR [zpatch_dlc_path_file_exists]
+        test eax, eax
+        jne dlc_tlad_exists
+        push esi
+        lea eax, [esp + 184h]
+        push 104h
+        push eax
+        call ebx
+        add esp, 0Ch
+        lea eax, [esp + 180h]
+        push OFFSET zpatch_dlc_tlad_legacy
+        push 104h
+        push eax
+        call edi
+        add esp, 0Ch
+        // The original's `jne 0x1002320E` lands here, on the *second* probe: a
+        // "content" layout that exists is probed once more, and a failed probe still
+        // skips the registration. The fallback path reaches the same instruction by
+        // fallthrough, which is why the label sits on the probe and not on the
+        // register block.
+    dlc_tlad_exists:
+        lea eax, [esp + 180h]
+        push eax
+        call DWORD PTR [zpatch_dlc_path_file_exists]
+        test eax, eax
+        je dlc_next
+        mov ecx, DWORD PTR [zpatch_dlc_game_base]
+        lea eax, [esp + 18h]
+        mov esi, DWORD PTR [zpatch_dlc_register_rva]
+        push 168h
+        push 0
+        push eax
+        lea esi, [esi + ecx]
+        call DlcZeroBlock
+        add esp, 0Ch
+        lea eax, [esp + 180h]
+        push eax
+        lea eax, [esp + 1Ch]
+        push 104h
+        push eax
+        call ebx
+        add esp, 0Ch
+        mov BYTE PTR [esp + 17Eh], 1
+        lea eax, [esp + 18h]
+        mov DWORD PTR [esp + 170h], 1
+        push 1
+        push eax
+        push 2
+        call esi
+        mov ecx, DWORD PTR [esp + 10h]
+        lea eax, [esp + 18h]
+        push eax
+        mov eax, DWORD PTR [zpatch_dlc_apply_rva]
+        add eax, DWORD PTR [zpatch_dlc_game_base]
+        call eax
+        mov esi, DWORD PTR [esp + 14h]
+    dlc_next:
+        push esi
+        lea eax, [esp + 184h]
+        push 104h
+        push eax
+        call ebx
+        add esp, 0Ch
+        lea eax, [esp + 180h]
+        push OFFSET zpatch_dlc_tbogt_content
+        push 104h
+        push eax
+        call edi
+        add esp, 0Ch
+        lea eax, [esp + 180h]
+        push eax
+        call DWORD PTR [zpatch_dlc_path_file_exists]
+        test eax, eax
+        jne dlc_tbogt_exists
+        push esi
+        lea eax, [esp + 184h]
+        push 104h
+        push eax
+        call ebx
+        add esp, 0Ch
+        lea eax, [esp + 180h]
+        push OFFSET zpatch_dlc_tbogt_legacy
+        push 104h
+        push eax
+        call edi
+        add esp, 0Ch
+        // Same join as TLaD's: `jne 0x100232F8` lands on this second probe, and the
+        // fallback reaches it by fallthrough.
+    dlc_tbogt_exists:
+        lea eax, [esp + 180h]
+        push eax
+        call DWORD PTR [zpatch_dlc_path_file_exists]
+        test eax, eax
+        je dlc_episodes
+        mov ecx, DWORD PTR [zpatch_dlc_game_base]
+        lea eax, [esp + 18h]
+        mov esi, DWORD PTR [zpatch_dlc_register_rva]
+        push 168h
+        push 0
+        push eax
+        lea esi, [esi + ecx]
+        call DlcZeroBlock
+        add esp, 0Ch
+        lea eax, [esp + 180h]
+        push eax
+        lea eax, [esp + 1Ch]
+        push 104h
+        push eax
+        call ebx
+        add esp, 0Ch
+        mov BYTE PTR [esp + 17Eh], 1
+        lea eax, [esp + 18h]
+        mov DWORD PTR [esp + 170h], 1
+        push 1
+        push eax
+        push 4
+        call esi
+        mov ecx, DWORD PTR [esp + 10h]
+        lea eax, [esp + 18h]
+        push eax
+        mov eax, DWORD PTR [zpatch_dlc_apply_rva]
+        add eax, DWORD PTR [zpatch_dlc_game_base]
+        call eax
+        mov esi, DWORD PTR [esp + 14h]
+    dlc_episodes:
+        mov edi, 3
+    dlc_episode_loop:
+        push esi
+        lea eax, [esp + 184h]
+        push 104h
+        push eax
+        call ebx
+        add esp, 0Ch
+        lea eax, [esp + 288h]
+        push edi
+        push OFFSET zpatch_dlc_episode_format
+        push 40h
+        push eax
+        call DlcFormat
+        lea eax, [esp + 298h]
+        push eax
+        lea eax, [esp + 194h]
+        push 104h
+        push eax
+        call DWORD PTR [zpatch_dlc_strcat_s]
+        add esp, 1Ch
+        lea eax, [esp + 180h]
+        push eax
+        call DWORD PTR [zpatch_dlc_path_file_exists]
+        test eax, eax
+        je dlc_episode_next
+        mov ecx, DWORD PTR [zpatch_dlc_game_base]
+        lea eax, [esp + 18h]
+        mov esi, DWORD PTR [zpatch_dlc_register_rva]
+        push 168h
+        push 0
+        push eax
+        lea esi, [esi + ecx]
+        call DlcZeroBlock
+        add esp, 0Ch
+        lea eax, [esp + 180h]
+        push eax
+        lea eax, [esp + 1Ch]
+        push 104h
+        push eax
+        call ebx
+        add esp, 0Ch
+        mov BYTE PTR [esp + 17Eh], 1
+        lea eax, [esp + 18h]
+        mov DWORD PTR [esp + 170h], 1
+        push 1
+        push eax
+        lea eax, [edi + edi]
+        push eax
+        call esi
+        mov ecx, DWORD PTR [esp + 10h]
+        lea eax, [esp + 18h]
+        push eax
+        mov eax, DWORD PTR [zpatch_dlc_apply_rva]
+        add eax, DWORD PTR [zpatch_dlc_game_base]
+        call eax
+        mov esi, DWORD PTR [esp + 14h]
+    dlc_episode_next:
+        inc edi
+        cmp edi, 0FFh
+        jl dlc_episode_loop
+        mov eax, DWORD PTR [esp + 10h]
+        mov ecx, DWORD PTR [esp + 2CCh]
+        pop edi
+        pop esi
+        pop ebx
+        xor ecx, esp
+        mov BYTE PTR [eax + 166h], 2
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
     }
-
-    *reinterpret_cast<uint8_t*>(static_cast<uint8_t*>(object) + kDlcObjectFlagOffset) = 2;
-    return object;
 }
 
 // sub_10023480, recovered VA 0x10023480 (2 instructions): the loader callback's
@@ -2056,6 +2314,23 @@ namespace
 // Registered like every other arm: the install tier owns the gate.
 export void RegisterLoading()
 {
+    // The discovery pass's five imported entries, filled before any tier runs. The
+    // original calls them through its own IAT slots; this module's are filled from
+    // its own imports so the transcription's operands are absolute on both sides.
+    zpatch_dlc_get_module_file_name = static_cast<uint32_t>(
+        reinterpret_cast<uintptr_t>(&GetModuleFileNameA));
+    zpatch_dlc_path_remove_file_spec = static_cast<uint32_t>(
+        reinterpret_cast<uintptr_t>(&PathRemoveFileSpecA));
+    zpatch_dlc_path_file_exists = static_cast<uint32_t>(
+        reinterpret_cast<uintptr_t>(&PathFileExistsA));
+    // `strcpy_s`/`strcat_s` are overloaded in C++ (the template form takes the
+    // destination by reference), so the address is the C three-argument entry.
+    using SafeCopyFn = int(__cdecl*)(char*, size_t, const char*);
+    zpatch_dlc_strcpy_s = static_cast<uint32_t>(
+        reinterpret_cast<uintptr_t>(static_cast<SafeCopyFn>(&strcpy_s)));
+    zpatch_dlc_strcat_s = static_cast<uint32_t>(
+        reinterpret_cast<uintptr_t>(static_cast<SafeCopyFn>(&strcat_s)));
+
     Loader::PublishEvent() += []
     {
         PublishLocalSettingsPath();

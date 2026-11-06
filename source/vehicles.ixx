@@ -160,6 +160,7 @@ extern "C"
     extern uint32_t zpatch_wheelangle_models[512];
     extern uint32_t zpatch_wheelangle_angles[512];
     extern uint32_t zpatch_ide_hook_slot;
+    extern uint32_t zpatch_format_entry;  // sub_10001280 (source/stability.ixx)
 }
 
 // abi_collision_deadlock_walk, recovered VA 0x10005D80: the whole node-walk of
@@ -758,20 +759,18 @@ static __declspec(naked) void* __fastcall VehicleComponentBody(void*, const char
 
 namespace
 {
-    // sub_10001280, rebuilt: the bounded `vsnprintf` wrapper the livery helpers
-    // format through. The original's callee reaches the UCRT print engine with the
-    // standard-snprintf option bit (docs/parity.md), so `_vsnprintf_s` with
-    // `_TRUNCATE` is the same bound and the same truncate-and-terminate result.
-    // Only the call's shape matters to the transcribed callers; the two bodies for
-    // which 0x10001280 is the only caller are NoLiveryLimit's, and the format is
-    // always "%s_sign_%d" into a 64-byte buffer.
-    int __cdecl NoliveryFormat(char* buffer, unsigned int size, const char* format, ...)
+    // sub_10001280, recovered VA 0x10001280: the bounded formatter, transcribed once
+    // in source/stability.ixx and proved there instruction for instruction
+    // (docs/rebuilt.md). A module interface cannot export a naked function, so this
+    // six-byte forwarder is what the livery helpers' `call` names: the original's
+    // call is an immediate too, and the forwarder enters the body with the stack and
+    // the registers untouched.
+    static __declspec(naked) void NoliveryFormat()
     {
-        va_list arguments;
-        va_start(arguments, format);
-        const int written = _vsnprintf_s(buffer, size, _TRUNCATE, format, arguments);
-        va_end(arguments);
-        return written;
+        __asm
+        {
+            jmp DWORD PTR [zpatch_format_entry]
+        }
     }
 
     // sub_10003E50 (source/shared.ixx), called as the original's direct `call`:

@@ -28,7 +28,7 @@ fix.
 | null section dereference | a key line before the first `[section]` line | `Feather::Parse` |
 | a line longer than 255 bytes is split | the parser's 255-byte line buffer | `Feather::Parse` |
 | the file-registry helpers fault on a scan miss | the original's one-time scans (`0x10051730`, `0x10051610`, `0x100517E0`) match nothing | `NewfilesObject` / `NewfilesCallObject` / `NewfilesCallAdd` read or call through the null the scan left, as the original's unguarded `mov eax,[esi]` with `ESI = 0` and its `call edx` do |
-| the DLC register call's `this` is undefined | every `LoadDLCs` run | the original calls the register entry at `0x48F440` with `ECX` left over from the preceding `strcpy_s`. The callee uses it only through the loader-callback call this key replaces with `0x10023480` and through a branch its non-zero flag argument skips, so the value is never dereferenced. The rebuild keeps the same call shape (`__stdcall`, three stack arguments, `ECX` untouched) rather than inventing a `this` |
+| the DLC register call's `this` is undefined | every `LoadDLCs` run | the original calls the register entry (image base + the stored register RVA) with `ECX` left over from the preceding `strcpy_s`: `mov ecx,dword_1015AD70 / mov esi,dword_1015804C / … / lea esi,[esi+ecx] / call esi` (`0x10023220`-`0x10023276`). The callee uses it only through the loader-callback call this key replaces with `0x10023480` and through a branch its non-zero flag argument skips, so the value is never dereferenced. The transcription (`dlc_discovery`) leaves `ECX` exactly where the original leaves it -- no `this` is invented and no register is set up |
 | the steer consumer faults on a preamble miss | a build whose model-info array, bone getter or setter scan matches nothing leaves `dword_1015AD78` / `dword_10159B88` / `dword_1015D63C` / `dword_10159CDC` zero | `sub_10004C70` reads them unguarded (`mov eax,[eax+ecx*4]`, `call edx`, `call dword_1015D63C`); the rebuild keeps every hop and every indirect call unguarded, so a miss faults at the same instruction. 1.0.8.0 has all four patterns |
 | the headlight-shadow check faults on a null lookup or object | a build whose `dword_10159C0C` scan matched nothing, or a call with a null object | `sub_1001AD20`'s `call dword_10159C0C` (`0x1001AD5C`) and `movsx eax, word [edi+2Eh]` (`0x1001AD62`) are both unguarded in the original; the rebuild calls first and loads second, so it faults on the same instruction of either condition (the key's section below records the rebuild) |
 | the cutscene chain faults on an unresolved native or a missed camera site | the game's native resolver answers null (`dword_1015BDE0` unresolved, or the resolver faults and the layer answers zero), or chain B's first scan matched nothing so `dword_1015BDE4` / `dword_1015BDF0` are still zero | `sub_100388C0` reads the resolver's answer unguarded (`mov ecx,[eax+0Eh]`, `0x100388EE`) and writes through the published poke (`dec esi` / `mov byte [esi],1`, `0x10038913`-`0x10038935`); the transcription keeps every hop and both stores unguarded, so it faults at the same instruction on the same condition. All nine stored baselines record both chain B installs, so every supported image matches both patterns; the resolver scan is the native layer's, measured on 1.0.8.0 |
@@ -42,19 +42,32 @@ Two of these remain assumptions, not measurements: feather 1.41's non-advancing
 CRLF folding (the original reads in text mode). The shipped INI's longest line is
 192 bytes, so the first is unreachable from it.
 
+## Rebuilt pieces
+
+Not every body is transcribed. A piece is rebuilt in C++ when its original stream
+cannot be compared under `verify_bodies.py`'s operand-slot rule -- an indexed absolute
+table access, an exception frame, a TLS static-init guard -- or when every call it
+makes lands in another rebuild. [`rebuilt.md`](rebuilt.md) is the catalogue: recovered
+VA and size, the exact instruction pattern that blocks each one, what the rebuild
+reproduces, how that was verified, the residual risk, and the order to check them in
+play. This file stays the record of *behaviour* and *faults*; the rebuild reasons are
+not repeated here.
+
 ## Status
 
-Measured on 1.0.8.0 with `tools/parity_report.py 9`: `build 9: 98 key(s) closed, 1
-open`. The open key is `SkipLauncher`, whose cell is the baseline's own gap (see
-below). `NewSavesCompatibility`, the last substantial feature key, is closed by the
-rebuilt converter recorded in its own section below; `HighQualityReflections` closed
-with the site-arithmetic resolution recorded below.
+Measured on 1.0.8.0 with `tools/parity_report.py 9`: `build 9: 98 key(s) closed, 0
+open, 1 oracle-verified (baseline incomplete)`. The oracle-verified key is the
+`SkipLauncher` baseline gap (see below). `NewSavesCompatibility`, the last substantial
+feature key, is closed by the converter recorded in its own section below;
+`HighQualityReflections` closed with the site-arithmetic resolution recorded below.
 
 - **98 of 99 option keys closed**;
-- **119 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **125 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
-  bodies are still to transcribe, and the compiled-C bodies listed below are
-  rebuilt in C++ instead, with no proof row. The longest is
+  bodies are still to transcribe, and the compiled bodies listed in
+  [`rebuilt.md`](rebuilt.md) are rebuilt in C++ instead, with no proof row. That file
+  is the catalogue of rebuilt pieces: what blocks each transcription, what the rebuild
+  reproduces, how that was verified and what it leaves unproven. The longest is
   `HighQualityReflections`' detour (`0x1001F030`, 157 instructions / 858 bytes;
   see the section below), which displaced `CutsceneFixes` chain B's body
   (`0x100388C0`, 146 instructions / 592 bytes); before that the livery counter
@@ -99,8 +112,8 @@ exists as `source/native.ixx`, and the key is closed with it.
 | zero-argument call, hash from `ECX` | `0x1005B150` | 44 | transcribed |
 | copy pending records out, dword result | `0x1005DE40` | 21 | transcribed |
 | copy pending records out, byte result | `0x1005DE80` | 21 | transcribed |
-| guarded resolve-and-invoke | `0x100038E0` | 59 | rebuilt as C |
-| guarded resolve-only | `0x10003980` | 52 | rebuilt as C |
+| guarded resolve-and-invoke | `0x100038E0` | 59 | rebuilt as C: `__try`/`__except` frame (`rebuilt.md` §3 class B) |
+| guarded resolve-only | `0x10003980` | 52 | rebuilt as C: same frame (class B) |
 
 The last two are compiler output for a C function with `__try`/`__except`
 (`GuardedInvoke` / `GuardedResolve`): their frames carry a cookie-xored scope table
@@ -143,8 +156,8 @@ target and the C entry's decorated name is not nameable from inline asm.
 
 The key had been reverted as blocked on that library. Its remaining pieces turned
 out to be transcribable: every call the installed code makes lands on a piece the
-tree already carries or on a piece small enough to transcribe here, and the two
-that are not instruction streams are rebuilt with their behaviour intact.
+tree already carries or on a piece small enough to transcribe here, and the one
+piece that is not (the name-table walk) is rebuilt with its behaviour intact.
 
 | piece | VA | instructions | how |
 |---|---:|---:|---|
@@ -153,8 +166,8 @@ that are not instruction streams are rebuilt with their behaviour intact.
 | the GTAC.dll "who" call | `0x1005B290` | 61 | transcribed |
 | the GTAC.dll chat print | `0x1005B530` | 45 | transcribed |
 | its one-argument native wrapper | `0x1005B3F0` | 46 | the layer's copy, called through a forwarder |
-| the model-name lookup | `0x10003F00` | 21 | rebuilt |
-| the bounded formatter | `0x10001280` (`0x10001240`) | 13 | rebuilt |
+| the model-name lookup | `0x10003F00` | 21 | rebuilt: indexed absolute table read (`rebuilt.md` §3 class A) |
+| the bounded formatter | `0x10001280` (`0x10001240`, `0x10001230`) | 13 + 21 + 2 | transcribed and proven (rows `bpm_format`, `bpm_format_engine`, `bpm_format_options`) |
 
 The arm jumps to the trampoline at the game's model-resolution entry (game
 `0x7CF803`, three bytes into the function, so `EBP` is live) and publishes the
@@ -168,26 +181,21 @@ exist for the same reason `DrivebyFOVFix`'s does: a module interface cannot expo
 a naked function, so the arm fills each slot from the body registry by the piece's
 recovered VA.
 
-**The two rebuilds, and why they are not transcriptions.**
+**The one rebuild left in this key.** `0x10003F00` walks the original's
+38,455-entry name table and hashes each name with `sub_10003E50`. Its only data
+operand is an *indexed* absolute address (`push dword ptr [esi*4 + 0x100DE770]`),
+which the comparator compares literally, so the loop stays C++: the same table
+order, the same resolver, the same first-match result and the same `"**UNKNOWN**"`
+miss answer. The table is recovered data, not a rebuild: `source/model_names.inc`
+holds the 38,455 names in the table's own order with the extraction recipe and the
+pinned image's SHA-256 in its header. `rebuilt.md` records the residual risk.
 
-- `0x10003F00` walks the original's 38,455-entry name table and hashes each name
-  with `sub_10003E50`. Its only data operand is an *indexed* absolute address
-  (`push dword ptr [esi*4 + 0x100DE770]`), and the whole-body comparator compares an
-  indexed absolute operand's displacement literally -- unlike a plain absolute
-  operand, which it reduces to "abs" (below). A rebuilt module cannot place its
-  table at the original's VA, and normalising the operand would be a change to the
-  comparator, so the loop is written in C++ instead: the same table order, the same
-  resolver, the same first-match result and the same `"**UNKNOWN**"` miss answer.
-  The table itself is recovered data, not a rebuild: `source/model_names.inc` holds
-  the 38,455 names in the table's own order with the extraction recipe and the
-  pinned image's SHA-256 in its header.
-- `0x10001280` is compiler output for a `vsnprintf`-shaped wrapper, and its callee
-  reaches the UCRT's own printf engine -- the `FF 15` at `0x1000125E` goes through
-  the IAT slot `0x1006336C`, which imports `__stdio_common_vsprintf`, with the
-  `STANDARD_SNPRINTF_BEHAVIOR` option bit (`or ecx, 2`) -- so the rebuild is
-  `_vsnprintf_s` with `_TRUNCATE`: the same bound, the same truncate-and-terminate
-  result for this `%s ... %s` format. The payload's call to it compares as a call
-  immediate either way.
+The formatter used to be the key's second rebuild (`_vsnprintf_s` with `_TRUNCATE`).
+It is now the original's own instructions: the wrapper, the engine call with the
+`STANDARD_SNPRINTF_BEHAVIOR` bit (`or ecx, 2`) through the `__stdio_common_vsprintf`
+slot, and the two-dword options block. A probe of the old rebuild against the
+original's engine call showed identical buffer contents at every truncation and a
+different (unread) return value; `rebuilt.md` §2 quotes it.
 
 **The preamble's salt block, and what the layer had wrong.** `Native::CallBool`'s
 body reads `dword_101580B8`, so the layer has to resolve the original loader
@@ -357,7 +365,7 @@ opcodes and the four placeholder bytes) plus seven displacement bytes it exclude
 | piece | VA | instructions/bytes | how |
 |---|---|---|---|
 | the hook thunk | `0x1001ADB0` | 9 instructions | transcribed and proven (`force_headlight_shadows_shim`) |
-| the offset check | `0x1001AD20` | 139 bytes | rebuilt as C++, no proof row |
+| the offset check | `0x1001AD20` | 139 bytes, 46 instructions | rebuilt as C++: two indexed absolute table operands (`rebuilt.md` §3 class A) |
 
 The shim is the whole body: store `ECX` into `dword_1015BDD0`, `pushad`, call the
 check, `popad`, replay the prologue the `E9` replaced (`push ebp` / `mov ebp,esp` /
@@ -436,26 +444,25 @@ images** (each key's per-option cell is byte-identical to its baseline on builds
 5, 6, 7, 8, 9, 11, 12 and 13; build 1 is measured with isolated single-key cells
 because its per-option dump faults at `NoImpostorHeightCutoff` by design).
 
-**What `sub_10004C70` is, and why it is rebuilt rather than transcribed.** It is
-compiler output for C, and the instruction stream says so: a `/GS` frame
-(`mov eax,___security_cookie` / `xor eax,ebp` at `0x10004C76`; `call
-@__security_check_cookie@4` at `0x100051A6`), SSE double conversions around every
-float expression (`cvtps2pd` / `mulsd` / `divsd` / `cvtpd2ps`, e.g. `0x10004CB2`,
-`0x10004E09..0x10004E1C`, `0x10004E45..0x10004E6C`), the MSVC float-`!=` idiom
-(`ucomiss` at `0x10004DDF`, `lahf`/`test ah,44h`/`jnp` at `0x10004DE3..0x10004DE7`)
-and `cmova` for the two `>` comparisons (`0x10004E8E`, `0x10004E9A`). Nothing in it
-is image-specific: every game entry it reaches is called through a slot the
-loader resolves (`call dword_10159C0C`, `call edx` with `edx = dword_10159B88`,
-`call dword_1015D63C`, `call dword_10159CDC`, `call dword_1015AD4C`) and every
-constant it reads is a plain `.rdata` qword (`-pi` at `0x101523A8`, `pi`/`180` at
-`0x10152358`/`0x10152370`, `0.01`/`-0.01` at `0x10152320`/`0x10152390`,
-`0.5`/`-0.5` at `0x10152348`/`0x10152398`, `0.75`/`0.25` at
-`0x10152350`/`0x10152338`, `1.0f`/`100.0f` at `0x10152310`/`0x10152388`). Typing
-`sub_10004C70` in IDA yields those constants and the slot calls; transcribing 320
-instructions would prove the compiler's register allocation, not the feature, so
-it is rebuilt with the original's statement order, state words and observable
-effects. The rebuild carries **no proof row** (the same rule as `SpeedupBugFix`
-and the launcher's DFA helpers).
+**What `sub_10004C70` is, and the one operand that blocks its transcription.** It is
+compiler output for C -- a `/GS` frame (`mov eax,___security_cookie` / `xor eax,ebp`
+at `0x10004C76`; `call @__security_check_cookie@4` at `0x100051A6`), SSE double
+conversions around every float expression (`cvtps2pd` / `mulsd` / `divsd` /
+`cvtpd2ps`), the MSVC float-`!=` idiom (`ucomiss` at `0x10004DDF`,
+`lahf`/`test ah,44h`/`jnp`) and `cmova` for the two `>` comparisons. None of that
+blocks a transcription: the tree transcribes `/GS` and SSE bodies elsewhere, and every
+game entry it reaches is called through a slot the loader resolves
+(`call dword_10159C0C`, `call edx` with `edx = dword_10159B88`,
+`call dword_1015D63C`, `call dword_10159CDC`, `call dword_1015AD4C`) while every
+constant is a plain `.rdata` qword (`-pi` at `0x101523A8`, `pi`/`180` at
+`0x10152358`/`0x10152370`, and the rest). What blocks it is exactly two operands:
+`mov eax,dword ptr [esi*4+0x1015A538]` (`0x10004CD0`) and
+`movss xmm0,dword ptr [esi*4+0x10159D38]` (`0x10004E00`) -- the wheelangle
+model/angle tables, read as an *indexed absolute* address, which the whole-body
+comparator compares literally. Those two tables are the tree's own arrays
+(`zpatch_wheelangle_models`/`_angles` in `source/misc.ixx`), whose address cannot be
+the original's. `rebuilt.md` §3 class A records the rebuild and its risk. It carries
+**no proof row**, the same rule as `SpeedupBugFix` and the launcher's DFA helpers.
 
 The assumptions the rebuild makes, each from the disassembly:
 
@@ -524,12 +531,12 @@ resumes at match+5). Writes on 1.0.8.0: `E9` at `0x868BB0` (to `0x10046C80`) and
 the 0x10-byte name copy `sub_1003D2F0` (6), the three livery site bodies
 `sub_1003D310`/`D340`/`D370` (11/11/12) and the two collectors
 `sub_1003D3A0`/`D3E0` (14/14). The two formatter calls are the one substitution:
-`sub_10001280`, the original's bounded `vsnprintf` wrapper, is rebuilt as
-`NoliveryFormat` (`_vsnprintf_s` with `_TRUNCATE`, the same bound and the same
-truncate-and-terminate result -- the same rebuild the BadPlayerModelCrashFix
-formatter uses), and the two resolver calls go through `NoliveryResolve`, a
-forwarder to `Shared::ValueResolver()`. Both are called by `E8`, which the proof
-compares as an immediate, so the bodies are otherwise whole. The handler
+`sub_10001280`, the original's bounded `vsnprintf` wrapper, is now the transcribed
+body in `source/stability.ixx` (row `bpm_format`), reached through this module's
+six-byte `jmp` forwarder so the call stays an immediate; the two resolver calls go
+through `NoliveryResolve`, a forwarder to `Shared::ValueResolver()`. Both are called
+by `E8`, which the proof compares as an immediate, so the bodies are otherwise whole.
+The handler
 (`sub_1003D420`) is an either/or: the first collector variant publishes the count
 loop's lookup (the call operand at match-6/-2) and the D/E resume (match+90) and
 jumps `match+2` to body D; failing that, the older variant publishes its own pair
@@ -565,18 +572,20 @@ lookups:
 
 | key | writes on 1.0.8.0 | bodies |
 |---|---|---|
-| `SpeedupBugFix` | `E9` at RVA `0x571B0` (game `0x4571B0`) | `sub_10050540`, 109 instructions, rebuilt in C++ |
+| `SpeedupBugFix` | `E9` at RVA `0x571B0` (game `0x4571B0`) | `sub_10050540`, 93 instructions to its `ret` (109 with the C++ static-init funclet), rebuilt in C++ (`rebuilt.md` §3 class B) |
 | `Patch4RemoveModChecks` | `E9` at RVA `0x3CBF70` (game `0x7CBF70`) | `sub_100054E0`, 8, transcribed |
 | `CopSirensFlag` | `E9` at RVAs `0x4FABE6`, `0x4FEBD3`, `0x646546` | `sub_10006310` 8, `sub_10006330` 8, `sub_100040E0` 9, transcribed |
 | `PopupHeadlightsFlag` | `E9` at `0x653A64`, `EB` at `0x653A6E`, the `fld` operand at `0x653AB6` (our pi/2 float, the baseline's `0xD0000000` placeholder), `E9` at `0x646546` | `sub_10044530` 10, `sub_10044560` 10, `sub_100040E0` 9, transcribed |
 
 #### `SpeedupBugFix`: an ungated handler, so the row differs per build only in where it matches
 
-`SpeedupBugFix` is the one key whose body has **no proof row**: `sub_10050540`
-(109 instructions) is an SEH frame, a /GS cookie, the MSVC thread-safe static
-guard for its one-time clock scan and SSE arithmetic, so it is reimplemented in
-C++ rather than transcribed -- the same call the tree makes for the launcher's
-DFA helpers.
+`SpeedupBugFix` is one of the keys whose body has **no proof row**: `sub_10050540`
+(93 instructions to its `ret`; IDA's 109 count includes the `__CxxFrameHandler3`
+funclet) carries a C++ static-local-init EH frame and the `_Init_thread_header` /
+`_Init_thread_footer` TLS guard for its one-time clock scan, so it is reimplemented in
+C++ rather than transcribed. Neither the `/GS` cookie nor the SSE arithmetic is the
+blocker — the tree transcribes both elsewhere; the EH frame and the TLS guard are
+(`rebuilt.md` §1). The same call the tree makes for the launcher's DFA helpers.
 
 The handler is `sub_100506B0`, reached from the dispatcher at `0x10055A62` and
 **not build-gated** -- the option's value alone decides whether it runs:
@@ -877,18 +886,19 @@ the registration is the ASI's own, not the game's.
 |---|---|---:|---|
 | the branch body (the `E9`'s target) | `0x1004C3C0` | 7 | transcribed, proved |
 | the mounting wrapper (the `E8`'s target) | `0x1004C350` | 41 | transcribed, proved |
-| the decoder's opcode step | `0x1004B150` | -- | rebuilt as C, no proof row |
-| the decode driver + Adler-32 | `0x1004B570` | -- | rebuilt as C, no proof row |
-| the init (decode, register, build) | `0x1004B750` | -- | rebuilt as C, no proof row |
-| the in-memory archive builder | `0x1004ACE0` | -- | rebuilt as C, no proof row |
-| the key's own handler | `0x1004C3F0` | 4199 | rebuilt as C, no proof row |
+| the decoder's opcode step | `0x1004B150` | 406 | rebuilt as C, no proof row (transcribable; `rebuilt.md` §3 class D, §4 item 1) |
+| the decode driver + Adler-32 | `0x1004B570` | 159 | rebuilt as C, no proof row (transcribable; same) |
+| the init (decode, register, build) | `0x1004B750` | 991 | rebuilt as C: EH frame + C++ container helpers (`rebuilt.md` §3 class B) |
+| the in-memory archive builder | `0x1004ACE0` | 314 | rebuilt as C, no proof row (`rebuilt.md` §3 class D) |
+| the key's own handler | `0x1004C3F0` | 4185 (IDA's total 4199) | rebuilt as C: EH4 frame + C++ string builder (`rebuilt.md` §3 class B) |
 
 - **The handler is compiler output, and it is the arm, not the decoder.**
   `sub_1004C3F0` is 16,311 bytes of C++: an EH4 prologue
   (`push -1; push 0x10061940`, scope table in `.data`), a `/GS` cookie, and the
   original's string builder -- every pattern string is assembled one character at a
   time through `std::to_string`-shaped digit loops, `strtol` and `toupper`, which is
-  why 4,199 instructions fill 16,311 bytes. It scans the branch anchor with
+  why 4,185 instructions fill its 16,311 bytes (IDA's per-function total is 4,199 with
+  the out-of-line funclet). It scans the branch anchor with
   `sub_1005B6A0`, publishes `dword_10158034` = `match+0x11`, `VirtualProtect`s
   `match+7` and writes the `E9` and its displacement to `sub_1004C3C0`; then it
   scans the wrapper anchor, publishes `dword_10159BF8` = the target of the call at
@@ -931,7 +941,7 @@ turned out to be unobservable (measured below, not assumed).
 |---|---|---|
 | `NewMemorySystem` | `E8` at `0x107A` retargeted to `0x10038670` (the opcode is already `E8`, so only the displacement changes), `E9` at `0x107F` to `0x108C` | vtable `0x100B5038`: eleven methods transcribed, three rebuilt |
 | `NewFilesCompatibility` | `E8` at `0x496149` and `0x496228` retargeted, `E9` at `0x70A970` | `sub_10051600` 4, transcribed; `sub_10051890` / `sub_100518D0` rebuilt |
-| `LoadDLCs` | six fixed-RVA writes per build: `E9` at `0x49040E`->`0x49042C`, `E8` at `0x49043A`->`0x48FBB0`, twelve `90`s at `0x49043F`, `E9` at `0x49035C`->`0x4903B8`, `E8` at `0x48F558`->body, `E9` at `0x4903D4`->body | `sub_10023480` 2, `sub_10023490` 19, transcribed; `sub_10023150` rebuilt |
+| `LoadDLCs` | six fixed-RVA writes per build: `E9` at `0x49040E`->`0x49042C`, `E8` at `0x49043A`->`0x48FBB0`, twelve `90`s at `0x49043F`, `E9` at `0x49035C`->`0x4903B8`, `E8` at `0x48F558`->body, `E9` at `0x4903D4`->body | `sub_10023480` 2, `sub_10023490` 19, `sub_10023150` 223, all transcribed |
 
 **`NewMemorySystem`.** The arm is the original handler's: the allocator-initialisation
 call at `0x107A` is retargeted to the vtable installer and a jump at `0x107F` skips
@@ -947,7 +957,9 @@ stub's body but keeps it internal to its unit, so the table gets a second copy w
 its own proof row. Eleven methods are transcribed (constructor 17 instructions,
 reject-pointer 2, self 2, null 2, no-op `ret 0` 1, paired no-op 1, reject 2, sync 2,
 slot-18 thunk 5, no-argument no-op 1, installer 5) and the three arena methods are
-rebuilt because they are compiled code with `/GS` frames and hash-map calls: the
+rebuilt because every call they make is a CRT allocator internal
+(`0x1005C610`/`0x1005C5A0`) the module cannot name — `rebuilt.md` §3 class D; their
+`/GS` frames are not the reason, those are transcribable. The
 allocate slot is the original's alignment scheme instruction for instruction —
 `unit = max(0x10, align)`, `want = max(size, unit)`, `HeapAlloc(want + 2 * unit)`,
 align to `((base - 1) / unit + 2) * unit`, store the distance from the base at
@@ -964,9 +976,11 @@ reads the registrar anchor's `call` operand (`68 64 28 C8 67 E8`, RVA `0x70A954`
 `0x625620` on 1.0.8.0); the install retargets the two file-type update calls and
 replaces the registrar's own `ret` at `0xB0A970`. The registration tail
 (`pushad`/`call`/`popad`/`ret`) is transcribed and proven; the two update bodies are
-compiled in the original and rebuilt with the same ABI (`__fastcall`, object in
-`ECX`, plain `ret`, the answer in `AL` — the site's caller at `0x89614E` overwrites
-`EAX`, so only `AL` is observed) and the same call order. They hash the file name
+rebuilt with the same ABI (`__fastcall`, object in `ECX`, plain `ret`, the answer in
+`AL` — the site's caller at `0x89614E` overwrites `EAX`, so only `AL` is observed) and
+the same call order. Their own stream is transcribable but three of their four callees
+are TLS-guarded scans (`rebuilt.md` §3 class C) and two would need `__fastcall` entry
+shims, so they stay class D there. They hash the file name
 through the transcribed resolver `sub_10003E50` (`Shared::ValueResolver()`), not a
 C++ hash, so a `hash:NNNN` name resolves as it does in the original, and the three
 scan-resolved helpers use the original's own signatures (`8B 35 …` for the
@@ -1001,16 +1015,18 @@ The two bodies are transcribed and proven: the loader-callback replacement
 initialisation tail (`0x10023490`, 19). The tail clears five request slots, and on
 the first call runs the loader callback and the discovery pass before setting the
 loaded byte at `+0xA4`; its epilogue is the game function's own, so it returns to
-that function's caller. The discovery (`sub_10023150`) is compiled code — a `/GS`
-frame, TLS static-init guards and 32 calls — and is rebuilt in C++ with the
-original's call sequence: the `0x104`-byte module-path buffer allocated unchecked and
-never freed, `GetModuleFileNameA` + `PathRemoveFileSpecA`, the two named folders
-(TLaD id 2, TBoGT id 4, the `\dlc\…\content\` layout first and the legacy `\TLAD\` /
-`\TBoGT\` fallback second, with the second `PathFileExistsA` probe the original makes
-even when the primary existed), then 252 probes `\Episode3\` … `\Episode254\` whose
-ids are `2n`, each registration building the `0x168`-byte request (path at `+0`, mode
-dword `1` at `+344`, flag `1` at `+358`) and calling the published register and apply
-entries, and finally the object's `+0x166` byte set to `2`.
+that function's caller. The discovery (`sub_10023150`) is transcribed too, and
+proven whole (`dlc_discovery`, 223 instructions): the `0x104`-byte module-path buffer
+allocated unchecked and never freed, `GetModuleFileNameA` + `PathRemoveFileSpecA`, the
+two named folders (TLaD id 2, TBoGT id 4, the `\dlc\…\content\` layout first and the
+legacy `\TLAD\` / `\TBoGT\` fallback second, with the second `PathFileExistsA` probe
+the original makes even when the primary existed), then 252 probes `\Episode3\` …
+`\Episode254\` whose ids are `2n`, each registration building the `0x168`-byte
+request (path at `+0`, mode dword `1` at `+344`, flag `1` at `+358`) and calling the
+published register and apply entries, and finally the object's `+0x166` byte set to
+`2`. It was the one rebuilt body in this key with no EH frame, no TLS static-init
+guard and no indexed absolute operand, so it is the original's own instruction
+stream; `rebuilt.md` §2 records how it was verified and what stays unproven.
 
 *The EDX contract, measured.* The earlier attempt refused the key because it could not
 verify what `sub_10023150` must leave in EDX. It leaves whatever its last callee left:
@@ -1021,20 +1037,20 @@ The body passes EDX through untouched to its own `ret`, which returns to game
 `0x4931FF` — the instruction after the only call to the patched function
 (`call 0x890320` at `0x4931FA`). That instruction is `call 0x8CCCD0`: neither `EAX`
 nor `EDX` is read, and neither image mentions `0x890320` anywhere else (checked as a
-branch target and as a dword), so the value is unobservable. The rebuild nevertheless
-keeps the same call sequence, so it ends on the same value on every path (the game's
-apply entry on a hit path, `PathFileExistsA` on a miss path), and the formatter's own
-EDX is always overwritten by the `strcat_s`/`PathFileExistsA` that follow it. The one
-piece of the reference's model that can be checked statically is
-`sub_10001280`: it loads `edx = [ebp+0xC]` (its size argument, `0x40`) before its call
-and never reloads it, so if it ever were the last callee the value would be `0x40`.
+branch target and as a dword), so the value is unobservable. The transcription runs
+the same calls in the same order, so it ends on the same value on every path (the
+game's apply entry on a hit path, `PathFileExistsA` on a miss path); the formatter's
+own EDX is always overwritten by the `strcat_s`/`PathFileExistsA` that follow it. The
+one piece of the reference's model that can be checked statically is `sub_10001280`:
+it loads `edx = [ebp+0xC]` (its size argument, `0x40`) before its call and never
+reloads it, so if it ever were the last callee the value would be `0x40`.
 
 The register entry is a `__thiscall` that the original calls without setting `ECX`
 (left over from the preceding `strcpy_s`); with its flag argument non-zero it skips
 the only branch that would use `this`, and the one call that still reads it is the
-loader callback this key replaces. The rebuild reproduces that shape exactly
-(`__stdcall`, three stack arguments, `ECX` untouched) instead of inventing a `this`
-— recorded above under preserved faults.
+loader callback this key replaces. The transcription leaves `ECX` exactly where the
+original leaves it, instead of inventing a `this` — recorded above under preserved
+faults.
 
 ### `CutsceneFixes`, and why the proof can compare its constants
 
@@ -1225,7 +1241,8 @@ E8 <prepare>           call sub_10051FD0
 FF 25 <resume>         jmp dword ptr [dword_1015AD88]
 ```
 
-**The converter** (`sub_10051B30`, 363 instructions) is ordinary file IO, rebuilt
+**The converter** (`sub_10051B30`, 337 instructions in its own bytes; IDA's total is
+363 with the out-of-line EH blocks) is ordinary file IO, rebuilt
 in C++ with the original's call sequence and faults:
 
 - `fopen_s(&Stream, path, "rb")`, `fread(Buffer, 0x110, 1, Stream)`, then
@@ -1257,20 +1274,21 @@ buffer - 312 is the gap to the next `.bss` object at `0x101A8440`), and then the
 path: `strlen(directory)`, a `\` (written as the word `5Ch`), `strlen(Src)`,
 `memmove`, `call sub_10051B30` with the copy.
 
-**The two hooks** are rebuilt with their exact frames: `sub_10051A90`
+**The two hooks** are transcribed with their exact frames: `sub_10051A90`
 (`sub esp,0E7Ch`; `call dword_1015AD94` with its own buffer and the caller's size,
 the caller's buffer never touched, the call's value returned) and `sub_10051AD0`
 (`sub esp,10h`; `cmp byte_1015AD99,0` before and after `call dword_1015AD8C`, with
 a twelve-byte `push 0Ch` read on both sides and the second read's value returned
-when the block is present).
+when the block is present). Both were C++ rebuilds until they were proven
+(`rebuilt.md` §2).
 
 | piece | VA | instructions | how |
 | --- | ---: | ---: | --- |
 | load trampoline | `0x100521E0` | 8 | transcribed, row `new_saves_tramp` |
-| prepare step | `0x10051FD0` | 157 | rebuilt: TLS static guards, `std::string`, EH frame |
-| converter | `0x10051B30` | 363 | rebuilt: CRT file IO, `operator new`, TLS guards |
-| read hook | `0x10051A90` | 20 | rebuilt: compiled C with a `/GS` cookie |
-| second-load hook | `0x10051AD0` | 33 | rebuilt: compiled C with a `/GS` cookie |
+| prepare step | `0x10051FD0` | 157 | rebuilt: TLS static guards, `std::string`, EH frame (`rebuilt.md` §3 class B) |
+| converter | `0x10051B30` | 337 (IDA's total 363 with the out-of-line EH blocks) | rebuilt: CRT file IO, `operator new`, TLS guards (`rebuilt.md` §3 class B) |
+| read hook | `0x10051A90` | 20 | transcribed, row `new_saves_read_hook` |
+| second-load hook | `0x10051AD0` | 33 | transcribed, row `new_saves_second_hook` |
 
 **What is measured.** The trampoline proves whole (8 of 8 instructions). All six
 signatures occur exactly once on every image that carries them (`GTAIV.exe`: name
@@ -1310,14 +1328,16 @@ A body-bearing key is committed only when all four parts exist:
 3. **The registry entry** `Bodies::Register(&body, recoveredVa)`, so the dump can
    express the branch in the original's coordinates.
 4. **The proof row** in `tests/bodies.tsv` — name, recovered VA, symbol resolved from
-   the linker map, instruction budget — and `zp_body_proof` must PASS. A body that is
-   compiler output for a C function (an SEH frame, a /GS cookie, the thread-safe
-   static-init protocol) is rebuilt in C++ instead, and then has no proof row:
-   `SpeedupBugFix`, the steer consumer `sub_10004C70`,
-   `ForceCarHeadlightShadows`' offset check and `OutOfCommissionFix`'s decoder,
-   init, archive builder and handler are the current examples. A rebuilt piece whose
-   result is data rather than a side effect can be pinned a second way, without the
-   game: `OutOfCommissionFix`'s decode and archive build run from
+   the linker map, instruction budget — and `zp_body_proof` must PASS. A body whose
+   stream cannot be compared under the proof's operand-slot rule is rebuilt in C++
+   instead, and then has no proof row: an *indexed absolute* table access, an
+   exception frame or a TLS static-init guard. `[rebuilt.md](rebuilt.md)` lists every
+   such piece with its blocking instruction pattern; the steer consumer `sub_10004C70`,
+   `ForceCarHeadlightShadows`' offset check, `SpeedupBugFix`'s body and
+   `OutOfCommissionFix`'s decoder, init, archive builder and handler are the current
+   examples. A `/GS` cookie is **not** a blocker: the tree transcribes those. A rebuilt
+   piece whose result is data rather than a side effect can be pinned a second way,
+   without the game: `OutOfCommissionFix`'s decode and archive build run from
    `zp_dump --ooc-selftest` and are compared with the fingerprints the recovered
    bytes carry (that key's section).
 
@@ -1361,10 +1381,11 @@ call our equivalent helper instead of the original's compiled target:
   native layer's published resolve entry, because the layer's C entry is not
   nameable from inline asm in another module unit.
 - the `BadPlayerModelCrashFix` bodies call `BpmZeroBlock` (a cdecl forwarder to the
-  CRT `memset`), `BpmFormat` (the rebuilt `0x10001280`), `BpmModelName` (the rebuilt
-  `0x10003F00`) and five one-instruction `jmp` forwarders into the layer's pieces.
-  The forwarders are the same shape as `DrivebyResolveEntry` and for the same
-  reason; the two rebuilt helpers are named in the section above;
+  CRT `memset`), `BpmFormat` (the transcribed `0x10001280`, row `bpm_format`),
+  `BpmModelName` (the rebuilt `0x10003F00`) and five one-instruction `jmp` forwarders
+  into the layer's pieces. The forwarders are the same shape as `DrivebyResolveEntry`
+  and for the same reason; the formatter is proven and the name lookup is the key's one
+  rebuilt piece (`rebuilt.md` §3 class A);
 - `cutscene_chain_b` calls `CutsceneResolveEntry`, the same six-byte forwarder shape
   into the native layer's resolve entry (the original's `E8` to `sub_10003980`), and
   its two epilogues call the CRT's `__security_check_cookie`, which is the function

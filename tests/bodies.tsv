@@ -214,3 +214,25 @@ ooc_wrap 1004C350 ?OocWrapBody@@YAXXZ 41
 # the first eleven, and the tail jump. The site's own call is at match+0x0E, so
 # the resume it publishes is match+0x13 (the `push 0` after that call).
 hqr_body 1001F030 ?HqrBody@@YAXXZ 157
+
+# The bounded formatter (source/stability.ixx): the original's single formatter,
+# transcribed whole. sub_10001280 is the wrapper (the other modules reach it through
+# a six-byte forwarder on zpatch_format_entry), sub_10001240 the printf-engine call
+# -- its `call ds:[__stdio_common_vsprintf]` is a slot here, because the static CRT
+# has no IAT for the engine -- and sub_10001230 the two-dword options block it reads.
+# The three C++ `_vsnprintf_s` rebuilds this replaces are gone; docs/rebuilt.md.
+bpm_format 10001280 ?BpmFormat@@YAXXZ 13
+bpm_format_engine 10001240 ?BpmFormatEngine@@YAXXZ 21
+bpm_format_options 10001230 ?BpmFormatOptions@@YAXXZ 2
+# NewSavesCompatibility's two installed hooks (source/loading.ixx): the read at game
+# 0x7D8C50 and the second LoadData at 0x8DA090. Both were C++ rebuilds; the /GS
+# frames, the EAX the hooks answer with and the unconditional second call are now
+# the original's own instructions. docs/rebuilt.md.
+new_saves_read_hook 10051A90 ?NewSavesReadHook@@YAXXZ 20
+new_saves_second_hook 10051AD0 ?NewSavesSecondLoadHook@@YAXXZ 33
+# LoadDLCs' discovery pass (source/loading.ixx): 223 instructions to its `ret`, with
+# no EH frame, no TLS static-init guard and no indexed absolute operand -- the one
+# rebuilt piece that was transcribable, so it is transcribed. Its IAT operands are
+# the five slots the arm fills; its two `call` targets are the allocation/memset
+# forwarders and the shared formatter. docs/rebuilt.md.
+dlc_discovery 10023150 ?DlcDiscovery@@YAXXZ 223

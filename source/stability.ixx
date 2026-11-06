@@ -97,6 +97,23 @@ extern "C"
     uint32_t zpatch_bpm_call_bool = 0;      // sub_1005B3F0 (source/native.ixx)
     uint32_t zpatch_bpm_resolver = 0;       // sub_10003E50 (source/shared.ixx)
 
+    // The bounded formatter's two data pieces. `sub_10001230` answers the UCRT
+    // printf options block the original keeps at 0x101A84B0, which is zero in its
+    // .data; `sub_10001240` reaches the UCRT's own printf engine through the IAT
+    // slot 0x1006336C, and this module links the static CRT, so the engine is
+    // reached through this slot and the call keeps the original's `call ds:[...]`
+    // shape. Both are filled unconditionally in RegisterStability: the formatter is
+    // reached from every module that formats a bounded string, so it cannot sit
+    // behind a key's gate.
+    uint32_t zpatch_bpm_format_options[2] = { 0, 0 };  // 0x101A84B0
+    uint32_t zpatch_bpm_stdio_common_vsprintf = 0;     // 0x1006336C
+
+    // sub_10001280's address, for the modules whose inline asm names a local
+    // formatter. They enter this body through a six-byte `jmp` forwarder, because a
+    // module interface cannot export a naked function; the slot is a plain dword so
+    // the forwarder's `jmp DWORD PTR [...]` keeps the original's shape.
+    uint32_t zpatch_format_entry = 0;       // sub_10001280 (this module)
+
     // The entries those two modules already publish: the guarded resolve-and-invoke
     // entry (sub_100038E0) and the game's model-index lookup (dword_10159C0C).
     extern uintptr_t zpatch_native_invoke_entry;
@@ -474,11 +491,10 @@ static __declspec(naked) void FreezeGunShim()
 // one-argument wrapper its fallback calls (0x1005B3F0). The pieces those wrappers
 // share with the native-call layer stay where they are transcribed, in
 // source/native.ixx and source/shared.ixx, and are reached through the six-byte
-// forwarders below. Two pieces are rebuilt rather than transcribed, both compiler
-// output whose instruction stream cannot be proved here: the model-name lookup
-// (0x10003F00, whose only data operand is an indexed absolute address) and the
-// bounded formatter (0x10001280 over the static CRT's formatter). docs/parity.md
-// records both.
+// forwarders below. The bounded formatter (0x10001280 over 0x10001240/0x10001230)
+// is transcribed as well, so one piece here stays rebuilt: the model-name lookup
+// (0x10003F00), whose only data operand is an indexed absolute address, which the
+// whole-body comparator compares literally. docs/rebuilt.md records it.
 // ---------------------------------------------------------------------------
 
 // The block zeroing the wrappers open with. The original calls the CRT `memset`
@@ -490,20 +506,90 @@ static void __cdecl BpmZeroBlock(void* destination, int value, unsigned int coun
     std::memset(destination, value, count);
 }
 
-// sub_10001280, rebuilt: the original's bounded `vsnprintf` wrapper. Its callee
-// (0x10001240) is compiler output that reaches the UCRT's printf engine
-// (`__stdio_common_vsprintf`, imported at the slot 0x1006336C, with the standard
-// snprintf option bit), so there is no hand-written instruction stream to
-// transcribe: `_vsnprintf_s` with `_TRUNCATE` is the same bound and the same
-// truncate-and-terminate result, and the arg list is the original's
-// `(char* buffer, unsigned size, const char* format, ...)`.
-static int __cdecl BpmFormat(char* buffer, unsigned int size, const char* format, ...)
+// sub_10001230, recovered VA 0x10001230 (2 instructions): the UCRT printf options
+// block the engine reads. The original answers the address of its own zeroed .data
+// word at 0x101A84B0; this module answers its copy, and the instruction is the
+// original's. Transcribed, with a proof row (docs/rebuilt.md).
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void BpmFormatOptions()
 {
-    va_list arguments;
-    va_start(arguments, format);
-    const int written = _vsnprintf_s(buffer, size, _TRUNCATE, format, arguments);
-    va_end(arguments);
-    return written;
+    __asm
+    {
+        mov eax, OFFSET zpatch_bpm_format_options
+        ret
+    }
+}
+
+// sub_10001240, recovered VA 0x10001240 (21 instructions): the printf engine call
+// itself, with the original's standard-snprintf option bit (`or ecx, 2`) and its
+// "every negative answer becomes -1" tail. The original's `call ds:0x1006336C` is
+// its IAT slot for `__stdio_common_vsprintf`; the static CRT has no IAT, so the
+// engine is reached through the slot above and the instruction keeps that shape.
+// Both the option block and the engine are what the original calls, so the rebuild
+// this replaces (`_vsnprintf_s` with `_TRUNCATE`) is gone: the semantics are now the
+// original's own CRT entry point rather than an equivalent one.
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void BpmFormatEngine()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        and esp, 0FFFFFFF8h
+        push DWORD PTR [ebp + 0Ch]
+        push 0
+        push DWORD PTR [ebp + 8]
+        push edx
+        push ecx
+        call BpmFormatOptions
+        mov ecx, DWORD PTR [eax]
+        push DWORD PTR [eax + 4]
+        or ecx, 2
+        push ecx
+        call DWORD PTR [zpatch_bpm_stdio_common_vsprintf]
+        or ecx, 0FFFFFFFFh
+        add esp, 1Ch
+        test eax, eax
+        cmovs eax, ecx
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
+// sub_10001280, recovered VA 0x10001280 (13 instructions): the original's bounded
+// `vsnprintf` wrapper, `(char* buffer, unsigned size, const char* format, ...)`,
+// with the arg list's address taken from the frame (`[ebp+14h]`) exactly as the
+// compiled original does. Transcribed and proven, so the C++ `_vsnprintf_s` rebuild
+// the tree carried is gone. The other modules whose inline asm names a local
+// formatter (vehicles' livery helpers, the OOC wrapper, the DLC discovery) enter
+// this body through a six-byte `jmp` forwarder on `zpatch_format_entry`, so the
+// original's single formatter is single here too.
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void BpmFormat()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        push ecx
+        mov ecx, DWORD PTR [ebp + 8]
+        lea eax, [ebp + 14h]
+        mov edx, DWORD PTR [ebp + 0Ch]
+        push eax
+        push DWORD PTR [ebp + 10h]
+        call BpmFormatEngine
+        add esp, 8
+        pop ecx
+        pop ebp
+        ret
+    }
 }
 
 // sub_10003F00, rebuilt: walk the original's 38,455-name table from index 0,
@@ -512,8 +598,9 @@ static int __cdecl BpmFormat(char* buffer, unsigned int size, const char* format
 // rebuilt rather than transcribed because its only data operand is an indexed
 // absolute address (`push [esi*4 + 0x100DE770]`): a rebuilt module cannot place
 // its table at that VA, and the whole-body comparator compares such an operand's
-// displacement literally, so the loop is written in C++ instead (docs/parity.md).
-// The original takes its argument in ECX.
+// displacement literally, so the loop is written in C++ instead (docs/rebuilt.md).
+// Every other instruction in it is transcribable; the indexed table read is the
+// whole blocker. The original takes its argument in ECX.
 static const char* __fastcall BpmModelName(uint32_t hash) noexcept
 {
     const auto resolve =
@@ -1456,6 +1543,14 @@ namespace
 // tier is about to overwrite, and the install tier owns the gate and the writes.
 export void RegisterStability()
 {
+    // The bounded formatter's data, filled before any tier runs. The body is
+    // reached from three modules, so neither slot may sit behind a key's gate: a
+    // run with BadPlayerModelCrashFix off still formats livery, OOC and DLC paths.
+    zpatch_format_entry = static_cast<uint32_t>(
+        reinterpret_cast<uintptr_t>(&BpmFormat));
+    zpatch_bpm_stdio_common_vsprintf = static_cast<uint32_t>(
+        reinterpret_cast<uintptr_t>(&__stdio_common_vsprintf));
+
     Loader::PublishEvent() += []
     {
         PublishFreezeGunFix();

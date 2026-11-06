@@ -81,6 +81,12 @@ extern "C"
     const char zpatch_ooc_mount_prefix[] = "mor";
 }
 
+// The bounded formatter's entry, published by source/stability.ixx (sub_10001280).
+extern "C"
+{
+    extern uint32_t zpatch_format_entry;
+}
+
 namespace
 {
     // sub_1004B750's malloc argument and sub_1004B570's output bound
@@ -482,17 +488,18 @@ namespace
         return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(archive));
     }
 
-    // sub_10001280, rebuilt: the bounded formatter the wrapper builds the mount
-    // string with. It is a `_vsnprintf_s(..., _TRUNCATE, ...)` wrapper in the
-    // original too (the same bound, the same truncate-and-terminate result); only
-    // the call's shape matters to the transcribed caller.
-    int __cdecl OocFormat(char* buffer, unsigned int size, const char* format, ...)
+    // sub_10001280, recovered VA 0x10001280: the bounded formatter, transcribed once
+    // in source/stability.ixx and proved there instruction for instruction
+    // (docs/rebuilt.md). A module interface cannot export a naked function, so this
+    // six-byte forwarder is what the wrapper's `call` names: the original's call is
+    // an immediate too, and the forwarder enters the body with the stack and the
+    // registers untouched.
+    static __declspec(naked) void OocFormat()
     {
-        va_list arguments;
-        va_start(arguments, format);
-        const int written = _vsnprintf_s(buffer, size, _TRUNCATE, format, arguments);
-        va_end(arguments);
-        return written;
+        __asm
+        {
+            jmp DWORD PTR [zpatch_format_entry]
+        }
     }
 
     // fnv1a over a recovered block, for the self-check below only: it is the
