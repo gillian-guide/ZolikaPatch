@@ -54,3 +54,6 @@ savegame_fix_null 10038570 ?SavegameNullBody@@YAXXZ 2
 savegame_fix_close 10045580 ?SavegameCloseBody@@YAXXZ 7
 savegame_fix_copy 100455A0 ?SavegameCopyBody@@YAXXZ 28
 savegame_fix_mutex 100455E0 ?SavegameMutexBody@@YAXXZ 19
+rom_set 10004610 ?RomSetBody@@YAXXZ 4
+rom_reset 10004570 ?RomResetBody@@YAXXZ 28
+dfa_init 10004780 ?DfaInitBody@@YAXXZ 2

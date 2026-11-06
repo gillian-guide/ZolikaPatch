@@ -35,15 +35,20 @@ CRLF folding (the original reads in text mode). The shipped INI's longest line i
 Measured on 1.0.8.0 with `tools/parity_report.py 9`:
 
 - **78 of 99 option keys closed**;
-- **52 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **55 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe. The longest two are the `DualVehicleHeadlights`
   pair at 78 instructions / 309 bytes each, which is what exposed the proof tool's
   old 256-byte sweep window: it compared 64 of 78 and still reported PASS. The tool
   now sweeps 4096 bytes and fails a row that decodes fewer instructions than its
   budget, so a truncated sweep can never pass again;
-- launcher: `LaunchWithPlayGTAIV` implemented and its slots verified per build
-  (`zp_launcher_slots`); SkipLauncher, DFA and ROM are not started;
+- launcher: both arms implemented. `LaunchWithPlayGTAIV` rewrites the two launch
+  slots and `zp_launcher_slots` verifies them per build; `SkipLauncher` carries the
+  original's 25-row table, both collectors, the DFA file-API stage (IAT capture, six
+  installs, two collected jumps) and the ROM message-window stage (two installs, the
+  WM_ROM service and its two bodies). The write set matches the original's recovered
+  handlers byte for byte on all nine images (see the section below); the key reads
+  OPEN only because the stored baseline is a partial recording of this feature;
 - the 18 full/per-option per-build dump hashes and the oracle differential are not
   yet produced.
 
@@ -167,6 +172,171 @@ called, so on 1.0.0.0/1.0.4.0 the baseline lacks the six-byte NOP fill this tree
 writes from the recovered `@noE` row. `CarDynamicShadowFix` therefore reports six
 extra bytes on 1.0.4.0; it is a baseline omission, not a difference in the bytes
 both sides write.
+
+## A second incomplete baseline: `SkipLauncher`
+
+`SkipLauncher` reads OPEN on every image and it is **not** a missing arm. The stored
+cell is a partial recording of the feature, and the bytes it lacks are ones the
+original's own handlers write. Its parity is therefore decided against the oracle —
+the recovered handlers at `0x10045CE0` (main table and collectors), `0x10004850`
+(DFA) and `0x10004620` (ROM) — not against the baseline.
+
+How that was measured. `ZolikaPatch_reconstruction/evidence/skip_launcher_ops.json`
+holds the recovered rows, their signature anchors, offsets, bytes and the hook
+targets; the comparison replays those rows on each pristine image (matching the
+scanner's executable range, applying the handlers' own guards and the E8/E9
+displacements with the recovered body VAs) and diffs the result against this tree's
+dump. The row data is the evidence, so the comparison is against the original, not
+against a restatement of the transcription under test. On all nine images the two
+write sets are identical: no missing byte, no extra byte, no differing byte.
+
+Why the baseline cannot be the oracle here. Its producer is the reference tree's
+*other* implementation: `../readable/source/xliveless.cpp` carries this same
+25-row table plus the DFA and ROM stages, but nothing in that tree calls
+`ApplySkipLauncher`; the live arm `ApplySkipLauncherOption` implements seven of the
+25 rows (0, 2, 3, 4, 5, 6, 9) and neither hook stage. The stored cell is that
+seven-row arm's output, so it cannot contain the rows the live arm never scanned.
+
+The smallest counter-example is 1.0.0.0, where three different write sets exist for
+one key:
+
+| source | bytes | what it writes |
+|---|---:|---|
+| original handlers | 14 | row 2's two NOP pairs (4), row 10's `90 A3` (2), the second collector's two sites (8) |
+| reference live arm | 4 | row 2's two NOP pairs only (it never scans row 10 or the collectors) |
+| stored baseline | 2 | row 2's first NOP pair only |
+
+So the baseline is not even self-consistent with the reference implementation that
+was supposed to have produced it: even a 7-row arm writes four bytes there. On
+1.0.8.0 the original writes 108 bytes, the baseline records 8, and every one of
+those 8 is inside the original's set (the baseline never invents a byte).
+
+### Per-image totals
+
+`rows` is the set of main-table entries whose signature matched, `collectors` the two
+stub sites per pattern, `DFA` the capture plus installs plus collected jumps that the
+stage's gates let through (the four EFLC builds exclude it), `ROM` its two installs.
+"baseline" counts the bytes the stored `b{n}-per.txt` cell records for this key.
+
+| image | rows matched | collectors | DFA | ROM | original bytes | baseline bytes | baseline lacks |
+|---|---|---:|---:|---:|---:|---:|---:|
+| 1.0.0.0 (b1) | 2, 10 | 2 | capture | 0 | 14 | 2 | 12 |
+| 1.0.4.0 (b5) | 0, 3, 4, 7, 8, 20 | 4 | capture | 2 | 485 | 9 | 476 |
+| 1.0.0.4 (b6) | 0, 1, 5, 9, 10, 11–22 | 4 | capture + 4 installs | 2 | 224 | 9 | 215 |
+| 1.0.6.0 (b7) | 1, 6, 9, 10, 21, 22, 23, 24 | 4 | capture + 6 installs + 2 | 2 | 117 | 8 | 109 |
+| 1.0.7.0 (b8) | 1, 6, 9, 10, 21, 22, 23, 24 | 4 | capture + 6 installs + 2 | 2 | 117 | 8 | 109 |
+| 1.0.8.0 (b9) | 1, 6, 9, 10, 21, 22 | 4 | capture + 6 installs + 2 | 2 | 108 | 8 | 100 |
+| 1.1.1.0 (b11) | 1, 6, 9, 10, 21, 22, 23, 24 | 4 | none (EFLC gate) | 2 | 78 | 8 | 70 |
+| 1.1.2.0 (b12) | 1, 6, 9, 10, 21, 22, 23, 24 | 4 | none (EFLC gate) | 2 | 78 | 8 | 70 |
+| 1.1.3.0 (b13) | 1, 6, 9, 10, 21, 22 | 4 | none (EFLC gate) | 2 | 70 | 8 | 62 |
+
+`0x4BFE2` (every supported build) is the key's own mask, so every image above runs
+the arm; the ROM stage runs even on the images whose DFA stage is gated off, and even
+when the XLivelessAddon companion is loaded (that flag skips the main table and the
+DFA stage only).
+
+### Row sites per image
+
+Each cell is the site the row's signature resolves to (RVA), or `–` where the
+signature is absent. A row is only applied where it has a site, exactly like the
+original: 19 of the 25 rows have none on 1.0.8.0 because they belong to other
+launcher versions, and the original skips them there too — no row is unmatched that
+the original matches.
+
+| row | anchor | b1 | b5 | b6 | b7 | b8 | b9 | b11 | b12 | b13 |
+|---:|---|---|---|---|---|---|---|---|---|---|
+| 0 | 0x1012DC74 | – | 0x071580 | 0x1260C0 | – | – | – | – | – | – |
+| 1 | 0x1012DCE0 | – | – | 0x126BC6 | 0x00289E | 0x00287E | 0x0900DE | 0x07359E | 0x07316E | 0x16941E |
+| 2 | 0x1012DD5C | 0x00293A | – | – | – | – | – | – | – | – |
+| 3 | 0x1012DDB0 | – | 0x071E8A | – | – | – | – | – | – | – |
+| 4 | 0x1012DE10 | – | 0x071F1D | – | – | – | – | – | – | – |
+| 5 | 0x1012DE60 | – | – | 0x126C5C | – | – | – | – | – | – |
+| 6 | 0x1012DEB0 | – | – | – | 0x00293D | 0x00291D | 0x09017D | 0x07363D | 0x07320D | 0x1694BD |
+| 7 | 0x1012DF28 | – | 0x071E8E | – | – | – | – | – | – | – |
+| 8 | 0x1012DF80 | – | 0x052128 | – | – | – | – | – | – | – |
+| 9 | 0x1012E0D0 | – | – | 0x1269B9 | 0x00264D | 0x00262D | 0x08FE8D | 0x07334D | 0x072F1D | 0x1691CD |
+| 10 | 0x1012E134 | 0x002946 | 0x071E98 | 0x126BCB | 0x0028A3 | 0x002883 | 0x0900E3 | 0x0735A3 | 0x073173 | 0x169423 |
+| 11 | 0x1012E1A0 | – | – | 0x074D0B | – | – | – | – | – | – |
+| 12 | 0x1012E1F0 | – | – | 0x081225 | – | – | – | – | – | – |
+| 13 | 0x1012E23C | – | – | 0x0812F5 | – | – | – | – | – | – |
+| 14 | 0x1012E290 | – | – | 0x081375 | – | – | – | – | – | – |
+| 15 | 0x1012E2E8 | – | – | 0x0813EF | – | – | – | – | – | – |
+| 16 | 0x1012E340 | – | – | 0x0815E3 | – | – | – | – | – | – |
+| 17 | 0x1012E394 | – | – | 0x083BF5 | – | – | – | – | – | – |
+| 18 | 0x1012E3F8 | – | – | 0x083EA2 | – | – | – | – | – | – |
+| 19 | 0x1012E45C | – | – | 0x1280B0 | – | – | – | – | – | – |
+| 20 | 0x1012E4B0 | – | 0x072BA0 | 0x127930 | – | – | – | – | – | – |
+| 21 | 0x1012E518 | – | – | 0x126F77 | 0x002D35 | 0x002D15 | 0x0905C5 | 0x073A25 | 0x073605 | 0x169905 |
+| 22 | 0x1012E574 | – | – | 0x126E4F | 0x002B32 | 0x002B12 | 0x0903C2 | 0x073832 | 0x073402 | 0x169702 |
+| 23 | 0x1012E5EC | – | – | – | 0x003890 | 0x003870 | – | 0x074580 | 0x074160 | – |
+| 24 | 0x1012E658 | – | – | – | 0x004270 | 0x004250 | – | 0x074F60 | 0x074B40 | – |
+
+### The 1.0.8.0 cell, byte by byte
+
+"differing" counts only the bytes that differ from the pristine image (a store over
+an identical byte is not a dump row, and a displacement can coincide with its
+preimage). "baseline" is how many of those bytes the stored cell records.
+
+| row | site | differing bytes | baseline |
+|---:|---|---:|---:|
+| 1 | 0x0900DE | 0 (jump target only) | 0 |
+| 6 | 0x09017D | 6 | 6 |
+| 9 | 0x08FE8D | 4 | 2 |
+| 10 | 0x0900E3 | 2 | 0 |
+| 21 | 0x0905C5 | 16 | 0 |
+| 22 | 0x0903C2 | 14 | 0 |
+| collector `A1 ? ? ? ? 85 C0 8B 0D ? ? ? ? 75` | 0x74FAA0, 0x74FAD0 | 8 | 0 |
+| collector `33 C0 83 3D ? ? ? ? 01 0F 94 C0 C3` | 0x74FAC0, 0x74FB00 | 8 | 0 |
+| `dfa_init` | 0x055EFC | 4 | 0 |
+| `create_file` | 0x917CD3 | 5 | 0 |
+| `close_handle` | 0x917E6B | 4 | 0 |
+| `set_file_pointer` | 0x917E92 | 5 | 0 |
+| `get_file_size_ex` | 0x917EE1 | 5 | 0 |
+| `read_file` | 0x917D38 | 5 | 0 |
+| collected jump 0 | 0x0701B7 | 5 | 0 |
+| collected jump 1 | 0x07031B | 5 | 0 |
+| `rom_reset` | 0x08FE46 | 4 | 0 |
+| `rom_set` | 0x090A20 | 5 | 0 |
+
+Total: 108 differing bytes, the baseline records 8 of them (row 6's six NOPs and
+row 9's two `xor` bytes) and no byte the original does not write. Hence
+`parity_report.py 9` prints `OPEN SkipLauncher: baseline 8, ours 108, missing 0,
+extra 57, differing 0`: the 57 "extra" bytes are the ones the baseline omits minus
+the 43 displacement bytes the scoreboard excludes by design.
+
+### What the launcher stage reimplements, and what it cannot prove
+
+- The 25-row table, the collectors, the DFA and ROM install rows are in-place
+  instruction patches; the eight hook bodies are the callable part. Three are
+  transcribed assembly and proven whole (`rom_set` 4 instructions, `rom_reset` 28,
+  `dfa_init` 2). The five DFA file-API wrappers (`create_file`, `close_handle`,
+  `set_file_pointer`, `get_file_size_ex`, `read_file`) are fresh C++ with the
+  original's `__cdecl` ABI, the same argument order and the same fallbacks; the
+  original's are compiler output for the same signatures, not hand-written assembly,
+  so they are rebuilt rather than transcribed (`close_handle` needs MSVC's own SEH
+  frame). `create_file` keeps the original's unguarded indirect call — a slot whose
+  target is null faults, as it does in the original.
+- The ROM service is a live-process component: a `std::thread` that registers
+  `"MessageWindow"` (falling back to `"MessageWindow2"`), creates a message-only
+  window, publishes the handle from `WM_NCCREATE` and answers `WM_ROM` (43858) with
+  the recovered action table. `StartRomService` spins on `Sleep(0)` until the window
+  exists, with no bound: if class registration succeeds and window creation fails,
+  the game hangs there. The original does the same, so the fault is preserved rather
+  than timed out. Its thread object is a module global that is never joined, also as
+  in the original.
+- The two collectors keep the original's shape: a non-empty check and then the pair,
+  with no `size() > 1` guard. A pattern that matches has at least two hits on every
+  supported image (the table above counts 2 and 4–5; 1.0.0.0 has no hit for the first
+  pattern and the collector is skipped), so the shape cannot fault here; on an image
+  where it did, the original would write through the same out-of-range slot.
+- The DFA stage is suppressed when `XLivelessAddon.asi` is loaded, when `GTAC.dll` is
+  loaded, and on the four EFLC builds, and it is one-shot; the ROM stage is one-shot
+  and runs regardless. Those are the original's own guards (`0x1000487B` onward).
+- **Not wired:** the original's *other* DFA call, from the MiscFixes handler
+  (`0x10024018`). It is a no-op whenever `SkipLauncher=1` because the DFA one-shot is
+  already set, so it cannot change this key's cell or any other cell measured above;
+  it would only matter for `SkipLauncher=0, MiscFixes=1` in the game, and that arm
+  lives in `misc.ixx` rather than the launcher module.
 
 ## A preserved fault that the tools cannot measure
 
