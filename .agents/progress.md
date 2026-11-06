@@ -770,3 +770,69 @@ bytes off; after moving the labels, `.scratch/branch_targets.py` (new) reports
 `125 row(s), 154 internal branch target(s), 0 failure(s)`. That check is the top
 follow-up in `rebuilt.md` §4 — it belongs in `tools/verify_bodies.py`, and the whole
 row set already passes it.
+
+
+## 2026-11-06 — the transcribable backlog: OOC decoder pair and four DFA forwarders
+
+**Transcribed, six pieces (125 → 131 proof rows).** The pieces `docs/rebuilt.md` §4
+listed as transcribable are now the original's own instructions, registered with
+their recovered VAs and proved whole:
+
+| row | VA | insns | bytes | byte-identical |
+|---|---|---:|---:|---:|
+| `ooc_step` | `0x1004B150` | 406 | `0x41F` | 357 |
+| `ooc_decode` | `0x1004B570` | 159 | `0x1D7` | 149 |
+| `dfa_create_file` | `0x10004820` | 19 | `0x2F` | 17 |
+| `dfa_set_file_pointer` | `0x10004760` | 9 | `0x17` | 8 |
+| `dfa_get_file_size_ex` | `0x10004720` | 7 | `0x11` | 6 |
+| `dfa_read_file` | `0x10004740` | 10 | `0x1A` | 9 |
+
+Every non-identical instruction differs in an absolute operand or a `call`
+immediate — no opcode, register, frame offset or branch (`.scratch/byte_compare.py`
+with the row names as arguments; it used to be limited to the six rows of the last
+pass, now it takes an optional name list). The five C++ rebuilds are gone from
+`source/ooc.ixx` and `source/launcher.ixx`.
+
+**One blocker in the old catalogue was not real.** `0x10004820` was filed as class C
+with a `__try/__except` frame; the binary has none — 19 instructions, `test eax,eax;
+je` between the captured-slot call and the `CreateFileA` fallback. Under the tree's
+own rule it had no reason to stay rebuilt, so it is transcribed too and moved to the
+proof rows. `0x10004790` (close-handle) does have the EH4 frame (filter at
+`0x100047EC`, continuation at `0x100047F0`, 45 instructions in `0x81` bytes) and stays
+the one rebuilt DFA body; `docs/rebuilt.md` §3 now files it under class B where the
+blocker actually is, with corrected counts.
+
+**The OOC pair is behaviourally proven, not just shape-proven.**
+`zp_dump --ooc-selftest` now runs the original's own 565 instructions against the
+recovered resource and still prints `ooc selftest: PASS` — the decoded table's
+`fnv1a 0xC883859F`, the archive's 182,272 bytes and `fnv1a 0xB5AF7B10`, the header's
+`16`/`0xE9` words. That is the first rebuilt body in this tree whose *behaviour* is
+pinned offline.
+
+**Two assembly details worth keeping.** (1) The decoder's three `call memcpy` sites
+go through `OocCopyBlock` because the inline assembler refuses the intrinsic; `/OPT:ICF`
+folds it into `loading.ixx`'s identical `SavegameCopyBlock` — same arguments, same
+caller-cleans `add esp, 0Ch`. (2) The original's alignment NOPs (`0F 1F 00` and
+`66 0F 1F 44 00 00`) cannot be written as `nop dword ptr [eax]` in the inline
+assembler and are emitted as `_emit` bytes; the five-byte one is load-bearing because
+the assembler only forms the four-byte encoding and every later instruction would sit
+a byte earlier, failing the branch-target check.
+
+**Gates (final runs).** `cmake --build --preset release` exit 0 (Trace also builds);
+`ctest --preset release` 12/12; `python tools/parity_report.py 9` →
+`build 9: 98 key(s) closed, 0 open, 1 oracle-verified (baseline incomplete)`;
+`python tools/verify_bodies.py ...` → `131 body(ies), 0 failure(s)`;
+`zp_dump --ooc-selftest` → `ooc selftest: PASS`; `.scratch/branch_targets.py` →
+`131 row(s), 206 internal branch target(s), 0 failure(s)`.
+
+**Docs.** `docs/rebuilt.md`: new §2a with the table, the corrected `0x10004820`
+diagnosis and the verification steps; §3 loses the two OOC decoder rows, the
+create-file row and gains the close-handle row in class B; §4 drops the two done
+items and records that the internal-branch check is now in `verify_bodies.py`;
+§6 says 131. `docs/parity.md`: 125 → 131 bodies, both OOC decoder rows marked
+transcribed, the launcher paragraph rewritten (four of five forwarders transcribed),
+and the "same reason the DFA helpers are rebuilt" references narrowed to
+close-handle.
+
+**Open, not mine to edit.** `readable-fusion/AGENTS.md` line 11 still says "125 hook
+bodies transcribed"; it is 131 now. That file belongs to the keeper.

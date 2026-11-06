@@ -37,19 +37,22 @@ import patch;
 //               to the wrapper. Compiler output (EH4 frame, /GS, std::string
 //               temporaries, the string builder's digit loops), so it is rebuilt
 //               below rather than transcribed and has no proof row.
-//   0x1004B150  the decoder's opcode step.      rebuilt, no proof row
-//   0x1004B570  the decode driver + Adler-32.   rebuilt, no proof row
+//   0x1004B150  the decoder's opcode step.                transcribed, proved
+//   0x1004B570  the decode driver + Adler-32.             transcribed, proved
 //   0x1004B750  the init: decode, register, build the archive, publish the size.
 //   0x1004ACE0  the in-memory archive builder.  rebuilt, no proof row
 //   0x1004C350  the wrapper the second `E8` is retargeted to.  transcribed, proved
 //   0x1004C3C0  the branch body the `E9` jumps to.             transcribed, proved
 //
-// Every rebuilt piece is compiler output for a plain C function with no register
-// contract: the decoder is a switch over the opcode byte, the archive builder is
-// a memset plus a sequence of memcpys, and the handler is the original's own
-// loader-shaped scan/publish/write code. They are rebuilt in C++ with the
-// original's arithmetic, bounds and call order, so their behaviour is the same
-// and there is nothing instruction-level to compare.
+// The decoder pair is transcribed instruction for instruction from the original's
+// own stream: an interpreter with sixteen exits and no register contract beyond
+// "ECX in, EAX out", no exception frame, no TLS guard and no indexed absolute
+// operand, so it is provable whole (`tests/bodies.tsv`). The remaining rebuilds are
+// compiler output for a plain C function: the archive builder is a memset plus a
+// sequence of memcpys, the init is C++ container plumbing and the handler is the
+// original's own loader-shaped scan/publish/write code. They are rebuilt in C++
+// with the original's arithmetic, bounds and call order, so their behaviour is the
+// same and there is nothing instruction-level to compare.
 
 // The recovered resource, verbatim. source/ooc_finale2.inc carries the pinned
 // image SHA-256, the source VA and length, the extraction recipe and the decoded
@@ -68,6 +71,15 @@ extern "C"
     uint32_t zpatch_ooc_mount = 0;     // dword_10159BF8: the game's device register
     uint32_t zpatch_ooc_original = 0;  // dword_10159C04: the retargeted call's target
     uint32_t zpatch_ooc_state = 0;     // dword_10159BFC: the archive's byte count
+
+    // The decode stream's four words, which the original keeps in its own .bss and
+    // its transcribed bodies read as absolute operands: the output buffer's start
+    // (dword_101A842C), its cursor (dword_101A8430), its end (dword_10196374) and
+    // the source's lower bound (dword_101887D4 = the resource's base - 16).
+    uint32_t zpatch_ooc_begin = 0;
+    uint32_t zpatch_ooc_cursor = 0;
+    uint32_t zpatch_ooc_end = 0;
+    uint32_t zpatch_ooc_lower = 0;
 }
 
 // The two halves of the mount string the wrapper formats: "me" + "mor" + "y" +
@@ -99,200 +111,679 @@ namespace
     // value the branch body compares the script resource against.
     constexpr char kOocName[] = "finale2.sco";
     constexpr uint32_t kOocArchiveMagic = 0x86723DFFu;
+}
 
-    // The original's three output globals as one record: dword_101A842C (begin),
-    // dword_101A8430 (cursor) and dword_10196374 (end). The source's lower bound,
-    // dword_101887D4, is the resource's base - 16 and is constant-true against a
-    // stream that starts at the base, so there is no source test to reproduce.
-    struct OocStream
-    {
-        uint8_t* begin;
-        uint8_t* cursor;
-        uint8_t* end;
-    };
+// The decode pair's one call, the CRT's memcpy. The inline assembler refuses
+// `call memcpy` (it is a compiler intrinsic), so the three copy sites call this
+// thin wrapper instead; the original calls the CRT directly, the call shape is the
+// same (`call imm`), the caller cleans the three arguments and the copy itself is
+// the CRT's.
+static void __cdecl OocCopyBlock(void* destination, const void* source, std::size_t size)
+{
+    std::memcpy(destination, source, size);
+}
 
-    // One literal run of sub_1004B150. A run that would end past the output's end
-    // advances the cursor by its length without copying, which is the original's
-    // fall-through after its bound test (`dword_101A8430 = v29`).
-    void OocLiteral(OocStream& stream, size_t from, size_t count)
+// sub_1004B150, recovered VA 0x1004B150 (406 instructions): the decoder's opcode
+// step. ECX is the stream's source cursor on entry and EAX the next one on exit --
+// the original's own contract, and a step that does not advance answers its input,
+// which is the driver's stop signal. The stream's four words are absolute operands
+// in the original (its own .bss), so they are module slots here; the three `call`
+// sites are the CRT's memcpy through the wrapper above.
+//
+// The dispatch is the original's chain of comparisons, not a switch: `>= 0x80` is
+// the two-byte back-reference, `>= 0x40` the three-byte one biased by 0x3FFF,
+// `>= 0x20` the short literal whose count is the opcode less 31, and below that
+// 0x18/0x10/0x08/7/6/4 in that order. Everything else (0, 1, 2, 3, 5) falls through
+// to the shared epilogue with the cursor unchanged.
+static __declspec(naked) void OocStepBody()
+{
+    __asm
     {
-        const auto cursor = reinterpret_cast<uintptr_t>(stream.cursor);
-        if (cursor + count > reinterpret_cast<uintptr_t>(stream.end))
-        {
-            stream.cursor = reinterpret_cast<uint8_t*>(cursor + count);
-            return;
-        }
-        std::memcpy(stream.cursor, kOocResource + from, count);
-        stream.cursor += count;
+        push ebp
+        mov ebp, esp
+        push ecx
+        push ebx
+        push esi
+        mov esi, ecx
+        push edi
+        mov dl, byte ptr [esi]
+        cmp dl, 20h
+        jb ooc_step_below20
+        movzx ebx, dl
+        lea eax, [esi + 1]
+        cmp dl, 80h
+        jb ooc_step_40
+        mov ecx, dword ptr [zpatch_ooc_cursor]
+        lea edi, [ebx - 7Fh]
+        movzx eax, byte ptr [eax]
+        mov edx, ecx
+        mov ebx, dword ptr [zpatch_ooc_end]
+        sub edx, eax
+        dec edx
+        lea eax, [ecx + edi]
+        cmp eax, ebx
+        ja ooc_step_ov2
+        cmp edx, dword ptr [zpatch_ooc_begin]
+        jae ooc_step_copy2
+        lea eax, [ebx + 1]
+    ooc_step_ov2:
+        add esi, 2
+        mov dword ptr [zpatch_ooc_cursor], eax
+        pop edi
+        mov eax, esi
+        pop esi
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+    ooc_step_copy2:
+        test edi, edi
+        je ooc_step_ret2
+        // The original's three-byte alignment NOP (0F 1F 00, `nop dword ptr [eax]`).
+        // The inline assembler refuses `nop` with a memory operand and has no `db`,
+        // so the bytes are emitted one at a time; they are load-bearing, because
+        // every instruction after them sits at the same offset on both sides and
+        // the proof compares internal branch targets by offset.
+        _emit 0x0F
+        _emit 0x1F
+        _emit 0x00
+    ooc_step_copy2_loop:
+        mov al, byte ptr [edx]
+        lea edx, [edx + 1]
+        mov byte ptr [ecx], al
+        inc ecx
+        sub edi, 1
+        jne ooc_step_copy2_loop
+        mov dword ptr [zpatch_ooc_cursor], ecx
+    ooc_step_ret2:
+        add esi, 2
+        pop edi
+        mov eax, esi
+        pop esi
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+    ooc_step_40:
+        cmp dl, 40h
+        jb ooc_step_20
+        movzx edi, byte ptr [esi + 2]
+        mov ecx, dword ptr [zpatch_ooc_cursor]
+        inc edi
+        movzx eax, byte ptr [eax]
+        mov edx, ecx
+        shl ebx, 8
+        sub edx, ebx
+        mov ebx, dword ptr [zpatch_ooc_end]
+        sub edx, eax
+        lea eax, [ecx + edi]
+        add edx, 3FFFh
+        cmp eax, ebx
+        ja ooc_step_ov3
+        cmp edx, dword ptr [zpatch_ooc_begin]
+        jae ooc_step_copy3
+        lea eax, [ebx + 1]
+    ooc_step_ov3:
+        add esi, 3
+        mov dword ptr [zpatch_ooc_cursor], eax
+        pop edi
+        mov eax, esi
+        pop esi
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+        // The original's five-byte alignment NOP (66 0F 1F 44 00 00, `nop word ptr
+        // [eax+eax]` with a zero displacement). The inline assembler only forms the
+        // four-byte encoding of that instruction, and the extra byte is
+        // load-bearing: every instruction after it sits one byte later and the
+        // proof compares internal branch targets by offset.
+        _emit 0x66
+        _emit 0x0F
+        _emit 0x1F
+        _emit 0x44
+        _emit 0x00
+        _emit 0x00
+    ooc_step_copy3:
+        mov al, byte ptr [edx]
+        lea edx, [edx + 1]
+        mov byte ptr [ecx], al
+        inc ecx
+        sub edi, 1
+        jne ooc_step_copy3
+        add esi, 3
+        mov dword ptr [zpatch_ooc_cursor], ecx
+        pop edi
+        mov eax, esi
+        pop esi
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+    ooc_step_20:
+        mov edi, dword ptr [zpatch_ooc_cursor]
+        add ebx, -31
+        mov ecx, dword ptr [zpatch_ooc_end]
+        add edi, ebx
+        cmp edi, ecx
+        ja ooc_step_lit_over
+        cmp eax, dword ptr [zpatch_ooc_lower]
+        jae ooc_step_lit_copy
+        lea edi, [ecx + 1]
+        movzx eax, dl
+        add esi, -30
+        mov dword ptr [zpatch_ooc_cursor], edi
+        add esi, eax
+        pop edi
+        mov eax, esi
+        pop esi
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+    ooc_step_lit_copy:
+        push ebx
+        push eax
+        push dword ptr [zpatch_ooc_cursor]
+        call OocCopyBlock
+        mov dl, byte ptr [esi]
+        add esp, 0Ch
+    ooc_step_lit_over:
+        movzx eax, dl
+        add esi, -30
+        add esi, eax
+        mov dword ptr [zpatch_ooc_cursor], edi
+        pop edi
+        mov eax, esi
+        pop esi
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+    ooc_step_below20:
+        cmp dl, 18h
+        jb ooc_step_below18
+        movzx eax, byte ptr [esi + 1]
+        mov ecx, dword ptr [zpatch_ooc_cursor]
+        mov edi, ecx
+        movzx ebx, byte ptr [esi + 3]
+        shl eax, 8
+        inc ebx
+        sub edi, eax
+        movzx eax, dl
+        mov edx, dword ptr [zpatch_ooc_end]
+        shl eax, 10h
+        sub edi, eax
+        movzx eax, byte ptr [esi + 2]
+        sub edi, eax
+        lea eax, [ecx + ebx]
+        add edi, 17FFFFh
+        cmp eax, edx
+        ja ooc_step_ov4
+        cmp edi, dword ptr [zpatch_ooc_begin]
+        jae ooc_step_copy4
+        lea eax, [edx + 1]
+    ooc_step_ov4:
+        add esi, 4
+        mov dword ptr [zpatch_ooc_cursor], eax
+        pop edi
+        mov eax, esi
+        pop esi
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+    ooc_step_copy4:
+        mov al, byte ptr [edi]
+        lea edi, [edi + 1]
+        mov byte ptr [ecx], al
+        inc ecx
+        sub ebx, 1
+        jne ooc_step_copy4
+        add esi, 4
+        mov dword ptr [zpatch_ooc_cursor], ecx
+        pop edi
+        mov eax, esi
+        pop esi
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+    ooc_step_below18:
+        cmp dl, 10h
+        jb ooc_step_below10
+        movzx ecx, byte ptr [esi + 3]
+        movzx ebx, byte ptr [esi + 4]
+        movzx eax, byte ptr [esi + 1]
+        inc ebx
+        shl ecx, 8
+        shl eax, 8
+        add ebx, ecx
+        mov ecx, dword ptr [zpatch_ooc_cursor]
+        mov edi, ecx
+        sub edi, eax
+        movzx eax, dl
+        mov edx, dword ptr [zpatch_ooc_end]
+        shl eax, 10h
+        sub edi, eax
+        movzx eax, byte ptr [esi + 2]
+        sub edi, eax
+        lea eax, [ecx + ebx]
+        add edi, 0FFFFFh
+        cmp eax, edx
+        ja ooc_step_ov5
+        cmp edi, dword ptr [zpatch_ooc_begin]
+        jae ooc_step_copy5
+        lea eax, [edx + 1]
+    ooc_step_ov5:
+        add esi, 5
+        mov dword ptr [zpatch_ooc_cursor], eax
+        pop edi
+        mov eax, esi
+        pop esi
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+    ooc_step_copy5:
+        mov al, byte ptr [edi]
+        lea edi, [edi + 1]
+        mov byte ptr [ecx], al
+        inc ecx
+        sub ebx, 1
+        jne ooc_step_copy5
+        add esi, 5
+        mov dword ptr [zpatch_ooc_cursor], ecx
+        pop edi
+        mov eax, esi
+        pop esi
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+    ooc_step_below10:
+        cmp dl, 8
+        jb ooc_step_below8
+        mov bl, byte ptr [esi + 1]
+        mov edi, dword ptr [zpatch_ooc_cursor]
+        movzx ecx, dl
+        shl ecx, 8
+        movzx eax, bl
+        add eax, 0FFFFF801h
+        add ecx, eax
+        lea eax, [esi + 2]
+        add edi, ecx
+        mov dword ptr [ebp - 4], ecx
+        mov ecx, dword ptr [zpatch_ooc_end]
+        cmp edi, ecx
+        ja ooc_step_ov6
+        cmp eax, dword ptr [zpatch_ooc_lower]
+        jae ooc_step_copy6
+        lea edi, [ecx + 1]
+        jmp ooc_step_ov6
+    ooc_step_copy6:
+        push dword ptr [ebp - 4]
+        push eax
+        push dword ptr [zpatch_ooc_cursor]
+        call OocCopyBlock
+        mov dl, byte ptr [esi]
+        add esp, 0Ch
+        mov bl, byte ptr [esi + 1]
+    ooc_step_ov6:
+        movzx ecx, dl
+        shl ecx, 8
+        movzx eax, bl
+        add eax, esi
+        mov dword ptr [zpatch_ooc_cursor], edi
+        pop edi
+        lea esi, [ecx - 7FDh]
+        add esi, eax
+        mov eax, esi
+        pop esi
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+    ooc_step_below8:
+        cmp dl, 7
+        jne ooc_step_below7
+        mov dl, byte ptr [esi + 1]
+        mov bl, byte ptr [esi + 2]
+        mov edi, dword ptr [zpatch_ooc_cursor]
+        movzx ecx, dl
+        shl ecx, 8
+        movzx eax, bl
+        inc eax
+        add ecx, eax
+        lea eax, [esi + 3]
+        add edi, ecx
+        mov dword ptr [ebp - 4], ecx
+        mov ecx, dword ptr [zpatch_ooc_end]
+        cmp edi, ecx
+        ja ooc_step_ov7
+        cmp eax, dword ptr [zpatch_ooc_lower]
+        jae ooc_step_copy7
+        lea edi, [ecx + 1]
+        jmp ooc_step_ov7
+    ooc_step_copy7:
+        push dword ptr [ebp - 4]
+        push eax
+        push dword ptr [zpatch_ooc_cursor]
+        call OocCopyBlock
+        mov dl, byte ptr [esi + 1]
+        add esp, 0Ch
+        mov bl, byte ptr [esi + 2]
+    ooc_step_ov7:
+        movzx ecx, dl
+        shl ecx, 8
+        movzx eax, bl
+        add eax, esi
+        mov dword ptr [zpatch_ooc_cursor], edi
+        pop edi
+        lea esi, [ecx + 4]
+        add esi, eax
+        mov eax, esi
+        pop esi
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+    ooc_step_below7:
+        cmp dl, 6
+        jne ooc_step_below6
+        movzx eax, byte ptr [esi + 1]
+        mov edx, dword ptr [zpatch_ooc_cursor]
+        mov ecx, edx
+        movzx edi, byte ptr [esi + 4]
+        mov ebx, dword ptr [zpatch_ooc_end]
+        inc edi
+        shl eax, 10h
+        sub ecx, eax
+        movzx eax, byte ptr [esi + 2]
+        shl eax, 8
+        sub ecx, eax
+        movzx eax, byte ptr [esi + 3]
+        sub ecx, eax
+        lea eax, [edx + edi]
+        dec ecx
+        cmp eax, ebx
+        ja ooc_step_ov8
+        cmp ecx, dword ptr [zpatch_ooc_begin]
+        jae ooc_step_copy8
+        lea eax, [ebx + 1]
+    ooc_step_ov8:
+        add esi, 5
+        mov dword ptr [zpatch_ooc_cursor], eax
+        pop edi
+        mov eax, esi
+        pop esi
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+    ooc_step_copy8:
+        mov al, byte ptr [ecx]
+        lea ecx, [ecx + 1]
+        mov byte ptr [edx], al
+        inc edx
+        sub edi, 1
+        jne ooc_step_copy8
+        add esi, 5
+        mov dword ptr [zpatch_ooc_cursor], edx
+        pop edi
+        mov eax, esi
+        pop esi
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+    ooc_step_below6:
+        cmp dl, 4
+        jne ooc_step_none
+        movzx ecx, byte ptr [esi + 4]
+        movzx edi, byte ptr [esi + 5]
+        movzx eax, byte ptr [esi + 1]
+        inc edi
+        mov ebx, dword ptr [zpatch_ooc_end]
+        shl ecx, 8
+        shl eax, 10h
+        add edi, ecx
+        mov ecx, dword ptr [zpatch_ooc_cursor]
+        mov edx, ecx
+        sub edx, eax
+        movzx eax, byte ptr [esi + 2]
+        shl eax, 8
+        sub edx, eax
+        movzx eax, byte ptr [esi + 3]
+        sub edx, eax
+        lea eax, [ecx + edi]
+        dec edx
+        cmp eax, ebx
+        ja ooc_step_ov9
+        cmp edx, dword ptr [zpatch_ooc_begin]
+        jae ooc_step_copy9
+        lea eax, [ebx + 1]
+    ooc_step_ov9:
+        add esi, 6
+        mov dword ptr [zpatch_ooc_cursor], eax
+        pop edi
+        mov eax, esi
+        pop esi
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+        nop
+    ooc_step_copy9:
+        mov al, byte ptr [edx]
+        lea edx, [edx + 1]
+        mov byte ptr [ecx], al
+        inc ecx
+        sub edi, 1
+        jne ooc_step_copy9
+        mov dword ptr [zpatch_ooc_cursor], ecx
+        add esi, 6
+    ooc_step_none:
+        pop edi
+        mov eax, esi
+        pop esi
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
     }
+}
 
-    // One back-reference of sub_1004B150. The copy is byte by byte because the
-    // original's `do { *out++ = *in++ } while (--count)` lets an overlapping run
-    // propagate; a run whose source would start before the buffer sets the cursor
-    // to `end + 1`, the original's `dword_10196374 + 1`, which no later test can
-    // satisfy.
-    void OocBackReference(OocStream& stream, size_t distance, size_t count)
+// sub_1004B570, recovered VA 0x1004B570 (159 instructions): the decode driver. ECX
+// is the output buffer on entry (`__fastcall`-shaped, which is how the original's
+// init calls it: `mov ecx, eax; call`), the answer is 0x2BD50 on success and 0 on
+// any failed check. It seeds the stream's four words from the recovered resource,
+// steps until the opcode does not advance, then requires the `05 FA` terminator,
+// the exact output length and the Adler-32 trailer -- which the original computes
+// inline, not through a call, so its loop is transcribed here too: 1872 bytes
+// first (the length modulo 5552, constant-folded by the original's compiler), then
+// full 5552-byte blocks, each reduced modulo 65521 by the same magic multiply.
+//
+// The original's init discards the answer, so a resource that failed its own
+// checksum is registered and mounted as it decoded, exactly as here.
+static __declspec(naked) int __fastcall OocDecodeBody(uint8_t* table)
+{
+    __asm
     {
-        const auto cursor = reinterpret_cast<uintptr_t>(stream.cursor);
-        if (cursor + count > reinterpret_cast<uintptr_t>(stream.end))
-        {
-            stream.cursor = reinterpret_cast<uint8_t*>(cursor + count);
-            return;
-        }
-        const auto from = cursor - distance;
-        if (from < reinterpret_cast<uintptr_t>(stream.begin))
-        {
-            stream.cursor = reinterpret_cast<uint8_t*>(reinterpret_cast<uintptr_t>(stream.end) + 1);
-            return;
-        }
-        const auto* in = reinterpret_cast<const uint8_t*>(from);
-        for (size_t index = 0; index < count; ++index)
-            stream.cursor[index] = in[index];
-        stream.cursor += count;
+        push ebp
+        mov ebp, esp
+        sub esp, 1Ch
+        push ebx
+        push esi
+        push edi
+        mov edi, ecx
+        mov dword ptr [zpatch_ooc_lower], OFFSET kOocResource - 16
+        mov ecx, OFFSET kOocResource
+        mov dword ptr [zpatch_ooc_begin], edi
+        mov dword ptr [zpatch_ooc_cursor], edi
+        lea ebx, [edi + 2BD50h]
+        mov dword ptr [zpatch_ooc_end], ebx
+        call OocStepBody
+        mov dword ptr [ebp - 14h], eax
+        cmp eax, OFFSET kOocResource
+        je ooc_decode_terminator
+    ooc_decode_step:
+        cmp dword ptr [zpatch_ooc_cursor], ebx
+        ja ooc_decode_fail
+        mov ecx, eax
+        mov esi, eax
+        call OocStepBody
+        mov dword ptr [ebp - 14h], eax
+        cmp eax, esi
+        jne ooc_decode_step
+    ooc_decode_terminator:
+        cmp byte ptr [eax], 5
+        jne ooc_decode_fail
+        cmp byte ptr [eax + 1], 0FAh
+        jne ooc_decode_fail
+        cmp dword ptr [zpatch_ooc_cursor], ebx
+        jne ooc_decode_fail
+        mov dword ptr [ebp - 10h], 2BD50h
+        mov ecx, 1
+        xor esi, esi
+        mov dword ptr [ebp - 4], 750h
+    ooc_decode_block:
+        mov dword ptr [ebp - 0Ch], edi
+        xor ebx, ebx
+    ooc_decode_unroll8:
+        movzx eax, byte ptr [edi]
+        mov edx, edi
+        add ecx, eax
+        sub edx, dword ptr [ebp - 0Ch]
+        movzx eax, byte ptr [edi + 1]
+        add esi, ecx
+        add ecx, eax
+        add edx, 0Fh
+        movzx eax, byte ptr [edi + 2]
+        add esi, ecx
+        add ecx, eax
+        add ebx, 8
+        movzx eax, byte ptr [edi + 3]
+        add esi, ecx
+        add ecx, eax
+        movzx eax, byte ptr [edi + 4]
+        add esi, ecx
+        add ecx, eax
+        movzx eax, byte ptr [edi + 5]
+        add esi, ecx
+        add ecx, eax
+        movzx eax, byte ptr [edi + 6]
+        add esi, ecx
+        add ecx, eax
+        movzx eax, byte ptr [edi + 7]
+        add esi, ecx
+        add ecx, eax
+        add edi, 8
+        mov eax, dword ptr [ebp - 4]
+        add esi, ecx
+        cmp edx, eax
+        jb ooc_decode_unroll8
+        xor edx, edx
+        mov dword ptr [ebp - 1Ch], esi
+        mov dword ptr [ebp - 0Ch], 0
+        cmp ebx, eax
+        jae ooc_decode_modulo
+        sub eax, ebx
+        cmp eax, 2
+        jb ooc_decode_single
+        mov edx, dword ptr [ebp - 4]
+        sub edx, ebx
+        sub edx, 2
+        shr edx, 1
+        inc edx
+        lea eax, [ebx + edx*2]
+        mov ebx, dword ptr [ebp - 0Ch]
+        mov dword ptr [ebp - 18h], eax
+        mov esi, ebx
+    ooc_decode_pairs:
+        movzx eax, byte ptr [edi]
+        add ecx, eax
+        movzx eax, byte ptr [edi + 1]
+        add ebx, ecx
+        add edi, 2
+        add ecx, eax
+        add esi, ecx
+        sub edx, 1
+        jne ooc_decode_pairs
+        mov eax, dword ptr [ebp - 18h]
+        mov dword ptr [ebp - 8], esi
+        mov esi, dword ptr [ebp - 1Ch]
+        cmp eax, dword ptr [ebp - 4]
+        jae ooc_decode_pair_tail
+        movzx eax, byte ptr [edi]
+        mov edx, dword ptr [ebp - 8]
+        add ecx, eax
+        add esi, ecx
+        inc edi
+        jmp ooc_decode_combine
+    ooc_decode_single:
+        movzx eax, byte ptr [edi]
+        mov ebx, edx
+        add ecx, eax
+        add esi, ecx
+        inc edi
+        jmp ooc_decode_combine
+    ooc_decode_pair_tail:
+        mov edx, dword ptr [ebp - 8]
+    ooc_decode_combine:
+        lea eax, [edx + ebx]
+        add esi, eax
+    ooc_decode_modulo:
+        mov eax, 80078071h
+        mul ecx
+        shr edx, 0Fh
+        imul eax, edx, -65521
+        add ecx, eax
+        mov eax, 80078071h
+        mul esi
+        shr edx, 0Fh
+        imul eax, edx, -65521
+        add esi, eax
+        mov eax, dword ptr [ebp - 10h]
+        sub eax, dword ptr [ebp - 4]
+        mov dword ptr [ebp - 10h], eax
+        mov dword ptr [ebp - 4], 15B0h
+        jne ooc_decode_block
+        mov edi, dword ptr [ebp - 14h]
+        shl esi, 10h
+        add esi, ecx
+        movzx edx, byte ptr [edi + 2]
+        movzx eax, byte ptr [edi + 3]
+        shl edx, 8
+        add edx, eax
+        movzx eax, byte ptr [edi + 4]
+        shl edx, 8
+        add edx, eax
+        movzx eax, byte ptr [edi + 5]
+        shl edx, 8
+        add edx, eax
+        cmp esi, edx
+        jne ooc_decode_fail
+        pop edi
+        pop esi
+        mov eax, 2BD50h
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+    ooc_decode_fail:
+        pop edi
+        pop esi
+        xor eax, eax
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
     }
+}
 
-    // sub_1004B150, one opcode: the four literal forms, the five back-reference
-    // forms and the no-progress opcode that stops the driver. Returns the next
-    // opcode's offset; an opcode that does not advance is the stop signal. The
-    // resource is read unguarded, exactly as the original reads its own .rdata --
-    // what keeps `pc` inside it is the pinned resource's own `05 FA` terminator and
-    // its exact output length, which the driver checks and the self-check proves.
-    size_t OocStep(OocStream& stream, size_t pc)
-    {
-        const uint8_t op = kOocResource[pc];
-
-        if (op < 0x20)
-        {
-            if (op >= 0x18)  // 3-byte distance biased by 1572863, 1-byte length
-            {
-                const size_t length = kOocResource[pc + 3] + 1u;
-                const size_t distance = kOocResource[pc + 2] + 256u * kOocResource[pc + 1] +
-                                        65536u * op - 1572863u;
-                OocBackReference(stream, distance, length);
-                return pc + 4;
-            }
-            if (op >= 0x10)  // 3-byte distance biased by 0xFFFFF, 2-byte length
-            {
-                const size_t length = (kOocResource[pc + 3] << 8) + kOocResource[pc + 4] + 1u;
-                const size_t distance = kOocResource[pc + 2] + 256u * kOocResource[pc + 1] +
-                                        65536u * op - 0xFFFFFu;
-                OocBackReference(stream, distance, length);
-                return pc + 5;
-            }
-            if (op >= 0x08)  // literal: 1-byte count + 2047
-            {
-                const size_t count = 256u * op + kOocResource[pc + 1] - 2047u;
-                OocLiteral(stream, pc + 2, count);
-                return pc + 2 + count;
-            }
-            switch (op)
-            {
-            case 7:  // literal: 2-byte count + 1
-            {
-                const size_t count = 256u * kOocResource[pc + 1] + kOocResource[pc + 2] + 1u;
-                OocLiteral(stream, pc + 3, count);
-                return pc + 3 + count;
-            }
-            case 6:  // 3-byte distance + 1, 1-byte length
-            {
-                const size_t length = kOocResource[pc + 4] + 1u;
-                const size_t distance = kOocResource[pc + 3] + 256u * kOocResource[pc + 2] +
-                                        65536u * kOocResource[pc + 1] + 1u;
-                OocBackReference(stream, distance, length);
-                return pc + 5;
-            }
-            case 4:  // 3-byte distance + 1, 2-byte length
-            {
-                const size_t length = (kOocResource[pc + 4] << 8) + kOocResource[pc + 5] + 1u;
-                const size_t distance = kOocResource[pc + 3] + 256u * kOocResource[pc + 2] +
-                                        65536u * kOocResource[pc + 1] + 1u;
-                OocBackReference(stream, distance, length);
-                return pc + 6;
-            }
-            default:  // 0, 1, 2, 3, 5: no progress, which is the driver's stop
-                return pc;
-            }
-        }
-
-        if (op < 0x80)
-        {
-            if (op >= 0x40)  // 2-byte distance biased by 0x3FFF, 1-byte length
-            {
-                const size_t length = kOocResource[pc + 2] + 1u;
-                const size_t distance = 256u * op + kOocResource[pc + 1] - 0x3FFFu;
-                OocBackReference(stream, distance, length);
-                return pc + 3;
-            }
-            // A short literal: the opcode itself is the count, biased by 31, so the
-            // whole run is one byte of opcode plus count bytes.
-            const size_t count = op - 31u;
-            OocLiteral(stream, pc + 1, count);
-            return pc + count + 1;
-        }
-
-        // The shortest back-reference: the opcode is the length, biased by 127, and
-        // the distance is one byte.
-        OocBackReference(stream, kOocResource[pc + 1] + 1u, op - 127u);
-        return pc + 2;
-    }
-
-    // The resource's Adler-32 trailer, computed the way the original's inlined
-    // zlib routine does: `a` seeded 1, `b` seeded 0, both reduced modulo 0xFFF1
-    // every 5552 bytes so neither accumulator can wrap.
-    uint32_t OocAdler32(const uint8_t* data, size_t size)
-    {
-        constexpr uint32_t kModulus = 0xFFF1u;
-        constexpr size_t kBlock = 5552;
-        uint32_t a = 1u;
-        uint32_t b = 0u;
-        for (size_t start = 0; start < size; start += kBlock)
-        {
-            const size_t end = (start + kBlock < size) ? start + kBlock : size;
-            for (size_t index = start; index < end; ++index)
-            {
-                a += data[index];
-                b += a;
-            }
-            a %= kModulus;
-            b %= kModulus;
-        }
-        return (b << 16) | a;
-    }
-
-    // sub_1004B570: decode until the no-progress opcode, then require the `05 FA`
-    // terminator, the exact output length and the trailer. The original answers
-    // 179536 on success and 0 otherwise -- and sub_1004B750 discards that answer,
-    // so a resource that failed its own checksum is registered and mounted as it
-    // decoded, exactly as here.
-    bool OocDecode(uint8_t* table)
-    {
-        OocStream stream{ table, table, table + kOocTableSize };
-        size_t pc = OocStep(stream, 0);
-        if (pc != 0)
-        {
-            while (reinterpret_cast<uintptr_t>(stream.cursor) <= reinterpret_cast<uintptr_t>(stream.end))
-            {
-                const size_t previous = pc;
-                pc = OocStep(stream, pc);
-                if (pc == previous)
-                    break;
-            }
-            // The original leaves through a second door when the cursor ran past the
-            // output: that path answers 0 without ever looking at the terminator.
-            if (reinterpret_cast<uintptr_t>(stream.cursor) > reinterpret_cast<uintptr_t>(stream.end))
-                return false;
-        }
-        if (kOocResource[pc] != 0x05 || kOocResource[pc + 1] != 0xFA)
-            return false;
-        if (reinterpret_cast<uintptr_t>(stream.cursor) != reinterpret_cast<uintptr_t>(stream.end))
-            return false;
-        const uint32_t trailer = (static_cast<uint32_t>(kOocResource[pc + 2]) << 24) |
-                                 (static_cast<uint32_t>(kOocResource[pc + 3]) << 16) |
-                                 (static_cast<uint32_t>(kOocResource[pc + 4]) << 8) |
-                                 static_cast<uint32_t>(kOocResource[pc + 5]);
-        return OocAdler32(table, kOocTableSize) == trailer;
-    }
-
+namespace
+{
     // One entry of the original's fake-pak vector (a `std::vector` at 0x1016E43C
     // with its three pointers at 0x1016E43C/40/44). The name is a std::string
     // there; the only name ever registered is the eleven-character "finale2.sco",
@@ -479,7 +970,7 @@ namespace
         // Unchecked, like the original: the decode writes through the block whether
         // or not the allocation succeeded.
         auto* table = static_cast<uint8_t*>(std::malloc(kOocTableSize));
-        static_cast<void>(OocDecode(table));  // the original discards the answer
+        static_cast<void>(OocDecodeBody(table));  // the original discards the answer
         OocRegister(table);
         uint32_t final_offset = 0;
         uint8_t* archive = OocBuildArchive(final_offset);
@@ -532,7 +1023,7 @@ export const char* OocSelfCheck()
     auto* table = static_cast<uint8_t*>(std::malloc(kOocTableSize));
     if (table == nullptr)
         return "the decoded table's allocation failed";
-    if (!OocDecode(table))
+    if (OocDecodeBody(table) == 0)
     {
         std::free(table);
         return "the resource did not decode: terminator, output length or Adler-32 trailer";
@@ -707,9 +1198,14 @@ namespace
 }
 
 // Registered like every other arm: the publish tier reads the two sites the
-// install tier overwrites, and the install tier owns the writes.
+// install tier overwrites, and the install tier owns the writes. The decoder pair
+// carries its recovered VAs too, so a tool that ever branches into it can express
+// the branch in the original's coordinates.
 export void RegisterOoc()
 {
+    Bodies::Register(reinterpret_cast<uintptr_t>(&OocStepBody), 0x1004B150u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&OocDecodeBody), 0x1004B570u);
+
     Loader::PublishEvent() += []
     {
         PublishOutOfCommissionFix();

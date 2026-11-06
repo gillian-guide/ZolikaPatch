@@ -62,7 +62,7 @@ feature key, is closed by the converter recorded in its own section below;
 `HighQualityReflections` closed with the site-arithmetic resolution recorded below.
 
 - **98 of 99 option keys closed**;
-- **125 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **131 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe, and the compiled bodies listed in
   [`rebuilt.md`](rebuilt.md) are rebuilt in C++ instead, with no proof row. That file
@@ -118,8 +118,8 @@ exists as `source/native.ixx`, and the key is closed with it.
 The last two are compiler output for a C function with `__try`/`__except`
 (`GuardedInvoke` / `GuardedResolve`): their frames carry a cookie-xored scope table
 whose handler fields are addresses inside the original image, so there is no
-instruction stream to transcribe -- the same reason the launcher's DFA helpers are
-rebuilt. Both keep the original ABI and behaviour: on the normal path the invoke
+instruction stream to transcribe -- the same reason the launcher's DFA close-handle
+body is rebuilt. Both keep the original ABI and behaviour: on the normal path the invoke
 entry answers `1` (a null resolver skips the handler call at `0x10003937`), a fault
 anywhere inside the guarded region -- the resolver call or the handler call -- is
 caught and answers `0`, and when the resolver answers null the *caller* then faults
@@ -462,7 +462,8 @@ model/angle tables, read as an *indexed absolute* address, which the whole-body
 comparator compares literally. Those two tables are the tree's own arrays
 (`zpatch_wheelangle_models`/`_angles` in `source/misc.ixx`), whose address cannot be
 the original's. `rebuilt.md` §3 class A records the rebuild and its risk. It carries
-**no proof row**, the same rule as `SpeedupBugFix` and the launcher's DFA helpers.
+**no proof row**, the same rule as `SpeedupBugFix` and the launcher's DFA
+close-handle body.
 
 The assumptions the rebuild makes, each from the disassembly:
 
@@ -585,7 +586,8 @@ funclet) carries a C++ static-local-init EH frame and the `_Init_thread_header` 
 `_Init_thread_footer` TLS guard for its one-time clock scan, so it is reimplemented in
 C++ rather than transcribed. Neither the `/GS` cookie nor the SSE arithmetic is the
 blocker — the tree transcribes both elsewhere; the EH frame and the TLS guard are
-(`rebuilt.md` §1). The same call the tree makes for the launcher's DFA helpers.
+(`rebuilt.md` §1). The same call the tree makes for the launcher's DFA close-handle
+body, which has the frame and no other blocker.
 
 The handler is `sub_100506B0`, reached from the dispatcher at `0x10055A62` and
 **not build-gated** -- the option's value alone decides whether it runs:
@@ -886,8 +888,8 @@ the registration is the ASI's own, not the game's.
 |---|---|---:|---|
 | the branch body (the `E9`'s target) | `0x1004C3C0` | 7 | transcribed, proved |
 | the mounting wrapper (the `E8`'s target) | `0x1004C350` | 41 | transcribed, proved |
-| the decoder's opcode step | `0x1004B150` | 406 | rebuilt as C, no proof row (transcribable; `rebuilt.md` §3 class D, §4 item 1) |
-| the decode driver + Adler-32 | `0x1004B570` | 159 | rebuilt as C, no proof row (transcribable; same) |
+| the decoder's opcode step | `0x1004B150` | 406 | transcribed, proved (`rebuilt.md` §2a) |
+| the decode driver + Adler-32 | `0x1004B570` | 159 | transcribed, proved (same) |
 | the init (decode, register, build) | `0x1004B750` | 991 | rebuilt as C: EH frame + C++ container helpers (`rebuilt.md` §3 class B) |
 | the in-memory archive builder | `0x1004ACE0` | 314 | rebuilt as C, no proof row (`rebuilt.md` §3 class D) |
 | the key's own handler | `0x1004C3F0` | 4185 (IDA's total 4199) | rebuilt as C: EH4 frame + C++ string builder (`rebuilt.md` §3 class B) |
@@ -915,14 +917,16 @@ the registration is the ASI's own, not the game's.
   original's bytes apart from the six absolute operands (two resume slots, the
   mount slot, the replayed-call slot, the cookie and the two string literals), which
   are what must differ.
-- **The rebuilt decoder and builder are proven offline without the game.**
-  `zp_dump --ooc-selftest` runs the module's own decode, registration and archive
-  build against the pinned resource and compares each result with the fingerprint
-  the recovered bytes carry: the stream's Adler-32 trailer, the decoded table's
-  `fnv1a 0xC883859F`, the archive's 182,272 bytes and `fnv1a 0xB5AF7B10`, and the
-  header's `16`/`0xE9` words. It answers `PASS`. The shipped ASI never calls it --
+- **The decoder is transcribed and behaviourally proven; the builder is still a
+  rebuild and is proven offline.** `zp_dump --ooc-selftest` runs the module's own
+  decode, registration and archive build against the pinned resource and compares each
+  result with the fingerprint the recovered bytes carry: the stream's Adler-32
+  trailer, the decoded table's `fnv1a 0xC883859F`, the archive's 182,272 bytes and
+  `fnv1a 0xB5AF7B10`, and the header's `16`/`0xE9` words. It answers `PASS`. Because
+  the decode path is now the original's own 565 instructions, that PASS is also a
+  behavioural proof of the transcription. The shipped ASI never calls the selftest --
   the payload path only runs when the game calls the wrapper, which no offline tool
-  can reach, so this is the only way the rebuilt code executes at all.
+  can reach, so this is the only way the decode and build code executes at all.
 - **Two build facts the arm inherits.** The branch anchor (`A9 39 44 24 18`, five
   bytes that start on the last byte of the `mov eax, <magic>` preceding the compare)
   is absent from 1.0.0.0 and present exactly once on the other eight images; the
@@ -1334,12 +1338,13 @@ A body-bearing key is committed only when all four parts exist:
    exception frame or a TLS static-init guard. `[rebuilt.md](rebuilt.md)` lists every
    such piece with its blocking instruction pattern; the steer consumer `sub_10004C70`,
    `ForceCarHeadlightShadows`' offset check, `SpeedupBugFix`'s body and
-   `OutOfCommissionFix`'s decoder, init, archive builder and handler are the current
+   `OutOfCommissionFix`'s init, archive builder and handler are the current
    examples. A `/GS` cookie is **not** a blocker: the tree transcribes those. A rebuilt
    piece whose result is data rather than a side effect can be pinned a second way,
    without the game: `OutOfCommissionFix`'s decode and archive build run from
    `zp_dump --ooc-selftest` and are compared with the fingerprints the recovered
-   bytes carry (that key's section).
+   bytes carry (that key's section). The decode half is now the original's own
+   instructions, so that selftest also proves the transcription.
 
 ## What the scoreboard can and cannot compare
 
@@ -1532,15 +1537,19 @@ the 43 displacement bytes the scoreboard excludes by design.
 ### What the launcher stage reimplements, and what it cannot prove
 
 - The 25-row table, the collectors, the DFA and ROM install rows are in-place
-  instruction patches; the eight hook bodies are the callable part. Three are
+  instruction patches; the eight hook bodies are the callable part. Seven are
   transcribed assembly and proven whole (`rom_set` 4 instructions, `rom_reset` 28,
-  `dfa_init` 2). The five DFA file-API wrappers (`create_file`, `close_handle`,
-  `set_file_pointer`, `get_file_size_ex`, `read_file`) are fresh C++ with the
-  original's `__cdecl` ABI, the same argument order and the same fallbacks; the
-  original's are compiler output for the same signatures, not hand-written assembly,
-  so they are rebuilt rather than transcribed (`close_handle` needs MSVC's own SEH
-  frame). `create_file` keeps the original's unguarded indirect call — a slot whose
-  target is null faults, as it does in the original.
+  `dfa_init` 2, `create_file` 19, `set_file_pointer` 9, `get_file_size_ex` 7,
+  `read_file` 10). The five DFA file-API wrappers (`create_file`, `close_handle`,
+  `set_file_pointer`, `get_file_size_ex`, `read_file`) are `__cdecl` forwarders to
+  the kernel32 imports; four are transcribed, and each `call ds:[…]` reads a module
+  slot filled with the same function the original imported (the static CRT has no
+  IAT). `create_file` keeps the original's `test eax, eax` fallback and its unguarded
+  inner indirect call — a captured slot whose dereferenced target is null faults, as
+  it does in the original. The fifth, `close_handle` (0x10004790), keeps its C++
+  rebuild: its original stream is an EH4 frame with the filter and the unwind
+  continuation inside the same byte range, so there is nothing linear to prove
+  (`rebuilt.md` §3 class B).
 - The ROM service is a live-process component: a `std::thread` that registers
   `"MessageWindow"` (falling back to `"MessageWindow2"`), creates a message-only
   window, publishes the handle from `WM_NCCREATE` and answers `WM_ROM` (43858) with

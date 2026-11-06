@@ -61,6 +61,17 @@ savegame_fix_mutex 100455E0 ?SavegameMutexBody@@YAXXZ 19
 rom_set 10004610 ?RomSetBody@@YAXXZ 4
 rom_reset 10004570 ?RomResetBody@@YAXXZ 28
 dfa_init 10004780 ?DfaInitBody@@YAXXZ 2
+# The four DFA file-API forwarders (source/launcher.ixx): `__cdecl` wrappers that
+# push the caller's arguments and call the kernel32 entry through the original's
+# IAT slot. The module has no IAT, so each `call ds:[…]` reads a slot the arm fills
+# with the same function; the proof compares an absolute operand as a slot. The
+# fifth, close_handle (0x10004790), keeps its C++ rebuild: its original stream is an
+# EH4 frame (`__except_handler4`, scope table 0x10153FC0) with the funclet outside
+# the linear range.
+dfa_create_file 10004820 ?DfaCreateFileBody@@YAXXZ 19
+dfa_set_file_pointer 10004760 ?DfaSetFilePointerBody@@YAXXZ 9
+dfa_get_file_size_ex 10004720 ?DfaGetFileSizeExBody@@YAXXZ 7
+dfa_read_file 10004740 ?DfaReadFileBody@@YAXXZ 10
 # The native-script call layer (source/native.ixx). Its two SEH entries,
 # sub_100038E0 (59 instructions) and sub_10003980 (52), are compiler output for a
 # C function with __try/__except and are rebuilt rather than transcribed; their
@@ -208,6 +219,14 @@ cutscene_chain_b 100388C0 ?CutsceneChainBody@@YAXXZ 146
 # pieces have no rows (docs/parity.md).
 ooc_branch 1004C3C0 ?OocBranchBody@@YAXXZ 7
 ooc_wrap 1004C350 ?OocWrapBody@@YAXXZ 41
+# The decoder pair (source/ooc.ixx): an interpreter with sixteen exits and no
+# register contract beyond "ECX in, EAX out", no exception frame, no TLS static-init
+# guard and no indexed absolute operand, so it is transcribed whole. The opcode
+# step's four CRT `memcpy` calls go through a forwarder (the inline assembler
+# refuses `call memcpy`); the driver's Adler-32 loop is inline in the original, not
+# a call, so its 5552-byte block structure is transcribed too. docs/rebuilt.md.
+ooc_step 1004B150 ?OocStepBody@@YAXXZ 406
+ooc_decode 1004B570 ?OocDecodeBody@@YIHPAE@Z 159
 # HighQualityReflections (source/graphics.ixx): the detour body the E9 at game
 # 0xC51311 jumps to. 157 instructions to its `jmp [resume]` (858 bytes): eight
 # register saves, the twelve builder calls with the eight restores after each of

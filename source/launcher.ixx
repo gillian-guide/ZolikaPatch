@@ -461,27 +461,6 @@ namespace
 
     // ---- hook bodies -------------------------------------------------------
 
-    using CreateFileAFn = HANDLE(WINAPI*)(LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD,
-        DWORD, HANDLE);
-
-    // The CreateFile IAT slot the DFA capture records; 0 leaves the fallback path.
-    std::atomic<uint32_t> gCreateFileSlot{ 0 };
-
-    // 0x10004820: CreateFileA through the captured IAT slot, or through the import
-    // when the capture found none. __cdecl like the original trampoline: the caller
-    // pops the seven arguments (a stdcall body would corrupt the stack). The target
-    // is called without a null check, as the original does.
-    HANDLE __cdecl CreateFileBody(LPCSTR name, DWORD access, DWORD share,
-        LPSECURITY_ATTRIBUTES security, DWORD disposition, DWORD flags, HANDLE templateFile)
-    {
-        const uint32_t slot = gCreateFileSlot.load();
-        if (slot == 0)
-            return CreateFileA(name, access, share, security, disposition, flags, templateFile);
-
-        const auto forward = *reinterpret_cast<CreateFileAFn*>(static_cast<uintptr_t>(slot));
-        return forward(name, access, share, security, disposition, flags, templateFile);
-    }
-
     // 0x10004790: CloseHandle behind an exception guard; the original's handler
     // returns -1 when the call faults.
     BOOL __cdecl CloseHandleBody(HANDLE handle)
@@ -496,25 +475,21 @@ namespace
         }
     }
 
-    // 0x10004760
-    DWORD __cdecl SetFilePointerBody(HANDLE handle, LONG distance, PLONG distanceHigh,
-        DWORD moveMethod)
-    {
-        return SetFilePointer(handle, distance, distanceHigh, moveMethod);
-    }
+}
 
-    // 0x10004720
-    BOOL __cdecl GetFileSizeExBody(HANDLE handle, PLARGE_INTEGER size)
-    {
-        return GetFileSizeEx(handle, size);
-    }
-
-    // 0x10004740
-    BOOL __cdecl ReadFileBody(HANDLE handle, LPVOID buffer, DWORD toRead, LPDWORD read,
-        LPOVERLAPPED overlapped)
-    {
-        return ReadFile(handle, buffer, toRead, read, overlapped);
-    }
+// The four transcribed file-API forwarders' operands. Each `call ds:[…]` in the
+// original is the kernel32 import through its own IAT; the module has no IAT (static
+// CRT), so the slot holds the same function. The create-file body also reads the
+// address the DFA capture recorded (the original's dword_10159D30), which the
+// capture writes before the install tier runs. All four are filled in
+// RegisterLauncher(), before any tier.
+extern "C"
+{
+    uint32_t zpatch_dfa_create_file = 0;          // the original's IAT slot 0x10063048
+    uint32_t zpatch_dfa_create_file_slot = 0;     // dword_10159D30, the captured slot
+    uint32_t zpatch_dfa_set_file_pointer = 0;     // the original's IAT slot 0x10063030
+    uint32_t zpatch_dfa_get_file_size_ex = 0;     // 0x10063008
+    uint32_t zpatch_dfa_read_file = 0;            // 0x10063000
 }
 
 // The transcribed bodies are naked assembly, so they live at module scope: MSVC
@@ -527,6 +502,39 @@ static __declspec(naked) void DfaInitBody()
     __asm
     {
         mov eax, 1
+        ret
+    }
+}
+
+// sub_10004820, recovered VA 0x10004820 (19 instructions): the DFA create-file
+// body. It pushes the caller's seven arguments first, then reads the slot address
+// the DFA capture recorded: a non-zero address means the game's own CreateFile IAT
+// entry, which the body dereferences and calls (a null target faults, as in the
+// original); zero falls back to the import. __cdecl like the original -- plain
+// `ret`, the caller pops the seven arguments.
+static __declspec(naked) void DfaCreateFileBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        push DWORD PTR [ebp + 20h]
+        mov eax, DWORD PTR [zpatch_dfa_create_file_slot]
+        push DWORD PTR [ebp + 1Ch]
+        push DWORD PTR [ebp + 18h]
+        push DWORD PTR [ebp + 14h]
+        push DWORD PTR [ebp + 10h]
+        push DWORD PTR [ebp + 0Ch]
+        push DWORD PTR [ebp + 8]
+        test eax, eax
+        je dfa_create_file_fallback
+        mov eax, DWORD PTR [eax]
+        call eax
+        pop ebp
+        ret
+    dfa_create_file_fallback:
+        call DWORD PTR [zpatch_dfa_create_file]
+        pop ebp
         ret
     }
 }
@@ -570,6 +578,62 @@ static __declspec(naked) void RomResetBody()
     }
 }
 
+// sub_10004760, recovered VA 0x10004760 (9 instructions): the DFA SetFilePointer
+// forwarder. __cdecl like the original -- plain `ret`, the caller pops the four
+// arguments -- entered by the `jmp` the DFA install writes at game 0x917E92. The
+// original's `call ds:[0x10063030]` is the kernel32 import through its own IAT; the
+// module slot holds the same function.
+static __declspec(naked) void DfaSetFilePointerBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        push DWORD PTR [ebp + 14h]
+        push DWORD PTR [ebp + 10h]
+        push DWORD PTR [ebp + 0Ch]
+        push DWORD PTR [ebp + 8]
+        call DWORD PTR [zpatch_dfa_set_file_pointer]
+        pop ebp
+        ret
+    }
+}
+
+// sub_10004720, recovered VA 0x10004720 (7 instructions): the DFA GetFileSizeEx
+// forwarder, installed at game 0x917EE1.
+static __declspec(naked) void DfaGetFileSizeExBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        push DWORD PTR [ebp + 0Ch]
+        push DWORD PTR [ebp + 8]
+        call DWORD PTR [zpatch_dfa_get_file_size_ex]
+        pop ebp
+        ret
+    }
+}
+
+// sub_10004740, recovered VA 0x10004740 (10 instructions): the DFA ReadFile
+// forwarder, installed at game 0x917D38.
+static __declspec(naked) void DfaReadFileBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        push DWORD PTR [ebp + 18h]
+        push DWORD PTR [ebp + 14h]
+        push DWORD PTR [ebp + 10h]
+        push DWORD PTR [ebp + 0Ch]
+        push DWORD PTR [ebp + 8]
+        call DWORD PTR [zpatch_dfa_read_file]
+        pop ebp
+        ret
+    }
+}
+
 // 0x10004610, 4 instructions: the object arrives in ESI (the patched site keeps it
 // there) and the site pushed two arguments the callee must pop, so this is
 // reproduced instruction for instruction.
@@ -591,11 +655,11 @@ namespace
         switch (hook)
         {
         case SkipHook::dfa_init: return reinterpret_cast<uintptr_t>(&DfaInitBody);
-        case SkipHook::create_file: return reinterpret_cast<uintptr_t>(&CreateFileBody);
+        case SkipHook::create_file: return reinterpret_cast<uintptr_t>(&DfaCreateFileBody);
         case SkipHook::close_handle: return reinterpret_cast<uintptr_t>(&CloseHandleBody);
-        case SkipHook::set_file_pointer: return reinterpret_cast<uintptr_t>(&SetFilePointerBody);
-        case SkipHook::get_file_size_ex: return reinterpret_cast<uintptr_t>(&GetFileSizeExBody);
-        case SkipHook::read_file: return reinterpret_cast<uintptr_t>(&ReadFileBody);
+        case SkipHook::set_file_pointer: return reinterpret_cast<uintptr_t>(&DfaSetFilePointerBody);
+        case SkipHook::get_file_size_ex: return reinterpret_cast<uintptr_t>(&DfaGetFileSizeExBody);
+        case SkipHook::read_file: return reinterpret_cast<uintptr_t>(&DfaReadFileBody);
         case SkipHook::rom_reset: return reinterpret_cast<uintptr_t>(&RomResetBody);
         case SkipHook::rom_set: return reinterpret_cast<uintptr_t>(&RomSetBody);
         }
@@ -705,7 +769,7 @@ namespace
         auto pattern = find_pattern(kDfaCapture);
         if (pattern.empty())
             return;
-        gCreateFileSlot.store(*pattern.get_first<uint32_t>(kDfaCaptureOffset));
+        zpatch_dfa_create_file_slot = *pattern.get_first<uint32_t>(kDfaCaptureOffset);
     }
 
     // One E8/E9 per install row; a missing signature is the original's clean skip.
@@ -791,6 +855,17 @@ namespace
 // Registered like every other arm: the install tier owns the gate.
 export void RegisterLauncher()
 {
+    // The transcribed forwarders' targets, filled before any tier runs: the bodies
+    // are reached only from the game's own calls, but the DFA stage installs them
+    // from the install tier and nothing may read an empty slot. The capture slot
+    // (zpatch_dfa_create_file_slot) is the publish tier's, not this one's.
+    zpatch_dfa_create_file = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&CreateFileA));
+    zpatch_dfa_set_file_pointer =
+        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&SetFilePointer));
+    zpatch_dfa_get_file_size_ex =
+        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&GetFileSizeEx));
+    zpatch_dfa_read_file = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&ReadFile));
+
     Loader::PublishEvent() += [] { PublishDfaCapture(); };
     Loader::InstallEvent() += []
     {
@@ -801,11 +876,11 @@ export void RegisterLauncher()
     // The hook bodies carry their recovered VAs so the dump can express every
     // branch in the original's coordinates.
     Bodies::Register(reinterpret_cast<uintptr_t>(&DfaInitBody), 0x10004780u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&CreateFileBody), 0x10004820u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&DfaCreateFileBody), 0x10004820u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&CloseHandleBody), 0x10004790u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&SetFilePointerBody), 0x10004760u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&GetFileSizeExBody), 0x10004720u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&ReadFileBody), 0x10004740u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&DfaSetFilePointerBody), 0x10004760u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&DfaGetFileSizeExBody), 0x10004720u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&DfaReadFileBody), 0x10004740u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&RomResetBody), 0x10004570u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&RomSetBody), 0x10004610u);
 }

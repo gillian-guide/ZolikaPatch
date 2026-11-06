@@ -4,7 +4,7 @@ Every other piece of this module is **transcribed**: a body is written instructi
 instruction from the original ASI, and `tools/verify_bodies.py` decodes the same
 instruction count on both sides and compares mnemonic, registers, memory shape and
 immediate *class*. That proof is what `tests/bodies.tsv` is for, and it currently
-covers **125 bodies**.
+covers **131 bodies**.
 
 This file is about the pieces that are **not** in that file. They are rebuilt in C++
 because their original instruction stream cannot be compared under the proof's rules,
@@ -72,7 +72,9 @@ Two things that are **not** blockers, and used to be treated as one:
 
 ---
 
-## 2. What this pass transcribed, and what it removed
+## 2. What the transcription passes did, and what they removed
+
+### The first pass (six bodies)
 
 Six bodies became proven, and five C++ rebuilds disappeared. `tests/bodies.tsv` rows
 are the proof; the byte column is from `.scratch/byte_compare.py`, which decodes the
@@ -104,12 +106,13 @@ labels onto the probe instruction, and the check that now guards it compares eve
 
 ```
 python .scratch/branch_targets.py
-125 row(s), 154 internal branch target(s), 0 failure(s)
+131 row(s), 206 internal branch target(s), 0 failure(s)
 ```
 
-The DLC row was the only failure before the fix; after it, all 125 rows agree on every
-internal branch target. That check belongs in `tools/verify_bodies.py` (§4 item 1) —
-it is a one-screen addition and the whole row set already passes it.
+The DLC row was the only failure before the fix; after it, every row agrees on
+every internal branch target (154 of them for the 125 rows that existed then; the
+six rows §2a adds bring the current total to 206). That check lives in
+`tools/verify_bodies.py` now (§4 item 1), so the count moves with the row set.
 
 **The C++ rebuilds this removes**, and the source of the replacement:
 
@@ -124,7 +127,8 @@ it is a one-screen addition and the whole row set already passes it.
 **How the upgrade was verified**
 
 1. **Proof rows.** `python tools/verify_bodies.py --original … --candidate … --bodies
-   tests/bodies.tsv --map …` → `125 body(ies), 0 failure(s)`, including
+   tests/bodies.tsv --map …` → `125 body(ies), 0 failure(s)` for the row set of that
+   pass (131 today), including
    `PASS dlc_discovery (223 instruction(s), 23 absolute operand(s))`. The count is the
    body's exact count, so a missing or extra instruction fails the row.
 2. **Byte comparison.** The table above: every difference is an absolute operand or a
@@ -176,9 +180,10 @@ it is a one-screen addition and the whole row set already passes it.
    Same instruction sequence, same ABI, same `memset`.
 7. **Every internal branch lands where the original's does.** The proof's jump-target
    blind spot is closed for these rows by comparing each `jcc`/`jmp` target's offset
-   from the body start on both sides (`.scratch/branch_targets.py`). This is the check
-   that caught the first DLC transcription's mis-attached label (§2); it now passes for
-   all 125 rows and 154 internal targets.
+   from the body start on both sides (`.scratch/branch_targets.py`, now inside
+   `tools/verify_bodies.py`). This is the check that caught the first DLC
+   transcription's mis-attached label (§2); it passes for the 125 rows of that pass
+   (154 internal targets) and for the 131 rows of today's set (206).
 
 **What remains unproven even for these six.** The bodies now execute only on the
 game's own calls, and no offline harness can make the game call them:
@@ -195,6 +200,87 @@ game's own calls, and no offline harness can make the game call them:
 
 That is the same residual as any transcribed body: the proof is of *code*, the
 behaviour is seen in play. `docs/parity.md` carries the per-key play items.
+
+### 2a. This pass: six more bodies
+
+The pieces §4 of the previous revision listed as **transcribable today** are
+transcribed. They were left rebuilt only because that pass did not own the modules
+they live in, and one of them (`0x10004820`) carried a blocker that is not in the
+binary at all — see the note under the table.
+
+| piece | recovered VA | size | insns | row | byte-identical | differs only in |
+|---|---|---:|---:|---|---:|---|
+| OOC decoder, opcode step | `0x1004B150` | `0x41F` | 406 | `ooc_step` | 357/406 | 46 absolute operands + 3 `call` immediates |
+| OOC decode driver + Adler-32 | `0x1004B570` | `0x1D7` | 159 | `ooc_decode` | 149/159 | 8 absolute operands + 2 `call` immediates |
+| DFA create-file body | `0x10004820` | `0x2F` | 19 | `dfa_create_file` | 17/19 | 2 absolute operands |
+| DFA SetFilePointer body | `0x10004760` | `0x17` | 9 | `dfa_set_file_pointer` | 8/9 | 1 absolute operand |
+| DFA GetFileSizeEx body | `0x10004720` | `0x11` | 7 | `dfa_get_file_size_ex` | 6/7 | 1 absolute operand |
+| DFA ReadFile body | `0x10004740` | `0x1A` | 10 | `dfa_read_file` | 9/10 | 1 absolute operand |
+
+Every difference is again an absolute operand (a slot) or a `call` immediate — no
+opcode, register, frame offset or branch. The OOC pair's instruction sizes sum to
+1055 and 471 bytes, the original's exact sizes, so every instruction sits at the same
+relative offset and the internal-branch check passes for both (the opcode step alone
+has 36 internal branches, the driver 15).
+
+**One correction to the previous revision's premise.** `0x10004820` was filed under
+class C with "`__try/__except` (`fs:[0]` registration + funclet)" as its blocker. It
+has no exception frame: the original is nineteen instructions, `push ebp; mov ebp,
+esp;` seven argument pushes with `mov eax, ds:10159D30` in the middle, `test eax,
+eax; je` and either `mov eax, [eax]; call eax` or `call ds:[CreateFileA]`, then `pop
+ebp; ret` at `0x1000484E`. Its two absolute operands are the captured slot address
+and the `CreateFileA` import, both slots here. Under this file's own rule — a body is
+only rebuilt for an indexed absolute table access, an exception frame, a TLS
+static-init guard or a call graph of rebuilds — it had no reason to stay rebuilt, so
+it is transcribed too. `0x10004790` (close-handle) *does* have the frame (`push -2;
+push 0x10153FC0; push __except_handler4; … mov fs:[0], eax`, the filter at
+`0x100047EC` and the unwind block at `0x100047F0`, 45 instructions in `0x81` bytes)
+and stays a rebuild.
+
+**How this pass was verified**
+
+1. **Proof rows.** `python tools/verify_bodies.py …` → `131 body(ies), 0 failure(s)`,
+   with `PASS ooc_step (406 instruction(s), 46 absolute operand(s))`, `PASS
+   ooc_decode (159, 6)`, `PASS dfa_create_file (19, 2)`, `PASS dfa_set_file_pointer
+   (9, 1)`, `PASS dfa_get_file_size_ex (7, 1)` and `PASS dfa_read_file (10, 1)`.
+2. **Byte comparison** (`.scratch/byte_compare.py`, above): 546 of the 610 new
+   instructions are byte-identical; the other 64 differ only in a slot or a `call`
+   immediate.
+3. **The slots hold what the original's operands point at.** `.scratch/resolve_calls.py`
+   maps every emitted operand back to the linker map: the four DFA bodies call through
+   `_zpatch_dfa_create_file` / `_zpatch_dfa_set_file_pointer` /
+   `_zpatch_dfa_get_file_size_ex` / `_zpatch_dfa_read_file`, which `RegisterLauncher()`
+   fills with `CreateFileA`, `SetFilePointer`, `GetFileSizeEx` and `ReadFile`; the
+   create-file body reads `_zpatch_dfa_create_file_slot` (the address the publish
+   tier's IAT capture recorded, the original's `dword_10159D30`); the decoder reads and
+   writes `_zpatch_ooc_begin` / `_zpatch_ooc_cursor` / `_zpatch_ooc_end` /
+   `_zpatch_ooc_lower`; and `ooc_decode`'s two `call`s land on `?OocStepBody@@YAXXZ`.
+4. **The decoder's three `call`s are the CRT's `memcpy`.** The inline assembler
+   refuses `call memcpy`, so each site calls `OocCopyBlock`, and `/OPT:ICF` folds it
+   into `loading.ixx`'s identical `SavegameCopyBlock` — same three arguments, same
+   caller-cleans `add esp, 0Ch`, same `memcpy`. The call still compares as an immediate,
+   so the proof is unaffected.
+5. **The behaviour is pinned, not assumed.** `zp_dump --ooc-selftest` runs the
+   transcribed pair against the recovered resource and still prints `ooc selftest:
+   PASS`: the decoded table's `fnv1a 0xC883859F`, the archive's 182,272 bytes and
+   `fnv1a 0xB5AF7B10`, and the header's `16`/`0xE9` words. That is a *behavioural*
+   proof of a 406-instruction interpreter, not only a shape proof.
+6. **The surrounding behaviour is unchanged.** `ctest --preset release` is 12/12,
+   `python tools/parity_report.py 9` is `98 key(s) closed, 0 open, 1 oracle-verified`,
+   and the DFA install rows still write the same five bytes at the same sites (the
+   branch targets canonicalise to the original's VAs).
+
+**What stays rebuilt in these two areas, and why.** The OOC archive builder
+(`0x1004ACE0`, class D: twelve helper callees), the init (`0x1004B750`, EH + C++
+containers), the key's handler (`0x1004C3F0`, EH4 + a 16 KB string builder) and the
+DFA close-handle body (`0x10004790`, EH4) — every one of them for a reason this file
+lists. The OOC pair's behaviour stays pinned by the selftest; the wrapper and the
+branch body were already transcribed.
+
+**What remains unproven for these six.** The decoder pair is now behaviourally proven
+offline (item 5), which is more than any other body here; the DFA forwarders are only
+shape-proven — they run when the game opens a file through its DFA layer, and a wrong
+argument order would show as a file-open failure in play, not as a proof failure.
 
 ---
 
@@ -224,6 +310,7 @@ is IDA's function size.
 |---|---|---:|---:|---|---|---|---|
 | guarded resolve-and-invoke | `0x100038E0` | `0x9E` | 59 | `__try/__except`: `push -1; push 0x10153EE8; push __except_handler4; … mov fs:[0],eax`, two funclets (`mov eax,1; ret` and the unwind path) | resolve a native handler by hash, call it with the one argument, answer `true`; a fault in the call is caught and answered `false` — that is the feature | the *bodies* of the native-call layer that call it are transcribed (`audio_call_*`, `bad_player_model_*`); its consumers' cells are closed; the fault path is unreachable offline | high: the `__except` is the whole point. If the rebuild's frame caught a different range, a game fault would either crash (original: answered 0) or be swallowed (original: crash) |
 | guarded resolve-only | `0x10003980` | `0x90` | 52 | same, scope table `0x10153F08` | resolve only, answer the handler pointer or 0 | as above; called from the transcribed steer consumer, the popup shims and `MouseFix`'s helpers | high, same reason |
+| DFA close-handle body | `0x10004790` | `0x81` | 45 | `__try/__except` around `CloseHandle`: `push -2; push 0x10153FC0; push __except_handler4 (0x1005FE4C); … mov fs:[0], eax`, with the filter (`or eax, -1; ret` at `0x100047EC`) and the unwind continuation (`0x100047F0`) inside the same byte range | `CloseHandle` behind the guard, answering `-1` when the call faults | the DFA stage's write set and the launcher cell (`oracle-verified`); the body runs when the game closes a file through DFA | low: a close that faults is caught either way. The frame is the feature, so it stays rebuilt; the four forwarders beside it are transcribed (§2a) |
 | SpeedupBugFix body | `0x10050540` | `0x16F` | 93 (+funclet at `0x10061981`) | C++ static-init EH: `push -1; push SEH_10050540; … fs:[0]`, funclet `jmp __CxxFrameHandler3` with throw info `0x10154358`, plus the `_Init_thread_header/footer` TLS guard (`0x1005FFC3`/`0x1005FF77`) around the one-time QPC/scan | the clock fix: QPC frequency → one-over-frequency into eight published float slots, then tail-call `sub_10003830`'s resolver result − 0x33 (the game's timer getter) and return its `(eax,edx)` pair in a 64-bit answer | the arm's eight operands are validated per site and the per-key dump is byte-identical to the pre-change dump on all nine images; the *body* never runs offline | moderate: the eight timer slots are the whole fix. A wrong slot or a float/double mix-up would show as a broken game clock, not a crash |
 | audio install body | `0x10050AD0` | `0xF9` | 75 | EH4 (`push __except_handler4`, scope `0x10154384`, funclet `0x100619C1`) + the CRT clock/seed block through `fs:[2Ch]` and `TlsIndex` | resolve the `6A 06 68 ? ? ? ? 8D 8C` site once and write `rand() % 5 + 1` into its `push` immediate, gated on the transcribed `0x10050A50` gate | `RestoreDeathMusic`'s cell is closed; the gate and the three native wrappers around it are transcribed and proven | **the one recorded 1:1 divergence in that key**: the original's guard compares `dword_101A84C0` with the CRT per-thread word and may skip the whole block on a fresh process; the rebuild always writes. Recorded in `parity.md` §RestoreDeathMusic |
 | save converter | `0x10051B30` | `0x489` | 337 | EH registration (`fs:[0]`) + three `_Init_thread_header/footer` TLS guards + CRT file API (`fopen_s`, `fread`, `fclose`, `operator new`, `free`) + `std::string` (IDA's per-function total is 363: 337 plus the out-of-line funclet/abort blocks) | open the save, check `SAVE` at +0xC, walk eighteen chunks with `fread(9)` / `operator new(size-9)` / `fread(payload)` / `free`, remember chunks 9/13/16 (`0x4C45`/`0x1741`/`0x0E77`), then patch the three sites (`0x872185`, `0x7D8C50`, `0x8DA090`) | the file walk was replayed offline against the two real saves in `game_refs/saves/…` (`SGTA400`/`SGTA401`: `SAVE` at +0xC, 18 `BLOCK` chunks, sizes `0x3AB1`/`0x1729`/`0x0CC7`); the three sites' writes are what the key's cell measures | **high**: a corrupt save already faults (preserved), and the chunk-size conditions decide whether the new-format hooks are installed. A wrong condition converts a save wrongly instead of failing |
@@ -238,8 +325,6 @@ is IDA's function size.
 | NewFiles container scan | `0x10051730` | `0xB0` | 55 | TLS static-init guard (`fs:[0]`, `fs:[2Ch]`, `_Init_thread_header/footer`) around the one-time find of the game's registry global | find the game's `mov esi,<global>` once, dereference the global on every call (the game rebuilds the registry) | the NewFiles arm's writes are the key's cell; the scan result is used by the two rebuilt update bodies | moderate: a miss returns a null the update bodies then call or dereference — the original's fault, preserved |
 | NewFiles "is registered" | `0x10051610` | `0x114` | 74 | two TLS guards (two build variants cached) | ask the container whether the hash is registered, trying one signature and then an older build's | as above | moderate |
 | NewFiles "append" | `0x100517E0` | `0xB0` | 53 | TLS guard + a call into the game function 20 bytes inside the match | append the name to the container | as above | moderate |
-| DFA create-file body | `0x10004820` | `0x2F` | 36 | `__try/__except` (`fs:[0]` registration + funclet) | `CreateFileA` through the captured slot, answering the handle | the DFA stage's write set and the launcher cell (`oracle-verified`); the body runs when the game opens a file through DFA | moderate: it is the entry point for every intercepted file open |
-| DFA close-handle body | `0x10004790` | `0x81` | 20 | same, plus an exception guard around `CloseHandle` | `CloseHandle` behind the guard | as above | low: a close that faults is caught either way |
 | ROM message service | `0x10004260` (class registration) + `0x10004300` (registrar, `0xC8`) + the window procedure and thread entry they store | — | — | not one instruction stream at all: a thread, a window class, a `WNDPROC`, a message-only window and a `WM_ROM` action table — process-wide state reached only through pointers the original stores | a `std::thread` that registers `"MessageWindow"` (falling back to `"MessageWindow2"`), creates the message-only window, publishes the handle from `WM_NCCREATE` and answers `WM_ROM` (43858) with the recovered action table; `StartRomService` spins on `Sleep(0)` with no bound, as the original does | its *install rows* are transcribed (`rom_set` 4 instructions, `rom_reset` 28, `dfa_init` 2) and the launcher cell is oracle-verified; the service itself is only observable in a running game | low: nothing depends on it except the ROM message window; a failure to create the window hangs the game in both trees (a preserved fault) |
 
 `0x10004300` is the only function in the ASI that references `"MessageWindow"` /
@@ -252,38 +337,21 @@ the registrar alone would prove nothing about the service.
 
 | piece | VA | bytes | insns | what it calls | why that keeps it rebuilt | residual risk |
 |---|---|---:|---:|---|---|---|
-| OOC decoder, opcode step | `0x1004B150` | `0x41F` | 406 | CRT `memcpy` (`0x10060F11`) at three sites; 16 return paths | *transcribable* — no EH, no TLS guard, no indexed absolute. Left because its behaviour is already pinned by the archive fingerprints (`--ooc-selftest` PASS) and it is an interpreter with 16 exits; it is §4 item 2 | low: a wrong run copy corrupts the fake-pak payload, which the selftest would catch |
-| OOC decode driver + Adler-32 | `0x1004B570` | `0x1D7` | 159 | `0x1004B150` twice | transcribable in shape; its callee is the rebuild above, so the pair has to move together | low, same |
 | OOC archive builder | `0x1004ACE0` | `0x461` | 314 | 12 internal helpers (`0x1004AB70`…, `0x10056500`) that are themselves rebuilds | class D: proving the caller of 12 rebuilds proves nothing behavioural | low: the archive is fingerprinted (`fnv1a 0xB5AF7B10`) |
-| NewFiles updates (2) | `0x10051890`, `0x100518D0` | `0x3F`, `0x45` | 30, 30 | the three class-C scans above + the transcribed resolver `0x10003E50` | their own stream is transcribable, but three of four callees are class C and two of the four need `__fastcall` entry shims (`ECX` = object/list, stack = hash/name) whose register contract would itself be unproven — that is the register-contract bug class, not a proof. §4 item 3 | moderate: it decides whether a new-format file is registered at all |
+| NewFiles updates (2) | `0x10051890`, `0x100518D0` | `0x3F`, `0x45` | 30, 30 | the three class-C scans above + the transcribed resolver `0x10003E50` | their own stream is transcribable, but three of four callees are class C and two of the four need `__fastcall` entry shims (`ECX` = object/list, stack = hash/name) whose register contract would itself be unproven — that is the register-contract bug class, not a proof. §4 item 1 | moderate: it decides whether a new-format file is registered at all |
 | NMS arena methods | `0x10038360` (alloc), `0x10038430` (free), `0x100385A0` (contains) | `0xC2`, `0x10E`, `0x7D` | 69, 91, 40 | CRT allocator helpers `0x1005C610`/`0x1005C5A0`, `memset`, `operator delete` | class D: the vtable's other eleven methods are transcribed, but these three are thin wrappers over CRT allocator internals the module cannot name | low: the vtable methods that matter are transcribed; these three are allocator plumbing whose failure mode is an allocation fault, which the game shows immediately |
 
 ---
 
 ## 4. Follow-ups, in the order they are worth doing
 
-1. **Put the internal-branch-target check into `tools/verify_bodies.py`.** The proof
-   compares a jump's target as an immediate, so a label attached to the wrong
-   instruction passes — this pass found exactly that bug in its own first DLC
-   transcription (§2). The check is: for a `jcc`/`jmp` whose target lies inside the
-   body, the target's offset from the body start must be equal on both sides. All 125
-   rows already pass it (154 internal targets), so adopting it breaks nothing:
-   `python .scratch/branch_targets.py` → `125 row(s), 154 internal branch target(s),
-   0 failure(s)`. Keep `.scratch/branch_targets.py` as the reference implementation.
-2. **OOC decoder pair** (`0x1004B150` 406 + `0x1004B570` 159). Transcribable today:
-   no EH, no TLS, no indexed absolute; the only calls are `memcpy` (immediate) and
-   each other. Two proof rows, two rebuilds gone. The offline fingerprint selftest
-   stays as the behavioural check; the rows add the code proof.
-3. **NewFiles updates** (`0x10051890`/`0x100518D0`, 30 each). Needs two `__fastcall`
+1. **NewFiles updates** (`0x10051890`/`0x100518D0`, 30 each). Needs two `__fastcall`
    entry shims in front of `NewfilesCallObject`/`NewfilesCallAdd`; once those exist the
    two bodies are a straight transcription. Their call graph stays class C, so the doc
    entry above changes from "blocked" to "proven caller, rebuilt callees".
-4. **The three transcribable DFA bodies** (`0x10004760` 33, `0x10004720` 16,
-   `0x10004740` 22). They live in `launcher.ixx`, which this pass did not own. No
-   blocker: absolute slots and standard-ABI calls only.
-5. **NMS arena methods** (`0x10038360`/`0x10038430`/`0x100385A0`). Transcribable in
+2. **NMS arena methods** (`0x10038360`/`0x10038430`/`0x100385A0`). Transcribable in
    shape; only worth it together with the CRT allocator helpers they call.
-6. **The comparator, and why not to relax it.** Six class-A pieces would become
+3. **The comparator, and why not to relax it.** Six class-A pieces would become
    transcribable if `summarise()` treated an indexed absolute displacement as a slot
    too. That is a one-line change and it is **not** made here, deliberately: it would
    stop the proof distinguishing `[esi*4+0x1015A538]` from `[esi*4+0x10159D38]`, i.e. a
@@ -291,6 +359,11 @@ the registrar alone would prove nothing about the service.
    the price of keeping table identity inside the proof. If it is ever wanted, the
    honest form is a per-row opt-in flag ("this displacement is a slot") in
    `tests/bodies.tsv`, not a global relaxation.
+4. **The internal-branch-target check** (the previous revision's item 1) is **done**:
+   it is `tools/verify_bodies.py::internal_branch_mismatch`, it runs on every row, and
+   it is what §2a's six transcriptions were proved with. `.scratch/branch_targets.py`
+   stays as the independent reference implementation; the two agree at
+   `131 row(s), 206 internal branch target(s), 0 failure(s)`.
 
 ---
 
@@ -333,23 +406,29 @@ deliberately after any change to the modules above.
    `PopupHeadlightsFlag` (pop-up lights on the configured model),
    `ForceCarHeadlightShadows`. What to look for: the feature silently not applying to
    one model.
-8. **The ROM service and the DFA bodies** (classes B/C). Exercise: launch through
-   `PlayGTAIV.exe` and watch for the ROM message window to exist (no visible symptom);
-   a hang here is the preserved original fault. Least likely to matter, hardest to see.
+8. **The ROM service and the DFA close-handle body** (classes B/C). Exercise: launch
+   through `PlayGTAIV.exe` and watch for the ROM message window to exist (no visible
+   symptom); a hang here is the preserved original fault. Then open a save so the DFA
+   layer closes a file. Least likely to matter, hardest to see. The other four DFA
+   forwarders are transcribed (§2a) and need the same file-open exercise: a wrong
+   argument order would fail the open, not crash.
 
 ---
 
 ## 6. Where the numbers live
 
-- `tests/bodies.tsv` — the 125 proof rows; a row's count is the body's exact
+- `tests/bodies.tsv` — the 131 proof rows; a row's count is the body's exact
   instruction count, so it cannot silently shrink.
-- `tools/verify_bodies.py` — the comparator; `--selftest` proves it against the
-  original and against a one-byte corruption.
-- `.scratch/byte_compare.py` — the byte-level comparison quoted in §2 (absolute
-  operands and `call`/`push` immediates are the only differences, by construction).
-- `.scratch/branch_targets.py` — the internal-branch-target check over every row; the
-  reference implementation for the addition proposed in §4 item 1.
-- `.scratch/resolve_calls.py` — the call/operand-to-symbol check quoted in §2 (what
-  the proof's call-as-immediate rule cannot see).
+- `tools/verify_bodies.py` — the comparator, including the internal-branch-target
+  check; `--selftest` proves it against the original and against a one-byte
+  corruption and a moved branch target.
+- `.scratch/byte_compare.py` — the byte-level comparison quoted in §2 and §2a
+  (absolute operands and `call`/`push` immediates are the only differences, by
+  construction). Run it with body names to select rows; with no arguments it prints
+  the six of the first pass.
+- `.scratch/branch_targets.py` — the internal-branch-target check over every row, the
+  independent reference implementation of what `verify_bodies.py` now does.
+- `.scratch/resolve_calls.py` — the call/operand-to-symbol check quoted in §2 and §2a
+  (what the proof's call-as-immediate rule cannot see).
 - `docs/parity.md` — per-key behaviour, the preserved faults, and the oracle-verified
   class; its rebuild notes now point here instead of repeating the reasons.
