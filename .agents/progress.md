@@ -100,3 +100,64 @@ Four catalogue keys in `source/misc.ixx` closed on 1.0.8.0 (80 → 84 keys,
 proven at instruction level where transcribed, but the rebuilt helpers' live
 behaviour is not executed); `AGENTS.md`'s "Current state" still says 79/62 and is
 outside this task's file scope, so the parent must refresh it (84/73 now).
+
+## 2026-11-06 — the loader preamble's salt rule, and the two wrong constants
+
+**What was wrong:** `Native::CallBool`'s body read a slot seeded with `0x62BFDB37`
+and `DrivebyFOVFix`'s helper read its own slot seeded with `0x09399528`. Both are
+the original preamble's *probe-miss* values; on 1.0.8.0 the probe hits, so the
+original runs with the shipped `.data` values (`0x4E61480A` for `dword_101580B8`,
+`0x75E005F1` for `dword_101580D4`).
+
+**The recovered rule** (IDA `idZolikaPatch.asi.i64`, preamble `sub_100523C0`):
+
+```
+10052e10  mov  ecx, offset "68 ? ? ? ? 68 A9 54 14 51 E8"  ; 0x1012B710
+10052e15  call sub_10003830                                 ; pattern scan
+10052e1a  test eax, eax
+10052e1c  jnz  short loc_10052E82                           ; hit: skip all ten stores
+10052e1e..10052e78  ten `mov dword_10158xxx, imm`           ; miss: fallback set
+10052e88  ... resolver scan
+10052e96  mov ecx,[eax+6]; add eax,0Ah; add eax,ecx; mov dword_1015BDE0,eax
+```
+
+A hit copies nothing from the game image; it jumps past every store, leaving the
+ASI's `.data`. The ten slot/value/consumer rows are in `docs/parity.md`. On the
+nine images: 1.0.8.0 hits at game `0xB3878C`; 1.0.0.0 and 1.0.4.0 miss (the other
+six supported images also hit); misses substitute `0x62BFDB37` / `0x09399528` /
+`0x406B4B20` / `0xC9DBDA90` for B8/D4/C8/40.
+
+**Changes**
+
+- `source/native.ixx` — ten `zpatch_native_salt_10158xxx` words seeded with the
+  shipped values; `Native::ResolveSalts()` scans the probe and applies the miss
+  set; `Native::Register()` calls it before any arm. `NativeCallBoolBody` reads
+  the resolved B8 slot; `Native::Salt(reference)` exposes a slot for the tools.
+- `source/misc.ixx` — only the DrivebyFOVFix salt declaration/comment and one
+  `mov ecx` operand: the helper now reads the layer's D4 slot instead of a local
+  `0x09399528`.
+- `source/stability.ixx` — `BadPlayerModelCrashFix`'s duplicate 46-instruction
+  `0x1005B3F0` body is retired. `BpmCheckBody` calls the layer's copy through a
+  six-byte `jmp [zpatch_bpm_call_bool]` forwarder (slot filled by
+  `RegisteredBody(0x1005B3F0)`), its local B8 salt and the now-unused
+  `BpmCleanupBoolEntry`/`zpatch_bpm_cleanup_bool` are gone; C8/40 stay local.
+- `tests/salt_check.cpp` + `zp_salt_probe` (new 10th ctest): loads
+  `GTAIV.exe`, `GTAIV_1000.exe` and `GTAIV_1040.exe`, calls
+  `Native::ResolveSalts()` and asserts the probe branch and all ten slots per
+  image; 33 checks. Also disassembly-confirmed in the built ASI that
+  `NativeCallBoolBody` reads slot `0x1014714C` (B8) and `DrivebyFovHelperBody`
+  reads `0x10147160` (D4).
+- `tests/bodies.tsv` — `bad_player_model_call_bool` row removed (73 -> 72).
+- `docs/parity.md` — the rule table, the two fixes and the retirement; body count
+  73 -> 72; public surface adds `Salt`/`ResolveSalts`.
+
+**Gates (final runs)**: `cmake --build --preset release` success;
+`python tools/parity_report.py 9` -> `build 9: 84 key(s) closed, 15 open`
+(exit 1, as always with `SkipLauncher` open by construction);
+`ctest --preset release` -> `100% tests passed out of 10`;
+`python tools/verify_bodies.py ...` -> `72 body(ies), 0 failure(s)`.
+
+**Not verifiable here**: the helper's live FOV arithmetic and `Native::CallBool`
+against the real resolver need a running game; the input value and the body's
+slot operand are what were proven. `AGENTS.md` still says 73 bodies (now 72) and
+is outside this task's file scope.

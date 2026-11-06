@@ -47,7 +47,15 @@ import patch;
 // and the two cleanup pieces copy each pending record out through its m_out_ptrs
 // entry, then return args[0]. The zero-argument wrapper (0x1005B150) takes the
 // hash in ECX; the one-argument wrapper (0x1005B3F0) takes the argument in EDX and
-// uses the fixed hash in dword_101580B8.
+// uses the salt in dword_101580B8.
+//
+// The ten salt words the wrappers read are the original loader preamble's: the
+// preamble probes the game image for `68 ? ? ? ? 68 A9 54 14 51 E8` (its own
+// string at 0x1012B710) and takes `jnz 0x10052E82` past ten stores at
+// 0x10052E1E..0x10052E78 when the probe hits, so the ASI's shipped `.data` values
+// stand; a miss falls through the stores and substitutes the recovered fallback
+// set. Native::Register() applies that rule once, before any arm, because the
+// wrappers may run before an arm publishes its own copy of a slot.
 
 // The published state, in C linkage because the transcribed code names the slots
 // directly (the original keeps them in its own .bss beside its bodies).
@@ -65,10 +73,20 @@ extern "C"
     uintptr_t zpatch_native_resolve_entry = 0;
     uintptr_t zpatch_native_invoke_entry = 0;
 
-    // dword_101580B8: the fixed hash the one-argument wrapper passes. The original
-    // writes this constant in its loader preamble (`mov dword_101580B8,
-    // 62BFDB37h`, 0x10052E3C), so Register() writes it here too.
-    uint32_t zpatch_native_bool_hash = 0;
+    // The original loader preamble's ten salt words, each named by the VA it has in
+    // the ASI and seeded with that slot's shipped `.data` value (the value a
+    // successful probe leaves untouched). The consumer comments are the recovered
+    // readers; Native::ResolveSalts() owns the probe and the miss fallbacks.
+    uint32_t zpatch_native_salt_10158054 = 0x511454A9u;  // sub_1005B1E0, two-argument wrapper
+    uint32_t zpatch_native_salt_101580C8 = 0x570F5725u;  // sub_1005B290, the BPM "who" wrapper
+    uint32_t zpatch_native_salt_10158050 = 0x3B0C6738u;  // sub_10050A50
+    uint32_t zpatch_native_salt_101580B8 = 0x4E61480Au;  // sub_1005B3F0, this layer's CallBool
+    uint32_t zpatch_native_salt_10158028 = 0x6A6B4F18u;  // sub_1005B490, one-argument byte wrapper
+    uint32_t zpatch_native_salt_101580A8 = 0x79A95BF9u;  // sub_10050A50
+    uint32_t zpatch_native_salt_10158040 = 0x4BF36A32u;  // sub_10037AC0, the BPM payload
+    uint32_t zpatch_native_salt_1015803C = 0x022B2DA9u;  // sub_10004C70, sub_100388C0
+    uint32_t zpatch_native_salt_101580D4 = 0x75E005F1u;  // sub_10006450, drive-by FOV helper
+    uint32_t zpatch_native_salt_1015805C = 0x62E319C6u;  // sub_10050A50
 }
 
 // sub_100038C0, recovered VA 0x100038C0 (5 instructions): zero the three words of
@@ -200,7 +218,7 @@ static __declspec(naked) unsigned int __fastcall NativeCallBoolBody(unsigned int
         mov eax, DWORD PTR [__security_cookie]
         xor eax, esp
         mov DWORD PTR [esp + 0A8h], eax
-        mov eax, DWORD PTR [zpatch_native_bool_hash]
+        mov eax, DWORD PTR [zpatch_native_salt_101580B8]
         push ebx
         push esi
         push edi
@@ -364,8 +382,8 @@ export namespace Native
     // its dword result.
     uint32_t Call(uint32_t hash);
 
-    // sub_1005B3F0: call the fixed native dword_101580B8 with `argument` and return
-    // its result's low byte (the original's `char`).
+    // sub_1005B3F0: call the native named by the salt dword_101580B8 with
+    // `argument` and return its result's low byte (the original's `char`).
     bool CallBool(uint32_t argument);
 
     // sub_10003980: the native handler for `hash`, or null when the resolver faults.
@@ -378,11 +396,52 @@ export namespace Native
     // The resolved dword_1015BDE0 value, for the startup trace and the tools.
     uintptr_t Resolver();
 
+    // The current value of one of the original preamble's ten salt words, named by
+    // the VA it has in the ASI (0x10158054, 0x101580C8, ..., 0x1015805C). Those are
+    // the slots the transcribed wrappers read; exposed for the startup trace, the
+    // dump and the salt test.
+    uint32_t Salt(uint32_t reference);
+
+    // Applies the original preamble's salt rule to those ten words: a probe hit
+    // leaves the shipped `.data` values, a miss writes the recovered fallback set.
+    // Register() calls it once before any arm; the tools call it per image.
+    void ResolveSalts();
+
     // Runs once, before any arm: resolves the game's native-handle resolver from
-    // the game image, publishes the two C entries and the fixed hash, and registers
-    // every transcribed piece with its recovered VA. Called from the startup
-    // drivers next to the other Register functions.
+    // the game image, publishes the two C entries, resolves the ten salt words and
+    // registers every transcribed piece with its recovered VA. Called from the
+    // startup drivers next to the other Register functions.
     void Register();
+}
+
+namespace
+{
+    // One of the original preamble's ten stores: the ASI slot VA, the slot, the
+    // value the ASI ships in `.data` and the value the miss path writes there.
+    struct SaltWord
+    {
+        uint32_t reference;
+        uint32_t* value;
+        uint32_t shipped;
+        uint32_t fallback;
+    };
+
+    // In the original's store order (0x10052E1E..0x10052E78), which is not address
+    // order. Every shipped value is the dword at that VA in the ASI image; every
+    // fallback is the immediate of the corresponding `mov` at that store.
+    constexpr SaltWord kSaltWords[] =
+    {
+        { 0x10158054u, &zpatch_native_salt_10158054, 0x511454A9u, 0x6B86410Eu },
+        { 0x101580C8u, &zpatch_native_salt_101580C8, 0x570F5725u, 0x406B4B20u },
+        { 0x10158050u, &zpatch_native_salt_10158050, 0x3B0C6738u, 0x6DCD115Au },
+        { 0x101580B8u, &zpatch_native_salt_101580B8, 0x4E61480Au, 0x62BFDB37u },
+        { 0x10158028u, &zpatch_native_salt_10158028, 0x6A6B4F18u, 0x931F73A2u },
+        { 0x101580A8u, &zpatch_native_salt_101580A8, 0x79A95BF9u, 0x7F6A60D3u },
+        { 0x10158040u, &zpatch_native_salt_10158040, 0x4BF36A32u, 0xC9DBDA90u },
+        { 0x1015803Cu, &zpatch_native_salt_1015803C, 0x022B2DA9u, 0xA4EA0691u },
+        { 0x101580D4u, &zpatch_native_salt_101580D4, 0x75E005F1u, 0x09399528u },
+        { 0x1015805Cu, &zpatch_native_salt_1015805C, 0x62E319C6u, 0x1CC648EAu },
+    };
 }
 
 namespace Native
@@ -414,8 +473,41 @@ namespace Native
         return zpatch_native_resolver;
     }
 
+    uint32_t Salt(uint32_t reference)
+    {
+        for (const auto& word : kSaltWords)
+        {
+            if (word.reference == reference)
+                return *word.value;
+        }
+        return 0;
+    }
+
+    void ResolveSalts()
+    {
+        // The ASI ships the ten values below in its `.data`; the original only
+        // overwrites them when its probe misses.
+        for (const auto& word : kSaltWords)
+            *word.value = word.shipped;
+
+        // 0x10052E10..0x10052E1C: `mov ecx, offset "68 ? ? ? ? 68 A9 54 14 51 E8"
+        // (the ASI's string at 0x1012B710); `test eax,eax`; `jnz 0x10052E82` --
+        // a hit jumps over every store, so the hit path copies nothing from the
+        // game image and the shipped values stand. 0x10052E1E..0x10052E78: a miss
+        // falls through the ten `mov dword_10158xxx, imm` stores.
+        if (find_pattern("68 ? ? ? ? 68 A9 54 14 51 E8").empty())
+        {
+            for (const auto& word : kSaltWords)
+                *word.value = word.fallback;
+        }
+    }
+
     void Register()
     {
+        // The preamble's salt block (0x10052E1E..0x10052E78) runs before its
+        // resolver store (0x10052E88..0x10052E9E); neither reads the other.
+        ResolveSalts();
+
         // dword_1015BDE0, resolved the way the original's loader preamble does it
         // (0x10052E88..0x10052E9E): scan the game module for `08 0B C2 8B F0 E8`
         // and take the target of the call whose opcode is the last byte --
@@ -432,9 +524,6 @@ namespace Native
             zpatch_native_resolver = reinterpret_cast<uintptr_t>(match + 10) +
                 static_cast<uintptr_t>(static_cast<intptr_t>(displacement));
         }
-
-        // dword_101580B8's recovered constant (the original writes it at 0x10052E3C).
-        zpatch_native_bool_hash = 0x62BFDB37u;
 
         zpatch_native_resolve_entry = reinterpret_cast<uintptr_t>(&GuardedResolve);
         zpatch_native_invoke_entry = reinterpret_cast<uintptr_t>(&GuardedInvoke);

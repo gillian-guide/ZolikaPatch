@@ -129,6 +129,20 @@ set_target_properties(zp_dump PROPERTIES CXX_SCAN_FOR_MODULES ON)
 target_link_libraries(zp_dump PRIVATE zp_modules)
 add_dependencies(zp_dump ${ZP_NAME})
 
+# The loader preamble's salt rule, pinned on the real images: the probe hits on
+# 1.0.8.0 (shipped `.data` values stand) and misses on 1.0.0.0 / 1.0.4.0 (the ten
+# fallback stores run). Not a game launch: the images are files.
+add_executable(zp_salt_check tests/salt_check.cpp)
+set_target_properties(zp_salt_check PROPERTIES CXX_SCAN_FOR_MODULES ON)
+target_link_libraries(zp_salt_check PRIVATE zp_modules)
+add_dependencies(zp_salt_check ${ZP_NAME})
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/GTAIV.exe
+   AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/GTAIV_1000.exe
+   AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/GTAIV_1040.exe)
+  add_test(NAME zp_salt_probe
+    COMMAND zp_salt_check ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs)
+endif()
+
 # The empty baseline: with no arm installed the pipeline must change nothing on
 # every supported image. Every later arm is diffed against that.
 find_package(Python3 COMPONENTS Interpreter QUIET)

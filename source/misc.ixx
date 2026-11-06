@@ -21,14 +21,18 @@ import shared;
 
 // The DrivebyFOVFix published state, in C linkage because the transcribed bodies
 // name the slots directly (the original keeps them in its own .bss beside its
-// bodies). The values are the original's own: dword_101580D4 is the native hash the
-// helper resolves (the loader preamble writes 0x09399528 at 0x10052E6E),
+// bodies). dword_101580D4 is the native hash the helper resolves; it is not seeded
+// here, because the original's loader preamble resolves it with its ten-word salt
+// rule (source/native.ixx): on 1.0.8.0 the probe hits and the slot keeps the
+// shipped `.data` value 0x75E005F1, while a probe miss substitutes 0x09399528.
 // dword_101580C4 is the FOV it caches (45.0f, the .data value and the helper's own
 // first instruction), dword_1015BDF8 the cached entry pointer, byte_1015AD4A the
 // one-shot flag, and dword_1015BDF4 the resume the arm publishes.
 extern "C"
 {
-    uint32_t zpatch_driveby_salt = 0x09399528u;
+    // The layer's resolved salt (source/native.ixx), dword_101580D4.
+    extern uint32_t zpatch_native_salt_101580D4;
+
     float zpatch_driveby_fov = 45.0f;
     uint32_t zpatch_driveby_cached = 0;
     uint8_t zpatch_driveby_done = 0;
@@ -88,7 +92,7 @@ static __declspec(naked) void DrivebyFovHelperBody()
         cmp BYTE PTR [zpatch_driveby_done], 0
         mov DWORD PTR [zpatch_driveby_fov], 42340000h  // 45.0f
         jne driveby_have
-        mov ecx, DWORD PTR [zpatch_driveby_salt]
+        mov ecx, DWORD PTR [zpatch_native_salt_101580D4]
         call DrivebyResolveEntry
         mov ecx, DWORD PTR [eax + 0Eh]
         add eax, 0Eh

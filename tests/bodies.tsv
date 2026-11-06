@@ -72,17 +72,17 @@ native_cleanup_bool 1005DE80 ?NativeCleanupBoolBody@@YAIXZ 21
 driveby_fov_helper 10006450 ?DrivebyFovHelperBody@@YAXXZ 20
 driveby_fov_shim 100064B0 ?DrivebyFovShimBody@@YAXXZ 5
 # BadPlayerModelCrashFix (source/stability.ixx): the site's trampoline, the payload
-# it calls, the two native wrappers of its GTAC.dll diagnostic and the one-argument
-# wrapper its fallback calls. The wrappers' shared pieces (sub_100038C0/DE40/DE80,
-# sub_1005B150, sub_10003E50, sub_100038E0) are transcribed in source/native.ixx and
-# source/shared.ixx and proved by their own rows above; the model-name lookup
-# (0x10003F00) and the bounded formatter (0x10001280) are rebuilt, so they have no
-# row (docs/parity.md).
+# it calls and the two native wrappers of its GTAC.dll diagnostic. The wrappers'
+# shared pieces (sub_100038C0/DE40, sub_1005B150, sub_1005B3F0, sub_10003E50,
+# sub_100038E0) are transcribed in source/native.ixx and source/shared.ixx and
+# proved by their own rows above; the payload's fallback calls the layer's copy of
+# sub_1005B3F0 through a forwarder, so there is no second row for it. The
+# model-name lookup (0x10003F00) and the bounded formatter (0x10001280) are
+# rebuilt, so they have no row (docs/parity.md).
 bad_player_model_tramp 10037BA0 ?BpmTrampoline@@YAXXZ 16
 bad_player_model_check 10037AC0 ?BpmCheckBody@@YAXXZ 65
 bad_player_model_who 1005B290 ?BpmWhoBody@@YAXXZ 61
 bad_player_model_print 1005B530 ?BpmPrintBody@@YAXXZ 45
-bad_player_model_call_bool 1005B3F0 ?BpmCallBoolBody@@YAXXZ 46
 # Patch4RemoveModChecks (source/misc.ixx): the shared GFWL/Patch4 stub. Its
 # helper (sub_10005340, 145 instructions) is compiler output and is rebuilt; the
 # same recovered VA is already proven for loading.ixx's RemoveGFWLUpdatePopup arm.

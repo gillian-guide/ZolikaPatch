@@ -12,6 +12,7 @@ fix.
 | Read boundary is `std::stoi` on the stored text with the arm's default | `zp_tests`, `TestConfigGrammar` |
 | Build classification: the four version fields concatenated (`1.0.7.0` -> 1070, `1.2.0.43` -> 12043) and the original's switch; an unsupported executable is `unknown` and applies nothing | `zp_tests`, `TestBuilds` |
 | Option catalogue: 99 keys with the shipped value, the absent-key default and the build mask | `source/options.inc` (generated), `zp_tests` |
+| The loader preamble's ten salt words: the shipped `.data` values when its probe hits, the recovered fallback set when it misses | `zp_salt_probe` (1.0.8.0 hit; 1.0.0.0 and 1.0.4.0 miss) |
 | With no arm installed the pipeline changes nothing on any supported image | `zp_dump_empty` (9 images) |
 | The generated catalogue and INI cannot drift from their sources | `zp_catalogue_drift`, `zp_ini_drift` |
 
@@ -35,7 +36,7 @@ CRLF folding (the original reads in text mode). The shipped INI's longest line i
 Measured on 1.0.8.0 with `tools/parity_report.py 9`:
 
 - **84 of 99 option keys closed**;
-- **73 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **72 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe, and the compiled-C bodies listed below are
   rebuilt in C++ instead, with no proof row. The longest two are the
@@ -63,7 +64,7 @@ exists as `source/native.ixx`, and the key is closed with it.
 | piece | VA | instructions | how |
 |---|---:|---:|---|
 | zero a pending output record | `0x100038C0` | 5 | transcribed |
-| one-argument call, fixed hash `0x62BFDB37` | `0x1005B3F0` | 46 | transcribed |
+| one-argument call, salt `dword_101580B8` | `0x1005B3F0` | 46 | transcribed |
 | zero-argument call, hash from `ECX` | `0x1005B150` | 44 | transcribed |
 | copy pending records out, dword result | `0x1005DE40` | 21 | transcribed |
 | copy pending records out, byte result | `0x1005DE80` | 21 | transcribed |
@@ -120,7 +121,7 @@ that are not instruction streams are rebuilt with their behaviour intact.
 | the payload it calls | `0x10037AC0` | 65 | transcribed |
 | the GTAC.dll "who" call | `0x1005B290` | 61 | transcribed |
 | the GTAC.dll chat print | `0x1005B530` | 45 | transcribed |
-| its one-argument native wrapper | `0x1005B3F0` | 46 | transcribed |
+| its one-argument native wrapper | `0x1005B3F0` | 46 | the layer's copy, called through a forwarder |
 | the model-name lookup | `0x10003F00` | 21 | rebuilt |
 | the bounded formatter | `0x10001280` (`0x10001240`) | 13 | rebuilt |
 
@@ -128,12 +129,13 @@ The arm jumps to the trampoline at the game's model-resolution entry (game
 `0x7CF803`, three bytes into the function, so `EBP` is live) and publishes the
 resume `match+10` before the jump, because the resume is the instruction the jump
 covers. What the bodies read from the tree is unchanged: `sub_100038C0`,
-`sub_1005DE40`/`DE80` and `sub_1005B150` come from `source/native.ixx`,
-`sub_10003E50` from `source/shared.ixx`, `sub_100038E0` through the layer's
-published invoke entry and `dword_10159C0C` through `source/shared.ixx`'s slot. The
-six `jmp` forwarders (one instruction each) exist for the same reason
-`DrivebyFOVFix`'s does: a module interface cannot export a naked function, so the
-arm fills each slot from the body registry by the piece's recovered VA.
+`sub_1005DE40`, `sub_1005B150` and `sub_1005B3F0` come from
+`source/native.ixx`, `sub_10003E50` from `source/shared.ixx`, `sub_100038E0`
+through the layer's published invoke entry and `dword_10159C0C` through
+`source/shared.ixx`'s slot. The six `jmp` forwarders (one instruction each)
+exist for the same reason `DrivebyFOVFix`'s does: a module interface cannot export
+a naked function, so the arm fills each slot from the body registry by the piece's
+recovered VA.
 
 **The two rebuilds, and why they are not transcriptions.**
 
@@ -156,31 +158,69 @@ arm fills each slot from the body registry by the piece's recovered VA.
   result for this `%s ... %s` format. The payload's call to it compares as a call
   immediate either way.
 
-**A layer constant this key must not inherit.** `Native::CallBool`'s body reads the
-salt `source/native.ixx` seeds with `0x62BFDB37`. That is the original's
-*probe-miss* constant: the loader's ten salt stores sit at `0x10052E1E` ..
-`0x10052E78`, after the `jne 0x10052E82` at `0x10052E1C`, so they run only when the
-build probe (signature `68 ? ? ? ? 68 A9 54 14 51 E8`, the ASI's own string at
-`0x1012B710`) misses. On 1.0.8.0 the probe hits (`0xB3878C`), and
-`game_refs/ZolikaPatch.log` -- the reconstruction's 1.0.8.0 run, `compact=1080 id=9`
-at line 9 -- records `phase=preamble resolved=7 missing=0` (lines 115-116) with no
-salt-probe-miss line, so `dword_101580B8` keeps its shipped `.data` value
-`0x4E61480A` and the three salts this key reads are `0x570F5725` (`c8`),
-`0x4E61480A` (`b8`) and `0x4BF36A32` (`40`).
-The key therefore carries its own transcription of `0x1005B3F0` with a slot seeded
-from the shipped values, and reproduces the original's probe-miss substitution (the
-recovered fallback set) for the builds whose probe misses -- measured on 1.0.0.0 and
-1.0.4.0, where the salts become `0x406B4B20` / `0x62BFDB37` / `0xC9DBDA90`. The
-layer's own copy is untouched; `Native::CallBool` is unchanged.
+**The preamble's salt block, and what the layer had wrong.** `Native::CallBool`'s
+body reads `dword_101580B8`, so the layer has to resolve the original loader
+preamble's ten salt words, not seed one constant. The probe is
+`0x10052E10..0x10052E1C`:
 
-The same constant is the wrong one in `source/misc.ixx`'s `DrivebyFOVFix` helper,
-which seeds `0x09399528` -- the `dword_101580D4` fallback, not the shipped
-`0x75E005F1` -- so on 1.0.8.0 that helper asks the game's resolver for a hash the
-build does not define instead of the drive-by handle the original resolves. What the
-resolver answers decides the consequence (the helper dereferences the answer at
-`0x1000646E` without a guard, so a null answer faults where the original finds the
-entry), but either way the input is not the original's. That is the other arm's file
-and its owner's call; recorded here because the evidence is this same probe branch.
+```
+10052e10  mov  ecx, offset a6868A9541451E8 ; "68 ? ? ? ? 68 A9 54 14 51 E8"
+10052e15  call sub_10003830
+10052e1a  test eax, eax
+10052e1c  jnz  short loc_10052E82
+```
+
+and `loc_10052E82` is the resolver scan (`GetModuleHandleA(0)` again, then the
+`08 0B C2 8B F0 E8` probe at `0x10052E88`). The ten stores at
+`0x10052E1E..0x10052E78` are in the fall-through, so they run **only when the
+probe misses**. The hit path copies nothing from the game image: `jnz` jumps over
+every store, so each slot keeps its shipped `.data` dword. No other code writes
+these ten words -- the only xrefs are the preamble store and the readers below.
+
+| store | slot | miss value | shipped `.data` (hit) | consumer |
+|---|---:|---:|---:|---|
+| `0x10052E1E` | `0x10158054` | `0x6B86410E` | `0x511454A9` | `sub_1005B1E0`, two-argument native wrapper |
+| `0x10052E28` | `0x101580C8` | `0x406B4B20` | `0x570F5725` | `sub_1005B290`, the BPM "who" wrapper |
+| `0x10052E32` | `0x10158050` | `0x6DCD115A` | `0x3B0C6738` | `sub_10050A50` |
+| `0x10052E3C` | `0x101580B8` | `0x62BFDB37` | `0x4E61480A` | `sub_1005B3F0`, `Native::CallBool` |
+| `0x10052E46` | `0x10158028` | `0x931F73A2` | `0x6A6B4F18` | `sub_1005B490`, one-argument byte wrapper |
+| `0x10052E50` | `0x101580A8` | `0x7F6A60D3` | `0x79A95BF9` | `sub_10050A50` |
+| `0x10052E5A` | `0x10158040` | `0xC9DBDA90` | `0x4BF36A32` | `sub_10037AC0`, the BPM payload |
+| `0x10052E64` | `0x1015803C` | `0xA4EA0691` | `0x022B2DA9` | `sub_10004C70`, `sub_100388C0` |
+| `0x10052E6E` | `0x101580D4` | `0x09399528` | `0x75E005F1` | `sub_10006450`, drive-by FOV helper |
+| `0x10052E78` | `0x1015805C` | `0x1CC648EA` | `0x62E319C6` | `sub_10050A50` |
+
+The stores are followed by `dword_1015BDE0`'s resolver sequence at
+`0x10052E96` (`mov ecx,[eax+6]; add eax,0Ah; add eax,ecx; mov
+dword_1015BDE0,eax` at `0x10052E9E`), which is the scan `Native::Register()` also
+reproduces.
+
+On 1.0.8.0 the probe hits (game VA `0xB3878C`), so the runtime values are the
+shipped set: `0x4E61480A` for B8, `0x75E005F1` for D4, `0x570F5725` for C8,
+`0x4BF36A32` for 40. On 1.0.0.0 and 1.0.4.0 the scan has no hit, so the stores run
+and the same slots become `0x62BFDB37` / `0x09399528` / `0x406B4B20` /
+`0xC9DBDA90`. `source/native.ixx` now carries the ten words, seeds each with its
+shipped value and applies the miss set; `Native::Register()` calls
+`Native::ResolveSalts()` before any arm. `zp_salt_probe` pins both branches on
+those three real images, through that same function and `find_pattern`.
+
+Two layer bugs came from seeding one slot with the miss constant instead:
+`source/native.ixx` set B8 to `0x62BFDB37`, so `Native::CallBool` asked for a
+hash 1.0.8.0 does not define; and `source/misc.ixx`'s `DrivebyFOVFix` helper read
+its own slot seeded with the D4 miss value `0x09399528`, so on 1.0.8.0 it
+resolved the wrong native and then dereferenced the answer at `0x1000646E`
+unguarded. The helper now reads the layer's `0x101580D4` slot. The unguarded
+dereference stays -- that is the original's.
+
+**The duplicate `0x1005B3F0` body is retired.** With the layer's B8 slot correct,
+`BadPlayerModelCrashFix` no longer needs its own 46-instruction copy of the
+one-argument wrapper. `BpmCheckBody` calls the layer's body through a six-byte
+`jmp [zpatch_bpm_call_bool]` forwarder -- the same pattern the arm already uses
+for `sub_100038C0`/`DE40`/`1005B150` -- and the arm's `zpatch_bpm_salt_b8`
+slot is gone; its C8 and 40 salts stay local. `BpmCheckBody` keeps its 65
+instructions and its proof (the call target is an immediate on both sides), and
+`bad_player_model_call_bool` is removed from `tests/bodies.tsv` (73 -> 72
+bodies).
 
 **The fault these bodies keep.** On a build whose ped-array anchor is absent, the
 original's preamble skips the store into `dword_1015AD78` and leaves it zero, and
@@ -238,7 +278,7 @@ Transcribed and available for the arms that need it (`source/shared.ixx`):
 original's own pattern). `AllowHashesForIDE` needs exactly that resolver (its site is
 the game's hash function at `0x45CF50`). The native-script call layer is
 `source/native.ixx` (above); its public surface is `Native::Call`, `CallBool`,
-`Resolve`, `Invoke`, `Resolver` and `Register`.
+`Resolve`, `Invoke`, `Resolver`, `Salt`, `ResolveSalts` and `Register`.
 
 ### The misc keys closed in this pass
 

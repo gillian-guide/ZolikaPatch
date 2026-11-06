@@ -74,12 +74,14 @@ extern "C"
     uint32_t zpatch_bpm_ped_array = 0;      // dword_1015AD78 (a game address)
     uint32_t zpatch_bpm_fn_59c74 = 0;       // dword_10159C74 (a game address)
 
-    // The three hash salts the bodies read. These are the original's on-disk
-    // .data values, which are also its runtime values on every build whose build
-    // probe hits (1.0.8.0 included); the probe-miss branch of the original's
-    // loader preamble substitutes the fallback set, reproduced by the arm.
+    // The two hash salts this arm's own bodies read. These are the original's
+    // on-disk .data values, which are also its runtime values on every build whose
+    // build probe hits (1.0.8.0 included); the probe-miss branch of the original's
+    // loader preamble substitutes the fallback set, reproduced by the arm. The
+    // third salt the payload's fallback wrapper used, dword_101580B8, now comes
+    // from the native layer's resolved slot (source/native.ixx), because that
+    // layer's own copy of sub_1005B3F0 reads it.
     uint32_t zpatch_bpm_salt_c8 = 0x570F5725u;  // dword_101580C8
-    uint32_t zpatch_bpm_salt_b8 = 0x4E61480Au;  // dword_101580B8
     uint32_t zpatch_bpm_salt_40 = 0x4BF36A32u;  // dword_10158040
 
     // The original's IAT slot for GetModuleHandleW (0x10063074), which its
@@ -90,9 +92,9 @@ extern "C"
     // addresses are published here by the arm, because a module interface cannot
     // export a naked function (see RegisteredBody).
     uint32_t zpatch_bpm_context_init = 0;   // sub_100038C0 (source/native.ixx)
-    uint32_t zpatch_bpm_cleanup_bool = 0;   // sub_1005DE80 (source/native.ixx)
     uint32_t zpatch_bpm_cleanup_dword = 0;  // sub_1005DE40 (source/native.ixx)
     uint32_t zpatch_bpm_call_hash = 0;      // sub_1005B150 (source/native.ixx)
+    uint32_t zpatch_bpm_call_bool = 0;      // sub_1005B3F0 (source/native.ixx)
     uint32_t zpatch_bpm_resolver = 0;       // sub_10003E50 (source/shared.ixx)
 
     // The entries those two modules already publish: the guarded resolve-and-invoke
@@ -545,14 +547,6 @@ static __declspec(naked) void BpmInvokeEntry()
     }
 }
 
-static __declspec(naked) void BpmCleanupBoolEntry()
-{
-    __asm
-    {
-        jmp DWORD PTR [zpatch_bpm_cleanup_bool]
-    }
-}
-
 static __declspec(naked) void BpmCleanupDwordEntry()
 {
     __asm
@@ -566,6 +560,20 @@ static __declspec(naked) void BpmCallHashEntry()
     __asm
     {
         jmp DWORD PTR [zpatch_bpm_call_hash]
+    }
+}
+
+// The one-argument native wrapper the fallback calls is the native layer's own
+// transcription of sub_1005B3F0 (source/native.ixx), reached through this
+// forwarder: the layer resolves the salt the wrapper reads (dword_101580B8) with
+// the preamble's probe rule, so a second copy here would resolve the same word a
+// second time. This is a call target only -- sub_1005B3F0 is never written into
+// the game image -- so the forwarder needs no body-registry entry of its own.
+static __declspec(naked) void BpmCallBoolEntry()
+{
+    __asm
+    {
+        jmp DWORD PTR [zpatch_bpm_call_bool]
     }
 }
 
@@ -721,70 +729,6 @@ static __declspec(naked) void BpmPrintBody()
     }
 }
 
-// sub_1005B3F0, recovered VA 0x1005B3F0 (46 instructions): build the block, call
-// the fixed native dword_101580B8 with the model hash the caller passed in EDX
-// and answer its low byte. It is transcribed here rather than called through
-// source/native.ixx because that module's slot holds 0x62BFDB37, which is the
-// original's probe-MISS constant: on 1.0.8.0 the loader's build probe hits, so its
-// salt block at 0x10052E1E..0x10052E78 is skipped and the shipped slot keeps
-// 0x4E61480A (docs/parity.md). Native::CallBool stays as it is for its own users.
-//
-// Naked and internal: an external-linkage naked function is written to the module
-// and every importer fails (C2488).
-static __declspec(naked) void BpmCallBoolBody()
-{
-    __asm
-    {
-        push ebp
-        mov ebp, esp
-        and esp, 0FFFFFFF8h
-        sub esp, 0ACh
-        mov eax, DWORD PTR [__security_cookie]
-        xor eax, esp
-        mov DWORD PTR [esp + 0A8h], eax
-        mov eax, DWORD PTR [zpatch_bpm_salt_b8]
-        push ebx
-        push esi
-        push edi
-        push 0A0h
-        mov DWORD PTR [esp + 10h], eax
-        mov ebx, edx
-        lea eax, [esp + 14h]
-        push 0
-        push eax
-        call BpmZeroBlock
-        add esp, 0Ch
-        lea edi, [esp + 30h]
-        mov esi, 4
-    bpm_bool_records:
-        mov ecx, edi
-        call BpmContextInitEntry
-        add edi, 10h
-        sub esi, 1
-        jnz bpm_bool_records
-        mov ecx, DWORD PTR [esp + 0Ch]
-        lea eax, [esp + 70h]
-        lea edx, [esp + 10h]
-        mov DWORD PTR [esp + 18h], eax
-        mov DWORD PTR [esp + 10h], eax
-        mov DWORD PTR [esp + 1Ch], esi
-        mov DWORD PTR [esp + 70h], ebx
-        mov DWORD PTR [esp + 14h], 1
-        call BpmInvokeEntry
-        lea ecx, [esp + 10h]
-        call BpmCleanupBoolEntry
-        mov ecx, DWORD PTR [esp + 0B4h]
-        pop edi
-        pop esi
-        pop ebx
-        xor ecx, esp
-        call __security_check_cookie
-        mov esp, ebp
-        pop ebp
-        ret
-    }
-}
-
 // sub_10037AC0, recovered VA 0x10037AC0 (65 instructions): the payload. It reads
 // the model the caller named through the ped array, asks the model's own class id
 // (the vtable slot at +0Ch) and returns when it is a ped. Otherwise: when GTAC.dll
@@ -843,7 +787,7 @@ static __declspec(naked) void BpmCheckBody()
         add esp, 4
         mov esi, eax
         mov edx, esi
-        call BpmCallBoolBody
+        call BpmCallBoolEntry
         test al, al
         jne bpm_check_lookup
         push 0
@@ -1460,14 +1404,14 @@ namespace
 
         // The build probe. The original's loader installs its ten fallback hash
         // salts only when this pattern is absent (0x10052E1A jumps the ten stores
-        // on a hit), so on 1.0.8.0 the shipped .data values stand. The three this
-        // key reads are seeded with those; a missed probe substitutes the recovered
-        // fallback set.
+        // on a hit), so on 1.0.8.0 the shipped .data values stand. The two salts
+        // this key's own bodies read are seeded with those; a missed probe
+        // substitutes the recovered fallback set. The third, dword_101580B8, is
+        // the native layer's resolved slot (source/native.ixx).
         pattern = find_pattern("68 ? ? ? ? 68 A9 54 14 51 E8");
         if (pattern.empty())
         {
             zpatch_bpm_salt_c8 = 0x406B4B20u;
-            zpatch_bpm_salt_b8 = 0x62BFDB37u;
             zpatch_bpm_salt_40 = 0xC9DBDA90u;
         }
 
@@ -1476,11 +1420,13 @@ namespace
         zpatch_bpm_getmodulehandle = static_cast<uint32_t>(
             reinterpret_cast<uintptr_t>(&GetModuleHandleW));
 
-        // The layer's transcribed pieces, by their recovered VAs.
+        // The layer's transcribed pieces, by their recovered VAs. The wrapper is
+        // the layer's copy of sub_1005B3F0; only one body can carry that recovered
+        // VA, so this arm does not register a second one.
         zpatch_bpm_context_init = RegisteredBody(0x100038C0u);
-        zpatch_bpm_cleanup_bool = RegisteredBody(0x1005DE80u);
         zpatch_bpm_cleanup_dword = RegisteredBody(0x1005DE40u);
         zpatch_bpm_call_hash = RegisteredBody(0x1005B150u);
+        zpatch_bpm_call_bool = RegisteredBody(0x1005B3F0u);
         zpatch_bpm_resolver = static_cast<uint32_t>(Shared::ValueResolver());
     }
 
@@ -1500,9 +1446,6 @@ namespace
         Bodies::Register(reinterpret_cast<uintptr_t>(&BpmCheckBody), 0x10037AC0u);
         Bodies::Register(reinterpret_cast<uintptr_t>(&BpmWhoBody), 0x1005B290u);
         Bodies::Register(reinterpret_cast<uintptr_t>(&BpmPrintBody), 0x1005B530u);
-        // The same recovered VA as source/native.ixx's copy: this one reads the
-        // shipped salt slot, that one the layer's fixed constant (see the body).
-        Bodies::Register(reinterpret_cast<uintptr_t>(&BpmCallBoolBody), 0x1005B3F0u);
 
         injector::MakeJMP(pattern.get_first<std::byte>(0),
             reinterpret_cast<void*>(&BpmTrampoline), true);
