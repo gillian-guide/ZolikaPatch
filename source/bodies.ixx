@@ -54,6 +54,26 @@ export namespace Bodies
         return PublishedRegistry();
     }
 
+    // The 4-byte slots an arm writes a *game image* address into (an operand that
+    // points at a float or a table inside the game executable). The baselines record
+    // the reference dump's own placeholder for those words, so the dump has to
+    // substitute it - and again only the arm knows which words they are.
+    inline std::vector<uintptr_t>& PublishedImageRegistry()
+    {
+        static std::vector<uintptr_t> slots;
+        return slots;
+    }
+
+    inline void RegisterPublishedImage(uintptr_t slot)
+    {
+        PublishedImageRegistry().push_back(slot);
+    }
+
+    inline std::span<const uintptr_t> PublishedImage()
+    {
+        return PublishedImageRegistry();
+    }
+
     inline std::span<const Entry> All()
     {
         return Registry();

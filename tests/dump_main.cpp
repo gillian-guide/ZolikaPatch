@@ -100,6 +100,12 @@ namespace
     {
         static constexpr uint32_t kBaselinePlaceholder = 0xD0000000u;
 
+        // Two kinds of registered slot. A published *module* address is a host
+        // pointer, so the slot holds our own layout and the baseline's placeholder
+        // stands in for it. A published *game image* address is a real value in the
+        // original too, but the reference dump recorded the same placeholder for it,
+        // so the dump substitutes there as well - the arm still writes the true
+        // address, and only the tool speaks the baseline's convention.
         for (const auto slot : Bodies::Published())
         {
             if (slot < hostBase || slot + sizeof(uint32_t) > hostBase + image.size)
@@ -111,6 +117,21 @@ namespace
             // published pointer in this cell: the loop restores the image from the
             // pristine copy before every arm, so an untouched slot still reads its
             // original bytes and must be left alone.
+            if (std::memcmp(image.bytes.data() + rva, image.pristine.data() + rva, sizeof(uint32_t)) == 0)
+                continue;
+
+            std::memcpy(image.bytes.data() + rva, &kBaselinePlaceholder, sizeof(kBaselinePlaceholder));
+        }
+
+        // A game-image address slot is an RVA in the image the dump is holding, so
+        // its slot address is the host base plus that RVA - the same arithmetic as
+        // above, and again only when this run actually wrote it.
+        for (const auto slot : Bodies::PublishedImage())
+        {
+            if (slot < hostBase || slot + sizeof(uint32_t) > hostBase + image.size)
+                continue;
+
+            const auto rva = static_cast<size_t>(slot - hostBase);
             if (std::memcmp(image.bytes.data() + rva, image.pristine.data() + rva, sizeof(uint32_t)) == 0)
                 continue;
 
