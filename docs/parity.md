@@ -37,16 +37,57 @@ Measured on 1.0.8.0 with `tools/parity_report.py 9`:
 - **78 of 99 option keys closed**;
 - **52 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
-  bodies are still to transcribe. Two of the 52 (the `DualVehicleHeadlights` pair,
-  78 instructions each) are longer than the proof tool's 256-byte sweep window, so
-  the built-in proof compares their first 64 instructions and reports that count;
-  the full 78-instruction, 309-byte sweep was proven separately by the same
-  comparator over a 1 KiB window, with zero mismatches on either side. Widening
-  `verify_bodies.disassemble`'s window closes the gap in the harness;
+  bodies are still to transcribe. The longest two are the `DualVehicleHeadlights`
+  pair at 78 instructions / 309 bytes each, which is what exposed the proof tool's
+  old 256-byte sweep window: it compared 64 of 78 and still reported PASS. The tool
+  now sweeps 4096 bytes and fails a row that decodes fewer instructions than its
+  budget, so a truncated sweep can never pass again;
 - launcher: `LaunchWithPlayGTAIV` implemented and its slots verified per build
   (`zp_launcher_slots`); SkipLauncher, DFA and ROM are not started;
 - the 18 full/per-option per-build dump hashes and the oracle differential are not
   yet produced.
+
+### The vehicle arms closed in this pass
+
+- `IncreaseVehicleModelLimit` (anchor `0x8DD143`): writes the dword `0x400` through
+  the operand of the `mov ecx, 0xF3E8E8` at match+77, which is the model-limit
+  object the allocator is constructed with. The write target is a *game* address, so
+  this arm rebases it through the image's preferred base (`GamePointer`): the
+  identity in the game, and what makes the offline dump write the same two bytes.
+- `EpisodicVehicleSupport`: on 1.0.7.0 and 1.0.8.0 it retargets two absolute
+  episode-flag operands to this module's own word (initial 2, the game's value);
+  every gated build then gets the 23 signature-driven NOP rows, in the original's
+  row order (two all-hits rows, two rows with a second window).
+- `HighFPSBikePhysicsFix` (anchor `0xB9C05B`): jumps to the clamp detour at
+  `0x1001EF60`, whose published resume is the site's own `call` (match+9).
+- `DualVehicleHeadlights` (anchor `0x8F7CE5`): two 78-instruction bodies --
+  `0x100064F0` for the new builds, `0x10006630` for the old ones -- that draw both
+  headlights through the site's own calls and tail-jump to the site's `pop edi`
+  (match+338).
+
+**A recovered-data conflict, recorded rather than papered over.**
+`DualVehicleHeadlights`' catalogue row carries the mask `0x20` (bit 5 alone,
+1.0.4.0). The original's own two arm masks are in `recovered_build_gates.inc`:
+`@old` = `0x62` (build ids 1, 5, 6 -- 1.0.0.0, 1.0.4.0, 1.0.0.4) and `@new` =
+`0x4BF80` (ids 7, 8, 9, 10, 11, 12, 13, 15, 18 -- 1.0.6.0 through 1.2.0.43), and the
+original's handler picks the body by the build id it classified (`cmp [build], 1` ..
+`cmp [build], 6` at `0x100067F3`). So the arm consults `@old` for the jump to
+`0x10006630` and `@new` for the jump to `0x100064F0`; their union, `0x4BFE2`, is
+every supported build, and the 1.0.8.0 baseline the scoreboard compares does carry
+the write. `Loader::Enabled` would therefore never install this arm on 1.0.8.0, so
+this one arm gates on `Catalogue::Read("DualVehicleHeadlights")` plus those two
+recovered masks.
+
+The catalogue row is wrong, and the fault is in `tools/gen_options.py`, not in the
+inventory's prose: `mask_for()` splits a build cell on `,` and `/` and keeps only the
+tokens that are a known version string or a bare integer, silently dropping the
+rest. This key's cell is `doc: 1000/1040/1004 — **code: no gate** (§10)`, so the
+first and third tokens are dropped (`doc: 1000`, `1004 — ...`) and only the middle
+`1040` survives -- `1 << 5` = `0x20`. Two ways out, both outside this tree's feature
+code: make `mask_for` reject a cell it cannot parse completely (so the next prose
+cell fails loudly instead of picking one build), or move the prose out of the build
+column and list the code's own mask (`ALL`, i.e. `0x4BFE2`). Until one lands, the
+catalogue and the arms disagree on this key.
 
 Transcribed and available for the arms that need it (`source/shared.ixx`):
 `sub_10003E50` (the `hash:`/quote config-value resolver, 67 instructions) and the

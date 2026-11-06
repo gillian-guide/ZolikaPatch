@@ -7,11 +7,19 @@ and EFLC. The oracle is `../game_refs/ZolikaPatch_original.asi.off`; the old
 ## Current state
 
 Eleven feature modules are in place (stability, vehicles, graphics, useless_checks,
-launcher, audio, misc, options, loader, pattern, shared) and 61 of the 99 catalogue
-keys are closed on 1.0.8.0, with 34 hook bodies transcribed and proven
+launcher, audio, misc, options, loader, pattern, shared, loading) and 78 of the 99
+catalogue keys are closed on 1.0.8.0, with 52 hook bodies transcribed and proven
 instruction-for-instruction against the original ASI. The shipped-INI cell now shows
 zero differing and zero extra bytes: everything the tree writes agrees with the
 baseline, and what remains is unimplemented, not wrong.
+
+Known generator defect: `tools/gen_options.py::mask_for()` silently drops unparseable
+tokens, so a catalogue cell that mixes prose with build ids yields the wrong build
+mask (`DualVehicleHeadlights` gets `0x20` where the original's own per-arm masks are
+`0x62 | 0x4BF80`). Until the generator fails on an unparseable token and the inventory
+cells are machine-readable, an arm whose mask is contradicted by
+`recovered_build_gates.inc` must gate on `Catalogue::Read()` plus the recovered masks,
+and say so in a comment.
 
 The harness that produces that evidence: `zp_tests` (contract suite),
 `zp_dump_empty` (nine images, every option off), `zp_pe_check`, `zp_body_proof`

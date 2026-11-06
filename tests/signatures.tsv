@@ -30,6 +30,13 @@ HighFPSBikePhysicsFix	0xB9C05B	D9 45 08 51 8B CE D9 1C 24 E8 ? ? ? ? 8A 86 90 14
 # operands at +140/+144, +151/+155, +207, +331/+335 and the resume +338, then jumps
 # to the build's body (new 0x100064F0 for build ids 7+, old 0x10006630 for 1..6).
 DualVehicleHeadlights	0x8F7CE5	8B 17 8B 42 64 8B CF FF D0 8B 54	11
+# EpisodicVehicleSupport's 23 NOP rows (source/vehicles.ixx) match these 1.0.8.0 sites,
+# in row order: 0x8FEC12/0x8FEC46 (row 1, both hits), 0xB1D8CB/0xB20EB7 (row 2, both
+# hits), then 0xD49B09, 0x98C7DE, 0x801039, 0xA530FD, 0x965823, 0xB20F3C, 0x965D30,
+# 0x835771, 0x98AC20, 0xA7A951, 0x989974, 0x9D22E9, 0x9D223E, 0xAA704D, 0x8FC61F,
+# 0x850F03, 0x71C81A, 0x801273, 0x4A86EE, 0x803035, 0x9F21B8 (25 sites, 23 rows).
+# The two episode-flag operands are 0x495040 and 0xA84ABE here, 0x421500 and 0xBD91AE
+# on 1.0.7.0 (both patterns carry the build's own operand bytes).
 BikeFeetFix	0xBCB919	39 82 ? ? ? ? 0F 85 ? ? ? ? 39 05	14
 BikePhoneAnimsFix	0xB67F01	80 BE ? ? ? ? ? 0F 85 ? ? ? ? 80 BE ? ? ? ? ? 0F 84 ? ? ? ? 83 3D	28
 PipeBombDropIconSupport	0x4A6F50	83 7D ? ? 75 ? 8B 15	8
