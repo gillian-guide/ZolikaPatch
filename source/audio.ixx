@@ -118,17 +118,53 @@ extern "C"
     // (the original's scratch dwords at 0x10159C30..0x10159C64).
     float zpatch_mf_xmm_save[8] = {};
 
-    uint64_t zpatch_mf_scale = 0x3F80000000000000ull;      // 0x10152318  0.0078125
-    uint64_t zpatch_mf_scale_255 = 0x406FE00000000000ull;  // 0x10152378  255.0
-    uint64_t zpatch_mf_time_mul = 0x3FB333334015BC21ull;   // 0x10152330
-    uint64_t zpatch_mf_time_add = 0x3F9999999999999Aull;   // 0x10152328  0.025
-    uint64_t zpatch_mf_mul_neg1_d = 0xBFF0000000000000ull; // 0x101523A0  -1.0
-    uint64_t zpatch_mf_pi = 0x400921FB5A7ED197ull;         // 0x10152360
-    uint64_t zpatch_mf_two_pi = 0x401921FB6134CE3Eull;     // 0x10152368
-    uint64_t zpatch_mf_neg_pi = 0xC00921FB5A7ED197ull;     // 0x101523B0
-    uint32_t zpatch_mf_sign = 0x42FF0000u;                 // 0x10158044  127.5f
-    uint32_t zpatch_mf_mul_neg1 = 0xBF800000u;             // 0x1015238C  -1.0f
-    uint32_t zpatch_mf_step_scale = 0x3DCCCCCDu;           // 0x10158048  0.1f
+    // The scalar constants the transcribed bodies read with `mulsd/movsd/comisd
+    // QWORD PTR [slot]` and `movss DWORD PTR [slot]`. They are declared with the
+    // type the instruction reads - double or float - and initialised with the value,
+    // because a slot's *meaning* is readable and its *bits* are checkable: each
+    // `static_assert` pins the bit pattern the original's .rdata holds, so an editor
+    // cannot quietly change what the code multiplies by.
+    //
+    // The asserts matter most where the value is NOT the mathematical constant it
+    // looks like: `zpatch_mf_pi` is 3.1415927 (the original's own value, whose low
+    // mantissa bits differ from pi), and `zpatch_mf_time_mul` is a float-precision
+    // 0.075 widened to double. Writing `3.141592653589793` or `0.075` there would
+    // compile and be wrong.
+    constexpr double kMfScale = 0.0078125;
+    constexpr double kMfScale255 = 255.0;
+    constexpr double kMfTimeMul = 0x1.333334015bc21p-4;   // 0.075000003, a float widened
+    constexpr double kMfTimeAdd = 0.025;
+    constexpr double kMfMulNeg1D = -1.0;
+    constexpr double kMfPi = 0x1.921fb5a7ed197p+1;        // 3.1415927, NOT pi
+    constexpr double kMfTwoPi = 0x1.921fb6134ce3ep+2;     // 6.2831855, NOT 2*pi
+    constexpr double kMfNegPi = -0x1.921fb5a7ed197p+1;
+    constexpr float kMfSign = 127.5f;
+    constexpr float kMfMulNeg1 = -1.0f;
+    constexpr float kMfStepScale = 0.1f;
+
+    static_assert(std::bit_cast<uint64_t>(kMfScale) == 0x3F80000000000000ull);   // 0x10152318
+    static_assert(std::bit_cast<uint64_t>(kMfScale255) == 0x406FE00000000000ull); // 0x10152378
+    static_assert(std::bit_cast<uint64_t>(kMfTimeMul) == 0x3FB333334015BC21ull);  // 0x10152330
+    static_assert(std::bit_cast<uint64_t>(kMfTimeAdd) == 0x3F9999999999999Aull);  // 0x10152328
+    static_assert(std::bit_cast<uint64_t>(kMfMulNeg1D) == 0xBFF0000000000000ull); // 0x101523A0
+    static_assert(std::bit_cast<uint64_t>(kMfPi) == 0x400921FB5A7ED197ull);       // 0x10152360
+    static_assert(std::bit_cast<uint64_t>(kMfTwoPi) == 0x401921FB6134CE3Eull);    // 0x10152368
+    static_assert(std::bit_cast<uint64_t>(kMfNegPi) == 0xC00921FB5A7ED197ull);    // 0x101523B0
+    static_assert(std::bit_cast<uint32_t>(kMfSign) == 0x42FF0000u);               // 0x10158044
+    static_assert(std::bit_cast<uint32_t>(kMfMulNeg1) == 0xBF800000u);            // 0x1015238C
+    static_assert(std::bit_cast<uint32_t>(kMfStepScale) == 0x3DCCCCCDu);          // 0x10158048
+
+    alignas(8) double zpatch_mf_scale = kMfScale;
+    alignas(8) double zpatch_mf_scale_255 = kMfScale255;
+    alignas(8) double zpatch_mf_time_mul = kMfTimeMul;
+    alignas(8) double zpatch_mf_time_add = kMfTimeAdd;
+    alignas(8) double zpatch_mf_mul_neg1_d = kMfMulNeg1D;
+    alignas(8) double zpatch_mf_pi = kMfPi;
+    alignas(8) double zpatch_mf_two_pi = kMfTwoPi;
+    alignas(8) double zpatch_mf_neg_pi = kMfNegPi;
+    alignas(4) float zpatch_mf_sign = kMfSign;
+    alignas(4) float zpatch_mf_mul_neg1 = kMfMulNeg1;
+    alignas(4) float zpatch_mf_step_scale = kMfStepScale;
 
     // The two xorps masks: four single-precision sign bits (0x101523F0) and two
     // double-precision ones (0x101523E0). Both are 16 bytes in the original and
