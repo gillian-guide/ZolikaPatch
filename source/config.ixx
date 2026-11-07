@@ -10,9 +10,18 @@ import common;
 // 1.41, a third-party library it links statically; its grammar is the contract,
 // quirks and all (tests/config_contract pins every one of them):
 //
-//   * a 255-character line buffer: a longer line is read as two lines;
-//   * a first line starting with 0xEF (a UTF-8 BOM) aborts the parse -- the whole
-//     file is dropped and every option keeps its default;
+//   * a 255-character line buffer, and a fault: a line with a 256th byte sets the
+//     stream's `failbit`, which nothing clears, so the original's loop -- whose only
+//     exit is `eofbit` -- re-parses the same 255 bytes for ever. This reader models
+//     the stream's two flags for that reason, and spins where the original spins
+//     (docs/parity.md, Preserved faults);
+//   * no BOM branch: the 1.41 source has `if (line[0] == 0xEF)`, but the oracle's
+//     build compiles it out (`char` is signed, so a byte 0xEF promotes to -17 and
+//     never equals the literal 239). A first line starting with the UTF-8 BOM is an
+//     ordinary malformed line: it has no '=', so it is dropped -- and if it carried
+//     `[Options]`, that header is lost and the first key line faults on the null
+//     current section. The oracle faults here, and so does this tree (docs/parity.md,
+//     Preserved faults);
 //   * only `#` and `//` start a comment, and only at the start of a line;
 //   * a section line is `[...]`, and re-opening a section starts it empty;
 //   * a key line is split on '=' with strtok semantics, the key keeps any
@@ -50,24 +59,37 @@ export namespace Feather
     {
         Document document;
         Keys* current = nullptr;
-        size_t offset = 0;
-        bool first = true;
 
-        while (offset < text.size())
+        // The original's loop (`sub_10059D70`), over a text-mode file stream:
+        //
+        //     char line[256];
+        //     while (!file.eof()) { file.getline(line, 256); <parse line> }
+        //
+        // `line`, `position`, `fail` and `eof` are that stream's buffer, read
+        // position, failbit and eofbit. `getline` stores at most 255 bytes and
+        // consumes the delimiter when the line fits; a line with a 256th byte sets
+        // `failbit` and stops there, and because the loop's only exit is `eofbit` and
+        // nothing in the body clears the stream, every later `getline` is a sentry
+        // no-op that leaves the buffer alone. That is the original's hang, not a
+        // simplification -- `docs/parity.md` records it as a preserved fault.
+        std::string line;      // the original's `char line[256]`
+        size_t position = 0;   // the stream's read position
+        bool fail = false;     // failbit: sticky, set by a line that does not fit
+        bool eof = false;      // eofbit: the loop's only exit
+
+        while (!eof)
         {
-            const auto newline = text.find('\n', offset);
-            const auto remaining = (newline == std::string_view::npos ? text.size() : newline) - offset;
-            const auto taken = std::min<size_t>(remaining, 255);
-            std::string line(text.substr(offset, taken));
-            offset += taken;
-            if (taken == remaining && offset < text.size() && text[offset] == '\n')
-                ++offset;
-
-            if (first)
+            if (!fail)
             {
-                first = false;
-                if (!line.empty() && static_cast<unsigned char>(line[0]) == 0xEF)
-                    return Document{};
+                line.clear();
+                while (line.size() < 255 && position < text.size() && text[position] != '\n')
+                    line.push_back(text[position++]);
+                if (position < text.size() && text[position] == '\n')
+                    ++position;
+                else if (position < text.size())
+                    fail = true;
+                else
+                    eof = true;
             }
 
             if (line.empty())
@@ -119,8 +141,13 @@ export namespace Feather
 
         std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
-        // The original reads in text mode, so the CRT folds CRLF to LF before the
-        // parser sees it.
+        // The original opens the file with `std::ifstream file(wfilename)` in text
+        // mode -- `_Fiopen(wchar_t const*, 1, 0x40)` at `0x10059C5B`, where mode 1 is
+        // `ios::in` alone (`ios::binary` is 0x20) -- so the CRT folds CRLF to LF
+        // before the parser sees it. This reader takes the bytes in binary mode and
+        // folds them itself. The `wstring_convert<codecvt_utf8_utf16>` around the
+        // call converts the *file name* the loader passes ("ZolikaPatch.ini" at
+        // `0x10052425`), not the contents, so nothing else touches the text.
         std::string normalised;
         normalised.reserve(text.size());
         for (size_t index = 0; index < text.size(); ++index)

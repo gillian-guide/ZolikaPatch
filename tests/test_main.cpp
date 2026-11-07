@@ -148,26 +148,34 @@ namespace
             Check(Stored(document, "Options", "Key") == "1", "ini: ... and match exactly");
             Check(Stored(document, "options", "Key") == "<absent>", "ini: sections are case sensitive");
         }
-        // A UTF-8 BOM on the first line aborts the whole parse.
+        // There is no BOM branch: feather 1.41 has one, but the oracle's build
+        // compiles it out (signed `char` against 239), so a BOM-prefixed first line
+        // is an ordinary malformed line -- no '=' means it is dropped, and the
+        // `[Options]` header it carried is lost. The fault that leaves when a key
+        // line follows is pinned in `zp_fault_parity`.
         {
-            const auto document = Feather::Parse("\xEF\xBB\xBF[Options]\nA=1\n");
-            Check(document.sections.empty(), "ini: a UTF-8 BOM drops the whole file");
+            const auto document = Feather::Parse("\xEF\xBB\xBF[Options]\n[Other]\nA=1\n");
+            Check(document.Section("Options") == nullptr, "ini: a BOM line is not a section header");
+            Check(Stored(document, "Other", "A") == "1", "ini: ... and the parse continues past it");
         }
-        // A BOM is only special on the first line.
+        // A BOM is not special on any line: past the first it is part of the key.
         {
             const auto document = Feather::Parse("[Options]\n" "\xEF\xBB\xBF" "A=1\n");
-            Check(Stored(document, "Options", "\xEF\xBB\xBF" "A") == "1", "ini: a later BOM is part of the key");
+            Check(Stored(document, "Options", "\xEF\xBB\xBF" "A") == "1", "ini: a BOM inside a line is part of its key");
         }
-        // The 255-character line buffer: the rest of a long line is a new line.
+        // The 255-character line buffer's boundary: a 255-byte line is the longest
+        // that fits. A 256th byte sets the stream's sticky failbit and the original
+        // re-reads the same buffer for ever; `zp_fault_parity` pins that hang with a
+        // child process, because it cannot be run in this one.
         {
             std::string text = "[Options]\nA=";
-            text.append(300, 'x');
+            text.append(253, 'x');
             text += "\nB=1\n";
             const auto document = Feather::Parse(text);
             const auto* value = document.Find("Options", "A");
-            Check(value != nullptr && value->size() == 253, "ini: a long line is cut at the 255-byte buffer",
+            Check(value != nullptr && value->size() == 253, "ini: a 255-byte line is read whole",
                 value != nullptr ? std::to_string(value->size()) : "absent");
-            Check(ReadInt(document, "B", "0") == 1, "ini: ... and the rest starts a new line");
+            Check(ReadInt(document, "B", "0") == 1, "ini: ... and the next line still parses");
         }
         // An empty file is an empty document.
         {

@@ -119,3 +119,12 @@ Faulting tests suppress the Windows fault dialog through `SetErrorMode`, and
 `tools/check_fault_dialogs.py` (ctest `zp_fault_dialogs`) fails if any test that
 mentions `--child`, `0xC0000005`, `STATUS_ACCESS_VIOLATION` or `SEH` reaches `main`
 without it. That check exists because the mistake happened twice.
+
+## Two transients, recorded
+
+Twice the first suite run immediately after a full relink reported one failure
+(zp_native_guard once, zp_dump_empty once); neither reproduced in any subsequent
+run, in ten standalone check_empty_dump.py runs, or in the clean rebuild and Trace
+runs. Both are recorded rather than dismissed: if a relink-time failure reappears, the
+first thing to check is whether a test's child process is still running when the
+build directory changes underneath it.

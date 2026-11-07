@@ -9,3 +9,5 @@ run.err.txt
 save_walk_inputs/
 native_guard_child.report
 fault_parity_child.report
+fault_parity_bom_child.report
+fault_parity_long_child.report

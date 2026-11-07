@@ -2,6 +2,7 @@
 
 #include <climits>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <stdexcept>
 #include <typeinfo>
@@ -16,44 +17,49 @@ import options;
 
 // The preserved faults in the INI loader, asserted by their *observable* behaviour
 // instead of by prose. `docs/parity.md` lists them; `zp_tests` asserted the two
-// conversion throws as values only (a `bool threw`), the BOM as an empty document,
-// and left the null-section dereference and the 255-byte split to the comments.
-// This test is the behavioural half:
+// conversion throws as values only (a `bool threw`) and left the rest to prose. This
+// test is the behavioural half:
 //
 //   1. std::invalid_argument out of a non-numeric [Options] value  -- in-process,
 //      asserted by exact type (`typeid`), on `Key=abc` and on `Key=<space>`;
 //   2. std::out_of_range out of a numeric value outside `int`      -- same;
-//   3. a first-line UTF-8 BOM drops the whole file                -- in-process:
-//      no throw, and every catalogue key keeps its arm default (the tree's model of
-//      the 1.41 source; `docs/parity.md` records that the oracle's parse body has no
-//      such branch, so the oracle side of this one is open);
+//   3. a first-line UTF-8 BOM                                      -- in-process for
+//      the parse shape (there is no BOM branch, so the BOM line is not a section
+//      header and the parse goes on), and in a child process for the fault that
+//      leaves: the header lost was `[Options]`, so the key line under it stores into
+//      the null current section and dies;
 //   4. a key line before the first [section] dereferences a null section pointer
 //      -- a child process, because it kills the process: the parent asserts the
 //      child's exit code and that its report stopped *after* the diagnostic line
 //      that precedes the faulting parse, not before it;
-//   5. a line at/over the 255-byte buffer                          -- what this tree
-//      does (splits and continues) and how that differs from the original.
+//   5. a line at or over the 256-byte buffer                        -- the original's
+//      own hang, preserved: a 255-byte line parses and its child exits 0, while a
+//      256-byte line leaves the child spinning, so the test asserts the child did
+//      *not* exit inside the timeout and then terminates it. A split, or a dropped
+//      file, would fail that check instead of hanging the suite.
 //
-// Point 5 is where the tree and the oracle part company. The oracle's parser is
-// `sub_10059D70`, feather 1.41's
+// The oracle's parser is `sub_10059D70`, feather 1.41's
 //
 //     char line[256];                       // FINI_BUFFER_SIZE 256
 //     while (!file.eof()) { file.getline(line, 256); ... }
 //
-// -- `getline(&line, 0x100)` at `0x10059E0E`, the loop tail testing MSVC's eofbit
-// (`test byte ptr [eax+ecx+0Ch], 1 / jz`) at `0x1005A53E`, and the same loop in
-// `ZolikaPatch/INI.h`, the original's own mirror of the header. A line that fills
-// the buffer sets `failbit` *without* consuming the rest, so `eof()` stays false and
-// every later `getline` is a sentry no-op: the original re-reads the same buffer
-// forever (a startup hang). This tree splits the line at 255 bytes and continues, so
-// the test pins this tree's half and `docs/parity.md` records the difference as a
-// divergence -- the original's hang is not reproduced.
+// -- `getline(&String, 0x100)` at `0x10059E0E`, the loop tail testing only MSVC's
+// eofbit (`test byte ptr [eax+ecx+0Ch], 1 / jz`) at `0x1005A53E`, and no compare
+// against 0xEF anywhere in the body: the source's `line[0] == 0xEF` is dead because
+// `char` is signed (`movsx` at `0x10059E93`), so the oracle reads a BOM-prefixed
+// first line as an ordinary line. A line that fills the buffer sets `failbit` --
+// measured against MSVCP140, the library the oracle imports `getline` from -- and
+// nothing clears it, so every later `getline` is a sentry no-op that leaves the same
+// 255 bytes in the buffer: the parse never terminates. The same measurement puts the
+// boundary at 255: a line of exactly 255 bytes is stored and its delimiter consumed.
 //
 // Nothing here needs the game or the built ASI: the loader's reader is called
 // directly, exactly as `Loader::Enabled` calls it.
 //
-//     zp_fault_parity                    the suite
-//     zp_fault_parity --child <report>   the key-before-section fault, fresh process
+//     zp_fault_parity                                the suite
+//     zp_fault_parity --child <report>               the key-before-section fault
+//     zp_fault_parity --child-bom <report>           the BOM fault
+//     zp_fault_parity --child-long <report> <bytes>  the line-buffer child
 
 namespace
 {
@@ -80,7 +86,7 @@ namespace
     }
 
     // Evidence that is worth reading on a green run too (the observed exception
-    // type and message, the child's exit code, the catalogue size).
+    // type and message, the children's exit codes, the catalogue size).
     void Detail(std::string_view text)
     {
         std::printf("     %.*s\n", static_cast<int>(text.size()), text.data());
@@ -140,7 +146,12 @@ namespace
                (raised.type != nullptr ? raised.type->name() : "<unknown>") + " (\"" + raised.what + "\")";
     }
 
-    // ------------------------------------------------------------------- faults 1, 2
+    int StoredInt(const Feather::Document& document, std::string_view key, int fallback)
+    {
+        return Config::Integer(document, key, std::to_string(fallback));
+    }
+
+    // --------------------------------------------------------------- faults 1, 2
     void CheckInvalidArgument()
     {
         const std::string key = "CarDynamicShadowFix";
@@ -213,82 +224,29 @@ namespace
             "out_of_range: INT_MIN - 1 throws std::out_of_range", Describe(pastMin));
     }
 
-    // ----------------------------------------------------------------------- fault 3
-    // The whole file, with every catalogue key set to a value that differs from its
-    // arm default. It is the control: without the BOM this text changes every option.
-    std::string FullOptionsText()
+    // ------------------------------------------------------------------- fault 3
+    void CheckBomInProcess()
     {
-        std::string text = "[Options]\n";
-        for (const auto& option : Catalogue::All)
-            text += std::string(option.key) + "=" + std::to_string(option.absent == 1 ? 0 : 1) + "\n";
-        return text;
+        // The BOM line has no '=', so the ordinary key-line path drops it and the parse
+        // continues into the next line -- a whole-file drop would leave no section at
+        // all, so this text tells the two apart without faulting. The oracle's
+        // `[Options]` header is on that line, which is what makes the follow-up fatal.
+        const auto document = Feather::Parse("\xEF\xBB\xBF[Options]\n[Other]\nA=1\n");
+        Check(document.Section("Options") == nullptr,
+            "bom: the BOM line is not a section header, so [Options] is lost");
+        const auto* stored = document.Find("Other", "A");
+        Check(stored != nullptr && *stored == "1",
+            "bom: ... and the parse continues into the next line",
+            stored != nullptr ? *stored : "absent");
+
+        // The control, so the checks above cannot pass vacuously: the same text
+        // without the BOM keeps [Options] as a section.
+        const auto control = Feather::Parse("[Options]\n[Other]\nA=1\n");
+        Check(control.Section("Options") != nullptr,
+            "bom: control -- without the BOM the header is a section");
     }
 
-    void CheckFirstLineBom()
-    {
-        const std::string body = FullOptionsText();
-
-        // First line starts with 0xEF: the parse returns an empty document.
-        const auto dropped = Feather::Parse("\xEF\xBB\xBF" + body);
-        Check(dropped.sections.empty(), "bom: a UTF-8 BOM on the first line drops the whole file");
-        Check(dropped.Section("Options") == nullptr, "bom: ... the [Options] section is not there");
-
-        // Every option then reads its arm default, and nothing throws.
-        Config::Ini() = dropped;
-        int changed = 0;
-        int threw = 0;
-        std::string first;
-        for (const auto& option : Catalogue::All)
-        {
-            try
-            {
-                const int read = Catalogue::Read(option.key);
-                if (read != option.absent)
-                {
-                    if (changed == 0)
-                        first = std::string(option.key) + "=" + std::to_string(read) + " (default " +
-                                std::to_string(option.absent) + ")";
-                    ++changed;
-                }
-            }
-            catch (...)
-            {
-                ++threw;
-            }
-        }
-        Check(changed == 0 && threw == 0,
-            "bom: every catalogue key keeps its default after the drop",
-            std::format("{} changed (first {}), {} threw", changed, first, threw));
-        Detail(std::format("{} option(s) read after the drop, 0 differ, 0 threw", Catalogue::Count()));
-
-        // The control, so the check above cannot pass vacuously: the same text
-        // without the BOM sets every key, and every read answers the written value.
-        Config::Ini() = Feather::Parse(body);
-        int unchanged = 0;
-        std::string firstUnchanged;
-        for (const auto& option : Catalogue::All)
-        {
-            const int differ = option.absent == 1 ? 0 : 1;
-            const int read = Catalogue::Read(option.key);
-            if (read != differ)
-            {
-                if (unchanged == 0)
-                    firstUnchanged = std::string(option.key) + "=" + std::to_string(read) + " (wrote " +
-                                     std::to_string(differ) + ")";
-                ++unchanged;
-            }
-        }
-        Check(unchanged == 0,
-            "bom: control -- without the BOM the same text sets every option",
-            std::format("{} unchanged (first {})", unchanged, firstUnchanged));
-    }
-
-    // ----------------------------------------------------------------------- fault 4
-    int StoredInt(const Feather::Document& document, std::string_view key, int fallback)
-    {
-        return Config::Integer(document, key, std::to_string(fallback));
-    }
-
+    // ------------------------------------------------------------------- fault 4
     void CheckKeyBeforeSectionInProcess()
     {
         // The fault is the store into the selected section (feather's
@@ -340,12 +298,19 @@ namespace
     struct ChildResult
     {
         bool ran = false;
+        bool exited = false;      // terminated inside its wait
+        bool timedOut = false;    // still running when the wait expired
         DWORD status = 0;
+        DWORD waitedMs = 0;
         std::vector<std::string> lines;
         std::string why;
     };
 
-    ChildResult RunChildProcess(const std::filesystem::path& self, const std::filesystem::path& report)
+    // Runs one child mode and reads its report. A child that is still running when
+    // `timeoutMs` expires is the long-line fault, not a hung suite: it is terminated
+    // here and reported as `timedOut`.
+    ChildResult RunChildProcess(const std::filesystem::path& self, const std::string& mode,
+        const std::filesystem::path& report, const std::vector<std::wstring>& extra, DWORD timeoutMs)
     {
         ChildResult result;
         std::error_code ignored;
@@ -357,8 +322,10 @@ namespace
             return result;
         }
 
-        const std::wstring command =
-            L"\"" + self.wstring() + L"\" --child \"" + report.wstring() + L"\"";
+        std::wstring command = L"\"" + self.wstring() + L"\" \"" +
+            std::wstring(mode.begin(), mode.end()) + L"\" \"" + report.wstring() + L"\"";
+        for (const auto& argument : extra)
+            command += L" \"" + argument + L"\"";
         std::vector<wchar_t> line(command.begin(), command.end());
         line.push_back(L'\0');
 
@@ -371,12 +338,27 @@ namespace
             result.why = std::format("CreateProcess failed (error {})", GetLastError());
             return result;
         }
+        result.ran = true;
+        result.waitedMs = timeoutMs;
 
-        WaitForSingleObject(process.hProcess, 30000);
-        GetExitCodeProcess(process.hProcess, &result.status);
+        const DWORD wait = WaitForSingleObject(process.hProcess, timeoutMs);
+        if (wait == WAIT_OBJECT_0)
+        {
+            result.exited = true;
+            GetExitCodeProcess(process.hProcess, &result.status);
+        }
+        else if (wait == WAIT_TIMEOUT)
+        {
+            result.timedOut = true;
+            TerminateProcess(process.hProcess, 0xDEADu);
+            WaitForSingleObject(process.hProcess, 10000);
+        }
+        else
+        {
+            result.why = std::format("WaitForSingleObject failed (error {})", GetLastError());
+        }
         CloseHandle(process.hThread);
         CloseHandle(process.hProcess);
-        result.ran = true;
 
         std::ifstream stream(report, std::ios::binary);
         std::string text;
@@ -389,6 +371,21 @@ namespace
         return result;
     }
 
+    std::string Joined(const std::vector<std::string>& lines)
+    {
+        std::string joined;
+        for (const auto& text : lines)
+            joined += (joined.empty() ? "" : ", ") + text;
+        return joined.empty() ? "<empty>" : joined;
+    }
+
+    std::string StatusText(DWORD status)
+    {
+        char text[32] = {};
+        std::snprintf(text, sizeof(text), "0x%08X", static_cast<unsigned>(status));
+        return text;
+    }
+
     void CheckKeyBeforeSectionChild(const std::filesystem::path& self)
     {
         // The documented preserved fault: `(*current)[key] = value` with `current`
@@ -397,34 +394,52 @@ namespace
         // the parser reads a normal document) and one after a *successful* parse,
         // so the parent can tell "the parse faulted" from "the child died earlier".
         const auto report = std::filesystem::current_path() / "fault_parity_child.report";
-        const auto child = RunChildProcess(self, report);
-
-        std::string joined;
-        for (const auto& text : child.lines)
-            joined += (joined.empty() ? "" : ", ") + text;
-        if (joined.empty())
-            joined = "<empty>";
+        const auto child = RunChildProcess(self, "--child", report, {}, 30000);
 
         const std::vector<std::string> expected{ "PHASE=control-parsed", "PHASE=parse-start" };
-        Check(child.ran && child.lines == expected,
+        Check(child.ran && child.exited && child.lines == expected,
             "key-before-section: the child wrote its diagnostic line and then never returned",
-            child.ran ? "report " + joined : child.why);
+            child.ran ? "report " + Joined(child.lines) : child.why);
 
-        char statusText[32] = {};
-        std::snprintf(statusText, sizeof(statusText), "0x%08X", static_cast<unsigned>(child.status));
-        Check(child.ran && child.status == kStatusAccessViolation,
+        Check(child.ran && child.exited && child.status == kStatusAccessViolation,
             "key-before-section: the child died on an access violation (exit 0xC0000005)",
-            child.ran ? std::format("exit {}", statusText) : child.why);
-        Detail(std::format("child exit {} (expected 0x{:08X})", statusText, kStatusAccessViolation));
+            child.ran ? std::format("exit {}", StatusText(child.status)) : child.why);
+        Detail(std::format("key-before-section child exit {} (expected 0x{:08X})",
+            StatusText(child.status), kStatusAccessViolation));
     }
 
-    // ----------------------------------------------------------------------- fault 5
-    void CheckLongLine()
+    void CheckBomChild(const std::filesystem::path& self)
     {
-        // The tree's model of feather's 256-byte buffer: `taken = min(remaining, 255)`,
-        // and the bytes after the 255th are a *fresh* line. Measured at the boundary.
+        // The fault the BOM leaves: the swallowed line was the `[Options]` header, so
+        // the key line under it is a key line before any section and stores into the
+        // null current section. The child first records the header being swallowed
+        // *without* faulting (the same parse shape as the in-process checks), then
+        // enters the faulting parse, so the parent can tell the fault from an earlier
+        // death.
+        const auto report = std::filesystem::current_path() / "fault_parity_bom_child.report";
+        const auto child = RunChildProcess(self, "--child-bom", report, {}, 30000);
+
+        const std::vector<std::string> expected{
+            "PHASE=control-parsed", "PHASE=bom-header-swallowed", "PHASE=parse-start" };
+        Check(child.ran && child.exited && child.lines == expected,
+            "bom: the child swallowed the BOM line's header and then never returned",
+            child.ran ? "report " + Joined(child.lines) : child.why);
+
+        Check(child.ran && child.exited && child.status == kStatusAccessViolation,
+            "bom: the child died on the null-section store (exit 0xC0000005)",
+            child.ran ? std::format("exit {}", StatusText(child.status)) : child.why);
+        Detail(std::format("bom child exit {} (expected 0x{:08X})", StatusText(child.status),
+            kStatusAccessViolation));
+    }
+
+    // ------------------------------------------------------------------- fault 5
+    void CheckLongLineInProcess()
+    {
+        // 255 bytes is the longest line that fits: stored whole, the delimiter
+        // consumed, so the line after it is read normally. This is the non-faulting
+        // side of the boundary. (256 bytes is not parsed here -- it hangs, which is
+        // exactly what the child below pins.)
         {
-            // "A=" + 253 = 255 bytes: the longest line that is kept whole.
             const auto document = Feather::Parse("[Options]\nA=" + std::string(253, 'x') + "\nB=1\n");
             const auto* value = document.Find("Options", "A");
             Check(value != nullptr && value->size() == 253,
@@ -433,76 +448,120 @@ namespace
             Check(StoredInt(document, "B", 0) == 1,
                 "long line: ... and the line after it still parses");
         }
+        // A 255-byte last line with no delimiter is still fine.
         {
-            // One byte more does not fit: 255 bytes are taken and the rest of the line
-            // starts a new one.
-            const auto document = Feather::Parse("[Options]\nA=" + std::string(254, 'x') + "\nB=1\n");
+            const auto document = Feather::Parse("[Options]\nA=" + std::string(253, 'x'));
             const auto* value = document.Find("Options", "A");
             Check(value != nullptr && value->size() == 253,
-                "long line: a 256-byte line is cut at 255, so its value keeps 253 bytes",
+                "long line: a 255-byte line at end of file is kept whole",
                 value != nullptr ? std::to_string(value->size()) : "absent");
-            Check(StoredInt(document, "B", 0) == 1,
-                "long line: ... and the parse continues after the cut");
-        }
-        {
-            // The consequence the split has: the continuation is parsed as a line of
-            // its own, so a key can start at byte 256 of the value's line.
-            const auto document = Feather::Parse("[Options]\nA=" + std::string(253, 'x') + "B=2\n");
-            const auto* value = document.Find("Options", "A");
-            const auto* injected = document.Find("Options", "B");
-            Check(value != nullptr && value->size() == 253 && injected != nullptr && *injected == "2",
-                "long line: the bytes after the 255th are parsed as a new line (a key can start there)",
-                std::format("A={}, B={}", value != nullptr ? std::to_string(value->size()) : "absent",
-                    injected != nullptr ? *injected : "absent"));
-        }
-        {
-            // A key *after* the split's remainder is still read: the parser advanced
-            // past the whole long line. (This is the half of docs/parity.md's note
-            // this tree can prove: it continues; the original's spin cannot be run.)
-            const auto document = Feather::Parse(
-                "[Options]\nA=" + std::string(300, 'x') + "\nB=1\n");
-            const auto* value = document.Find("Options", "A");
-            Check(value != nullptr && value->size() == 253 && StoredInt(document, "B", 0) == 1,
-                "long line: the parser terminates and reads the rest of the file",
-                std::format("A={}, B={}", value != nullptr ? std::to_string(value->size()) : "absent",
-                    StoredInt(document, "B", 0)));
         }
     }
 
-    // ---------------------------------------------------------------------- the child
+    void CheckLongLineChild(const std::filesystem::path& self)
+    {
+        const auto report = std::filesystem::current_path() / "fault_parity_long_child.report";
+
+        // 255 bytes: the parse returns, the child exits 0, and the record it wrote
+        // proves both the parse and the values.
+        const auto parsed = RunChildProcess(self, "--child-long", report, { L"255" }, 30000);
+        const std::vector<std::string> expected{ "PHASE=parse-start", "PHASE=parse-returned A=253 B=1" };
+        Check(parsed.ran && parsed.exited && parsed.status == 0 && parsed.lines == expected,
+            "long line: a 255-byte line parses and the child exits 0",
+            parsed.ran ? std::format("report {}, exit {}", Joined(parsed.lines), StatusText(parsed.status))
+                       : parsed.why);
+
+        // 256 bytes: the buffer fills, failbit is never cleared, and the parse re-reads
+        // the same 255 bytes for ever. The child must still be running when the wait
+        // expires; if it exited, the tree diverged again (it split the line, or dropped
+        // the file) and this check fails -- it does not hang the suite, because the
+        // child is terminated here either way.
+        constexpr DWORD kSpinTimeoutMs = 5000;
+        const auto spun = RunChildProcess(self, "--child-long", report, { L"256" }, kSpinTimeoutMs);
+        Check(spun.ran && spun.timedOut && !spun.exited,
+            "long line: a 256-byte line makes the parse spin (the child did not exit in 5 s)",
+            spun.ran ? std::format("exit {} after {} ms, report {}", StatusText(spun.status),
+                spun.waitedMs, Joined(spun.lines)) : spun.why);
+        Check(spun.ran && Joined(spun.lines) == "PHASE=parse-start",
+            "long line: ... and the child reached the parse (no earlier fault, no early return)",
+            Joined(spun.lines));
+        Detail(std::format("256-byte child: {} after {} ms, terminated by the test",
+            spun.timedOut && !spun.exited ? "still spinning" : "exited", spun.waitedMs));
+    }
+
+    // ------------------------------------------------------------------- the children
+    void AppendLine(const std::filesystem::path& report, std::string_view line)
+    {
+        std::ofstream stream(report, std::ios::binary | std::ios::app);
+        stream << line << "\n";
+    }
+
     int RunChild(const std::filesystem::path& report)
     {
-        auto append = [&report](std::string_view line)
-        {
-            std::ofstream stream(report, std::ios::binary | std::ios::app);
-            stream << line << "\n";
-        };
-
         // The control: this same process parses a normal document. Written first, so
         // the parent knows the report was writable and the parser ran before the
         // faulting parse.
         const auto control = Feather::Parse("[Options]\nA=1\n");
         const auto* value = control.Find("Options", "A");
-        append(value != nullptr && *value == "1" ? "PHASE=control-parsed" : "PHASE=control-failed");
+        AppendLine(report, value != nullptr && *value == "1" ? "PHASE=control-parsed" : "PHASE=control-failed");
 
         // The diagnostic point: the faulting parse starts here.
-        append("PHASE=parse-start");
+        AppendLine(report, "PHASE=parse-start");
 
         // A key line before the first section: the store into the null section must
         // die here.
         const auto document = Feather::Parse("Key=1\n[Options]\nA=1\n");
-        append(std::format("PHASE=parse-returned sections={}", document.sections.size()));
+        AppendLine(report, std::format("PHASE=parse-returned sections={}", document.sections.size()));
+        return 0;
+    }
+
+    int RunBomChild(const std::filesystem::path& report)
+    {
+        const auto control = Feather::Parse("[Options]\nA=1\n");
+        const auto* a = control.Find("Options", "A");
+        AppendLine(report, a != nullptr && *a == "1" ? "PHASE=control-parsed" : "PHASE=control-failed");
+
+        // The shape the fault comes from, recorded without faulting: the BOM line is
+        // dropped, `[Options]` is not a section, and the parse goes on into a later
+        // section.
+        const auto swallowed = Feather::Parse("\xEF\xBB\xBF[Options]\n[Other]\nB=1\n");
+        const auto* b = swallowed.Find("Other", "B");
+        AppendLine(report, swallowed.Section("Options") == nullptr && b != nullptr && *b == "1"
+            ? "PHASE=bom-header-swallowed" : "PHASE=bom-header-kept");
+
+        AppendLine(report, "PHASE=parse-start");
+
+        // The faulting text: a key line under the lost header.
+        const auto document = Feather::Parse("\xEF\xBB\xBF[Options]\nA=1\n");
+        AppendLine(report, std::format("PHASE=parse-returned sections={}", document.sections.size()));
+        return 0;
+    }
+
+    int RunLongChild(const std::filesystem::path& report, size_t lineBytes)
+    {
+        AppendLine(report, "PHASE=parse-start");
+
+        // The line is `A=` plus the rest of `lineBytes`, so its total length is
+        // exactly what the parent asked for.
+        const size_t valueBytes = lineBytes >= 2 ? lineBytes - 2 : 0;
+        const auto document = Feather::Parse("[Options]\nA=" + std::string(valueBytes, 'x') + "\nB=1\n");
+        const auto* value = document.Find("Options", "A");
+        AppendLine(report, std::format("PHASE=parse-returned A={} B={}",
+            value != nullptr ? value->size() : 0, StoredInt(document, "B", 0)));
         return 0;
     }
 
     int Run()
     {
+        const auto self = SelfPath();
         CheckInvalidArgument();
         CheckOutOfRange();
-        CheckFirstLineBom();
+        CheckBomInProcess();
         CheckKeyBeforeSectionInProcess();
-        CheckKeyBeforeSectionChild(SelfPath());
-        CheckLongLine();
+        CheckKeyBeforeSectionChild(self);
+        CheckBomChild(self);
+        CheckLongLineInProcess();
+        CheckLongLineChild(self);
         return failures == 0 ? 0 : 1;
     }
 }
@@ -510,14 +569,19 @@ namespace
 int main(int argc, char** argv)
 {
     // This test kills a child process on purpose (and would kill its own process if
-    // the child's case were ever run here), so a fault must be a result, never a
-    // Windows "Application Error" dialog on whoever runs the suite. The error mode
-    // is inherited by the child, and the child calls this line too.
+    // the child's case were ever run here), and one child is expected to spin until
+    // it is terminated, so a fault must be a result, never a Windows "Application
+    // Error" dialog on whoever runs the suite. The error mode is inherited by the
+    // children, and each child calls this line too.
     SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
     std::setvbuf(stdout, nullptr, _IONBF, 0);
 
-    if (argc >= 2 && std::strcmp(argv[1], "--child") == 0)
-        return RunChild(argc >= 3 ? std::filesystem::path(argv[2]) : std::filesystem::path());
+    if (argc >= 3 && std::strcmp(argv[1], "--child") == 0)
+        return RunChild(std::filesystem::path(argv[2]));
+    if (argc >= 3 && std::strcmp(argv[1], "--child-bom") == 0)
+        return RunBomChild(std::filesystem::path(argv[2]));
+    if (argc >= 4 && std::strcmp(argv[1], "--child-long") == 0)
+        return RunLongChild(std::filesystem::path(argv[2]), std::strtoul(argv[3], nullptr, 10));
 
     try
     {
