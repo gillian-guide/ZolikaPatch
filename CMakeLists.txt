@@ -170,6 +170,20 @@ target_link_libraries(zp_nms_arena PRIVATE zp_modules)
 add_test(NAME zp_nms_arena COMMAND zp_nms_arena)
 set_tests_properties(zp_nms_arena PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
+# The SpeedupBugFix body (0x10050540, class B in docs/rebuilt.md), asserted by
+# behaviour instead of by its disassembly: the four derived floats against the
+# formula recomputed in the test at five frequencies (bit patterns, not
+# approximations), the eight published slots by the ASI dword each one is, the
+# original's store order through overlapping destinations, the clock call at
+# `match - 51`, the missing-scan fault on 0xFFFFFFCD in-process, and the second
+# call's frequency-once/no-store guarantee. Offline: no game image, no ASI load,
+# no files.
+add_executable(zp_speedup_clock tests/speedup_clock.cpp)
+set_target_properties(zp_speedup_clock PROPERTIES CXX_SCAN_FOR_MODULES ON)
+target_link_libraries(zp_speedup_clock PRIVATE zp_modules)
+add_test(NAME zp_speedup_clock COMMAND zp_speedup_clock)
+set_tests_properties(zp_speedup_clock PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+
 add_executable(zp_dump tests/dump_main.cpp)
 set_target_properties(zp_dump PROPERTIES CXX_SCAN_FOR_MODULES ON)
 target_link_libraries(zp_dump PRIVATE zp_modules)
@@ -225,6 +239,8 @@ if(Python3_Interpreter_FOUND)
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/gen_ini.py --check)
   add_test(NAME zp_oracle_verified
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_oracle_verified.py)
+  add_test(NAME zp_fault_dialogs
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_fault_dialogs.py)
 endif()
 if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/EFLC_1110.exe)
   add_test(NAME zp_launcher_slots

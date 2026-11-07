@@ -380,6 +380,9 @@ namespace
 
 int main(int argc, char** argv)
 {
+    // This test faults on purpose (and re-runs itself as a faulting child), so the
+    // fault must be a result in this process, never a Windows dialog on the desktop.
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
     if (argc >= 2 && std::strcmp(argv[1], "--child") == 0)
         return RunChild(argc >= 3 ? std::filesystem::path(argv[2]) : std::filesystem::path());
 

@@ -403,6 +403,89 @@ namespace
 static std::atomic<uint32_t> zpatch_speedup_scan_done{ 0 };
 static uint32_t zpatch_speedup_clock = 0;
 
+namespace
+{
+    using SpeedupFrequencyReader = uint64_t(__cdecl*)();
+
+    // QueryPerformanceFrequency, the original's `call dword ptr [0x10063050]` at
+    // 0x100505EF. The original reaches it only when dword_10159350 is still zero.
+    uint64_t ReadQueryPerformanceFrequency()
+    {
+        LARGE_INTEGER frequency{};
+        QueryPerformanceFrequency(&frequency);
+        return static_cast<uint64_t>(frequency.QuadPart);
+    }
+
+    // The sequence sub_10050540 runs after its one-time scan: the
+    // dword_10159350 guard, the four derived floats written through eight
+    // pointers, then the clock call. It is split out so tests/speedup_clock.cpp
+    // (ctest `zp_speedup_clock`) can inject the frequency, the scan result and
+    // the eight destinations; the shipped body below passes the published globals,
+    // the scan slot and QueryPerformanceFrequency, so the parameters change no
+    // shipped behaviour.
+    //
+    // `targets` is in the original's *store* order (0x10050635..0x1005067F):
+    // dword_10159364, _1360, _1350, _135C, _1368, _134C, _1354, _1358. That is not
+    // the handler's read order (0x100506E8..0x10050738); the two must not be
+    // conflated. `clock` is dword_101A849C, the scan's match; the original calls
+    // `clock - 51`, so 0 is its missing-scan 0xFFFFFFCD.
+    void* SpeedupBugFixRun(void* self, float** targets, uint32_t clock,
+        SpeedupFrequencyReader read_frequency)
+    {
+        // The original tests the float at dword_10159350, not the pointer
+        // (0x100505D1..0x100505E5), so the dereference stays unguarded; the arm
+        // publishes all eight pointers before this body can run.
+        if (*targets[2] == 0.0f)
+        {
+            const uint64_t frequency = read_frequency();
+
+            // 0x10152380 is the double 1000.0 (0x408F400000000000) and 0x10152300
+            // the double 0.0010000000474974513 (0x3F50624DE0000000). The original
+            // divides, multiplies and truncates to float in this order
+            // (0x10050600..0x10050653): scale = 1000.0 / frequency, then
+            // (float)scale, (float)(scale * 1000.0),
+            // (float)(scale * 0.0010000000474974513) and
+            // (float)(0.0010000000474974513 / scale).
+            const double scale = 1000.0 / static_cast<double>(frequency);
+            const float perTickMilliseconds = static_cast<float>(scale);
+            const float millisecondsProduct = static_cast<float>(scale * 1000.0);
+            const float perTickSeconds = static_cast<float>(scale * 0.0010000000474974513);
+            const float reciprocal = static_cast<float>(0.0010000000474974513 / scale);
+
+            *targets[0] = perTickMilliseconds;
+            *targets[1] = millisecondsProduct;
+            *targets[2] = perTickSeconds;
+            *targets[3] = reciprocal;
+            *targets[4] = perTickMilliseconds;
+            *targets[5] = millisecondsProduct;
+            *targets[6] = perTickSeconds;
+            *targets[7] = reciprocal;
+        }
+
+        // 0x10050683..0x10050692: `mov ecx,[dword_101A849C]; add ecx,-51;
+        // call ecx; mov [esi],eax; mov [esi+4],edx`, and the answer is ESI. The
+        // call is unguarded: a scan miss leaves the slot zero and the call faults
+        // on 0xFFFFFFCD, exactly as the original's does.
+        using ClockFunction = __int64(__cdecl*)(void);
+        const __int64 stamp = reinterpret_cast<ClockFunction>(
+            static_cast<uintptr_t>(clock) - 51u)();
+        *reinterpret_cast<__int64*>(self) = stamp;
+        return self;
+    }
+
+    // Builds the eight destinations in the original's store order and runs the
+    // sequence. The body and the test-only seam below both go through this, so
+    // the order cannot drift between the shipped path and the measured one.
+    void* SpeedupBugFixRunPublished(void* self, uint32_t clock, SpeedupFrequencyReader read_frequency)
+    {
+        float* targets[8] = {
+            zpatch_speedup_t64, zpatch_speedup_t60, zpatch_speedup_t50, zpatch_speedup_t5c,
+            zpatch_speedup_t68, zpatch_speedup_t4c, zpatch_speedup_t54, zpatch_speedup_t58,
+        };
+        return SpeedupBugFixRun(self, targets, clock, read_frequency);
+    }
+}
+
 static void* __fastcall SpeedupBugFixBody(void* self, int)
 {
     // sub_10050587's MSVC static-init guard: the scan runs once per process. A
@@ -416,37 +499,7 @@ static void* __fastcall SpeedupBugFixBody(void* self, int)
                 reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)));
     }
 
-    // The original tests the float, not the pointer, so the dereference stays
-    // unguarded; the arm installs this body only after all eight pointers were
-    // published.
-    if (*zpatch_speedup_t50 == 0.0f)
-    {
-        LARGE_INTEGER frequency{};
-        QueryPerformanceFrequency(&frequency);
-
-        // 0x10152380 is 1000.0 and 0x10152300 is 0.0010000000474974513; the
-        // original divides, multiplies and truncates to float in this order.
-        const double scale = 1000.0 / static_cast<double>(frequency.QuadPart);
-        const float perTickMilliseconds = static_cast<float>(scale);
-        const float millisecondsProduct = static_cast<float>(scale * 1000.0);
-        const float perTickSeconds = static_cast<float>(scale * 0.0010000000474974513);
-        const float reciprocal = static_cast<float>(0.0010000000474974513 / scale);
-
-        *zpatch_speedup_t64 = perTickMilliseconds;
-        *zpatch_speedup_t60 = millisecondsProduct;
-        *zpatch_speedup_t50 = perTickSeconds;
-        *zpatch_speedup_t5c = reciprocal;
-        *zpatch_speedup_t68 = perTickMilliseconds;
-        *zpatch_speedup_t4c = millisecondsProduct;
-        *zpatch_speedup_t54 = perTickSeconds;
-        *zpatch_speedup_t58 = reciprocal;
-    }
-
-    using ClockFunction = __int64(__cdecl*)(void);
-    const __int64 stamp = reinterpret_cast<ClockFunction>(
-        static_cast<uintptr_t>(zpatch_speedup_clock) - 51u)();
-    *reinterpret_cast<__int64*>(self) = stamp;
-    return self;
+    return SpeedupBugFixRunPublished(self, zpatch_speedup_clock, &ReadQueryPerformanceFrequency);
 }
 
 namespace
@@ -576,6 +629,56 @@ namespace
             injector::MakeJMP(zpatch_speedup_site, reinterpret_cast<void*>(&SpeedupBugFixBody),
                 true);
     }
+}
+
+// The test-only seam over the rebuilt SpeedupBugFix entry (tests/speedup_clock.cpp,
+// ctest `zp_speedup_clock`). SpeedupBugFixPublishForTest writes the eight pointers
+// ResolveSpeedupBugFix would publish from a real image's site operands, so a test
+// process with no game image can stand in the eight game addresses with floats of
+// its own; SpeedupBugFixForTest then runs the same SpeedupBugFixRunPublished the
+// shipped body calls, with the scan result and the frequency read injected. Neither
+// entry touches the install: no site is written, no body is registered and the
+// one-time scan is bypassed (its result is the parameter). The shipped ASI calls
+// neither.
+export namespace Misc
+{
+    // The eight published pointers, named by the ASI dword each one is.
+    struct SpeedupSlots
+    {
+        float* t4c;  // dword_1015934C
+        float* t50;  // dword_10159350
+        float* t54;  // dword_10159354
+        float* t58;  // dword_10159358
+        float* t5c;  // dword_1015935C
+        float* t60;  // dword_10159360
+        float* t64;  // dword_10159364
+        float* t68;  // dword_10159368
+    };
+
+    void SpeedupBugFixPublishForTest(const SpeedupSlots& slots);
+
+    // `clock` is the scan result the body calls at `clock - 51`; 0 is a miss.
+    // `read_frequency` is called only when dword_10159350 is zero.
+    void* SpeedupBugFixForTest(void* self, uint32_t clock,
+        uint64_t (__cdecl* read_frequency)());
+}
+
+void Misc::SpeedupBugFixPublishForTest(const Misc::SpeedupSlots& slots)
+{
+    zpatch_speedup_t4c = slots.t4c;
+    zpatch_speedup_t50 = slots.t50;
+    zpatch_speedup_t54 = slots.t54;
+    zpatch_speedup_t58 = slots.t58;
+    zpatch_speedup_t5c = slots.t5c;
+    zpatch_speedup_t60 = slots.t60;
+    zpatch_speedup_t64 = slots.t64;
+    zpatch_speedup_t68 = slots.t68;
+}
+
+void* Misc::SpeedupBugFixForTest(void* self, uint32_t clock,
+    uint64_t (__cdecl* read_frequency)())
+{
+    return SpeedupBugFixRunPublished(self, clock, read_frequency);
 }
 
 // Patch4RemoveModChecks: the game's date arithmetic at 1.0.8.0 game 0x7CBF70
