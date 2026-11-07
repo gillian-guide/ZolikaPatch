@@ -184,6 +184,21 @@ target_link_libraries(zp_speedup_clock PRIVATE zp_modules)
 add_test(NAME zp_speedup_clock COMMAND zp_speedup_clock)
 set_tests_properties(zp_speedup_clock PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
+# The OutOfCommissionFix init (sub_1004B750, class B in docs/rebuilt.md), asserted
+# by behaviour instead of by its disassembly: the one-shot guard that has no writer
+# (three calls build three archives, none ever freed), the cursor slot left equal to
+# the archive's 182,272 bytes with the pinned fnv1a and header words, the
+# registration that happens even when the decode's own checks fail (a damaged
+# Adler-32 trailer, and a first opcode that never terminates), and the fake-pak
+# entry's name read out of the module's own vector. Offline: no game image, no ASI
+# load, no files; the resource is damaged in place through VirtualProtect and
+# restored, and `zp_dump --ooc-selftest` remains the shipped path's proof.
+add_executable(zp_ooc_init tests/ooc_init.cpp)
+set_target_properties(zp_ooc_init PROPERTIES CXX_SCAN_FOR_MODULES ON)
+target_link_libraries(zp_ooc_init PRIVATE zp_modules)
+add_test(NAME zp_ooc_init COMMAND zp_ooc_init)
+set_tests_properties(zp_ooc_init PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+
 # The documented preserved faults of the INI loader, asserted by their observable
 # behaviour instead of by prose: the two conversion throws by *exact* type
 # (std::invalid_argument on `Key=abc` and `Key=<space>`, std::out_of_range past

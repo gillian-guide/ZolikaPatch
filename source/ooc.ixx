@@ -1642,6 +1642,161 @@ export const char* OocSelfCheck()
     return failure;
 }
 
+// The test-only seam over the rebuilt init (tests/ooc_init.cpp, ctest
+// `zp_ooc_init`). Every entry names something this unit already has: `Initialise`
+// is the function `OocWrapBody` (0x1004C350) calls, `Decode` is the transcribed
+// driver 0x1004B570, `Register` is the push_back `sub_1004B750` makes at
+// 0x1004C287 (the five field stores and the `add dword_1016E440, 2Ch`),
+// `FrontEntry` reads the fake-pak vector at 0x1016E43C, `ClearEntries` is the
+// transcribed vector clear 0x10056500 that every init call ends with, and
+// `ResourceBytes` is the decoded resource itself. Nothing here is a second
+// implementation and nothing is instrumented: the init's own code is untouched, so
+// a test that drives it measures the shipped sequence.
+//
+// What it can change: a call writes the module's own slots (`zpatch_ooc_offset`,
+// `zpatch_ooc_state`, the fake-pak vector) exactly as the game's call would, and
+// hands the caller the archive the init built -- a block the original never frees
+// either, so a test that runs it N times owns N archives. It installs no arm, writes
+// no site, and scans nothing. Nor does it reach the shipped image: nothing in the ASI
+// calls these entries and they have no PE export, so /OPT:REF drops them (the linker
+// map has no `OocInit` symbol), while a test links the same object and calls them.
+//
+// One fact the seam exists to make visible: `dword_10159C00` (the original's
+// one-shot guard) has **no writer** -- it is named exactly once in the whole
+// image, at the read itself -- so the init re-runs on every call. This rebuild has
+// no guard variable at all, which is that fact stated in code: the second call
+// does the whole body again and leaks the previous archive, and `Run.slots` is what
+// lets a test watch each call leave the same 182,272-byte cursor behind.
+export namespace OocInit
+{
+    // The three slots a call leaves, by the ASI dword each one is.
+    struct Slots
+    {
+        uint32_t bytes;    // dword_10159C78: the builder's write cursor
+        uint32_t state;    // dword_10159BFC: the archive's byte count the mount carries
+        uint32_t entries;  // zpatch_ooc_pak.size(): the fake-pak registration
+    };
+
+    // A call's answer plus the slots it left. `archive` is EAX, the pointer the
+    // wrapper mounts; the archive is the caller's and is never freed.
+    struct Run
+    {
+        uint32_t archive;
+        Slots slots;
+    };
+
+    // The entry the init registers, read back out of zpatch_ooc_pak (44 bytes, the
+    // original's 0x1016E43C element). `entries` is the vector's size, not a field.
+    struct PakEntry
+    {
+        char name[16];           // +0x00 the std::string's inline buffer
+        uint32_t name_size;      // +0x10
+        uint32_t name_capacity;  // +0x14
+        uint32_t file_size;      // +0x18 the decoded table's size
+        uint32_t stored_offset;  // +0x1C
+        uint32_t stored_size;    // +0x20
+        uint32_t padding;        // +0x24
+        uint32_t data;           // +0x28 the decoded table
+        uint32_t entries;
+    };
+
+    // The recovered resource the decode reads (source/ooc_finale2.inc), so a test
+    // can hand the production init a damaged one.
+    struct Resource
+    {
+        uint32_t address;
+        uint32_t size;
+    };
+
+    // One call of the rebuilt init: the same function the mounting wrapper calls.
+    export Run Initialise();
+
+    // The slots as they stand, without calling anything.
+    export Slots Current();
+
+    // The transcribed decode driver (0x1004B570): 0x2BD50 on success, 0 otherwise.
+    export uint32_t Decode(uint32_t table);
+
+    // The init's registration step: answers zpatch_ooc_pak.size() afterwards.
+    export uint32_t Register(uint32_t table);
+
+    // The front entry of zpatch_ooc_pak; false when the vector is empty.
+    export bool FrontEntry(PakEntry& entry);
+
+    // The builder's own clear (0x10056500), which every init call ends with.
+    export uint32_t ClearEntries();
+
+    // The recovered resource's address and size, as the decode body names it.
+    export Resource ResourceBytes();
+}
+
+// 0x10056500 takes its vector in ECX (the original's own frame: `push esi; mov
+// esi, ecx`), and a C++ call cannot pass one there, so the seam's clear enters it
+// exactly the way the builder does at its `ooc_build_done`: `mov ecx, OFFSET
+// zpatch_ooc_pak; call`. Naked and internal, like every other body in this unit.
+static __declspec(naked) void OocClearPakBody()
+{
+    __asm
+    {
+        mov ecx, OFFSET zpatch_ooc_pak
+        jmp OocVectorClearBody
+    }
+}
+
+OocInit::Run OocInit::Initialise()
+{
+    Run run{};
+    run.archive = OocInitialise();
+    run.slots = Current();
+    return run;
+}
+
+OocInit::Slots OocInit::Current()
+{
+    return { zpatch_ooc_offset, zpatch_ooc_state,
+        static_cast<uint32_t>(zpatch_ooc_pak.size()) };
+}
+
+uint32_t OocInit::Decode(uint32_t table)
+{
+    return static_cast<uint32_t>(OocDecodeBody(reinterpret_cast<uint8_t*>(table)));
+}
+
+uint32_t OocInit::Register(uint32_t table)
+{
+    OocRegister(reinterpret_cast<uint8_t*>(table));
+    return static_cast<uint32_t>(zpatch_ooc_pak.size());
+}
+
+bool OocInit::FrontEntry(PakEntry& entry)
+{
+    if (zpatch_ooc_pak.empty())
+        return false;
+    const OocPakEntry& front = zpatch_ooc_pak.front();
+    std::memcpy(entry.name, front.name, sizeof(entry.name));
+    entry.name_size = front.name_size;
+    entry.name_capacity = front.name_capacity;
+    entry.file_size = front.file_size;
+    entry.stored_offset = front.stored_offset;
+    entry.stored_size = front.stored_size;
+    entry.padding = front.padding;
+    entry.data = front.data;
+    entry.entries = static_cast<uint32_t>(zpatch_ooc_pak.size());
+    return true;
+}
+
+uint32_t OocInit::ClearEntries()
+{
+    OocClearPakBody();
+    return static_cast<uint32_t>(zpatch_ooc_pak.size());
+}
+
+OocInit::Resource OocInit::ResourceBytes()
+{
+    return { static_cast<uint32_t>(reinterpret_cast<uintptr_t>(kOocResource)),
+        static_cast<uint32_t>(sizeof(kOocResource)) };
+}
+
 // sub_1004C3C0, recovered VA 0x1004C3C0 (7 instructions): the branch body the E9
 // at game 0xA22E97 jumps to. The five bytes it replaces are `cmp [esp+30h], eax`
 // plus the first byte of the `movq xmm0, [esp+30h]` that follows, so it replays

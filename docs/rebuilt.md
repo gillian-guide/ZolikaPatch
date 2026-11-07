@@ -1310,6 +1310,144 @@ body(ies), 0 failure(s)`; `zp_dump --ooc-selftest` → `ooc selftest: PASS`.
 
 ---
 
+### 2k. This pass: the OOC init, behaviourally
+
+The init (`0x1004B750`, class B, 991 instructions) was the largest rebuilt piece with no
+behavioural test. `zp_dump --ooc-selftest` (§2h) pins what the transform *produces* — the
+decode's table hash, the archive's 182,272 bytes and `fnv1a 0xB5AF7B10` — but it says
+nothing about the init's own semantics. `tests/ooc_init.cpp` (`zp_ooc_init`, 54 checks)
+pins the four things that were left: the guard's real behaviour (the body re-runs and
+leaks), the cursor it publishes, the registration that happens even when the decode's
+checks fail, and the entry's name. No game image.
+
+**The guard, and what it actually does.** The original's first instruction sequence is
+
+    0x1004B77B  a1 00 9c 15 10     mov  eax,[0x10159C00]   ; dword_10159C00
+    0x1004B780  85 c0              test eax,eax
+    0x1004B782  0f 85 ab 0b 00 00  jne  0x1004C333         ; the shared epilogue
+
+and `0x1004C333` *is* the epilogue that follows the final `mov [0x10159BFC],ecx`: unwind
+the EH frame, pop the saved registers, `__security_check_cookie`, `ret`. So the guard is a
+skip of the body **after** the byte-count publish, and `EAX` still holds the guard word on
+that path — a guard that was ever set would make the function answer that word as if it
+were the archive pointer, not just do nothing. The slot is named **once** in the whole
+image: at the read itself. Nothing writes it, so the branch is never taken.
+
+The rebuild carries no guard variable at all, and that is that fact in code rather than an
+omission: with the slot never written, `if (guard != 0) return guard;` would be dead. The
+test pins the observable consequence — the body runs on every call — and its falsification
+is the re-introduced guard (§*The test can fail*), so the property is defended rather than
+asserted. (One other store of the original's is dead in the same way and is not carried:
+`0x1004B7AA mov dword ptr [0x10159C2C], 2BD50h` writes a slot named once in the image, the
+store, so nothing reads it. The rebuild's entry gets the same 179,536 as a stack field.)
+
+**The seam.** `source/ooc.ixx` grew one exported, test-only namespace, `OocInit`, whose
+entries are all things the unit already has:
+
+| entry | is |
+|---|---|
+| `Initialise` | the function the mounting wrapper `OocWrapBody` (0x1004C350) calls |
+| `Current` | the three module slots, read and not run: `zpatch_ooc_offset`, `zpatch_ooc_state`, `zpatch_ooc_pak.size()` |
+| `Decode` | the transcribed driver `0x1004B570` |
+| `Register` | the push_back `sub_1004B750` makes at `0x1004C287` |
+| `FrontEntry` | the front element of `zpatch_ooc_pak` (the original's `0x1016E43C`) |
+| `ClearEntries` | the transcribed vector clear `0x10056500` the builder ends with |
+| `ResourceBytes` | `source/ooc_finale2.inc`'s array, address and size |
+
+It is not a second implementation and the init's code is untouched, so what a test drives
+is the shipped sequence. It writes no site, installs no arm, scans nothing; the only module
+state a call changes is the state the game's own call changes. The clear takes its vector in
+`ECX`, which a C++ call cannot set, so the seam enters it through a small naked thunk
+(`mov ecx, OFFSET zpatch_ooc_pak; jmp OocVectorClearBody`) exactly as the builder's
+`ooc_build_done` does. **None of this reaches the shipped image**: the namespace's entries
+have no caller inside the ASI and no PE export, so `/OPT:REF` drops them — the linker map
+has no `OocInit` symbol at all — while the test links the same object file and calls them.
+The shipped ASI's write set and its 151 proof rows are unchanged with the seam in the tree
+(`zp_dump_empty`, `zp_body_proof`).
+
+**The measurement that makes "twice" a count, not an impression.** `OocAllocate` is
+`::operator new` (the original calls the CRT's scalar `operator new` thunk at
+`0x100603F1`), so the test replaces the global `operator new`/`delete` family — the complete
+C++17 set, each entry routing to `std::malloc`/`std::free` — and ledgers every block of
+exactly 182,272 bytes, plus every `operator delete` of one. That turns two sentences into
+numbers: one archive is allocated per call, and no archive is ever freed. The archives
+themselves are also compared: three calls answer three distinct pointers, each byte-identical
+to the first, and the first is still intact (and still `fnv1a 0xB5AF7B10`) after the other
+two builds — had the init freed it, the next build would have taken the block back or
+overwritten its head.
+
+**The assertions.**
+
+| class | assertion | clause pinned |
+|---|---|---|
+| guard | three calls: three distinct archives, three 182,272-byte allocations, `g_archive_frees == 0`, the first archive still the pinned one | `0x1004B77B`-`0x1004B782` and the absent writer: no call latches anything, and the previous archive leaks |
+| cursor | after every call `dword_10159C78` is 182,272 and `dword_10159BFC` is the same word | the builder's final cursor, then `0x1004C327`/`0x1004C32D` |
+| the archive | `fnv1a` over exactly the published count is `0xB5AF7B10`; magic `0x86723DFF`, version `3`, entry count `1`, name bytes `28`, the words `16`/`0xE9`; the record's size `179536`, offset `0`, index `1`, pages `88`, pad `688`; the name `"finale2.sco"` at `+0x24`; the payload at `0x800` is the decoded table (memcmp of 179,536 bytes); the 688 bytes after it are zero | the builder `0x1004ACE0` as the init calls it, and the registration it consumed |
+| registration | a damaged Adler-32 trailer (the decode answers 0 with the table complete) and a first opcode that can never terminate (the decode answers 0 having written nothing): the init answers a non-null archive, throws nothing, publishes 182,272, and the archive's header/record/name are the registered entry's byte for byte (the first case's archive is byte-identical to the intact run's) | `call sub_1004B570` at `0x1004B798` with **no test of EAX** |
+| the entry | the fake-pak vector holds one entry: name `"finale2.sco"` (11 bytes, capacity 15), `file_size` `179536`, the three recomputed offsets 0, `data` = the table it was handed; the builder's clear empties the vector again | the push_back at `0x1004C287`-`0x1004C2A2`, read out of the module's own vector |
+| the restore | after both damages a clean call reproduces the pinned archive | the damages were real: they are undone byte for byte and the protection is restored |
+
+**The damaged resource.** The decode body names the resource as an immediate (`mov ecx,
+OFFSET kOocResource`), and that body is a *proved transcription*, so a test cannot hand it
+a buffer without ceasing to test the shipped code. Instead the test opens the array's
+`.rdata` page with `VirtualProtect`, changes one byte, runs both the decode's own verdict and
+the init inside that window, and restores the byte and the protection. Two damages, one per
+failure class: the last byte of the resource (the Adler-32 trailer's low byte — the stream
+still terminates, fills all 179,536 bytes, and only the checksum fails) and the first byte
+(`0x05`, the no-progress opcode, so the terminator test reads `0x73` where it wants `0xFA`
+and the decode gives up before writing a single byte — asserted by a `0xA5` fill that comes
+back untouched). Neither is reachable with the shipped resource, which passes all three
+checks; both are what the original's discarded answer makes possible.
+
+**The test can fail.** Four mutations, each reverted:
+
+- a one-shot guard that works (`static uint32_t guard; if (guard) return guard;`): 4
+  failures, and they are the guard's class — `runs: two more calls allocated two more
+  archives (1 recorded)`, `runs: every call answers a fresh archive
+  (0x016435B0, 0x016435B0, 0x016435B0)`, `restore: the resource decodes again after the
+  damages`, and `leak: six calls built six archives (1)`.
+- a fail-closed decode (`if (OocDecodeBody(table) == 0) return 0;`): 3 failures — both
+  `the init answers an archive (0x00000000)` lines, and `leak: six calls built six archives
+  (4)`.
+- the mount count published as the table's size instead of the cursor: 4 failures, all of
+  them the publish clause — `run 1: dword_10159BFC ... is 179536 and the cursor is 182272`,
+  both re-publish lines, and the two degraded-run count lines. The cursor checks still pass
+  under it, which is the point: the cursor comes from the builder, the mount count from the
+  init's own store.
+- the entry name changed to `"finale3.sco"`: 5 failures — the archive hash, the name at
+  `+0x24`, `the first archive is still the recovered one`, `entry: its name`, and the
+  restore run.
+
+**Gates.** `cmake --build --preset release` exit 0; `ctest --preset release` 19/19 twice
+(the new test is `zp_ooc_init`, 54 checks, 0 failures); `python tools/parity_report.py 9` →
+`build 9: 98 key(s) closed, 0 open, 1 oracle-verified (baseline incomplete)`;
+`python tools/verify_bodies.py …` → `151 body(ies), 0 failure(s)`; `zp_dump --ooc-selftest`
+→ `ooc selftest: PASS`; `python tools/check_fault_dialogs.py` → `0 failure(s)`.
+
+**What stays unproven.**
+
+- **The mount itself.** The wrapper formats `"memory:<archive>,<bytes>,0:"` and hands it to
+  the game's device register; both are game-side calls that only run when the site at
+  `0xB70733` fires (the key's cell and §2h cover the writes and the bodies).
+- **The guard's taken branch.** Nothing can set `0x10159C00`, and the rebuild has no slot,
+  so what the original does on that path — answer the guard word as the archive — is
+  documented here and nowhere exercised. It cannot be: the branch is unreachable in both
+  trees.
+- **The entry's `std::string`.** The rebuild's element is a 44-byte struct with a fixed
+  16-byte name buffer and the size/capacity pair of the original's inline string. The
+  entry the original registers spells the name through `to_string`-shaped digit loops,
+  `strtol` and a `char` cast; the rebuild stores the same eleven bytes, and nothing
+  observable distinguishes a fixed buffer from an inline `std::string` at this capacity
+  (the only entry ever registered is `"finale2.sco"`, and the destroy loop's free branch is
+  unreachable — §2h).
+- **Concurrency.** Single-threaded, like every other test here: the init is called once per
+  wrapper call in one thread, and the fake-pak vector is not guarded in either tree.
+- **The heap's own decision about the two leaked archives.** The test shows they are never
+  freed and never returned to a later build on this heap; whether a different heap would
+  place a third archive inside a leaked one is not a property of the module.
+
+---
+
 ## 3. Every piece that is still rebuilt
 
 `insns` is the linear sweep over the function's own bytes, i.e. what a proof row would
@@ -1345,7 +1483,7 @@ unregistered indexed absolute keeps the literal comparison.
 | audio install body | `0x10050AD0` | `0xF9` | 75 | EH4 (`push __except_handler4`, scope `0x10154384`, funclet `0x100619C1`) + the CRT clock/seed block through `fs:[2Ch]` and `TlsIndex` | resolve the `6A 06 68 ? ? ? ? 8D 8C` site once and write `rand() % 5 + 1` into its `push` immediate, gated on the transcribed `0x10050A50` gate | `RestoreDeathMusic`'s cell is closed; the gate and the three native wrappers around it are transcribed and proven | **the one recorded 1:1 divergence in that key**: the original's guard compares `dword_101A84C0` with the CRT per-thread word and may skip the whole block on a fresh process; the rebuild always writes. Recorded in `parity.md` §RestoreDeathMusic |
 | save converter | `0x10051B30` | `0x489` | 337 | EH registration (`fs:[0]`) + three `_Init_thread_header/footer` TLS guards + CRT file API (`fopen_s`, `fread`, `fclose`, `operator new`, `free`) + `std::string` (IDA's per-function total is 363: 337 plus the out-of-line funclet/abort blocks) | open the save, check `SAVE` at +0xC, walk eighteen chunks with `fread(9)` / `operator new(size-9)` / `fread(payload)` / `free`, remember chunks 9/13/16 (`0x4C45`/`0x1741`/`0x0E77`), then patch the three sites (`0x872185`, `0x7D8C50`, `0x8DA090`) | the walk, the three flag tests and the three patch values are pinned by `zp_save_walk` on both real saves and on three synthetic layouts, against the file re-read by the test's own parser (§2i); its two faults are asserted too — `std::bad_alloc` in-process, the uninitialised magic in a child process. What the test cannot run is anything but the decision: the three writes and the two hooks still need a save load | **high**: a corrupt save already faults (preserved), and the chunk-size conditions decide whether the new-format hooks are installed. A wrong condition converts a save wrongly instead of failing |
 | save prepare | `0x10051FD0` | `0x202` | 157 | same EH/TLS + `std::string` construction + the game's save-directory call | ask the game for the save directory, build `"<dir>\\<save name>"` as a `std::string`, call the converter | the directory call site is one of the key's six recovered scans; the *string* shape is not measured offline (§2i ends on it: `zp_save_walk` takes a path, so the prepare step is not in its reach) | moderate: a wrong path means the converter opens nothing (silent no-convert) or the wrong file |
-| OOC init (decode → register → build) | `0x1004B750` | `0xBFF` | 991 | EH (`fs:[0]`) + C++ container helpers (`0x10058620`, `0x1005CF20`) + `operator new` | decode the pinned resource, register it as the single fake-pak entry in the module's own table (`0x1016E43C`), then call the transcribed builder (§2h) for the 182,272-byte archive and read its write cursor back as the byte count | **proven end to end offline**: `zp_dump --ooc-selftest` checks the stream's Adler-32 trailer, the decoded table's `fnv1a 0xC883859F`, the archive's 182,272 bytes and `fnv1a 0xB5AF7B10`, and the header's `16`/`0xE9` words → PASS | low for the transform (fingerprints), **high** for when it runs: the original re-runs it on every call and leaks the previous archive; the rebuild keeps that |
+| OOC init (decode → register → build) | `0x1004B750` | `0xBFF` | 991 | EH (`fs:[0]`) + C++ container helpers (`0x10058620`, `0x1005CF20`) + `operator new` | decode the pinned resource, register it as the single fake-pak entry in the module's own table (`0x1016E43C`), then call the transcribed builder (§2h) for the 182,272-byte archive and read its write cursor back as the byte count | **proven end to end offline**: `zp_dump --ooc-selftest` checks the stream's Adler-32 trailer, the decoded table's `fnv1a 0xC883859F`, the archive's 182,272 bytes and `fnv1a 0xB5AF7B10`, and the header's `16`/`0xE9` words → PASS; **and its own semantics are a test**: `zp_ooc_init` (§2k) drives the init itself — three calls build three archives and free none (the guard has no writer), the cursor and the published mount count are the archive's 182,272 bytes, a damaged trailer and a dead first opcode still register and build, and the fake-pak entry is `"finale2.sco"` with 179,536 bytes of table | low: the transform is fingerprinted and the init's four semantics are asserted; what remains is the in-game mount (§2k) |
 | OOC handler (the key's arm) | `0x1004C3F0` | `0x3FB7` | 4185 (IDA's total 4199) | EH4 + a 16 KB C++ string builder (digit loops, `strtol`, `toupper`) | scan the branch anchor, publish four words, `VirtualProtect` and write the `E9`; scan the wrapper anchor, publish the mount/original call targets and write the `E8` | the arm's four published words and two writes are what the key's cell measures; both written bodies (`0x1004C3C0` 7, `0x1004C350` 41) are transcribed and proven | low: the handler only publishes and writes; a wrong word would show as a wrong mount target |
 
 ### Class C — TLS static-init guard
