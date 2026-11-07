@@ -1256,3 +1256,67 @@ memset - the original's fault, kept, recorded in `parity.md`, not run).
 **Open, not mine to edit.** `docs/review.md` line 14 says "14 tests" and line 24 `# 14/14`;
 it is 15/15. `readable-fusion/AGENTS.md`'s harness list also does not name `zp_nms_arena`.
 Both are outside the files this pass was given.
+
+## 2026-11-07 - the INI faults, executed: `zp_fault_parity`, 28 assertions
+
+**Closed:** the INI faults `docs/parity.md` carried in prose now have a behavioural
+test, `tests/fault_parity.cpp` (one executable, ctest `zp_fault_parity`, timeout 300 s
+so a re-introduced spin fails instead of hanging the suite). It writes one report file
+in the build tree (`fault_parity_child.report`, gitignored).
+
+**What it asserts**
+
+- `std::invalid_argument` of **exactly** that type (`typeid` pointer equality, not
+  `catch (...)`) out of `Catalogue::Read` -- the loader's own entry -- for `Key=abc`
+  and a spaces-only `Key= `; the parse stores the text first, so the throw is the read,
+  and an empty `Key=` throws nothing and reads the arm default.
+- `std::out_of_range` of exactly that type for `99999999999`, `-99999999999`,
+  `INT_MAX + 1` and `INT_MIN - 1`, with `INT_MAX`/`INT_MIN` still read (the boundary
+  really is `int`).
+- A first-line BOM: no throw, the document has no section, and **all 99** catalogue
+  keys read their arm default; the same text without the BOM sets every key, so the
+  default check cannot pass vacuously.
+- A key line before the first `[section]`: a **child process** exits `0xC0000005`, and
+  its report holds exactly `PHASE=control-parsed` + `PHASE=parse-start` and no
+  `PHASE=parse-returned`, so the crash is after the diagnostic point. In-process, the
+  shapes that return before the store are quiet: an empty value, a line without `=`, a
+  line starting with `=`, a comment; the same key line after a section is stored.
+- A line at/over the 255-byte buffer: 255 bytes are kept whole, 256 are cut after 255,
+  the remainder is parsed as a fresh line (a key can start there: `A=` + 253 `x` +
+  `B=2` stores `B=2`), and the parse terminates and reads the rest of the file.
+
+**Falsification.** Flipped the `typeid(std::invalid_argument)` comparison to `!=`,
+rebuilt, ran: `FAIL invalid_argument: Key=abc throws ... (threw class
+std::invalid_argument ("invalid stoi argument"))`, `28 check(s), 1 failure(s)`, exit 1.
+Reverted and rebuilt.
+
+**Two `docs/parity.md` corrections, both from the oracle, not from the test.**
+
+- The long-line row was in **Preserved faults** and said the original splits; the
+  oracle does not. `sub_10059D70` is the 7.65 parse body: a 256-byte buffer
+  (`String`/`Source[255]`), `getline(&String, 0x100)` at `0x10059E0E`, and the loop
+  tail `test byte ptr [eax+ecx+0Ch], 1 / jz 0x10059E00` at `0x1005A53E` -- i.e.
+  `while (!eof())` (MSVC eofbit is 1). A 256+ byte line fills the buffer, so `getline`
+  stores 255 bytes, consumes nothing and sets `failbit`, not `eofbit`; every later
+  `getline` is a sentry no-op, so the original re-reads the same buffer **forever** (a
+  startup hang). The tree's split is a divergence, and the row moved out of the table
+  into the note, which now states the measured original behaviour.
+- The BOM row's original-side mechanism is wrong: 1.41's `line[0] == 0xEF` is a
+  signed-`char` compare (`-17` against the literal `239`), so it can never be taken --
+  the image's `movsx` at `0x10059E93` shows `char` is signed -- and `sub_10059D70` has
+  no compare against `0xEF` at all. The tree's drop is the 1.41 *source's* intent,
+  pinned by the test; what the oracle's loader wrapper does with a BOM is unmeasured
+  (it builds a `wstring_convert<codecvt_utf8_utf16>` around the bytes before the memory
+  parse, `sub_10056130`), so the note records the oracle side as open rather than
+  settled. This is a candidate fidelity question for `source/config.ixx`, not touched
+  here.
+
+`docs/review.md` counts updated (17 -> 18 tests; the run-history paragraph now says
+which counts belong to which pass).
+
+**Gates.** `cmake --build --preset release` exit 0; `ctest --preset release` 18/18
+twice (7.67 s, 6.53 s); `python tools/parity_report.py 9` -> `build 9: 98 key(s)
+closed, 0 open, 1 oracle-verified (baseline incomplete)`; `python tools/verify_bodies.py
+...` -> `151 body(ies), 0 failure(s)`; `build\win-x86\Release\zp_dump.exe --ooc-selftest`
+-> `ooc selftest: PASS`; `python tools/check_fault_dialogs.py` -> `10 test source(s), 0
+failure(s)`.

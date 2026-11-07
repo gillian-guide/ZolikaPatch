@@ -8,8 +8,9 @@ fix.
 
 | contract | evidence |
 | --- | --- |
-| INI grammar (feather-ini-parser 1.41): 255-byte line buffer, first-line BOM drops the file, `#`/`//` comments only, strtok-on-`=` keys that keep a trailing space, values that keep their spaces, empty values not stored, last duplicate wins, a re-opened section starts empty, case-sensitive sections and keys | `zp_tests`, `TestConfigGrammar` |
+| INI grammar (feather-ini-parser 1.41): 255-byte line buffer, first-line BOM drops the file (the source's intent; the oracle's parse body has no live BOM branch -- see the note after the faults table), `#`/`//` comments only, strtok-on-`=` keys that keep a trailing space, values that keep their spaces, empty values not stored, last duplicate wins, a re-opened section starts empty, case-sensitive sections and keys | `zp_tests`, `TestConfigGrammar` |
 | Read boundary is `std::stoi` on the stored text with the arm's default | `zp_tests`, `TestConfigGrammar` |
+| The INI faults, by behaviour: `std::invalid_argument` of exactly that type on `Key=abc` and on a spaces-only `Key= `, nothing on an empty `Key=` (which reads the arm default); `std::out_of_range` of exactly that type past `int`, with `INT_MAX`/`INT_MIN` still read; a first-line BOM dropping the file (all 99 keys keep their default, with a no-BOM control that sets every key); the key-before-section store killing a child process with `0xC0000005` after its diagnostic line, while empty values, lines without `=` and lines starting with `=` never reach the store; and the 255-byte line split (255 kept whole, 256 cut, the tail parsed as a line, the parse terminating) | `zp_fault_parity` (28 checks; the null store is a child process) |
 | The two light tables: `Car<N>Name` / `Car<N>Angle` / `Car<N>Offset` with `N` = 1..512, the section gate, an empty name skipping the row, the hash stored before the value, the degrees-to-radians conversion, and the reader running before any option is read | `zp_model_tables` |
 | Build classification: the four version fields concatenated (`1.0.7.0` -> 1070, `1.2.0.43` -> 12043) and the original's switch; an unsupported executable is `unknown` and applies nothing | `zp_tests`, `TestBuilds` |
 | Option catalogue: 99 keys with the shipped value, the absent-key default and the build mask | `source/options.inc` (generated), `zp_tests` |
@@ -24,12 +25,11 @@ fix.
 
 | fault | condition | site |
 | --- | --- | --- |
-| `std::invalid_argument` escapes the loader | a non-numeric `[Options]` value (`Key=abc`, or `Key= ` of spaces only) | `Config::Integer` -> `std::stoi`, uncaught |
-| `std::out_of_range` escapes the loader | a numeric value outside `int` | same |
+| `std::invalid_argument` escapes the loader | a non-numeric `[Options]` value (`Key=abc`, or `Key=` whose value is spaces only, `Key= `) | `Config::Integer` -> `std::stoi`, uncaught; `zp_fault_parity` asserts the exact type |
+| `std::out_of_range` escapes the loader | a numeric value outside `int` | same; `zp_fault_parity` asserts the exact type, with `INT_MAX`/`INT_MIN` still read and one past each throwing |
 | `std::invalid_argument` / `std::out_of_range` escape the loader from a light-table value | a `[PopupLightAngles]` `Car<N>Angle` or `[HeadlightConeOffsets]` `Car<N>Offset` with no digits (`abc`, or a space-only value) or out of range (`1e999`), with a non-empty `Car<N>Name` | `Config::ReadModelTables` -> `std::stof`, uncaught; the original's inlined `strtof` and its two throw helpers (`0x100529BC` "invalid stof argument", `0x100529B1` "stof argument out of range"), reached with the row's hash already stored (`0x10052B0C` before `0x10052C14`, `0x1005265E` before `0x10052763`) |
-| the whole INI is dropped | the first line starts with a UTF-8 BOM | `Feather::Parse` |
-| null section dereference | a key line before the first `[section]` line | `Feather::Parse` |
-| a line longer than 255 bytes is split | the parser's 255-byte line buffer | `Feather::Parse` |
+| the whole INI is dropped | the first line starts with a UTF-8 BOM | `Feather::Parse` (the tree's model of the 1.41 source; the oracle's parse body has no live BOM branch -- see the note after the table) |
+| null section dereference | a key line before the first `[section]` line | `Feather::Parse`, `(*current)[key]` with `current` null; it kills the process, so `zp_fault_parity` runs it in a child and asserts exit `0xC0000005` after the child's diagnostic line (empty values, lines without `=` and lines starting with `=` never reach the store) |
 | the file-registry helpers fault on a scan miss | the original's one-time scans (`0x10051730`, `0x10051610`, `0x100517E0`) match nothing | `NewfilesObject` / `NewfilesCallObject` / `NewfilesCallAdd` read or call through the null the scan left, as the original's unguarded `mov eax,[esi]` with `ESI = 0` and its `call edx` do |
 | the DLC register call's `this` is undefined | every `LoadDLCs` run | the original calls the register entry (image base + the stored register RVA) with `ECX` left over from the preceding `strcpy_s`: `mov ecx,dword_1015AD70 / mov esi,dword_1015804C / … / lea esi,[esi+ecx] / call esi` (`0x10023220`-`0x10023276`). The callee uses it only through the loader-callback call this key replaces with `0x10023480` and through a branch its non-zero flag argument skips, so the value is never dereferenced. The transcription (`dlc_discovery`) leaves `ECX` exactly where the original leaves it -- no `this` is invented and no register is set up |
 | the steer consumer faults on a preamble miss | a build whose model-info array, bone getter or setter scan matches nothing leaves `dword_1015AD78` / `dword_10159B88` / `dword_1015D63C` / `dword_10159CDC` zero | `sub_10004C70` reads them unguarded (`mov eax,[eax+ecx*4]`, `call edx`, `call dword_1015D63C`); the transcription is the original's instruction stream, so a miss faults at the same instruction. 1.0.8.0 has all four patterns |
@@ -42,10 +42,36 @@ fix.
 | a double free is unguarded | the same pointer handed to the arena's free twice | `sub_10038430` has no membership check in front of the free: `0x10038449` tests the incoming pointer for null and nothing else, `0x10038457` recovers the base from `[pointer-4]`, and `0x10038474` calls `HeapFree` on it unconditionally. The rebuild keeps the same order (free, then erase) and the same missing guard. The second free therefore reads `[pointer-4]` from a block the heap owns again and hands `HeapFree` a base derived from the heap's own links rather than from the original's arithmetic; whether that is a no-op, a `STATUS_HEAP_CORRUPTION` termination or silent corruption is the heap's decision, so `zp_nms_arena` asserts only the knowable part (the pointer stops being a member after the first free) and does not run a double free |
 | the arena's request size is a 32-bit sum | a request of `2^32 - 2*unit` bytes or more (`0xFFFFFFE0` at the `0x10` floor) | `0x1003838B`'s `lea eax,[edi+esi*2]` adds `want + 2*unit` in 32 bits, so the request wraps to a tiny block while the `memset` at `0x100383C9` still fills `want` bytes - the allocate returns a block it cannot fill and the fill runs off the heap. The rebuild computes `want + unit * 2u` in `uint32_t` too, so the same input wraps the same way; the failure path the test asserts uses `0x7FFFFFF0`, whose sum `0x80000010` does not wrap, and the wrapping case is recorded here rather than run |
 
-Two of these remain assumptions, not measurements: feather 1.41's non-advancing
-`getline` on a long line (the original very likely spins; this tree continues), and
-CRLF folding (the original reads in text mode). The shipped INI's longest line is
-192 bytes, so the first is unreachable from it.
+Two of the rows above are not measurements of the oracle, and a third case -- now
+measured to *differ* from it -- has no row of its own:
+
+- **A line at or over the 256-byte buffer: the oracle hangs, this tree continues.**
+  The original's parser is `sub_10059D70`: a 256-byte buffer (the decompiler's
+  `String` at `[ebp-114h]` plus `Source[255]`), `getline(&String, 0x100)` at
+  `0x10059E0E`, and the loop tail `test byte ptr [eax+ecx+0Ch], 1 / jz 0x10059E00`
+  at `0x1005A53E` -- feather 1.41's `while (!file.eof())` (the `1` is MSVC's
+  `eofbit`). A line of 256 bytes or more fills the buffer, so `getline` stores 255
+  bytes, consumes nothing and sets `failbit`, not `eofbit`; every later `getline` is
+  a sentry no-op, so `eof()` stays false and the loop re-reads the same buffer
+  forever. The oracle's outcome on such a line is a **startup hang**, not a split, so
+  the split is a divergence, not a preserved fault, and it is not reproduced here.
+  `zp_fault_parity` pins the tree's half: a 255-byte line is kept whole, a 256-byte
+  one is cut after 255 bytes, the rest is parsed as a fresh line (so a long value's
+  tail can start a key), and the parse terminates. Unreachable from the shipped INI,
+  whose longest line is 192 bytes.
+- **The first-line BOM row is the tree's model of the 1.41 source, not a measured
+  oracle fault.** The 1.41 header tests `line[0] == 0xEF` on a `char`; with MSVC's
+  signed `char` that value is `-17` against the literal `239`, so the branch can
+  never be taken -- the oracle's own `movsx` at `0x10059E93` shows the build's `char`
+  is signed -- and the 7.65 parse body `sub_10059D70` has no compare against `0xEF`
+  at all. This tree keeps the source's *intent* (the whole file is dropped) and
+  `zp_fault_parity` pins it: no throw, every one of the 99 catalogue keys keeps its
+  arm default, and the same text without the BOM sets every key as a control. What
+  the oracle does with a BOM-prefixed file is not measured -- its loader builds a
+  `wstring_convert<codecvt_utf8_utf16>` around the bytes before the memory parse
+  (`sub_10056130`) -- so the oracle side of that row is open.
+- **CRLF folding** stays an assumption, not a measurement: the original reads in
+  text mode, and this tree folds `\r\n` to `\n` itself.
 
 ## Rebuilt pieces
 

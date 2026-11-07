@@ -184,6 +184,24 @@ target_link_libraries(zp_speedup_clock PRIVATE zp_modules)
 add_test(NAME zp_speedup_clock COMMAND zp_speedup_clock)
 set_tests_properties(zp_speedup_clock PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
+# The documented preserved faults of the INI loader, asserted by their observable
+# behaviour instead of by prose: the two conversion throws by *exact* type
+# (std::invalid_argument on `Key=abc` and `Key=<space>`, std::out_of_range past
+# `int`), the first-line BOM dropping every option, the key-before-section null
+# section store (a child process that must exit 0xC0000005 *after* its diagnostic
+# line), and what this tree does with a line at/over the 255-byte buffer (it splits
+# and continues; the oracle's parse loop cannot advance past a full buffer and
+# re-reads it forever -- docs/parity.md records that measured difference). The
+# timeout turns a re-introduced spin into a failure, not a hung suite. Offline: no
+# game image, no ASI load, no file beyond the child's report.
+add_executable(zp_fault_parity tests/fault_parity.cpp)
+set_target_properties(zp_fault_parity PROPERTIES CXX_SCAN_FOR_MODULES ON)
+target_link_libraries(zp_fault_parity PRIVATE zp_modules)
+add_test(NAME zp_fault_parity COMMAND zp_fault_parity)
+set_tests_properties(zp_fault_parity PROPERTIES
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  TIMEOUT 300)
+
 add_executable(zp_dump tests/dump_main.cpp)
 set_target_properties(zp_dump PROPERTIES CXX_SCAN_FOR_MODULES ON)
 target_link_libraries(zp_dump PRIVATE zp_modules)
