@@ -104,3 +104,17 @@ single-key matrix: 891 cell(s): 890 exit 0, 1 expected fault (NoImpostorHeightCu
 - `.agents/rewrite/05-body-audit.md` - the independent audit of all bodies.
 - `source/stability.ixx`, `vehicles.ixx`, `graphics.ixx`, `loading.ixx` - the four
   largest feature modules, in the house shape.
+
+## Stability of the evidence
+
+Measured, not asserted: five consecutive full suite runs (17/17 each), then a
+`--clean-first` release rebuild (17/17) and the same suite under the `Trace`
+configuration (17/17). The one transient seen earlier - `zp_native_guard` failing
+twice immediately after a relink, then passing every run since - did not reproduce in
+those seven runs, and its child-process shape is the only plausible explanation left;
+it is recorded here rather than dismissed.
+
+Faulting tests suppress the Windows fault dialog through `SetErrorMode`, and
+`tools/check_fault_dialogs.py` (ctest `zp_fault_dialogs`) fails if any test that
+mentions `--child`, `0xC0000005`, `STATUS_ACCESS_VIOLATION` or `SEH` reaches `main`
+without it. That check exists because the mistake happened twice.
