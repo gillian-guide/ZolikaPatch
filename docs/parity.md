@@ -947,18 +947,19 @@ excludes by design).
   game's frame clock `0xB4D3A0` and the two resumes (`0xA81B1F` and `+1878`). Each
   is rebased through the image's preferred base, so the offline dump reads the
   same words at a heap base that the game reads at `0x400000`.
-- The literals the bodies read are the original's `.data`, declared with the type
-  the instruction reads and initialised with the number it is, never with a bit
-  pattern: `0.0078125`, `255.0`, `0.075000003` (the original's own value; its slot
-  holds that decimal double, not the widening of `0.075f`), `0.025`, `-1.0` (double
-  and float), `3.1415927` / `6.2831855` / `-3.1415927` (the original's values, not
-  pi and 2pi), `127.5f`, `0.1f`. Every decimal round-trips to the original's bytes.
-  Hex survives only where the bytes are not a number: the two `xorps` sign masks
-  (four single-precision sign bits at `0x101523F0`, two double-precision ones at
-  `0x101523E0`; 16 bytes because `xorps` reads sixteen, hence `alignas(16)`), and
-  `CutsceneFixes`' `andps` sign mask `0x7FFFFFFF`. `Vehicles`' `sub_10004C70`
-  constants and `CutsceneFixes`' float pool are written the same way, each filled
-  with the shortest decimal that reproduces its recovered bytes.
+- The literals the bodies read are the original's `.data`, declared with the type the
+  instruction reads and initialised with the number it is, never with a bit pattern:
+  `0.0078125`, `255.0`, `0.075000003` (`0.075f` printed to 9 significant digits and read
+  back as a double; the original's slot is that decimal, not a widened `0.075f`),
+  `0.025`, `-1.0` (double and float), `3.1415927` / `6.2831855` / `-3.1415927` (the
+  original's values, not pi and 2pi), `127.5f`, `0.1f`; every decimal round-trips to the
+  original's bytes. Hex survives only where the bytes are not a number: the two `xorps`
+  sign masks (four single-precision sign bits at `0x101523F0`, two double-precision ones
+  at `0x101523E0`; 16 bytes because `xorps` reads sixteen, hence `alignas(16)`), and
+  `CutsceneFixes`' `andps` sign mask `0x7FFFFFFF`. `Vehicles`' `sub_10004C70` constants
+  and `CutsceneFixes`' float pool are written the same way, each filled with the shortest
+  significant-digit decimal that reproduces its recovered bytes (an integral value keeps
+  its `.0`/`f` so the type stays visible; that does not change the bits).
 - The advance helper (`0x100241E0`) is transcribed rather than rebuilt. Its only
   indirect call is the game's `VirtualProtect`, which the original reaches through
   its own IAT slot (`FF 15`), so ours is a `call dword ptr [slot]` as well: the

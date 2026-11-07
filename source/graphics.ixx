@@ -709,15 +709,16 @@ extern "C"
     // The body's literal pool, from the original ASI's .rdata. Each is declared
     // with the type its instruction reads and initialised with the number it is;
     // every literal round-trips to the original's bytes at the VA in its comment.
-    // The one mask stays a hex word because it is not a number.
-    alignas(8) double zpatch_cutscene_zero = 0.0;        // 0x101522F0
-    // 0x10152340: the original's 0.3333 -- not 1/3.
-    alignas(8) double zpatch_cutscene_limit = 0.3333;
+    // The one mask stays a hex word because it is not a number. No explicit
+    // alignment: a scalar load does not need one on x86.
+    double zpatch_cutscene_zero = 0.0;        // 0x101522F0
+    // 0x10152340: the double nearest 0.3333, not 1/3.
+    double zpatch_cutscene_limit = 0.3333;
     // 0x101523D0: an `andps` sign mask, not a number (the body clears the sign bit
     // of a difference before comparing it), so this one stays a hex word.
     uint32_t zpatch_cutscene_abs_mask = 0x7FFFFFFFu;
-    alignas(4) float zpatch_cutscene_eps_a = 0.05f;      // 0x101522F8
-    alignas(4) float zpatch_cutscene_eps_b = 0.5f;       // 0x101522FC
+    float zpatch_cutscene_eps_a = 0.05f;      // 0x101522F8
+    float zpatch_cutscene_eps_b = 0.5f;       // 0x101522FC
 }
 
 // The loader preamble's salt this body resolves its native with (dword_1015803C)

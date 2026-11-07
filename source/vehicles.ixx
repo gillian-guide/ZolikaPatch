@@ -124,17 +124,19 @@ extern "C"
     // the number it is. Every literal below round-trips to the original's .rdata
     // bytes at the VA in its comment, bit for bit; the proof compares an absolute
     // operand as a slot, so it cannot see the value, and the value is pinned here.
-    alignas(8) double zpatch_steer_neg_pi = -3.141592653589793;   // 0x101523A8
-    alignas(8) double zpatch_steer_pi = 3.141592653589793;        // 0x10152358
-    alignas(8) double zpatch_steer_degrees = 180.0;               // 0x10152370
-    alignas(8) double zpatch_steer_half = 0.5;                    // 0x10152348
-    alignas(8) double zpatch_steer_neg_half = -0.5;               // 0x10152398
-    alignas(8) double zpatch_steer_three_quarters = 0.75;         // 0x10152350
-    alignas(8) double zpatch_steer_quarter = 0.25;                // 0x10152338
-    alignas(8) double zpatch_steer_epsilon = 0.01;                // 0x10152320
-    alignas(8) double zpatch_steer_neg_epsilon = -0.01;           // 0x10152390
-    alignas(4) float zpatch_steer_one = 1.0f;                     // 0x10152310
-    alignas(4) float zpatch_steer_hundred = 100.0f;               // 0x10152388
+    // No explicit alignment: a scalar load does not need one on x86, and the
+    // compiler gives doubles and floats their natural alignment anyway.
+    double zpatch_steer_neg_pi = -3.141592653589793;   // 0x101523A8
+    double zpatch_steer_pi = 3.141592653589793;        // 0x10152358
+    double zpatch_steer_degrees = 180.0;               // 0x10152370
+    double zpatch_steer_half = 0.5;                    // 0x10152348
+    double zpatch_steer_neg_half = -0.5;               // 0x10152398
+    double zpatch_steer_three_quarters = 0.75;         // 0x10152350
+    double zpatch_steer_quarter = 0.25;                // 0x10152338
+    double zpatch_steer_epsilon = 0.01;                // 0x10152320
+    double zpatch_steer_neg_epsilon = -0.01;           // 0x10152390
+    float zpatch_steer_one = 1.0f;                     // 0x10152310
+    float zpatch_steer_hundred = 100.0f;               // 0x10152388
 
     // The two bone names the consumer hands sub_10003F40: the original's own .rdata
     // strings at 0x10129518 and 0x10129570, loaded with `mov edx, imm32`.
@@ -519,11 +521,11 @@ static __declspec(naked) void CarDecalsSelectorShim()
 // the SSE sequence: the value and the outcome are what the detour's contract is.
 static void BikePhysicsClamp() noexcept
 {
-    // 0x3BDA740E, the constant the original stores when the value is below the
-    // threshold. The static assertion pins the float the decimal below is meant to
-    // be: the neighbouring decimals are different floats.
-    constexpr float kBikeSpeedThreshold = 0.0066666668f;
-    static_assert(std::bit_cast<uint32_t>(kBikeSpeedThreshold) == 0x3BDA740Eu);
+    // The float the original's 0x3BDA740E immediate denotes, stored when the value
+    // is below the threshold; 0.006666667f is the shortest decimal that is that
+    // float. The comparison's own 8-byte constant is 0.006666666665 (the qword at
+    // 0x10152308).
+    constexpr float kBikeSpeedThreshold = 0.006666667f;
 
     const float value = zpatch_bike_value;
     if (0.006666666665 > static_cast<double>(value))

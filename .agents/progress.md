@@ -1532,3 +1532,52 @@ Gates: build exit 0; ctest 20/20 twice (13.81 s / 11.21 s); 98 closed / 0 open /
 oracle-verified; 151 bodies 0 failure; ooc-selftest PASS; check_fault_dialogs 12 sources,
 0 failures; zp_ooc_init 54 checks, 0 failures.
 
+## 2026-11-07 - the literal pool: numbers, not hex bit patterns (steer consumer, CutsceneFixes)
+
+**Changed:** `source/vehicles.ixx` (9 doubles + 2 floats) and `source/graphics.ixx` (2
+doubles + 2 floats) - the slots the transcribed asm reads with `mulsd`/`movsd`/`divsd`/
+`comisd`/`ucomisd` and `movss`/`mulss` - plus the convention note in `docs/parity.md`.
+Each slot is now declared with the type its instruction reads and initialised with the
+shortest significant-digit decimal that round-trips to the original's `.rdata` bytes (not
+a hex word, no `bit_cast`, no explicit `alignas`: a scalar load does not need one on x86,
+and the linker still placed every slot at the same address, all doubles 8-aligned).
+
+- `double`: `-3.141592653589793`/`3.141592653589793` (0x101523A8/0x10152358), `180.0`,
+  `0.5`, `-0.5`, `0.75`, `0.25`, `0.01`/`-0.01`, `0.0` (0x101522F0), `0.3333`
+  (0x10152340, the double nearest 0.3333, not 1/3).
+- `float`: `1.0f`, `100.0f`, `0.05f`, `0.5f`.
+- Left as hex, because it is not a number: `zpatch_cutscene_abs_mask = 0x7FFFFFFF`, the
+  `andps` sign mask (`movss` then `andps xmm0, xmm1`; the body clears the sign bit of a
+  difference before comparing). Mutable slots (`zpatch_cutscene_accum`,
+  `zpatch_engine_phase`, `zpatch_engine_timestep`) were outside the shape: they are
+  init-0 state written by the body, not literal-pool constants.
+- Same file, same convention, outside the hex shape: `BikePhysicsClamp`'s
+  `kBikeSpeedThreshold` lost the `static_assert(std::bit_cast<uint32_t>(...) ==
+  0x3BDA740E)` the rule forbids (the rule wants the number, not a bit-pattern assertion)
+  and now reads `0.006666667f`, the shortest decimal that is 0x3BDA740E (the previous
+  spelling, `0.0066666668f`, was 8 digits and not the shortest). Bits unchanged: the
+  immediate appears once in the built ASI, as in the oracle, and the comparison's
+  `0.006666666665` qword is the oracle's `0x10152308` (verified by disassembling the
+  original's `sub_1001EF30`).
+
+**Provenance:** every documented hex was re-read from the oracle at the VA in its comment
+(16/16 MATCH), and every written literal re-parsed and packed to exactly those bits
+(15/15). Note for the audio block: its `zpatch_mf_time_mul` byte pattern is the double
+denoted by the decimal `0.075000003` (0x3FB333334015BC21), not `0.075f` widened
+(0x3FB3333340000000).
+
+**Byte proof:** baseline snapshot of each slot from the built ASI (`symbol -> VA`, PE
+section mapping, zero-filled `.data` tail read as the zeros the loader maps), then the
+same after the edit: all 16 checked lines (15 converted + the mask kept as hex)
+byte-identical at unchanged VAs and whole-image occurrence counts unchanged (9 of the
+converted patterns are unique; `pi`/`180.0`/`0.5` occur 3x, `1.0f` 12x, `0.5f` 18x, the
+mask 155x, and the zero slot is zero-fill - the counts are inherited, not introduced,
+which is why the address-based check is the strong one). `steer_consumer` and
+`cutscene_chain_b` still pass the body proof with the operands compared as slots.
+
+**Gates:** build exit 0; ctest 20/20 twice (24.26 s / 14.49 s, serial); `parity_report.py 9`
+-> `build 9: 98 key(s) closed, 0 open, 1 oracle-verified (baseline incomplete)`;
+`verify_bodies.py` -> `151 body(ies), 0 failure(s)`; `zp_dump --ooc-selftest` ->
+`ooc selftest: PASS`; `check_fault_dialogs.py` -> `12 test source(s), 0 failure(s)`.
+
+
