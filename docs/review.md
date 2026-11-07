@@ -134,3 +134,32 @@ run, in ten standalone check_empty_dump.py runs, or in the clean rebuild and Tra
 runs. Both are recorded rather than dismissed: if a relink-time failure reappears, the
 first thing to check is whether a test's child process is still running when the
 build directory changes underneath it.
+
+## Final state
+
+Everything in scope is implemented, proven and documented, and the three things that
+remain cannot be settled without a running game:
+
+1. **A live run.** Six rebuilt pieces carry behavioural tests with demonstrated failure
+   modes - the save converter on the real saves, the native guards' fault paths, the
+   arena's alignment and fill, the speedup clock's arithmetic, the OOC init's leak and
+   re-registration, and the DFA close frame's retry. Two do not: the ROM message service,
+   which needs its window and pump driven by the game, and the CRT destroy loop, whose
+   free branch is unreachable in both trees (recorded in `rebuilt.md` 2n). Every rebuilt
+   piece names the instruction that blocks transcription and what stays unproven.
+2. **`SkipLauncher`'s baseline.** The key is implemented in full and replayed against the
+   oracle's own recovered rows on all nine images; the stored baseline records a 7-row arm
+   the reference never calls, so the scoreboard reports it as oracle-verified rather than
+   closed. Regenerating that baseline needs the original ASI executed per image.
+3. **The 1.0.0.0 fault.** `NoImpostorHeightCutoff` reproduces the original's access
+   violation instead of guarding it, so that image's per-option dump stops there by
+   design. The single-key matrix records 890 of 891 cells exiting 0 with that one
+   expected fault.
+
+What the tree can say, and the documents say precisely this: **98 of 99 keys closed**
+with the 99th measured against the oracle; **151 bodies proven whole**, every differing
+byte across all rows classified as a slot, an immediate or a registered table with
+nothing unclassified; **20 tests** plus nine measurement tools; the **18-cell matrix**
+generated with `differing 0` on all nine images and every residual attributed; and the
+INI contract pinned down to the two inputs that crash and hang, because that is what the
+original does.
