@@ -1234,10 +1234,13 @@ MemoryArena::Methods MemoryArena::Get()
 }
 
 // ---------------------------------------------------------------------------
-// NewFilesCompatibility, as the original handler applies it: the two file-type
-// update calls become this module's bodies and the registrar's own `ret` becomes
-// a jump to the registration body. Both arms are gated on the two modules the
-// original refuses to run beside.
+// NewFilesCompatibility, as the original handler applies it: the two sides are the
+// script native it registers and the radio-HUD texture lookups. The two radio-HUD
+// update calls become this module's bodies and the registrar's own `ret` becomes a
+// jump to the registration body. Both arms are gated on the two modules the original
+// refuses to run beside. What the three radio-HUD pieces resolve to - the current
+// texture dictionary, pgDictionary::Lookup and CSprite2d::SetTexture - is recorded in
+// docs/rebuilt.md 2m, since none of them can be driven offline.
 extern "C"
 {
     // dword_10159C08: the game's file-registration entry, published from the
@@ -1291,11 +1294,15 @@ namespace
         return pattern.empty() ? 0u : reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0));
     }
 
-    // sub_10051730, recovered VA 0x10051730: the container the file registry hangs
-    // off. The scan finds the game's `mov esi, <global>`, whose operand is the
-    // global itself; the global is dereferenced again on every call because the
-    // game rebuilds the registry at runtime. A miss reads through the null the scan
-    // left behind, as the original's `mov eax,[esi]` with ESI = 0 does.
+    // sub_10051730, recovered VA 0x10051730: the game's *current texture
+    // dictionary*, not a file registry. The scan lands on `mov esi,g_pCurrentTxd`
+    // inside CSprite2d::SetTexture, so the operand is that global and the
+    // dereference returns the TXD the game has just made current. It is scanned
+    // once and dereferenced on every call because the game swaps the dictionary as
+    // it streams. A miss reads through the null the scan left behind, as the
+    // original's `mov eax,[esi]` with ESI = 0 does. The game-facing behaviour of
+    // this half is documented in docs/rebuilt.md 2m, which also records that it
+    // cannot be driven from a synthetic image.
     void* NewfilesObject()
     {
         static const uintptr_t match = FirstMatch(

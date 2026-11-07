@@ -32,7 +32,7 @@ fix.
 | null section dereference | a key line before the first `[section]` line | `Feather::Parse`, `(*current)[key]` with `current` null; it kills the process, so `zp_fault_parity` runs it in a child and asserts exit `0xC0000005` after the child's diagnostic line (empty values, lines without `=` and lines starting with `=` never reach the store) |
 | a BOM-prefixed INI faults; the file is not dropped | the first line starts with the UTF-8 BOM (`EF BB BF`), so the line it prefixes is lost | the oracle has no BOM branch: the 1.41 source's `if (line[0] == 0xEF)` cannot fire (`char` is signed -- `movsx eax, [ebp+esi+Source]` at `0x10059E93` -- so the byte promotes to `-17` and never equals the literal `239`), and `sub_10059D70` carries no `0xEF` compare and no `memmove`. The BOM line reaches the ordinary dispatch, fails `cmp dl, 5Bh ; '['` at `0x10059E5E`, and has no `=`, so `strtok` leaves the second token null (`strtok(&String, "=")` at `0x1005A11C`) and the line is dropped whole -- including the `[Options]` header it carried. The loader zeroes the 0x30-byte INI object first (`memset(&obj, 0, 0x30)` at `0x10052419`), so `current` (`+0x20`) stays null and the next key line dies on `mov esi, [eax+20h]` / `mov ecx, [esi]` at `0x1005A2DA`-`0x1005A2E3`. `zp_fault_parity` runs it in a child that first records the header being swallowed *without* faulting, then asserts exit `0xC0000005` after `PHASE=parse-start` |
 | the parse never terminates on a line at or over 256 bytes | any line with a 256th byte before its newline | `sub_10059D70` reads lines with `getline(&String, 0x100)` at `0x10059E0E`. Measured against MSVCP140 (`14.51.36247.0`; the call goes through the import at `0x100631C0`, so this is the DLL's `basic_istream<char>::getline`, not image code): 255 bytes is the longest line that is stored and completed, a 256th byte stores 255 and sets `failbit` while `eofbit` stays clear, and the loop's only exit is the `eofbit` test (`test byte ptr [eax+ecx+0Ch], 1` / `jz 0x10059E00` at `0x1005A53E`). Nothing clears `failbit`: the body's `out.clear()`/`out.str("")` clear the *local stringstream*, never the file stream. So every later `getline` is a sentry no-op that leaves the buffer untouched and the loop re-parses the same 255 bytes for ever (a key-shaped line re-stores the same value, a section-shaped one re-creates its key map). `zp_fault_parity` pins both sides in child processes: 255 exits `0` after reading the values, 256 is still spinning when the test's 5 s wait expires and is then terminated |
-| the file-registry helpers fault on a scan miss | the original's one-time scans (`0x10051730`, `0x10051610`, `0x100517E0`) match nothing | `NewfilesObject` / `NewfilesCallObject` / `NewfilesCallAdd` read or call through the null the scan left, as the original's unguarded `mov eax,[esi]` with `ESI = 0` and its `call edx` do |
+| the NewFiles texture helpers fault on a scan miss | the original's one-time scans (`0x10051730`, `0x10051610`, `0x100517E0`) match nothing | `NewfilesObject` / `NewfilesCallObject` / `NewfilesCallAdd` read or call through the null the scan left, as the original's unguarded `mov eax,[esi]` with `ESI = 0` (`0x100517CE`), its `call edx` (`0x1005170F`) and its `call esi` (`0x1005187B`) do. None of the nine cells misses the object string; 1.2.0.43 has no image here, and 1.2.0.59 (not a gated build) misses it because the code has a different instruction order (`rebuilt.md` §2m) |
 | the DLC register call's `this` is undefined | every `LoadDLCs` run | the original calls the register entry (image base + the stored register RVA) with `ECX` left over from the preceding `strcpy_s`: `mov ecx,dword_1015AD70 / mov esi,dword_1015804C / … / lea esi,[esi+ecx] / call esi` (`0x10023220`-`0x10023276`). The callee uses it only through the loader-callback call this key replaces with `0x10023480` and through a branch its non-zero flag argument skips, so the value is never dereferenced. The transcription (`dlc_discovery`) leaves `ECX` exactly where the original leaves it -- no `this` is invented and no register is set up |
 | the steer consumer faults on a preamble miss | a build whose model-info array, bone getter or setter scan matches nothing leaves `dword_1015AD78` / `dword_10159B88` / `dword_1015D63C` / `dword_10159CDC` zero | `sub_10004C70` reads them unguarded (`mov eax,[eax+ecx*4]`, `call edx`, `call dword_1015D63C`); the transcription is the original's instruction stream, so a miss faults at the same instruction. 1.0.8.0 has all four patterns |
 | the headlight-shadow check faults on a null lookup or object | a build whose `dword_10159C0C` scan matched nothing, or a call with a null object | `sub_1001AD20`'s `call dword_10159C0C` (`0x1001AD5C`) and `movsx eax, word [edi+2Eh]` (`0x1001AD62`) are both unguarded in the original; the rebuild calls first and loads second, so it faults on the same instruction of either condition (the key's section below records the rebuild) |
@@ -1125,24 +1125,43 @@ request answering null with the arena still usable — 246 checks. A double free
 one thing it does not run, and cannot: see the preserved-fault row above.
 
 **`NewFilesCompatibility`.** Gated on the original's two refused neighbours
-(`GTAC.dll`, `JacksIVFixes.asi`), in both the publish and the install. The publish
-reads the registrar anchor's `call` operand (`68 64 28 C8 67 E8`, RVA `0x70A954`,
-`+6`) and computes the game's register entry (`match + 10 + displacement`,
-`0x625620` on 1.0.8.0); the install retargets the two file-type update calls and
-replaces the registrar's own `ret` at `0xB0A970`. The registration tail
-(`pushad`/`call`/`popad`/`ret`) is transcribed and proven; the two update bodies are
-rebuilt with the same ABI (`__fastcall`, object in `ECX`, plain `ret`, the answer in
-`AL` — the site's caller at `0x89614E` overwrites `EAX`, so only `AL` is observed) and
-the same call order. Their own stream is transcribable but three of their four callees
-are TLS-guarded scans (`rebuilt.md` §3 class C) and two would need `__fastcall` entry
-shims, so they stay class D there. They hash the file name
-through the transcribed resolver `sub_10003E50` (`Shared::ValueResolver()`), not a
-C++ hash, so a `hash:NNNN` name resolves as it does in the original, and the three
-scan-resolved helpers use the original's own signatures (`8B 35 …` for the
-container, `85 C9 53 55 56 57 74 40 …` / `53 55 8B 6C 24 0C 56 57 EB 06` for the
-membership query, `8B 0F 85 C9 74 ? 0F B7 41 0A 66 85 C0` minus `0x14` for the
-append). All three keep the original's unguarded behaviour: a scan miss reads or
-calls through the null it left.
+(`GTAC.dll`, `JacksIVFixes.asi`), in both the publish and the install. The feature has
+two halves, and they touch different game systems:
+
+- **The script half.** The publish reads the anchor `68 64 28 C8 67 E8` — the
+  `push 0x67C82864` / `call _registerNative` pair just before the end of
+  `CScriptCommands::RegisterCoreScriptCommands` (RVA `0x70A954`, the call at
+  `0xB0A959`) — and computes `match + 10 + displacement` = `_registerNative`
+  (`0x625620` on 1.0.8.0). The install replaces the function's own `ret` at
+  `0xB0A970` (0x1C bytes after the anchor's `push`) with the registration tail
+  (`pushad` / `call` / `popad` / `ret`, transcribed and proven), which registers
+  native command `0x2C89A1F9` with handler `sub_100515D0` (`mov eax,[ecx]` /
+  `mov dword ptr [eax],1` / `ret` — it marks its first argument and returns it).
+- **The radio half.** The install retargets the two per-slot update calls in the
+  `RadioLogo<N>` TXD loaders (`sub_8960B0` for a station's first load, `sub_896180`
+  for a reload), whose pristine targets `sub_8936A0`/`sub_893680` are ten
+  instructions each: `if (name[0]) SetTexture(sprite, name); return name[0] != 0;`.
+  The two rebuilt update bodies keep that shape and
+  the same ABI (`__fastcall`, the dictionary/sprite in `ECX`, the hash/name on the
+  stack, plain `ret`, the answer in `AL`; the site's caller discards it — the next
+  instructions at `0x89614E` are `mov esi,[esi]` / `test esi,esi`) and insert a
+  membership test before the call: a sprite whose name the just-loaded TXD does not
+  contain keeps its previous texture, where the pristine call clears it. Their own
+  stream is transcribable but three of their four callees are TLS-guarded scans
+  (`rebuilt.md` §3 class C) and two would need `__fastcall` entry shims, so they
+  stay class D there. They hash the file name through the transcribed resolver
+  `sub_10003E50` (`Shared::ValueResolver()`), not a C++ hash, so a `hash:NNNN` name
+  resolves as it does in the original.
+
+The three scan-resolved helpers are `g_pCurrentTxd` (`8B 35 …`, the current texture
+dictionary), `rage::pgDictionary<grcTexture>::Lookup` (`85 C9 53 55 56 57 74 40 …`,
+falling back to the older builds' `53 55 8B 6C 24 0C 56 57 EB 06`) and
+`CSprite2d::SetTexture` (`8B 0F 85 C9 74 ? 0F B7 41 0A 66 85 C0` minus `0x14`); no
+"file registry" is involved, and the "append" is a texture set. All three keep the
+original's unguarded behaviour: a scan miss reads or calls through the null it left.
+`rebuilt.md` §2m identifies each against 1.0.8.0, carries the per-image resolution
+table, and records why the three cannot be driven by a synthetic test — their object
+is the game's live TXD, not a parameter.
 
 **`LoadDLCs`.** The original handler does not scan. It switches on the build id and,
 for each of 1.0.6.0, 1.0.7.0 and 1.0.8.0, stores three game entry points and rewrites
@@ -1516,7 +1535,10 @@ body reads a table through an indexed absolute operand:
    `zp_save_walk` does for the converter's decision, `zp_nms_arena` for the arena's
    scheme, distance word, fill, membership and free path, and `zp_ooc_init` for the
    OOC init's re-run, its cursor, its registration on a failed decode and its entry
-   (`rebuilt.md` §2i, §2j, §2k).
+   (`rebuilt.md` §2i, §2j, §2k). The three `NewFilesCompatibility` scans mark the
+   limit of that rule: their result is the game's live TXD state and a call into the
+   game's own sprite code, not a value this module computes, so `rebuilt.md` §2m
+   records the identification and the live check that has to stand in for a test.
 
 **An indexed absolute table read is no longer a rebuild reason.** If the body reads a
 table through `[table + reg*4]` (or another indexed absolute form), the fifth part is

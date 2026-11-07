@@ -1431,3 +1431,58 @@ Gates: build exit 0; ctest 20/20 twice (zp_dfa_close 1.3 s); 98 closed / 0 open 
 oracle-verified; 151 bodies 0 failure; ooc-selftest PASS; check_fault_dialogs 12
 sources 0 failures.
 
+## 2026-11-07 - the NewFiles scans: a texture dictionary, not a file registry, and not reachable offline
+
+The three class-C pieces this round took - 0x10051730 (55 instructions), 0x10051610 (74)
+and 0x100517E0 (53) - cannot be pinned by a synthetic test, and the labels this tree
+carried for them were wrong. Read against the oracle and GTA IV 1.0.8.0:
+
+- 0x10051730 returns **the current texture dictionary, *g_pCurrentTxd** (the global is
+  at game VA 0x19CE510). The signature finds `mov esi,g_pCurrentTxd` at 0x85DF9B inside
+  CSprite2d::SetTexture; the body reads that instruction's operand (`mov eax,[eax+2]`)
+  and dereferences it (`mov eax,[eax]`).
+- 0x10051610 is **rage::pgDictionary<grcTexture>::Lookup** (0x43A490 on 1.0.8.0; the older
+  builds' fallback is 0x4059F0 on 1.0.0.0, 0x426430 on 1.1.1.0, ...).
+- 0x100517E0 is **CSprite2d::SetTexture** (0x85DF40), because the signature lands at +0x14
+  and the body calls `match-0x14`. It does not append: it releases the sprite's old
+  texture, looks the name up in the current TXD and stores the new one (or clears it).
+
+The consumers are the radio HUD's TXD loaders: __readRadioDat -> sub_8960B0 (first load)
+and sub_896180 (reload), which loop the station list at 0x11F8114, build "RadioLogo%d",
+call CTxdStore::loadFile/addRef/saveCurrentTxd/setCurrent and walk the sprite list at
+0x11F8110 calling sub_8936A0/sub_893680. Those ten-instruction functions are
+`if (name[0]) SetTexture(sprite,name); return name[0]!=0;` (name at +0x10/+0x10F, sprite at
++8/+4); the mod's update bodies add the membership test, so a sprite whose name the
+just-loaded TXD lacks keeps its previous texture instead of being blanked. The other half
+is not a file registry either: the published call operand is _registerNative (0x625620),
+the replaced `ret` at 0xB0A970 is the tail of CScriptCommands::RegisterCoreScriptCommands,
+and the mod registers native 0x2C89A1F9 with handler 0x100515D0.
+
+Why no test: 0x10051730 takes no arguments (its input is GetModuleHandleA(0) and the game's
+global); 0x10051610/0x100517E0 dispatch into game code. A fabricated dictionary or sprite
+would assert the test's own stand-in, a fabricated image would only prove find_pattern found
+the bytes the test embedded, and the per-string scan cache rules out a two-image fallback
+test anyway. The only offline-observable part is the miss: in a test process
+GetModuleHandleA(0) is the test exe, so 0x10051730 faults on `mov eax,[esi]` with ESI=0
+(read at 0), and the other two call 0. That is one instruction of the fault path and no hit.
+
+The per-image scan (nine images, base 0x400000) is rebuilt.md §2m, and it is the evidence a
+test could not replace: the object string matches once on all nine; the primary membership
+string on 1.0.8.0/1.1.3.0 and the older variant on the other seven; and on 1.0.0.0 the add
+string's first hit is 0x4433E7, a release loop inside 0x443030, so `match-0x14` is
+0x4433D3, mid-function. That is the original's own latent fault (the rebuild takes the same
+first hit), and it is why a synthetic hit would prove nothing. 1.2.0.59's own SetTexture has
+a different instruction order at 0x8D4189 (`8B CE 50`), so the object string misses there;
+1.2.0.43 is gated (bit 18) but no image exists here, so its object hit is the one live
+unknown.
+
+Changed: docs/rebuilt.md (new §2m; class C/D rows, §4 item 1 and §5 item 10 corrected) and
+docs/parity.md (the NewFilesCompatibility section, the preserved-fault row, the
+rebuilt-piece policy paragraph). No code, no seam, no test: loading.ixx is untouched, and
+its three comments still say "file registry"/"append" (the pass owned that file for test
+exposure only).
+
+Gates: build exit 0; ctest 20/20 twice (16.47 s / 12.72 s); 98 closed / 0 open / 1
+oracle-verified; 151 bodies 0 failure; ooc-selftest PASS; check_fault_dialogs 12 sources
+0 failures.
+

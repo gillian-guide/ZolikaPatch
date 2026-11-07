@@ -71,11 +71,13 @@ So the blockers are mechanical, and there are exactly four kinds in this tree:
 - **D · call graph of rebuilds.** The body itself is comparable, but every function it
   calls is a rebuild, so a transcription would prove the branch shape and none of the
   behaviour. This is why the NewFiles updates are still rebuilt: their callees are
-  class C. It is **not** a permanent reason: the OOC archive builder was filed here for
-  its twelve helper callees, and this pass transcribed the twelve helpers with it
-  (§2h), so the piece is proven whole. What is left in the class is the NewFiles pair
-  and the NewMemorySystem arena methods, whose callers cannot be transcribed without
-  the container internals they call (§3). The arena's three methods are pinned by
+  class C ( §2m identifies those callees — the game's current TXD,
+  `pgDictionary<grcTexture>::Lookup` and `CSprite2d::SetTexture` — and why no offline
+  test can drive them). It is **not** a permanent reason: the OOC archive builder was
+  filed here for its twelve helper callees, and this pass transcribed the twelve helpers
+  with it (§2h), so the piece is proven whole. What is left in the class is the NewFiles
+  pair and the NewMemorySystem arena methods, whose callers cannot be transcribed
+  without the container internals they call (§3). The arena's three methods are pinned by
   behaviour instead (§2j, `zp_nms_arena`), which is the strongest evidence that class
   can produce while the container stays untranscribable.
 
@@ -1687,6 +1689,288 @@ them. The write set and the 151 proof rows are unchanged.
   two implementations are not byte-compared — the *shape* of the frame is, and the
   disposition is measured.
 
+### 2m. This pass: the NewFiles scans, identified — and not reachable offline
+
+This pass set out to pin the three remaining class-C pieces — `0x10051730` (55
+instructions), `0x10051610` (74) and `0x100517E0` (53) — with a `zp_newfiles_scan`
+driving a fabricated object list and a fabricated append table. That test cannot
+exist: the pieces have no such inputs. Read against the oracle
+(`../game_refs/ZolikaPatch_original.asi.off`) and against GTA IV 1.0.8.0
+(`../game_refs/GTAIV.exe`), they are three resolve-and-call shims for
+the game's **texture dictionary** code, and the "append table" this file used to
+describe is a call to `CSprite2d::SetTexture`. What follows is the identification,
+the per-image data the scans depend on, why a synthetic test would assert only its
+own stand-in, and the live check that takes its place.
+
+**What they are.** The §3 labels were guesses; this is what each piece resolves and
+calls on 1.0.8.0:
+
+| piece | the earlier label | what it resolves and does |
+|---|---|---|
+| `0x10051730` | "the container the file registry hangs off" | the current texture dictionary, `*g_pCurrentTxd` (the global is at game VA `0x19CE510`). The scan finds `mov esi, g_pCurrentTxd` at `0x85DF9B` inside `CSprite2d::SetTexture`, reads that instruction's operand (`mov eax,[eax+2]`) and dereferences it (`mov eax,[eax]`) on every call |
+| `0x10051610` | "is registered" | `rage::pgDictionary<grcTexture>::Lookup`, `0x43A490` on 1.0.8.0 (the first hit of its primary signature), called with `ECX` = the dictionary and the hash pushed |
+| `0x100517E0` | "append" | `CSprite2d::SetTexture`, `0x85DF40` on 1.0.8.0: the signature lands at `+0x14`, so the scan subtracts `0x14` and calls that |
+
+Nothing is appended. `SetTexture` releases the sprite's old texture, looks the name
+up in the current TXD and stores the new one — or clears the sprite when the name
+is absent.
+
+**The bodies, quoted.** The `/GS` + EH prologue and the `_Init_thread_header/footer`
+brackets are elided; what is kept is the scan, the cache, the operand arithmetic and
+the call. The counts are the 55/74/53 §3 records (a linear sweep of each body's own
+bytes).
+
+```
+10051754  64 a1 2c 00 00 00        mov  eax,fs:[0x2C]        ; the TLS array
+1005175A  33 f6                    xor  esi,esi              ; ESI = 0: the miss path
+1005175C  8b 0d 28 93 15 10        mov  ecx,[0x10159328]     ; TlsIndex
+10051762  8b 0c 88                 mov  ecx,[eax+ecx*4]
+10051765  a1 74 84 1a 10           mov  eax,dword_101A8474   ; the once-guard
+1005176A  3b 81 04 00 00 00        cmp  eax,[ecx+4]
+10051770  7e 3e                    jle  0x100517B0
+10051772  68 74 84 1a 10           push 0x101A8474
+10051777  e8 47 e8 00 00           call __Init_thread_header
+...
+10051788  56                       push esi                  ; lpModuleName = NULL
+1005178C  ff 15 3c 30 06 10        call ds:[0x1006303C]      ; GetModuleHandleA
+10051794  b9 18 f6 12 10           mov  ecx,"8B 35 ? ? ? ? 6A 00 50 E8 …"
+10051799  e8 92 20 fb ff           call 0x10003830           ; the ASI's own scan
+100517A3  a3 68 84 1a 10           mov  dword_101A8468,eax   ; the match, cached
+...
+100517B0  a1 68 84 1a 10           mov  eax,dword_101A8468
+100517B5  85 c0                    test eax,eax
+100517B7  74 15                    jz   0x100517CE
+100517B9  8b 40 02                 mov  eax,[eax+2]          ; the matched instruction's operand
+100517BC  8b 00                    mov  eax,[eax]            ; *(void**)g_pCurrentTxd
+100517CD  c3                       ret
+100517CE  8b 06                    mov  eax,[esi]            ; ESI = 0: the miss is a read at 0
+```
+
+```
+10051635  8b d9                    mov  ebx,ecx               ; this = the dictionary
+...
+10051646  a1 7c 84 1a 10           mov  eax,dword_101A847C    ; the primary's guard
+...
+10051672  ff 15 3c 30 06 10        call ds:[0x1006303C]       ; GetModuleHandleA(0)
+1005167A  b9 48 f5 12 10           mov  ecx,"85 C9 53 55 56 57 74 40 8B 6C 24 14 8D 64 24 00"
+1005167F  e8 ac 21 fb ff           call 0x10003830
+10051689  a3 54 84 1a 10           mov  dword_101A8454,eax    ; primary Lookup, cached
+...
+1005169D  8b 15 54 84 1a 10        mov  edx,dword_101A8454
+100516A3  85 d2                    test edx,edx
+100516A5  75 63                    jnz  0x1005170A
+100516A7  a1 bc 84 1a 10           mov  eax,dword_101A84BC    ; the older build's guard
+...
+100516DB  b9 b4 f5 12 10           mov  ecx,"53 55 8B 6C 24 0C 56 57 EB 06"
+100516E0  e8 4b 21 fb ff           call 0x10003830
+100516EA  a3 94 84 1a 10           mov  dword_101A8494,eax    ; the fallback, cached
+...
+100516FE  a1 94 84 1a 10           mov  eax,dword_101A8494
+10051703  33 d2                    xor  edx,edx
+10051705  85 c0                    test eax,eax
+10051707  0f 45 d0                 cmovne edx,eax
+1005170A  ff 75 08                 push [ebp+8]               ; the hash
+1005170D  8b cb                    mov  ecx,ebx               ; ECX = the dictionary
+1005170F  ff d2                    call edx                   ; a double miss calls 0
+10051721  c2 04 00                 ret  4
+```
+
+```
+10051805  8b f9                    mov  edi,ecx               ; this = the CSprite2d
+1005180D  33 f6                    xor  esi,esi               ; ESI = 0: the miss path
+...
+10051818  a1 58 84 1a 10           mov  eax,dword_101A8458
+...
+1005183B  56                       push esi                  ; lpModuleName = NULL
+1005183F  ff 15 3c 30 06 10        call ds:[0x1006303C]       ; GetModuleHandleA
+10051847  b9 a8 f6 12 10           mov  ecx,"8B 0F 85 C9 74 ? 0F B7 41 0A 66 85 C0"
+1005184C  e8 df 1f fb ff           call 0x10003830
+10051856  a3 a4 84 1a 10           mov  dword_101A84A4,eax    ; the match, cached
+...
+1005186A  a1 a4 84 1a 10           mov  eax,dword_101A84A4
+1005186F  85 c0                    test eax,eax
+10051871  74 03                    jz   0x10051876
+10051873  8d 70 ec                 lea  esi,[eax-0x14]        ; the function starts 20 bytes earlier
+10051876  ff 75 08                 push [ebp+8]               ; the name
+10051879  8b cf                    mov  ecx,edi               ; ECX = the sprite
+1005187B  ff d6                    call esi                   ; a miss calls 0
+1005188D  c2 04 00                 ret  4
+```
+
+**Where the scans land, on the nine images.** The three strings are build data, not
+logic: which instruction each finds, and whether the `-0x14` lands on a function
+entry, is a property of the image and nothing else. Scanning the nine images in
+`../game_refs` (image base `0x400000` for all of them, the range `ImageScanRange`
+covers) gives:
+
+| image | object hit | add hit (first) | `first - 0x14` | isreg signature | first hit |
+|---|---|---|---|---|---|
+| 1.0.0.0 | `0x7A2D91` | `0x4433E7` | `0x4433D3` — inside `0x443030`, not an entry | older | `0x4059F0` |
+| 1.0.0.4 | `0x898CDB` | `0x898C94` | `0x898C80` | older | `0x4342B0` |
+| 1.0.4.0 | `0x7ABDC1` | `0x7ABD84` | `0x7ABD70` | older | `0x42F180` |
+| 1.0.6.0 | `0x85383B` | `0x8537F4` | `0x8537E0` | older | `0x424B60` |
+| 1.0.7.0 | `0x8534FB` | `0x8534B4` | `0x8534A0` | older | `0x424B60` |
+| 1.0.8.0 | `0x85DF9B` | `0x85DF54` | `0x85DF40` = `CSprite2d::SetTexture` | primary | `0x43A490` = `Lookup` |
+| 1.1.1.0 | `0x84FE8B` | `0x84FE44` | `0x84FE30` | older | `0x426430` |
+| 1.1.2.0 | `0x81CC6B` | `0x81CC24` | `0x81CC10` | older | `0x426530` |
+| 1.1.3.0 | `0x82904B` | `0x829004` | `0x828FF0` | primary | `0x52CD00` |
+
+The object hit is inside the same `SetTexture` the add hit sits in, on every image but
+1.0.0.0 (the code between them differs, so the distance does too, but the function is
+the same). On those eight images the `SetTexture` the add scan resolves calls the
+`Lookup` the membership scan found (checked call by call); on 1.0.0.0 the object and
+membership scans still agree — the real `SetTexture` at `0x7A2D40` calls the
+fallback's `0x4059F0` at `0x7A2DA5` — but the add string's first hit is not that
+function: it is the release loop at `0x4433E7` inside `0x443030`, and
+`0x4433E7 - 0x14` is `0x4433D3`, `jae` in the middle of that function. The second add
+hit, `0x7A2D54`, is the `SetTexture` at `0x7A2D40`. So on 1.0.0.0 the original's
+append call has a wrong target, and this tree takes the same first hit because taking
+it is the original's order. That is a preserved latent fault, not a rebuild defect;
+the table is why it cannot be called from a test either. Two more data points: the
+primary membership string also hits `0xA31B30` (`pgDictionary__getElementByKey`) on
+1.0.8.0 and `0x9FC500` on 1.1.3.0, and the first hit is the one taken; and on
+1.2.0.59 (`../game_refs/GTAIV_12059.exe`, not one of the nine cells) the object
+string misses because the code is the same shape with a different instruction order —
+`8B CE 50` instead of `50 8B CE` at `0x8D4189`, and `89 07 5E 85 C0 74 04` instead of
+`85 C0 89 07 5E 74 05`.
+
+The table is reproducible: `.scratch/scan_all_newfiles.py` maps each image by its
+section table and scans the same range `ImageScanRange` covers;
+`.scratch/resolve_newfiles.py` disassembles each image's `SetTexture` and checks that
+its `Lookup` call is the first membership hit; `.scratch/find_4433.py` walks the
+1.0.0.0 `add` hit back to the function that contains it; and
+`.scratch/disasm_newfiles.py` prints the three quoted bodies with their bytes.
+
+**The structures the scans reach.** On 1.0.8.0:
+
+- `g_pCurrentTxd` (`0x19CE510`) is the dictionary of the TXD the game has just made
+  current. It has no initialiser in the image: its RVA `0x15CE510` is past
+  `.data`'s raw bytes (which end at `0xCE9000`) and inside its virtual size
+  (`0x16B457C`), so the loader maps zeros there and `CTxdStore::setCurrent` binds it
+  at each load. That is why the original re-reads it every call instead of caching
+  the pointer.
+- The consumers are the radio HUD's TXD loaders. `__readRadioDat` calls
+  `sub_8960B0`, which loops the station list at `dword_11F8114` (name at `+4`) and,
+  for a station not yet loaded (`[station+0x108] == 0`), builds `"RadioLogo%d"`,
+  calls `CTxdStore::loadFile`, `addRef`, `saveCurrentTxd`, `setCurrent`, walks the
+  sprite list at `dword_11F8110` calling `sub_8936A0` per node, and restores
+  `restoreCurrentTxd`. `sub_896180` is the same loop for the `!= 0` case, reached
+  from `sub_477D00`/`sub_896590`, and calls `sub_893680` instead.
+- The two functions whose call sites the arm retargets are ten instructions each, and
+  the mod's rebuilt update bodies are the guarded version of them:
+
+```
+008936A0  80 79 10 00        cmp  byte ptr [ecx+10h],0     ; name A
+008936A4  8d 41 10           lea  eax,[ecx+10h]
+008936A7  74 0c              jz   0x8936B5
+008936A9  50                 push eax
+008936AA  83 c1 08           add  ecx,8                    ; the CSprite2d
+008936AD  e8 8e a8 fc ff     call CSprite2d::SetTexture
+008936B2  b0 01              mov  al,1
+008936B4  c3                 ret
+008936B5  32 c0              xor  al,al
+008936B7  c3                 ret
+```
+
+  (`sub_893680` is the same with `+10Fh` and `add ecx,4`.) The mod's bodies insert
+  the membership test before that call, so the difference from the pristine game is
+  exactly one outcome: a sprite whose name the just-loaded TXD does not contain
+  keeps its previous texture, where the pristine call would have cleared it
+  (`mov dword ptr [edi],0` at `0x85DF8C`, after releasing the old texture).
+- `CSprite2d::SetTexture` (`0x85DF40`, `0x90` bytes, 53 instructions) takes the
+  game's own lock (`CAutoLock` on `stru_11D60E0`), releases the old texture
+  (refcount `[tex+0xA]`, a vtable call for types 2 and 4), clears the slot, hashes
+  the name (`hashStringLowercaseFromSeed(name, 0)`, `0x45CF50`) and calls
+  `Lookup(g_pCurrentTxd, hash)`; a hit is stored at `[edi]` and its refcount at
+  `+0xA` incremented, a miss leaves the cleared slot. So the mod's own `Lookup`
+  duplicates the lookup `SetTexture` performs anyway; the only observable
+  difference is skipping the call and its clear.
+
+**Why no synthetic test can stand in.**
+
+- **No input is a list.** `0x10051730` takes no arguments at all: its input is
+  `GetModuleHandleA(0)` (the host process's main module) and the game's global.
+  `0x10051610` and `0x100517E0` take an object and a hash/name, but dispatch into
+  **game code** found by the scan. The object list such a test would want is
+  `g_pCurrentTxd`, which the game builds from its TXD streaming; it is not a
+  parameter and cannot be handed in.
+- **The "append" is a call, not a table.** `0x100517E0` calls
+  `CSprite2d::SetTexture`, which takes the game's global lock, hashes the name with
+  the game's hash and mutates a `grcTexture` refcount. A fabricated sprite and
+  dictionary would be a reimplementation of the game's own classes; a test would
+  then assert its stand-ins' answers, not the rebuild's.
+- **The boundaries are the game's too.** An empty dictionary, a one-entry dictionary
+  and a duplicate name are states of `pgDictionary` and of the TXD builder that fills
+  it. `Lookup` answers an empty dictionary at its `[this+0x14]` count test, and a
+  duplicate is not a state it distinguishes — it binary-searches a sorted key array
+  and answers whichever equal key it lands on; a test that fabricated those states
+  would again be testing its own container.
+- **A fabricated image only proves `find_pattern` found what the test embedded.**
+  The bytes could be made to hit or miss at will, and the operand could be pointed
+  at anything; the body would then return the test's own object. Such a test can be
+  made to detect a mutated offset by shaping the fake bytes, but it cannot tell
+  whether that offset is the one the real image has — on 1.0.0.0 `-0x14` from the
+  first hit is wrong, and a synthetic image would have called it right. The table
+  above is the property that matters, and it is a property of the real images.
+- **The scanner caches per signature string for the process lifetime**
+  (`source/patch.ixx`), so a fallback test cannot attach two images in one process
+  and re-scan the same string; it would answer from the first image's cache. The
+  build-variant order is per-image data, not a behaviour a test can exercise.
+- **What is offline-observable is only the miss, and only because a test process is
+  the wrong module.** In any test, `GetModuleHandleA(0)` is the test executable, so
+  all three scans miss: called directly, `0x10051730` faults on `mov eax,[esi]` at
+  `0x100517CE` (read at 0), `0x10051610` calls 0 at `0x1005170F` and `0x100517E0`
+  calls 0 at `0x1005187B` (through the update bodies the first of the three faults
+  before the other two run). That pins one instruction of the fault path and no hit,
+  no answer and no offset — the hit is the whole piece. A seam that only asserts
+  three null dereferences would look like coverage while no hit was ever exercised.
+
+**What a live check has to observe.** With `NewFilesCompatibility=1` on a build
+whose scans resolve (all nine):
+
+1. **The object.** Break at `0x100517B9`: the word loaded from `dword_101A8468` is
+   the address of `mov esi, g_pCurrentTxd` (`0x85DF9B` on 1.0.8.0), its operand is
+   `0x19CE510`, and the value at `0x19CE510` is the dictionary
+   `CTxdStore::setCurrent` bound immediately before the sprite loop (a
+   `RadioLogo<N>` TXD). A different match address, or a dictionary that is not that
+   TXD, means the object scan found the wrong code.
+2. **The hash.** The value pushed to `Lookup` at `0x100518B6` is
+   `sub_10003E50(name)`; it must equal the `hashStringLowercaseFromSeed(name, 0)`
+   the same `SetTexture` would compute. Both are the game's hash (`*0x401`,
+   `^ (h>>6)`, then `*9`, `^ (h>>11)`, `*0x8001`) with `A`–`Z` lower-cased and `\`
+   read as `/`; an ordinary name resolves to the same value in both. The resolver
+   adds `2` to a result below `2` and the game's hash does not, which is a
+   one-in-2^31 name; a `hash:NNNN` name bypasses hashing through the resolver.
+3. **The answer.** `Lookup` is the dictionary's binary search (`[this+0x14]` count,
+   `[this+0x10]` keys, `[this+0x18]` values, chain `[this+8]`), so a present name
+   answers non-zero and the `SetTexture` call runs; an absent name answers 0 and the
+   call is skipped.
+4. **The visible effect.** Load a save — or play to the radio HUD — with a
+   `radiohud`/RadioLogo TXD whose name set differs from the base game's. Every
+   station logo must still be drawn: a name the loaded TXD *has* gets its texture;
+   a name it lacks leaves the sprite's previous texture in place. The pristine
+   game, and any rebuild that drops the membership check, instead blanks that
+   sprite (`SetTexture`'s clear). A watchpoint on `CSprite2d::SetTexture` (or a
+   trace of the two update bodies) must show it called only for names that are in
+   the current TXD.
+5. **The 1.0.0.0 anomaly.** On 1.0.0.0 the add scan resolves `0x4433D3`; if the
+   radio path reaches a name the TXD contains there, both the original and this
+   tree call into the middle of `0x443030`. A crash there is the original's own
+   and should be recorded, not "fixed".
+6. **The 1.2 risk.** The key's mask includes 1.2.0.43 (bit 18) and `game_refs` has
+   no 1.2.0.43 image, only 1.2.0.59, where the object string misses. A live 1.2.0.43
+   run must confirm the object break above; if the image matches 1.2.0.59's code,
+   the arm's first non-empty sprite name faults at `0x100517CE` — again the
+   original's own fault, but one no offline check can predict.
+
+**What this pass changed.** No code, no seam and no test: there is nothing offline
+to drive, so the finding is the identification and the boundary. The three comments
+in `source/loading.ixx` still carry the old labels ("file registry", "append") —
+this pass owns that file for test exposure only — so §3 and `docs/parity.md` are
+the corrected record. The residual risk is bounded: the strings and offsets are
+checked against the nine images above, and what remains is whether the game's
+dictionary/sprite code answers as expected at run time — the live check, not a test.
+
 ---
 
 ## 3. Every piece that is still rebuilt
@@ -1731,9 +2015,9 @@ unregistered indexed absolute keeps the literal comparison.
 
 | piece | VA | bytes | insns | what blocks it | what the rebuild reproduces | how verified | residual risk |
 |---|---|---:|---:|---|---|---|---|
-| NewFiles container scan | `0x10051730` | `0xB0` | 55 | TLS static-init guard (`fs:[0]`, `fs:[2Ch]`, `_Init_thread_header/footer`) around the one-time find of the game's registry global | find the game's `mov esi,<global>` once, dereference the global on every call (the game rebuilds the registry) | the NewFiles arm's writes are the key's cell; the scan result is used by the two rebuilt update bodies | moderate: a miss returns a null the update bodies then call or dereference — the original's fault, preserved |
-| NewFiles "is registered" | `0x10051610` | `0x114` | 74 | two TLS guards (two build variants cached) | ask the container whether the hash is registered, trying one signature and then an older build's | as above | moderate |
-| NewFiles "append" | `0x100517E0` | `0xB0` | 53 | TLS guard + a call into the game function 20 bytes inside the match | append the name to the container | as above | moderate |
+| NewFiles container scan | `0x10051730` | `0xB0` | 55 | TLS static-init guard (`fs:[0]`, `fs:[2Ch]`, `_Init_thread_header/footer`) around the one-time find of `mov esi,g_pCurrentTxd` | find that instruction once, read its operand and dereference `g_pCurrentTxd` on every call (the game rebinds it per TXD; §2m) | the arm's writes are the key's cell; the resolution is checked against the nine images, not behaviourally (§2m) | moderate: a miss faults on `mov eax,[esi]` with `ESI = 0` — the original's fault, preserved |
+| NewFiles "is registered" | `0x10051610` | `0x114` | 74 | two TLS guards (two build variants cached) | `pgDictionary<grcTexture>::Lookup`: try the primary signature, then the older builds' (§2m) | as above | moderate |
+| NewFiles "append" | `0x100517E0` | `0xB0` | 53 | TLS guard + a call into the game function 20 bytes inside the match | `CSprite2d::SetTexture`: call `match - 0x14`, which releases and clears the sprite and looks the name up (§2m) | as above | moderate; on 1.0.0.0 the first hit is not the setter (§2m) |
 | ROM message service | `0x10004260` (class registration) + `0x10004300` (registrar, `0xC8`) + the window procedure and thread entry they store | — | — | not one instruction stream at all: a thread, a window class, a `WNDPROC`, a message-only window and a `WM_ROM` action table — process-wide state reached only through pointers the original stores | a `std::thread` that registers `"MessageWindow"` (falling back to `"MessageWindow2"`), creates the message-only window, publishes the handle from `WM_NCCREATE` and answers `WM_ROM` (43858) with the recovered action table; `StartRomService` spins on `Sleep(0)` with no bound, as the original does | its *install rows* are transcribed (`rom_set` 4 instructions, `rom_reset` 28, `dfa_init` 2) and the launcher cell is oracle-verified; the service itself is only observable in a running game | low: nothing depends on it except the ROM message window; a failure to create the window hangs the game in both trees (a preserved fault) |
 
 `0x10004300` is the only function in the ASI that references `"MessageWindow"` /
@@ -1746,7 +2030,7 @@ the registrar alone would prove nothing about the service.
 
 | piece | VA | bytes | insns | what it calls | why that keeps it rebuilt | residual risk |
 |---|---|---:|---:|---|---|---|
-| NewFiles updates (2) | `0x10051890`, `0x100518D0` | `0x3F`, `0x45` | 30, 30 | the three class-C scans above + the transcribed resolver `0x10003E50` | their own stream is transcribable, but three of four callees are class C and two of the four need `__fastcall` entry shims (`ECX` = object/list, stack = hash/name) whose register contract would itself be unproven — that is the register-contract bug class, not a proof. §4 item 1 | moderate: it decides whether a new-format file is registered at all |
+| NewFiles updates (2) | `0x10051890`, `0x100518D0` | `0x3F`, `0x45` | 30, 30 | the three class-C scans above + the transcribed resolver `0x10003E50` | their own stream is transcribable, but three of four callees are class C and two of the four need `__fastcall` entry shims (`ECX` = dictionary/sprite, stack = hash/name) whose register contract would itself be unproven — that is the register-contract bug class, not a proof. §4 item 1, §2m | moderate: it decides whether a sprite's texture is set at all |
 | NMS arena methods | `0x10038360` (alloc), `0x10038430` (free), `0x100385A0` (contains) | `0xC2`, `0x10E`, `0x7D` | 69, 91, 40 | the original's `std::_Hash` pair `0x1005C610` (emplace) / `0x1005C5A0` (find), `memset`, `operator delete`, and the map's own fields | the three streams are plain — no EH frame, no TLS guard — but their callees are not the builder's kind of helper. `0x1005C610` **has an exception frame** (`push -1; push SEH_1005C610; … mov fs:[0], eax` at `0x1005C613`-`0x1005C632`, the frame's funclet at `SEH_1005C610`), so it is class B and stays rebuilt. `0x1005C5A0` is the `std::_Hash::find` over four map-internal globals (`dword_101A8424`, `dword_101A8418`, `dword_101A8410`), and the free body **inlines** the erase unlink over the same globals (`mov ecx, dword_101A8424` at `0x100384CC`, `mov eax, dword_101A8418` at `0x100384D2`, `and ecx, esi / lea ecx, [eax+ecx*8]` after it), so its own stream reads container internals a module's `std::unordered_set` does not expose. Transcribing the three callers would prove the arithmetic and leave the registry a rebuild — the class-D position this pass removed for the builder, without a way to remove it here | low: the vtable's other eleven methods are transcribed, and these three are now pinned by behaviour instead — `zp_nms_arena` (§2j) asserts the alignment scheme, the distance word, the `0xCD` fill over exactly `want`, membership, free and the null-returning failure path, 246 assertions. What remains unmeasured is only what no caller can observe (the container behind the registry) and what the heap decides (a double free) — §2j |
 
 The NMS methods are the class's *honest* remainder: their own streams are exactly as
@@ -1769,7 +2053,11 @@ which the rebuild already reproduces.
 1. **NewFiles updates** (`0x10051890`/`0x100518D0`, 30 each). Needs two `__fastcall`
    entry shims in front of `NewfilesCallObject`/`NewfilesCallAdd`; once those exist the
    two bodies are a straight transcription. Their call graph stays class C, so the doc
-   entry above changes from "blocked" to "proven caller, rebuilt callees".
+   entry above changes from "blocked" to "proven caller, rebuilt callees". What the
+   transcription would not add is measurement: §2m identifies the three callees
+   (`g_pCurrentTxd`, `pgDictionary<grcTexture>::Lookup`, `CSprite2d::SetTexture`) and
+   shows that a synthetic test can only assert its own stand-ins, so the two bodies stay
+   play-verified either way.
 2. **NMS arena methods** (`0x10038360`/`0x10038430`/`0x100385A0`). Not transcribable
    without the container: `0x1005C610` carries an EH frame (class B), and `0x10038430`
    inlines the `std::_Hash` erase unlink over the original's map globals. A future pass
@@ -1896,6 +2184,16 @@ deliberately after any change to the modules above.
    whose stack is inside `0x10038360`/`0x10038430`/`0x100385A0` would mean the rebuild's
    arithmetic or its registry diverges from the original's, and §2j names the assertion
    that would have caught it.
+10. **The NewFiles scans** (class C, §2m — no offline test by construction). Exercise:
+    load a save and reach the radio HUD with a `radiohud`/RadioLogo TXD whose texture-name
+    set differs from the base game's. What to look for: every station logo drawn, with the
+    sprites whose names the loaded TXD lacks keeping their previous texture rather than
+    blanking (`rebuilt.md` §2m item 4); a blank or missing logo means the object/membership
+    scan resolved the wrong code or the hash differs. Two build notes: on 1.0.0.0 the add
+    scan's first hit is not `CSprite2d::SetTexture`, so a crash inside `0x443030` is the
+    original's own (§2m); and on 1.2.0.43 — the one gated build with no image here — the
+    object string may miss as it does on 1.2.0.59, in which case the first non-empty sprite
+    name faults at `0x100517CE` in both trees.
 
 ---
 
