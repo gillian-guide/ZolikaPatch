@@ -118,21 +118,23 @@ extern "C"
     // ---- sub_10004C70's constants, in its own read order ----------------------
     //
     // The original keeps these in .rdata and reads them with an absolute operand
-    // (`mulsd xmm0, qword ptr [0x101523a8]`). Each is the exact bit pattern at the
-    // VA named in its comment, read out of the original image; the proof compares
-    // an absolute operand as a slot, so it cannot see the value -- the value is
-    // pinned here, by the VA and by the .rdata bytes it was taken from.
-    uint64_t zpatch_steer_neg_pi = 0xC00921FB54442D18ull;          // 0x101523A8 -pi
-    uint64_t zpatch_steer_pi = 0x400921FB54442D18ull;              // 0x10152358 +pi
-    uint64_t zpatch_steer_degrees = 0x4066800000000000ull;         // 0x10152370 180.0
-    uint64_t zpatch_steer_half = 0x3FE0000000000000ull;            // 0x10152348 0.5
-    uint64_t zpatch_steer_neg_half = 0xBFE0000000000000ull;        // 0x10152398 -0.5
-    uint64_t zpatch_steer_three_quarters = 0x3FE8000000000000ull;  // 0x10152350 0.75
-    uint64_t zpatch_steer_quarter = 0x3FD0000000000000ull;         // 0x10152338 0.25
-    uint64_t zpatch_steer_epsilon = 0x3F847AE147AE147Bull;         // 0x10152320 0.01
-    uint64_t zpatch_steer_neg_epsilon = 0xBF847AE147AE147Bull;     // 0x10152390 -0.01
-    uint32_t zpatch_steer_one = 0x3F800000u;                       // 0x10152310 1.0f
-    uint32_t zpatch_steer_hundred = 0x42C80000u;                   // 0x10152388 100.0f
+    // (`mulsd xmm0, qword ptr [0x101523a8]`). Each is declared with the type the
+    // instruction reads -- `double` for the `mulsd`/`movsd`/`divsd`/`comisd`
+    // operands, `float` for the two `movss`/`mulss` ones -- and initialised with
+    // the number it is. Every literal below round-trips to the original's .rdata
+    // bytes at the VA in its comment, bit for bit; the proof compares an absolute
+    // operand as a slot, so it cannot see the value, and the value is pinned here.
+    alignas(8) double zpatch_steer_neg_pi = -3.141592653589793;   // 0x101523A8
+    alignas(8) double zpatch_steer_pi = 3.141592653589793;        // 0x10152358
+    alignas(8) double zpatch_steer_degrees = 180.0;               // 0x10152370
+    alignas(8) double zpatch_steer_half = 0.5;                    // 0x10152348
+    alignas(8) double zpatch_steer_neg_half = -0.5;               // 0x10152398
+    alignas(8) double zpatch_steer_three_quarters = 0.75;         // 0x10152350
+    alignas(8) double zpatch_steer_quarter = 0.25;                // 0x10152338
+    alignas(8) double zpatch_steer_epsilon = 0.01;                // 0x10152320
+    alignas(8) double zpatch_steer_neg_epsilon = -0.01;           // 0x10152390
+    alignas(4) float zpatch_steer_one = 1.0f;                     // 0x10152310
+    alignas(4) float zpatch_steer_hundred = 100.0f;               // 0x10152388
 
     // The two bone names the consumer hands sub_10003F40: the original's own .rdata
     // strings at 0x10129518 and 0x10129570, loaded with `mov edx, imm32`.

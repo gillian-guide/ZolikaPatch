@@ -947,12 +947,18 @@ excludes by design).
   game's frame clock `0xB4D3A0` and the two resumes (`0xA81B1F` and `+1878`). Each
   is rebased through the image's preferred base, so the offline dump reads the
   same words at a heap base that the game reads at `0x400000`.
-- The literals the bodies read are the original's `.data`, kept as raw words so the
-  bit patterns are exact: `0.0078125`, `255.0`, `0.075`, `0.025`, `-1.0` (double and
-  float), pi, 2pi, -pi, 127.5f, 0.1f, and the two `xorps` sign masks (four
-  single-precision sign bits at `0x101523F0`, two double-precision ones at
-  `0x101523E0`). The masks are 16 bytes and `xorps` reads sixteen, so they are
-  declared `alignas(16)`.
+- The literals the bodies read are the original's `.data`, declared with the type
+  the instruction reads and initialised with the number it is, never with a bit
+  pattern: `0.0078125`, `255.0`, `0.075000003` (the original's own value; its slot
+  holds that decimal double, not the widening of `0.075f`), `0.025`, `-1.0` (double
+  and float), `3.1415927` / `6.2831855` / `-3.1415927` (the original's values, not
+  pi and 2pi), `127.5f`, `0.1f`. Every decimal round-trips to the original's bytes.
+  Hex survives only where the bytes are not a number: the two `xorps` sign masks
+  (four single-precision sign bits at `0x101523F0`, two double-precision ones at
+  `0x101523E0`; 16 bytes because `xorps` reads sixteen, hence `alignas(16)`), and
+  `CutsceneFixes`' `andps` sign mask `0x7FFFFFFF`. `Vehicles`' `sub_10004C70`
+  constants and `CutsceneFixes`' float pool are written the same way, each filled
+  with the shortest decimal that reproduces its recovered bytes.
 - The advance helper (`0x100241E0`) is transcribed rather than rebuilt. Its only
   indirect call is the game's `VirtualProtect`, which the original reaches through
   its own IAT slot (`FF 15`), so ours is a `call dword ptr [slot]` as well: the
@@ -1263,6 +1269,12 @@ The body's slots, and where each value comes from:
 | `zpatch_cutscene_eps_a` | `0x101522F8` | `0x3D4CCCCD` (0.05f) |
 | `zpatch_cutscene_eps_b` | `0x101522FC` | `0x3F000000` (0.5f) |
 | the native salt | `dword_1015803C` | the layer's resolved salt (`Native::Salt`), `0x022B2DA9` on a probe hit |
+
+The `value` column above is the original's .rdata, i.e. the provenance of the slot;
+in the source the five float/double slots are declared as the numbers those bits
+encode (`0.0`, `0.3333`, `0.05f`, `0.5f`), each literal round-tripping to exactly
+the bytes listed, and only `zpatch_cutscene_abs_mask` stays a hex word because it is
+an `andps` sign mask rather than a value.
 
 Two call targets differ from the original's, both inside the proof's
 call-is-an-immediate rule: the body's `call 0x10003980` names a six-byte `jmp`

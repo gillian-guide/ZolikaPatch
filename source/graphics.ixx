@@ -706,13 +706,18 @@ extern "C"
     // after `mov edi, [slot]`), exactly as the original does.
     uint32_t zpatch_cutscene_virtual_protect = 0;
 
-    // The body's literal pool, recovered from the original ASI's .rdata as raw
-    // words so the bit patterns are exactly the original's.
-    uint64_t zpatch_cutscene_zero = 0x0000000000000000ull;   // 0x101522F0  0.0
-    uint64_t zpatch_cutscene_limit = 0x3FD554C985F06F69ull;  // 0x10152340  0.3333
-    uint32_t zpatch_cutscene_abs_mask = 0x7FFFFFFFu;         // 0x101523D0  0x7FFFFFFF
-    uint32_t zpatch_cutscene_eps_a = 0x3D4CCCCDu;            // 0x101522F8  0.05f
-    uint32_t zpatch_cutscene_eps_b = 0x3F000000u;            // 0x101522FC  0.5f
+    // The body's literal pool, from the original ASI's .rdata. Each is declared
+    // with the type its instruction reads and initialised with the number it is;
+    // every literal round-trips to the original's bytes at the VA in its comment.
+    // The one mask stays a hex word because it is not a number.
+    alignas(8) double zpatch_cutscene_zero = 0.0;        // 0x101522F0
+    // 0x10152340: the original's 0.3333 -- not 1/3.
+    alignas(8) double zpatch_cutscene_limit = 0.3333;
+    // 0x101523D0: an `andps` sign mask, not a number (the body clears the sign bit
+    // of a difference before comparing it), so this one stays a hex word.
+    uint32_t zpatch_cutscene_abs_mask = 0x7FFFFFFFu;
+    alignas(4) float zpatch_cutscene_eps_a = 0.05f;      // 0x101522F8
+    alignas(4) float zpatch_cutscene_eps_b = 0.5f;       // 0x101522FC
 }
 
 // The loader preamble's salt this body resolves its native with (dword_1015803C)
