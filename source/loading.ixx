@@ -1054,6 +1054,19 @@ namespace
     CRITICAL_SECTION nms_registry_lock;
     std::unordered_set<uint32_t> nms_allocations;
 
+    // The one-time setup of the registry lock, shared by the two paths that reach
+    // it: PublishNewMemorySystem (the game's allocator-init, once per process) and
+    // the test-only seam below (tests/nms_arena.cpp). A second call is a no-op, so
+    // neither path can initialise the section twice.
+    void PrepareArenaRegistry()
+    {
+        static bool prepared = false;
+        if (prepared)
+            return;
+        prepared = true;
+        InitializeCriticalSection(&nms_registry_lock);
+    }
+
     // sub_10038360, recovered VA 0x10038360: the vtable's allocate slot
     // (__stdcall, three arguments). Assembly in the original: unit =
     // max(0x10, align), want = max(size, unit), HeapAlloc(want + 2 * unit),
@@ -1155,11 +1168,11 @@ namespace
         // initialises them once, and the offline tools call the pipeline once per
         // dump cell, so the one-time flag keeps a second initialisation off the
         // section (nothing about the game's behaviour depends on it).
+        PrepareArenaRegistry();
         static bool prepared = false;
         if (!prepared)
         {
             prepared = true;
-            InitializeCriticalSection(&nms_registry_lock);
             PublishNmsVtable();
         }
     }
@@ -1179,6 +1192,44 @@ namespace
             injector::MakeJMP(match - 29, reinterpret_cast<void*>(match - 16), true);
         }
     }
+}
+
+// The test-only seam over the three arena methods of the NewMemorySystem vtable
+// (0x100B5038: allocate 0x10038360, free 0x10038430, membership 0x100385A0). They
+// are compiled into this unit's anonymous namespace and reached in the game only
+// through the table PublishNmsVtable fills; a rebuild's evidence is behaviour, so
+// tests/nms_arena.cpp (ctest `zp_nms_arena`) drives them directly with no game
+// image. Get() names the same three functions the table publishes and runs the
+// registry lock's one-time setup - nothing else: no site is written, no arm is
+// installed, and the published table is untouched. The only module state it can
+// change is that lock's initialisation, which the game's own allocator-init performs
+// anyway; the shipped ASI never calls it.
+export namespace MemoryArena
+{
+    // The ABIs are the originals', which is part of what the caller sees:
+    //   allocate 0x10038360  __stdcall, `ret 0Ch`, three arguments, ECX ignored
+    //                        (the object the vtable passes in ECX is unused);
+    //   release  0x10038430  __stdcall, `ret 4`, one argument, null is a no-op
+    //                        (`test edx,edx / je` before anything else);
+    //   contains 0x100385A0  __stdcall, `ret 4`, answers in AL only: the body ends
+    //                        `cmp edi,esi / setne al`, so EAX's upper 24 bits are
+    //                        whatever LeaveCriticalSection left there and only the
+    //                        byte is contractual.
+    struct Methods
+    {
+        void* (__stdcall* allocate)(uint32_t size, uint32_t align, uint32_t flags);
+        void (__stdcall* release)(void* pointer);
+        uint8_t (__stdcall* contains)(uint32_t key);
+    };
+
+    // The three entries, with the registry lock prepared; see Methods.
+    export Methods Get();
+}
+
+MemoryArena::Methods MemoryArena::Get()
+{
+    PrepareArenaRegistry();
+    return { &NmsAllocateBody, &NmsFreeBody, &NmsContainsBody };
 }
 
 // ---------------------------------------------------------------------------

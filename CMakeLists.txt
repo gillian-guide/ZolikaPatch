@@ -158,6 +158,18 @@ target_link_libraries(zp_native_guard PRIVATE zp_modules)
 add_test(NAME zp_native_guard COMMAND zp_native_guard)
 set_tests_properties(zp_native_guard PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
+# The NewMemorySystem arena, asserted by behaviour instead of by its disassembly: the
+# three rebuilt vtable methods (allocate 0x10038360, free 0x10038430, membership
+# 0x100385A0) driven directly through loading.ixx's test-only seam. The scheme (unit,
+# want, the 2*unit slack, the distance range), the distance word, the 0xCD fill,
+# membership, free and the null-returning failed request, all on the process heap.
+# Offline: no game image, no ASI load, and it writes no files.
+add_executable(zp_nms_arena tests/nms_arena.cpp)
+set_target_properties(zp_nms_arena PROPERTIES CXX_SCAN_FOR_MODULES ON)
+target_link_libraries(zp_nms_arena PRIVATE zp_modules)
+add_test(NAME zp_nms_arena COMMAND zp_nms_arena)
+set_tests_properties(zp_nms_arena PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+
 add_executable(zp_dump tests/dump_main.cpp)
 set_target_properties(zp_dump PROPERTIES CXX_SCAN_FOR_MODULES ON)
 target_link_libraries(zp_dump PRIVATE zp_modules)

@@ -1193,3 +1193,66 @@ arms reach them through.
 
 **Open, not mine to edit.** `docs/review.md` line 14 still says "13 tests" and line 24
 `# 13/13`; it is 14. (`readable-fusion/AGENTS.md` is current: it says 151 hook bodies.)
+
+## 2026-11-07 - the arena, executed: `zp_nms_arena`, 246 assertions
+
+The `NewMemorySystem` arena (`0x10038360` allocate, `0x10038430` free, `0x100385A0`
+membership) was class D's remaining allocator: rebuilt from the disassembly because its
+callees are the original's inlined `std::_Hash`, with no behavioural evidence - an
+allocator whose only failure mode is corruption in play. It is now a ctest entry.
+
+**The seam.** `source/loading.ixx` grew `MemoryArena::Get` (exported, test-only): the
+three `__stdcall` entries the vtable publishes plus the registry lock's one-time setup.
+`PublishNewMemorySystem` used to own the `InitializeCriticalSection`; both paths now call
+`PrepareArenaRegistry`, a no-op on its second call. Nothing else in the module changed: the
+four scheme lines are the original's, no site is written, no arm installed.
+`tests/nms_arena.cpp` writes no files, so `.gitignore` is untouched.
+
+**What is pinned.** 42 `(size, align)` pairs (sizes 0, 1, 0xF, 0x10, 0x11, 0x1000 against
+alignments 0, 1, 4, 8, 0x10, 0x20, 0x100): `pointer % unit == 0` (the `cmovae` unit and
+the `* unit` rounding), the distance at `[pointer-4]` in `[unit, 2*unit)` (the
+`(base-1)/unit + 2` rounding - with `base = q*unit + r` the distance is `unit` at `r = 0`
+and `2*unit - r` otherwise), `HeapSize(base) == want + 2*unit` (the `lea eax,[edi+esi*2]`
+request), `size` bytes writable, and pairwise-disjoint live ranges. Then the three limits
+(`align 3` rounds to unit, `align 0x30` is taken at face value, the flags argument is
+ignored), the distance word and the `0xCD` fill over exactly `want` (including a poisoned,
+freed, re-taken block whose slack stays untouched), membership (live/freed/stranger/
+`pointer+1`/0; the original answers in AL, `setne al`, so only the byte is read), the null
+free and the freed block reused, and the failed request: `0x7FFFFFF0` (sum
+`0x80000010`, no wrap) answers null with no throw and the arena still works afterwards.
+
+**The fill's end.** `memset(aligned, 0xCD, want)` cannot be observed on a fresh block
+because the slack bytes are undefined. The test poisons a block with `0xAA` (all but the
+four-byte distance word the free reads), frees it and asks for the same size until the
+heap returns it - 16 attempts of 16 held probes, because the process heap is free to serve
+a request from anywhere (210 consecutive suite runs never missed); a heap that never
+returned a freed block would be reported, not skipped.
+
+**The test can fail.** Three mutations, all reverted (the four scheme lines verified back
+to the original afterwards): (a) `want + unit * 2u` -> `want + unit`: the `HeapSize`
+check fails (1, 5 and 10 lines on three runs, depending on where the heap hands a
+corrupted block back) and the process then dies with `0xC0000374` - the `want`-byte fill no
+longer fits, so the slack cannot be shrunk; (b) `want = max(size, unit)` -> `want = size`:
+28 failures (25 `HeapSize`, 3 fill), 218 pass, no fault; (c) the memset's count `want` ->
+`size`: 3 failures, all in the fill class, 243 pass. The `size < unit` pairs are what
+make (b) and (c) visible at all.
+
+**Gates.** `cmake --build --preset release` exit 0; `ctest --preset release` 15/15 twice;
+`python tools/parity_report.py 9` -> `build 9: 98 key(s) closed, 0 open, 1
+oracle-verified (baseline incomplete)`; `python tools/verify_bodies.py ...` -> `151
+body(ies), 0 failure(s)`; `zp_dump.exe --ooc-selftest` -> `ooc selftest: PASS`.
+
+**What stays unproven, and why.** A double free is not tested and cannot be asserted
+offline: the original's free has no membership check (`0x10038449` tests null only,
+`0x10038457` recovers the base, `0x10038474` calls `HeapFree`), so a second free hands
+`HeapFree` a base derived from the heap's own links; whether that is a no-op, a
+`STATUS_HEAP_CORRUPTION` or silent corruption is the heap's decision. The rebuild keeps
+the same missing guard and the same order (free, then erase); the test asserts only that
+the pointer stops being a member. Also unmeasured: the container behind the registry
+(only membership is observable), the lock under contention, and the wrapping request
+(`0x1003838B` is a 32-bit add, so `>= 0xFFFFFFE0` wraps into a tiny block and a huge
+memset - the original's fault, kept, recorded in `parity.md`, not run).
+
+**Open, not mine to edit.** `docs/review.md` line 14 says "14 tests" and line 24 `# 14/14`;
+it is 15/15. `readable-fusion/AGENTS.md`'s harness list also does not name `zp_nms_arena`.
+Both are outside the files this pass was given.

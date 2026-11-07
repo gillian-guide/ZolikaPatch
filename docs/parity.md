@@ -17,6 +17,7 @@ fix.
 | The two guarded native entries (`sub_100038E0` / `sub_10003980`): the invoke calls the handler and answers `1` (the handler's own return value is ignored), the resolve answers the handler address without calling it; a fault inside either guarded region (the handler call or the resolver call) answers `0` and the process keeps working; a resolver that answers null is the invoke's skip (`mov al,1`) while the resolve answers null; a null resolver (`dword_1015BDE0` = 0) is caught as `0`, and the *caller's* read through that zero faults | `zp_native_guard` (27 checks; the caller fault is a child process that must exit `0xC0000005` with the report saying `RESOLVED=0`) |
 | With no arm installed the pipeline changes nothing on any supported image | `zp_dump_empty` (9 images) |
 | The save converter's walk (`sub_10051B30`): `SAVE` at `+0xC`, eighteen 9-byte chunk headers in file order, the three size tests (`4C45`/`1741`/`0E77`) and the three patch values they select (`74`/`EB`, `0CBE`/`0E6E`, `75 26`/`90 90`), on both real saves and on synthetic new/old layouts; a chunk size below nine throws `std::bad_alloc`; a header shorter than `0x110` is not rejected on its header when the file itself carries the magic, and a file shorter than the magic offset is decided by a fresh process's stack | `zp_save_walk` (258 checks; every expected value is recomputed from the file by the test's own parser, not by the converter) |
+| The `NewMemorySystem` arena (`0x10038360` allocate, `0x10038430` free, `0x100385A0` membership): `unit = max(0x10, align)`, `want = max(size, unit)`, a `want + 2*unit` request, the `((base-1)/unit + 2)*unit` rounding whose distance at `[pointer-4]` is always in `[unit, 2*unit)`, the `0xCD` fill over exactly `want` bytes and not past them, membership for a live pointer but not a freed one, not `pointer+1`, not a stranger address, a null free as a no-op, the freed block reused by the next same-size request, and a failed request answering null (the `test edx,edx`) with the arena still usable afterwards | `zp_nms_arena` (246 checks, driven through `MemoryArena::Get`; a double free is deliberately not asserted - see the faults table) |
 | The generated catalogue and INI cannot drift from their sources | `zp_catalogue_drift`, `zp_ini_drift` |
 
 ## Preserved faults
@@ -38,6 +39,8 @@ fix.
 | the decoded payload is registered and mounted even when its own checks fail | a resource whose decode does not end on `05 FA`, does not fill exactly 179,536 bytes, or does not match its Adler-32 trailer | `sub_1004B570` answers 179,536 or 0 and `sub_1004B750` discards the answer (`call sub_1004B570` at `0x1004B798`, no test of `EAX`), so the partially decoded buffer is registered and archived as it stands. The rebuild discards it the same way. Unreachable with the pinned resource, which passes all three checks |
 | a corrupt save makes the converter throw or check uninitialised bytes | a save whose 9-byte chunk header carries a size below 9, or a file shorter than its header | `sub_10051B30`'s `add eax,0FFFFFFF7h` (`0x10051C14`) feeds `operator new` (`0x100603F1`) unchecked, so the underflowed payload throws `std::bad_alloc` out of the trampoline; a short header read leaves the `cmp dword ptr [eax],45564153h` (`0x10051BD1`) reading the uninitialised stack buffer. The rebuild keeps the same `operator new` / `fread` / `free` sequence and the same unchecked header read, so the same input faults at the same step, and `zp_save_walk` asserts both: the size-underflow throw by type, in-process, at chunk 0 and at chunk 9; the short-header case as "not rejected on the header" in-process and as a fresh process's answer for a file shorter than the magic offset |
 | the load trampoline stores an unspecified EAX in the game's frame | every savegame load | the replayed `mov [esp+1E0h],eax` (`0x100521E7`) stores the prepare step's return value although `sub_10051FD0` is `void`. The transcription keeps the instruction, so the slot receives whatever EAX the compiled prepare leaves; the original's receives whatever its own prepare left. Both are unspecified and the game's own store at the site wrote a defined value, so the original already replaces it with an undefined one - the rebuild keeps that fault, and only the undefined value itself differs |
+| a double free is unguarded | the same pointer handed to the arena's free twice | `sub_10038430` has no membership check in front of the free: `0x10038449` tests the incoming pointer for null and nothing else, `0x10038457` recovers the base from `[pointer-4]`, and `0x10038474` calls `HeapFree` on it unconditionally. The rebuild keeps the same order (free, then erase) and the same missing guard. The second free therefore reads `[pointer-4]` from a block the heap owns again and hands `HeapFree` a base derived from the heap's own links rather than from the original's arithmetic; whether that is a no-op, a `STATUS_HEAP_CORRUPTION` termination or silent corruption is the heap's decision, so `zp_nms_arena` asserts only the knowable part (the pointer stops being a member after the first free) and does not run a double free |
+| the arena's request size is a 32-bit sum | a request of `2^32 - 2*unit` bytes or more (`0xFFFFFFE0` at the `0x10` floor) | `0x1003838B`'s `lea eax,[edi+esi*2]` adds `want + 2*unit` in 32 bits, so the request wraps to a tiny block while the `memset` at `0x100383C9` still fills `want` bytes - the allocate returns a block it cannot fill and the fill runs off the heap. The rebuild computes `want + unit * 2u` in `uint32_t` too, so the same input wraps the same way; the failure path the test asserts uses `0x7FFFFFF0`, whose sum `0x80000010` does not wrap, and the wrapping case is recorded here rather than run |
 
 Two of these remain assumptions, not measurements: feather 1.41's non-advancing
 `getline` on a long line (the original very likely spins; this tree continues), and
@@ -1068,6 +1071,17 @@ membership slot queries the registry. Only membership is observable, so the regi
 is a plain set behind an equivalent lock. A failed allocation returns null exactly
 where the original's `test edx, edx` does; no guard was added.
 
+That scheme is not argued from the disassembly any more: `zp_nms_arena`
+(`tests/nms_arena.cpp`, `rebuilt.md` §2j) drives the three bodies through
+`MemoryArena::Get` — the same three functions `PublishNmsVtable` puts in the table —
+on the process heap, with no game image, and asserts each clause: 42 `(size, align)`
+pairs for the `unit` rounding and `want`, the distance's `[unit, 2*unit)` range, the
+`want + 2*unit` block as `HeapSize` reports it, the `0xCD` fill over exactly `want`
+(the end made observable by poisoning a block, freeing it and taking it again), the
+membership answers, a null free as a no-op, the freed block reused, and the failed
+request answering null with the arena still usable — 246 checks. A double free is the
+one thing it does not run, and cannot: see the preserved-fault row above.
+
 **`NewFilesCompatibility`.** Gated on the original's two refused neighbours
 (`GTAC.dll`, `JacksIVFixes.asi`), in both the publish and the install. The publish
 reads the registrar anchor's `call` operand (`68 64 28 C8 67 E8`, RVA `0x70A954`,
@@ -1455,7 +1469,10 @@ body reads a table through an indexed absolute operand:
    without the game: `OutOfCommissionFix`'s decode and archive build run from
    `zp_dump --ooc-selftest` and are compared with the fingerprints the recovered
    bytes carry (that key's section). The decode half is now the original's own
-   instructions, so that selftest also proves the transcription.
+   instructions, so that selftest also proves the transcription. A rebuilt piece whose
+   result is state that later calls read can be pinned by driving it, which is what
+   `zp_save_walk` does for the converter's decision and `zp_nms_arena` for the arena's
+   scheme, distance word, fill, membership and free path (`rebuilt.md` §2i, §2j).
 
 **An indexed absolute table read is no longer a rebuild reason.** If the body reads a
 table through `[table + reg*4]` (or another indexed absolute form), the fifth part is

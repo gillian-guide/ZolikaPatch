@@ -75,7 +75,9 @@ So the blockers are mechanical, and there are exactly four kinds in this tree:
   its twelve helper callees, and this pass transcribed the twelve helpers with it
   (§2h), so the piece is proven whole. What is left in the class is the NewFiles pair
   and the NewMemorySystem arena methods, whose callers cannot be transcribed without
-  the container internals they call (§3).
+  the container internals they call (§3). The arena's three methods are pinned by
+  behaviour instead (§2j, `zp_nms_arena`), which is the strongest evidence that class
+  can produce while the container stays untranscribable.
 
 Two things that are **not** blockers, and used to be treated as one:
 
@@ -1191,6 +1193,123 @@ frames, which is only reachable in play. §5 item 1 keeps the in-game exercise.
 
 ---
 
+### 2j. This pass: the arena methods, behaviourally
+
+The three arena methods of the `NewMemorySystem` table (§3 class D) were the catalogue's
+weakest evidence: an allocator rebuilt from the disassembly, whose only support was that
+the rebuild's arithmetic read like the instructions. An allocator's failure mode is
+corruption in play, so "the arithmetic matches" is not the property that matters. It is a
+test now. `tests/nms_arena.cpp` (`zp_nms_arena`, 246 assertions) drives the module's own
+three bodies — the same three `PublishNmsVtable` puts in the table — on the process heap,
+with no game image, and pins the scheme clause by clause.
+
+**The seam.** `source/loading.ixx` grew one exported, test-only entry,
+`MemoryArena::Get`, which answers the three `__stdcall` entries and runs the registry
+lock's one-time setup. It is not a second implementation: it names `NmsAllocateBody`,
+`NmsFreeBody` and `NmsContainsBody`, and `PublishNmsVtable` takes the addresses of those
+same three functions. It writes no site, installs no arm, and touches neither the
+published table nor the object the installer points at; the only module state it can
+change is that lock's initialisation, which the game's own allocator-init performs anyway.
+The one refactor it needed is the lock: `PublishNewMemorySystem` used to own the
+`InitializeCriticalSection`, and both paths now call `PrepareArenaRegistry`, a no-op on
+its second call, so the pipeline still initialises the section once, before
+`PublishNmsVtable`. The pipeline's write set is unchanged (`parity_report.py 9` is the
+same line).
+
+**The scheme, and what each assertion class pins.** From the disassembly (image base
+`0x10000000`; the instruction addresses are in the test's own header):
+
+    unit    = align < 0x10 ? 0x10 : align      0x10038378/0x1003837D/0x10038383
+    want    = size  < unit ? unit : size       0x10038380/0x10038386/0x10038388
+    base    = HeapAlloc(heap, 0, want+2*unit)  0x1003838B, 0x10038398
+    aligned = ((base-1)/unit + 2) * unit       0x100383A6-0x100383B0
+    [aligned-4] = aligned - base               0x100383B3-0x100383B7
+    memset(aligned, 0xCD, want)                0x100383C2-0x100383C9
+    registry += aligned                        0x100383D1-0x100383F0
+
+| class | assertion | clause pinned |
+|---|---|---|
+| scheme, over 42 `(size, align)` pairs: sizes `0`, `1`, `0xF`, `0x10`, `0x11`, `0x1000` against alignments `0`, `1`, `4`, `8`, `0x10`, `0x20`, `0x100` | the pointer is a multiple of `unit` | `unit = max(0x10, align)` and the `* unit` in the rounding |
+| | `[pointer-4]` is in `[unit, 2*unit)` | the `(base-1)/unit + 2` rounding. With `base = q*unit + r`, `(base-1)/unit` is `q-1` at `r = 0` and `q` otherwise, so the distance is `unit` or `2*unit - r`, and that single range pins the `-1`, the `+2` and the slack the `+2*unit` request leaves |
+| | `HeapSize(base)` is in `[want + 2*unit, want + 2*unit + 8)` | the `lea eax,[edi+esi*2]` request itself (the heap reports it back rounded to its 8-byte granularity) |
+| | `size` bytes are writable and read back | the block is the caller's |
+| | none of the 42 live `[pointer, pointer+want)` ranges overlap | each pointer sits inside its own block: the distance is at least a unit and the fill fits in the slack |
+| scheme limits | `align 3` gives a `0x10`-aligned pointer, `align 0x30` a `0x30`-aligned one, and the flags argument is ignored | the rounding target is `unit`, not the request; `[ebp+10h]` has no reader and the HeapAlloc flags are the literal `0` at `0x1003838F` |
+| the distance word and the fill | `[pointer-4]` is the distance to the base and still there after the memset; `[pointer, pointer+want)` is `0xCD` for `size 0x11`, `size 0`, `size 1` | the store at `0x100383B7` happens before the `push 0CDh` at `0x100383C3`; the memset's count is `want`, not `size` |
+| the fill's end | a block poisoned `0xAA`, freed and taken again comes back with `want` bytes of `0xCD` and its slack bytes still `0xAA` | the memset stops at `aligned + want`, and `2*unit - distance >= 1` of the block is left over — the fill is the usable region and not past it |
+| membership | a live pointer answers `1`; a freed one, `pointer+1`, `0`, a stack address and an address never handed out answer `0`; freeing one leaves the other a member | `0x100385A0`'s `cmp edi,esi / setne al` (only AL is read, as the body sets only AL) and the erase at `0x100384C0` |
+| free | `release(nullptr)` is a no-op and leaves the arena usable; the next same-size request gets the freed block back; the pointer stops being a member | `0x10038449`'s null test, `0x10038457`'s base recovery, `0x10038474`'s `HeapFree`, then the erase |
+| the failed request | `allocate(0x7FFFFFF0, 0x10, 0)` answers null, throws nothing, and the arena allocates, fills, registers, writes and releases normally afterwards | `0x100383A0`'s `test edx,edx / je` and its zero path |
+
+**The fill's end, made observable.** The bytes after the fill belong to the block but
+have no defined value, so "the memset stopped" cannot be read off a fresh block. The test
+makes it readable: it poisons the block with `0xAA` (all of it except the four-byte
+distance word, which the free needs to find the base), frees it, and asks for the same
+`(size, align)` until the heap returns the block. The heap is free to serve that request
+from anywhere — it returns the just-freed block most of the time, and sometimes not (a
+free block can be coalesced, or the request served from new space) — so the test does not
+assume it: it holds whatever else comes back (which also stops a probe from spinning on
+its own block) and retries with a fresh block, sixteen attempts of sixteen probes. It was
+run 210 times without a miss; a heap that never returned a freed block would be reported
+as a failure, not skipped. The pair is `size 0xF, align 1`, one byte below the unit, so
+the check still holds under the mutation that fills `size` instead of `want`. The tail it
+then reads is the `2*unit - distance` bytes between `aligned + want` and the end of the
+block (measured: `0x8` to `0x10` on this heap).
+
+**The test can fail.** Three mutations of the scheme were run and reverted:
+
+- `want + unit * 2u` → `want + unit` (the request's slack). The `HeapSize` check fails for
+  the pairs that run before the process dies — ten lines on one run, five on another, one
+  on a third, depending on where the heap hands a corrupted block back — and the process
+  then exits with `0xC0000374` (`STATUS_HEAP_CORRUPTION`): the `want`-byte fill no longer
+  fits the block, so shrinking this term is a memory-safety break, not a size change. That
+  is why the check has to name the clause before the fault, and why the clause cannot be
+  weakened.
+- `want = size < unit ? unit : size` → `want = size` (the floor). 28 failures: 25
+  `HeapSize` lines (every pair whose `size < unit`, i.e. `want` is the floor rather than
+  the request) and 3 fill lines (`size 0 -> want 0x10`, `size 1, align 4 -> want 0x10`,
+  and the poisoned block's `0x10` bytes); 218 pass, exit 1, no fault.
+- the memset's count `want` → `size`. 3 failures, all in the fill class (the same three
+  lines), 243 pass, exit 1. The `size 0x11` fill check still passes there because for
+  that pair `size == want` — which is exactly why the `size < unit` pairs are in the
+  table.
+
+**Gates.** `cmake --build --preset release` exit 0; `ctest --preset release` 15/15 twice
+(the new test is `zp_nms_arena`, 246 checks, 0 failures);
+`python tools/parity_report.py 9` → `build 9: 98 key(s) closed, 0 open, 1
+oracle-verified (baseline incomplete)`; `python tools/verify_bodies.py …` → `151
+body(ies), 0 failure(s)`; `zp_dump --ooc-selftest` → `ooc selftest: PASS`.
+
+**What stays unproven.**
+
+- **A double free.** Not tested, and it cannot be asserted offline. The original's free
+  has no membership check in front of it: `0x10038449` tests the incoming pointer for null
+  and nothing else, `0x10038457` recovers the base from `[pointer-4]`, and `0x10038474`
+  calls `HeapFree` unconditionally. A second free therefore reads `[pointer-4]` out of a
+  block the heap owns again — the process heap writes its free-list links into a freed
+  block's first bytes, and the first free's erase removed the registry entry, so the
+  second call is not intercepted either. Its target is the heap manager's state, not the
+  original's arithmetic, and whether that is a no-op, a `STATUS_HEAP_CORRUPTION`
+  termination or silent corruption is decided by the heap implementation. The rebuild
+  keeps the missing guard (the same order: free, then erase), and the test asserts only
+  the part that is knowable — that the pointer stops being a member after the first free.
+- **The container behind the registry.** The original keeps its pointers in a `std::_Hash`
+  whose globals the free body inlines; the rebuild keeps a `std::unordered_set` behind an
+  equivalent lock. Only membership is observable through the three methods, so no
+  assertion can distinguish them: the hash function, the bucket layout, the iteration
+  order and the node allocation are invisible to every caller of the table.
+- **Concurrency.** The test is single-threaded: it enters and leaves the lock but never
+  contends it, so the lock's own behaviour under two threads is not exercised.
+- **The wrapping request.** `0x1003838B` is a 32-bit `lea`, so a size at or above
+  `2^32 - 2*unit` (`0xFFFFFFE0` at the `0x10` floor) wraps the `want + 2*unit` sum and the
+  allocate returns a tiny block for a nearly four-gigabyte memset — the original's fault,
+  preserved by the same arithmetic. The test does not run it (it faults, and a fault is
+  not an assertion); it is recorded as a preserved fault in `parity.md`. The failure-path
+  check uses `0x7FFFFFF0`, whose sum `0x80000010` does not wrap and that no 32-bit heap can
+  satisfy.
+
+---
+
 ## 3. Every piece that is still rebuilt
 
 `insns` is the linear sweep over the function's own bytes, i.e. what a proof row would
@@ -1249,7 +1368,7 @@ the registrar alone would prove nothing about the service.
 | piece | VA | bytes | insns | what it calls | why that keeps it rebuilt | residual risk |
 |---|---|---:|---:|---|---|---|
 | NewFiles updates (2) | `0x10051890`, `0x100518D0` | `0x3F`, `0x45` | 30, 30 | the three class-C scans above + the transcribed resolver `0x10003E50` | their own stream is transcribable, but three of four callees are class C and two of the four need `__fastcall` entry shims (`ECX` = object/list, stack = hash/name) whose register contract would itself be unproven — that is the register-contract bug class, not a proof. §4 item 1 | moderate: it decides whether a new-format file is registered at all |
-| NMS arena methods | `0x10038360` (alloc), `0x10038430` (free), `0x100385A0` (contains) | `0xC2`, `0x10E`, `0x7D` | 69, 91, 40 | the original's `std::_Hash` pair `0x1005C610` (emplace) / `0x1005C5A0` (find), `memset`, `operator delete`, and the map's own fields | the three streams are plain — no EH frame, no TLS guard — but their callees are not the builder's kind of helper. `0x1005C610` **has an exception frame** (`push -1; push SEH_1005C610; … mov fs:[0], eax` at `0x1005C613`-`0x1005C632`, the frame's funclet at `SEH_1005C610`), so it is class B and stays rebuilt. `0x1005C5A0` is the `std::_Hash::find` over four map-internal globals (`dword_101A8424`, `dword_101A8418`, `dword_101A8410`), and the free body **inlines** the erase unlink over the same globals (`mov ecx, dword_101A8424` at `0x100384CC`, `mov eax, dword_101A8418` at `0x100384D2`, `and ecx, esi / lea ecx, [eax+ecx*8]` after it), so its own stream reads container internals a module's `std::unordered_set` does not expose. Transcribing the three callers would prove the arithmetic and leave the registry a rebuild — the class-D position this pass removed for the builder, without a way to remove it here | low: the vtable's other eleven methods are transcribed; these three are allocator plumbing whose failure mode is an allocation fault, which the game shows immediately |
+| NMS arena methods | `0x10038360` (alloc), `0x10038430` (free), `0x100385A0` (contains) | `0xC2`, `0x10E`, `0x7D` | 69, 91, 40 | the original's `std::_Hash` pair `0x1005C610` (emplace) / `0x1005C5A0` (find), `memset`, `operator delete`, and the map's own fields | the three streams are plain — no EH frame, no TLS guard — but their callees are not the builder's kind of helper. `0x1005C610` **has an exception frame** (`push -1; push SEH_1005C610; … mov fs:[0], eax` at `0x1005C613`-`0x1005C632`, the frame's funclet at `SEH_1005C610`), so it is class B and stays rebuilt. `0x1005C5A0` is the `std::_Hash::find` over four map-internal globals (`dword_101A8424`, `dword_101A8418`, `dword_101A8410`), and the free body **inlines** the erase unlink over the same globals (`mov ecx, dword_101A8424` at `0x100384CC`, `mov eax, dword_101A8418` at `0x100384D2`, `and ecx, esi / lea ecx, [eax+ecx*8]` after it), so its own stream reads container internals a module's `std::unordered_set` does not expose. Transcribing the three callers would prove the arithmetic and leave the registry a rebuild — the class-D position this pass removed for the builder, without a way to remove it here | low: the vtable's other eleven methods are transcribed, and these three are now pinned by behaviour instead — `zp_nms_arena` (§2j) asserts the alignment scheme, the distance word, the `0xCD` fill over exactly `want`, membership, free and the null-returning failure path, 246 assertions. What remains unmeasured is only what no caller can observe (the container behind the registry) and what the heap decides (a double free) — §2j |
 
 The NMS methods are the class's *honest* remainder: their own streams are exactly as
 transcribable as the builder's, but the registry they call is a `std::_Hash` the
@@ -1258,7 +1377,11 @@ original inlines into them, not a set of private helpers. A transcription of
 entry shim, and a transcription of `0x10038430` would have to read our set's internals
 at the original's offsets — an unchecked layout assumption, not a proof. The rebuild's
 reproduction (the alignment scheme, the `[pointer-4]` distance, the `0xCD` fill, the
-lock) is unchanged, and `zp_tests`' NewMemorySystem coverage still exercises it.
+lock) is unchanged, and it is now measured rather than argued: `tests/nms_arena.cpp`
+(ctest `zp_nms_arena`, §2j) drives the three bodies through `MemoryArena::Get` and pins
+each clause of the scheme, so what the transcription would add is the call sequence into
+the original's own container — and only membership through that container is observable,
+which the rebuild already reproduces.
 
 ---
 
@@ -1272,8 +1395,11 @@ lock) is unchanged, and `zp_tests`' NewMemorySystem coverage still exercises it.
    without the container: `0x1005C610` carries an EH frame (class B), and `0x10038430`
    inlines the `std::_Hash` erase unlink over the original's map globals. A future pass
    could transcribe `0x10038360`/`0x100385A0` against a shim and leave `0x10038430` a
-   rebuild, but that proves the alignment arithmetic only, and the free path would then
-   be the one method whose stream is not the original's.
+   rebuild, but that proves the alignment arithmetic only — which `zp_nms_arena` (§2j)
+   now proves behaviourally, together with the distance word, the fill, the free path and
+   the null-returning failure — and the free path would then be the one method whose
+   stream is not the original's. The remaining gain is the registry's own container, and
+   nothing outside the three methods observes it.
 3. **The comparator, and how far to extend it.** The global relaxation is still
    **not** made, deliberately: treating every indexed absolute displacement as a slot
    would stop the proof distinguishing `[esi*4+0x1015A538]` from `[esi*4+0x10159D38]`,
@@ -1379,6 +1505,15 @@ deliberately after any change to the modules above.
    layer closes a file. Least likely to matter, hardest to see. The other four DFA
    forwarders are transcribed (§2a) and need the same file-open exercise: a wrong
    argument order would fail the open, not crash.
+9. **The arena** (class D). Exercise: any long session with `NewMemorySystem=1` — loading,
+   a mission, a save. What to look for: an allocation fault or a heap-corruption crash,
+   which the game shows immediately. `zp_nms_arena` (§2j) now pins the scheme, the fill
+   and the free path offline, so what play can add is the two things the test cannot
+   reach: the lock under real contention, and a double free, which the original does not
+   guard and the rebuild does not guard either (`parity.md`, preserved faults). A crash
+   whose stack is inside `0x10038360`/`0x10038430`/`0x100385A0` would mean the rebuild's
+   arithmetic or its registry diverges from the original's, and §2j names the assertion
+   that would have caught it.
 
 ---
 
@@ -1408,6 +1543,16 @@ deliberately after any change to the modules above.
   caller faulted" are distinguished. `Native::SetResolverForTest` is the test-only
   single store that installs the resolver; the fake resolver is naked because the layer
   passes the hash in ESI.
+- `tests/nms_arena.cpp` — the three rebuilt arena methods' behavioural test (§2j, §3
+  class D), ctest entry `zp_nms_arena` (246 checks, no game image): 42 `(size, align)`
+  pairs asserted for the `unit` rounding, the distance range, the `want + 2*unit` block,
+  usability and pairwise disjointness; the three limit cases (`align 3`, `align 0x30`,
+  the ignored flags); the distance word; the `0xCD` fill over exactly `want`, including a
+  poisoned, freed and re-taken block whose slack must stay untouched; membership before,
+  after and around a free; the null free and the block reused by the next same-size
+  request; and the failed request that answers null and leaves the arena usable. It
+  writes no files. `MemoryArena::Get` in `source/loading.ixx` is the test-only seam that
+  names the same three functions the vtable publishes and prepares the registry lock.
 - `tools/verify_bodies.py` — the comparator, including the internal-branch-target
   check and the table registry (`Tables`, `table_content_hash`, `table_mismatch`,
   `table_read`, `read_table`, `read_map`); `table_read` is the one place that decides
