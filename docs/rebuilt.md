@@ -1055,7 +1055,10 @@ image-internal CRT state this module cannot name, and it is the one place the cl
 argument still holds. `OocDestroyEntries` performs the same stores on the same 44-byte
 stride for the entry layout this module uses (an inline 16-byte name buffer, capacity
 `0x0F`), and the free branch is unreachable from the tree's own data in both trees:
-the only entry ever registered is `"finale2.sco"`, eleven bytes.
+the only entry ever registered is `"finale2.sco"`, eleven bytes. §2n reads the loop and
+the registration that fills it — the guard, the SSO threshold, the five call sites and
+every state either tree can produce — and shows that no reachable test can pin more
+than the clear's result, which `zp_ooc_init` already asserts.
 
 **What remains unproven.** The builder only runs when the game calls the wrapper at
 `0xB70733`, so the offline proof is of code, operands and the archive bytes; the mount
@@ -1444,7 +1447,8 @@ checks; both are what the original's discarded answer makes possible.
   `strtol` and a `char` cast; the rebuild stores the same eleven bytes, and nothing
   observable distinguishes a fixed buffer from an inline `std::string` at this capacity
   (the only entry ever registered is `"finale2.sco"`, and the destroy loop's free branch is
-  unreachable — §2h).
+  unreachable: §2n quotes the `cmp [entry+0x14],10h` guard and the `0x0F` capacity the
+  CRT's copy constructor stores, along with the states that cannot reach it).
 - **Concurrency.** Single-threaded, like every other test here: the init is called once per
   wrapper call in one thread, and the fake-pak vector is not guarded in either tree.
 - **The heap's own decision about the two leaked archives.** The test shows they are never
@@ -1970,6 +1974,128 @@ this pass owns that file for test exposure only — so §3 and `docs/parity.md` 
 the corrected record. The residual risk is bounded: the strings and offsets are
 checked against the nine images above, and what remains is whether the game's
 dictionary/sprite code answers as expected at run time — the live check, not a test.
+
+---
+
+### 2n. This pass: the destroy loop `0x1005CD50`, and why no test can reach its free branch
+
+`0x1005CD50` is the last rebuilt callee of §2h: the element-destroy loop the transcribed
+vector clear `0x10056500` calls. §2h filed it rebuilt and said, without quoting the
+instructions, that its free branch is unreachable. This pass reads the loop, the
+registration that fills the vector and the string capacity the two meet at, and settles
+the question: **the free branch is unreachable in both trees, no behaviourally reachable
+state takes it, and the only observable left — the vector is empty — is already asserted
+by `zp_ooc_init`.** Nothing changed in code, in the seam or in the tests.
+
+**What it destroys.** The container is the fake-pak vector (`0x1016E43C` begin,
+`0x1016E440` end, `0x1016E444` capacity); the element is the 44-byte entry, whose first
+24 bytes are the name `std::string` (16-byte inline buffer at `+0`, size at `+0x10`,
+capacity at `+0x14`) and whose five dwords follow at `+0x18`…`+0x28`. Only the string has
+a destructor, so the 38-instruction (`0x61`-byte) loop is the CRT's `_Destroy_range` for
+that element: read the capacity, free the heap name when the capacity is at least 16,
+then reset the string to empty and advance by `0x2C`.
+
+    1005cd60  8b 4e 14              mov  ecx,[esi+14h]          ; the name's capacity
+    1005cd63  83 f9 10              cmp  ecx,10h
+    1005cd66  72 27                 jb   1005CD8F               ; capacity < 16: no free
+    1005cd68  8b 06                 mov  eax,[esi]              ; the name's data pointer
+    1005cd6a  41                    inc  ecx
+    1005cd6b  81 f9 00 10 00 00     cmp  ecx,1000h
+    1005cd71  72 12                 jb   1005CD85               ; under 4 KiB: the plain free
+    1005cd73  8b 50 fc              mov  edx,[eax-4]            ; the allocator's block header
+    1005cd76  83 c1 23              add  ecx,23h
+    1005cd79  2b c2                 sub  eax,edx
+    1005cd7b  83 c0 fc              add  eax,0FFFFFFFCh
+    1005cd7e  83 f8 1f              cmp  eax,1Fh
+    1005cd81  77 28                 ja   1005CDAB               ; invalid_parameter_noinfo_noreturn
+    1005cd83  8b c2                 mov  eax,edx
+    1005cd85  51                    push ecx
+    1005cd86  50                    push eax
+    1005cd87  e8 57 36 00 00        call 100603E3               ; j_free
+    1005cd8c  83 c4 08              add  esp,8
+    1005cd8f  c7 46 10 00 00 00 00  mov  dword ptr [esi+10h],0     ; size = 0
+    1005cd96  c7 46 14 0f 00 00 00  mov  dword ptr [esi+14h],0Fh   ; capacity = 15
+    1005cd9d  c6 06 00              mov  byte ptr [esi],0          ; first byte = 0
+    1005cda0  83 c6 2c              add  esi,2Ch                   ; the 44-byte stride
+    1005cda3  3b f7                 cmp  esi,edi
+    1005cda5  75 b9                 jnz  1005CD60
+    1005cda7  5f 5e 5d c3           pop edi / pop esi / pop ebp / retn
+    1005cdab  ff 15 0c 33 06 10     call ds:_invalid_parameter_noinfo_noreturn
+
+The loop has five callers in the image, all of the same vector's own machinery: the clear
+`0x10056500` (the only one this tree transcribes), the reallocation `0x1005C350` (destroys
+the moved-from range, then frees the old buffer), the throw path's cleanup thunk
+`0x10058150` (called from `0x1005C350` at `0x1005C57A`), the move helper `0x1005E380`
+(which calls it on an empty range, `sub_1005CD50(v3, v3)`) and the vector's tidy
+`0x10062D30`. The rebuild gets growth and tidy from `std::vector`; only the clear calls
+`OocDestroyEntries`. For the capacity range that could ever occur, the original's free is
+a plain `free` (`0x100603E3` is `push [ebp+8]; call j_free`), which is what
+`OocDestroyEntries` calls; the allocator-header adjustment exists only for a capacity at
+or above `0xFFF`, behind the same guard.
+
+**The SSO threshold, and the value the loop tests.** The one name that ever reaches the
+vector is `"finale2.sco"`, eleven bytes, and it is built as an SSO `std::string`: the
+destination temporary's capacity is `0x0F` (the `mov [ebp+String],0Fh` at `0x1004C21D`;
+every one-character append re-initialises its own temporary the same way), the `assign` at
+`0x10058620` keeps the 15-capacity buffer because 11 < 16, and the CRT's copy constructor
+stores it into the entry:
+
+    100578cf  83 7f 14 10           cmp  dword ptr [edi+14h],10h  ; source capacity < 16: inline
+    100578d3  8b 47 10              mov  eax,[edi+10h]            ; source size (11)
+    100578dd  83 f8 10              cmp  eax,10h
+    100578e0  73 1a                 jae  100578FC                ; 11 < 16: stays inline
+    100578e2  0f 10 07              movups xmm0,[edi]             ; the 16-byte inline buffer
+    100578e5  bb 0f 00 00 00        mov  ebx,0Fh
+    100578eb  0f 11 06              movups [esi],xmm0
+    100578ee  89 46 10              mov  [esi+10h],eax            ; the entry's size = 11
+    100578f3  89 5e 14              mov  [esi+14h],ebx            ; the entry's capacity = 15
+
+So the guard's input is `0x0F`: `cmp ecx,10h` is not taken, the free never runs, and the
+`0x1000` header path and the `_invalid_parameter_noinfo_noreturn` call behind it are two
+comparisons further away. The registration agrees: the only place an element is appended
+is `0x1004C2A2  add dword_1016E440,2Ch` (after the five field stores at `0x1004C287`…), the
+growth helper `0x1005C350` has exactly one caller (`0x1004C2AC`, the push_back's full
+path), and the clear `0x10056500` has exactly one call site (`0x1004B12A`, the builder's
+`ooc_build_done`). Every entry any call site can see is that same SSO entry.
+
+**The reachable states, and why none of them changes the branch.**
+
+| state | reachable? | what the loop sees |
+|---|---|---|
+| one entry, the shipped path | yes — `OocInitialise`: register once, build, the builder's clear | capacity `0x0F`: reset only |
+| two entries | not on the shipped path (the same call that registers clears at its end); an allocation failure inside the builder can unwind past the clear, leaving the first behind, and the next call adds a second; the seam can create two directly | both are the same SSO entry. The original's growth helper destroys the moved-from copy, which the move helper has already reset to size 0 / capacity 15; the rebuild's `std::vector` has no destructor to call at all. Either way the loop sees `0x0F` |
+| a long name, capacity ≥ `0x10` | no — no push anywhere takes a name other than `"finale2.sco"`, and no seam produces one | would take the free; unreachable in both trees |
+| cleared, then refilled | yes (seam and init alike) | the refill is the same 11-byte SSO entry: reset again |
+
+**The observable is only "empty", and it is already asserted.** After the clear the
+vector's size is 0. The destroyed element's storage is still allocated (`clear` does not
+shrink), and the three resets are still in it — but no seam returns those bytes, and the
+next registration copies a fully-initialised 44-byte value over them, so nothing ever
+reads them. The size is the clear's own store (`0x10056500`: `mov eax,[esi]; mov
+[esi+4],eax`), not the destroy loop's: `OocInit::ClearEntries() == 0` would still pass if
+`OocDestroyEntries` did nothing. `zp_ooc_init` asserts that size twice — `run.slots.entries
+== 0` after a full init and `ClearEntries() == 0` on the seam — and it also asserts
+`entry.name_capacity == 15`, which is the guard's own input: a registration that could
+reach the free branch would fail the entry check before the loop ran.
+
+**What was not added, and why.** No state in this tree can reach the loop's free branch:
+the only push writes the SSO name, and the two-entry and cleared-then-refilled states take
+the same branch. The one way to exercise the free would be a new seam that registers a
+long, heap-backed name — a state the production code cannot enter — and the assertion would
+then be about `OocDestroyEntries`' own model, not about the original, which never has such
+an entry through this vector. A check of "the vector is empty" after a second registration
+would assert nothing new. So the test is unchanged at 54 checks, and this section is the
+record. The loop is still executed by `zp_ooc_init`: a stride that cannot land on `last`
+walks off the allocation, and a guard inverted to free at capacity 15 would hand `free` the
+first four bytes of the inline buffer as a pointer — either would fail by faulting. What
+the test cannot assert is the three resets, which are dead bytes in a dead element with no
+caller to read them.
+
+**Gates.** `cmake --build --preset release` exit 0; `ctest --preset release` 20/20 twice;
+`python tools/parity_report.py 9` → `build 9: 98 key(s) closed, 0 open, 1
+oracle-verified (baseline incomplete)`; `python tools/verify_bodies.py …` → `151
+body(ies), 0 failure(s)`; `zp_dump --ooc-selftest` → `ooc selftest: PASS`;
+`python tools/check_fault_dialogs.py` → `12 test source(s), 0 failure(s)`.
 
 ---
 

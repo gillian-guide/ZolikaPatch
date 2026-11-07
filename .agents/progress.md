@@ -1486,3 +1486,49 @@ Gates: build exit 0; ctest 20/20 twice (16.47 s / 12.72 s); 98 closed / 0 open /
 oracle-verified; 151 bodies 0 failure; ooc-selftest PASS; check_fault_dialogs 12 sources
 0 failures.
 
+## 2026-11-07 - the destroy loop `0x1005CD50`: the free branch is unreachable, and no test can move it
+
+`0x1005CD50` (`0x61` bytes, 38 instructions, IDA `ZolikaPatch.asi.i64`) is the
+`_Destroy_range` loop the transcribed vector clear `0x10056500` calls at the OOC builder's
+end. It destroys the fake-pak vector's elements: a 44-byte entry whose first 24 bytes are
+the name `std::string` (inline buffer at +0, size +0x10, capacity +0x14) and whose five
+dwords follow at +0x18..+0x28. The loop reads the capacity, frees the heap name when
+`capacity >= 0x10`, then resets size=0, capacity=15 and the first byte, striding 0x2C.
+
+The free branch is unreachable in both trees because the only entry ever registered is the
+11-byte `"finale2.sco"` in an SSO string of capacity `0x0F`:
+
+    1005cd60  8b 4e 14   mov ecx,[esi+14h]     ; the name's capacity
+    1005cd63  83 f9 10   cmp ecx,10h
+    1005cd66  72 27      jb  1005CD8F          ; 0x0F < 0x10: no free
+
+and the capacity is the CRT copy constructor's own: `0x100578E8 mov ebx,0Fh` /
+`0x100578F3 mov [esi+14h],ebx` on the SSO branch (`0x100578E0 cmp eax,10h / jae` takes the
+heap path only for a size at or above 16). The `0x1000` block-header path and
+`_invalid_parameter_noinfo_noreturn` are two comparisons behind the same guard.
+
+The only push in the image is `0x1004C2A2 add dword_1016E440,2Ch` (the registration at
+`0x1004C287`..), the growth helper `0x1005C350` has one caller (`0x1004C2AC`), and the
+clear `0x10056500` one call site (`0x1004B12A`, `ooc_build_done`). The reachable states -
+one entry, two entries (seam, or an allocation failure that unwinds past the clear), a
+cleared-then-refilled vector - all carry the same `0x0F`; a long name cannot be produced
+because `OocRegister` is the only push and hard-codes the name. The only observable is the
+vector's size, which `zp_ooc_init` already asserts twice (`run.slots.entries == 0`,
+`ClearEntries() == 0`) and whose guard input it also asserts (`name_capacity == 15`); the
+three resets are dead bytes in a dead element that no seam exposes and no caller reads.
+
+Why no test: exercising the free would need a new seam that registers a long, heap-backed
+name - a state the production code cannot enter - so the assertion would be about
+`OocDestroyEntries`' own model, not the original. A second registration asserted "empty"
+would add nothing. The loop is still executed by the existing test (a wrong stride walks
+off the allocation; an inverted guard hands `free` the inline buffer's first four bytes),
+so a broken loop faults rather than passing silently.
+
+Changed: docs/rebuilt.md only - §2h's "what stays rebuilt" paragraph and §2k's
+entry-string bullet point at the new §2n, which quotes the guard, the copy constructor and
+the five call sites. No code, no seam, no test; `source/ooc.ixx` untouched.
+
+Gates: build exit 0; ctest 20/20 twice (13.81 s / 11.21 s); 98 closed / 0 open / 1
+oracle-verified; 151 bodies 0 failure; ooc-selftest PASS; check_fault_dialogs 12 sources,
+0 failures; zp_ooc_init 54 checks, 0 failures.
+
