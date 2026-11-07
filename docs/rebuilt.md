@@ -257,7 +257,9 @@ static-init guard or a call graph of rebuilds — it had no reason to stay rebui
 it is transcribed too. `0x10004790` (close-handle) *does* have the frame (`push -2;
 push 0x10153FC0; push __except_handler4; … mov fs:[0], eax`, the filter at
 `0x100047EC` and the unwind block at `0x100047F0`, 45 instructions in `0x81` bytes)
-and stays a rebuild.
+and stays a rebuild; §2l identifies the filter's disposition (`-1`,
+`EXCEPTION_CONTINUE_EXECUTION`, so a fault is retried rather than answered), pins it in
+a child process, and compares the rebuilt body with the oracle byte for byte.
 
 **How this pass was verified**
 
@@ -294,10 +296,11 @@ and stays a rebuild.
 
 **What stays rebuilt in these two areas, and why.** The init (`0x1004B750`, EH +
 C++ containers), the key's handler (`0x1004C3F0`, EH4 + a 16 KB string builder) and
-the DFA close-handle body (`0x10004790`, EH4) — every one of them for a reason this
-file lists. The OOC archive builder that this paragraph used to name is transcribed
-with its twelve helpers in §2h; the OOC pair's behaviour stays pinned by the selftest,
-and the wrapper and the branch body were already transcribed.
+the DFA close-handle body (`0x10004790`, EH4 — now behaviourally pinned and byte-compared
+with the oracle, §2l) — every one of them for a reason this file lists. The OOC archive
+builder that this paragraph used to name is transcribed with its twelve helpers in §2h;
+the OOC pair's behaviour stays pinned by the selftest, and the wrapper and the branch body
+were already transcribed.
 
 **What remains unproven for these six.** The decoder pair is now behaviourally proven
 offline (item 5), which is more than any other body here; the DFA forwarders are only
@@ -1448,6 +1451,244 @@ checks; both are what the original's discarded answer makes possible.
 
 ---
 
+### 2l. This pass: the DFA close-handle body, identified and driven
+
+`0x10004790` was the last DFA body without a behavioural test and the last piece whose
+description in this file was wrong. Both are fixed: the body is now **byte-identical to
+the oracle except its four relocated operands**, its frame's filter is identified from
+the scope table, and `tests/dfa_close.cpp` (`zp_dfa_close`, 27 checks) drives it against
+a real file and, in a child process, against a faulting callee.
+
+**The body, quoted.** 45 instructions in `0x81` bytes (`0x10004790`..`0x10004810`):
+
+```
+10004790  55                    push ebp
+10004791  8b ec                 mov  ebp,esp
+10004793  6a fe                 push 0xFFFFFFFE          ; try level -2
+10004795  68 c0 3f 15 10        push 0x10153FC0          ; the scope table
+1000479A  68 4c fe 05 10        push 0x1005FE4C          ; __except_handler4
+1000479F  64 a1 00 00 00 00     mov  eax,fs:[0]          ; the thread's chain
+100047A5  50                    push eax
+100047A6  83 ec 08              sub  esp,8
+100047A9  53 56 57              push ebx/esi/edi
+100047AC  a1 0c 80 15 10        mov  eax,[0x1015800C]    ; __security_cookie
+100047B1  31 45 f8              xor  [ebp-8],eax
+100047B4  33 c5                 xor  eax,ebp
+100047B6  50                    push eax                 ; the frame cookie
+100047B7  8d 45 f0              lea  eax,[ebp-0x10]
+100047BA  64 a3 00 00 00 00     mov  fs:[0],eax
+100047C0  89 65 e8              mov  [ebp-0x18],esp
+100047C3  c7 45 fc 00 00 00 00  mov  [ebp-4],0           ; state 0: the guarded region
+100047CA  ff 75 08              push DWORD PTR [ebp+8]   ; the handle, unexamined
+100047CD  ff 15 58 30 06 10     call DWORD PTR ds:[0x10063058]   ; KERNEL32!CloseHandle
+100047D3  c7 45 fc fe ff ff ff  mov  [ebp-4],-2          ; state -2: the region is over
+100047DA  8b 4d f0              mov  ecx,[ebp-0x10]
+100047DD  64 89 0d 00 00 00 00  mov  fs:[0],ecx
+100047E4  59                    pop  ecx
+100047E5  5f 5e 5b              pop  edi/esi/ebx
+100047E8  8b e5                 mov  esp,ebp
+100047EA  5d                    pop  ebp
+100047EB  c3                    ret
+100047EC  83 c8 ff              or   eax,0xFFFFFFFF       ; the FILTER
+100047EF  c3                    ret
+100047F0  8b 65 e8              mov  esp,[ebp-0x18]       ; the HANDLER
+100047F3  c7 45 fc fe ff ff ff  mov  [ebp-4],-2
+100047FA  b8 01 00 00 00        mov  eax,1
+100047FF  8b 4d f0              mov  ecx,[ebp-0x10]
+10004802  64 89 0d 00 00 00 00  mov  fs:[0],ecx
+10004809  59 5f 5e 5b           pop  ecx/edi/esi/ebx
+1000480D  8b e5                 mov  esp,ebp
+1000480F  5d                    pop  ebp
+10004810  c3                    ret
+```
+
+`0x10063058` is `KERNEL32.dll!CloseHandle` (`../ZolikaPatch_reconstruction/evidence/import_table.json`),
+so the guarded region is exactly one push and one call, and the normal path hands back
+whatever `CloseHandle` left in `EAX`.
+
+**Which funclet is which.** The scope table at `0x10153FC0` is
+
+```
+10153FC0  fe ff ff ff 00 00 00 00   GSCookieOffset -2,  GSCookieXOROffset 0
+10153FD0  d8 ff ff ff 00 00 00 00   EHCookieOffset -0x28, EHCookieXOROffset 0
+10153FE0  fe ff ff ff ec 47 00 10   { EnclosingLevel -2, FilterFunc 0x100047EC
+10153FF0  f0 47 00 10               HandlerFunc 0x100047F0 }
+```
+
+so `0x100047EC` — `83 C8 FF; C3` — is the **filter**, and it answers `-1`,
+`EXCEPTION_CONTINUE_EXECUTION`. `0x100047F0` is the **except body**, i.e. the
+`return TRUE` arm; it is entered only when a filter answers `EXCEPTION_EXECUTE_HANDLER`
+(1), which this one never does. The record order is not a guess: the native guard's table
+(`0x10153EE8`, §3 class B) has the same layout with the opposite contents — filter
+`0x1000395A` = `mov eax,1; ret` and handler `0x10003960` = `xor al,al` — which is what
+`__except (EXCEPTION_EXECUTE_HANDLER) { return false; }` compiles to.
+
+**Which C shape that is, checked in bytes.** `.scratch/dfa_close/probe.cpp` compiles four
+candidate shapes at `/O2 /MT /GS` (the module's own flags); `.scratch/dfa_close/coff.py`
+compares each function's bytes with the oracle's range through the COFF symbol and
+relocation tables. Exactly one candidate reproduces the oracle:
+
+```
+oracle 0x10004790: 129 byte(s)
+
+?VariantReturnExceptContinue1@@YAHPAX@Z: 129 byte(s), 16 differing byte(s), 4 relocation(s)
+  +0x04 oracle fe 68 c0 3f candidate fe 68 00 00
+  +0x08 oracle 15 10 68 4c candidate 00 00 68 00
+  +0x0C oracle fe 05 10 64 candidate 00 00 00 64
+  +0x1C oracle a1 0c 80 15 candidate a1 00 00 00
+  +0x20 oracle 10 31 45 f8 candidate 00 31 45 f8
+  +0x3C oracle 08 ff 15 58 candidate 08 ff 15 00
+  +0x40 oracle 30 06 10 c7 candidate 00 00 00 c7
+  relocations at +0x06, +0x0B, +0x1D, +0x3F
+  -> the oracle's exact stream; every difference is a relocation
+```
+
+i.e. `__try { return CloseHandle(h); } __except (EXCEPTION_CONTINUE_EXECUTION) { return TRUE; }`.
+The other three shapes differ **outside** the relocations, which is what makes the
+comparison decide rather than suggest: the shape this tree shipped until this pass
+(`__except (EXCEPTION_EXECUTE_HANDLER) { return -1; }`) prints
+`129 byte(s), 34 differing byte(s), 4 relocation(s)` and
+`NOT the oracle's stream (18 byte(s) outside every relocation: +0x5C … +0x6E)` — the two
+funclets swapped, a different program. **The rebuild now uses the oracle's shape**, and
+`.scratch/dfa_close/module_body.py` repeats the comparison on the module's own object
+(`launcher.obj`) rather than on a probe, with the object's four relocation entries read
+from its COFF section table:
+
+```
+?CloseHandleBody@?A0x5b8f3f28@@YAHPAX@Z
+  .text$mn: 129 byte(s), 4 relocation(s) inside the body
+  oracle 0x10004790: 129 byte(s)
+  16 differing byte(s)
+    ... all seven words inside the relocations ...
+  relocated operands at +0x06, +0x0B, +0x1D, +0x3F
+  45 instruction(s): 45 oracle, 45 shipped
+  -> 16 differing byte(s), all relocated; IDENTICAL except the relocated operands
+  shipped +0x5C (filter): 83 c8 ff c3 8b 65 e8 c7
+  oracle  +0x5C (filter): 83 c8 ff c3 8b 65 e8 c7
+```
+
+The four relocated operands are the two pushes (scope table, `__except_handler4`), the
+cookie load and the `CloseHandle` slot — every operand the linker owns. The instruction
+stream, the branch shape, both funclets and the byte size are the original's.
+
+**What the disposition does, measured.** A filter that answers `-1` resumes the faulting
+instruction, so a fault inside the guarded call is **retried, not answered**. The test's
+child replaces the module's `CloseHandle` import slot — the same kind of slot the
+original's body reads at `0x10063058`, found through the test exe's own PE import
+directory, so no instruction is decoded — with a function that writes one byte to a probe
+file (opened *before* the patch, so the write uses no `CloseHandle`) and then writes to the
+unmapped null page; the child writes its `STARTED` line before the patch, then calls the
+body. The parent waits 1000 ms and requires the child to be *still running*, the probe byte
+to be there (so the guarded call was really entered, not merely slow) and no `ANSWERED`
+line, then terminates it and reaps it:
+
+```
+PASS child: the faulting callee was entered through the patched slot (the probe file holds
+     "X"), so the guarded call is where the child is stuck
+PASS child: the close body was reached after the slot was patched (report "STARTED")
+PASS child: the guarded call did not answer within 1000 ms -- the filter's
+     EXCEPTION_CONTINUE_EXECUTION (0x100047EC) makes the OS retry the faulting call, so the
+     frame has no answer for it (exit 0x0000DEAD; 0xC0000005 would be the fault with no
+     frame at all)
+PASS child: no ANSWERED line -- the handler at 0x100047F0 (`return TRUE`) is unreachable, so
+     the rebuild does not answer where the original retries (report "STARTED")
+PASS child: terminated and reaped by the test (exit 0x0000DEAD), so the suite leaves no
+     process behind
+```
+
+The child writes its `STARTED` line *before* the slot is patched, because the report
+stream's own close is a `CloseHandle` call through the import being replaced — writing it
+after the patch faults outside the frame under test (that mistake produced
+`exit 0xC0000005` on the first run of this test, and is the reason `zp_fault_dialogs`
+requires `SetErrorMode` in such a test's `main`).
+
+**What the frame protects, and what is reachable.** The guarded region covers the
+`call ds:[CloseHandle]` and nothing else, and no handle value can make `CloseHandle` fault
+— it validates the value and returns `FALSE`. So the fault path is **unreachable through
+the wrapper's own arguments**, and the reachable half is what the test asserts in this
+process:
+
+| piece | assertion | clause pinned |
+|---|---|---|
+| the round trip | the fixture is opened by `0x10004820`, sized (`TRUE`, 32), seeked (`16`, then `28` from the end with a negative distance), read (`"01234567"`, then `"ghijklmn"`, then `"stuv"`), then closed by the rebuild (`1`) | the four transcribed bodies' argument orders and `0x10004790`'s normal path returning `CloseHandle`'s `EAX` |
+| really closed | `DuplicateHandle` on the value answers `FALSE`/`6`; the transcribed reader answers `FALSE`/`6` and `ReadFile` itself answers `FALSE`/`6` for the same value | the close happened in the OS, not just in a return value, and the reader is a forwarder |
+| no argument guard | `close(nullptr)` answers `FALSE`/`6`; `close(closed value)` `FALSE`/`6`; `close(0xDEADBEEF)` `FALSE`/`6`; after all three a fresh create/close works | the body's only instructions between the frame and the call are `mov [ebp-4],0` and `push [ebp+8]` (`0x100047C3`, `0x100047CA`): the value reaches `CloseHandle` unchanged. The deciding instruction for a double close is the unconditional `call ds:[0x10063058]` at `0x100047CD`; nothing in the body remembers the first close |
+| pass-through | wrapper and `CloseHandle` answer the same value and the same error for two identical handles; a successful close leaves last error untouched (`0xFFFFFFFF` before and after) | the frame adds nothing on the reachable path |
+| the frame's registration | `fs:[0]` is the same before the call and after a successful close, and after the null close | the prologue/epilogue pair (`0x100047BA` installs, `0x100047DD` restores); a skipped restore would leave the chain pointing into a dead frame |
+
+Two values pin themselves. `ERROR_INVALID_HANDLE` is 6, asserted as the literal the
+checks name. And the never-opened value is `0xDEADBEEF`: both low flag bits are set, so
+the kernel rejects it without a table lookup, and the `FALSE` answer proves it was not a
+live handle (a closable one answers nonzero). `INVALID_HANDLE_VALUE` is deliberately **not**
+used: on Win32 it is `(HANDLE)-1`, the current-process pseudo-handle, and this machine
+answers `1` for `CloseHandle(INVALID_HANDLE_VALUE)` — the name is a trap, not an invalid
+handle (`.scratch/dfa_close/values.cpp` is the probe that measured the whole answer
+matrix: valid `1` with last error untouched, closed `0`/`6`, `NULL` `0`/`6`,
+`0xDEADBEEF` `0`/`6`, `0x1234` `0`/`6`, `1` `0`/`6`).
+
+**The seam.** `source/launcher.ixx` grew one exported, test-only namespace, `Launcher`,
+with a single entry:
+
+| entry | is |
+|---|---|
+| `DfaBodiesForTest` | the five body addresses — the four transcribed forwarders (`0x10004820`, `0x10004740`, `0x10004760`, `0x10004720`) and the rebuilt close (`0x10004790`) — typed with the originals' `__cdecl` ABIs |
+
+It is not a second implementation: the entries are the bodies' own addresses. It calls
+`PublishDfaForwarders()`, the four stores `RegisterLauncher` makes (the create body's
+fallback would otherwise `call` through zero), which is now one function so the shipped
+publish step and the seam cannot drift. That is the only change to shipped code besides
+the except clause: `.scratch/dfa_close/publish_check.py` disassembles the built
+`RegisterLauncher` and finds all four slot stores still there
+(`10022841`, `1002284B`, `10022855`, `1002285F`; `4 of 4 slot(s) written`). **Nothing
+reaches the shipped image**: the seam has no caller inside the ASI and no PE export, so
+`/OPT:REF` drops it — `ZolikaPatch.map` has 0 occurrences of `DfaBodiesForTest`, of the
+`DfaBodies` type and of the helper — while the test links the same object file and calls
+them. The write set and the 151 proof rows are unchanged.
+
+**The test can fail.** Two mutations, each reverted:
+
+- **the wrapper does not close** (`CloseHandleBody` becomes `return TRUE;`): 12 failures,
+  and they are the expected classes — `the handle is really closed: DuplicateHandle refuses
+  it…`, `read 0x10004740 after the close…`, `null: …`, `closing the already-closed value
+  again…`, `a handle that was never opened…`, the frame's failure-path check, and the whole
+  child class (the probe file is empty, the report says `ANSWERED=00000001`, so the retry
+  check's exit code is `0`).
+- **the divergent guard** (`__except (EXCEPTION_EXECUTE_HANDLER) { return -1; }`, what the
+  tree shipped until this pass): 5 failures, all in the child class, with
+  `report "ANSWERED=FFFFFFFF"` — the reachable-surface checks still pass, which is exactly
+  the point: the divergence lived only on the unreachable path, and only the child sees it.
+  The probe byte is present there, which is the right answer: that guard *does* reach the
+  fault, it just answers it.
+
+**Gates.** `cmake --build --preset release` exit 0; `ctest --preset release` 20/20 twice
+(the new test is `zp_dfa_close`, 27 checks, 0 failures, 1.3 s including the watchdog);
+`python tools/parity_report.py 9` → `build 9: 98 key(s) closed, 0 open, 1 oracle-verified
+(baseline incomplete)`; `python tools/verify_bodies.py …` → `151 body(ies), 0 failure(s)`;
+`zp_dump --ooc-selftest` → `ooc selftest: PASS`; `python tools/check_fault_dialogs.py` →
+`12 test source(s), 0 failure(s)`.
+
+**What stays unproven.**
+
+- **The in-game call.** The body runs when the game closes a file through its DFA layer,
+  and nothing offline can make it. The test drives the body directly, so what play still
+  decides is that the five install rows point at it and that a DFA close in the game takes
+  this path at all (the launcher cell is oracle-verified, and the install rows are the
+  bytes `parity.md` counts).
+- **A real fault inside `CloseHandle`.** There is none to have: `CloseHandle` validates
+  and returns. The child's fault is forced through the import slot, which is the only
+  mechanism the original's own body offers too (its `ds:[0x10063058]` is a data slot).
+- **The 1000 ms window.** The test proves the child had not answered after one second and
+  was still in the retry loop; it does not prove the loop is infinite, only that the shape
+  the oracle compiled is the shape the rebuild compiles. The scratch probe measured the
+  same shape hanging for three seconds.
+- **The CRT that interprets the filter.** The original imports `_except_handler4_common`
+  (`0x100632B4`) from its CRT; this tree's static CRT provides its own. Both are MSVC's
+  handler4 and `-1` is the documented `EXCEPTION_CONTINUE_EXECUTION` disposition, but the
+  two implementations are not byte-compared — the *shape* of the frame is, and the
+  disposition is measured.
+
+---
+
 ## 3. Every piece that is still rebuilt
 
 `insns` is the linear sweep over the function's own bytes, i.e. what a proof row would
@@ -1478,7 +1719,7 @@ unregistered indexed absolute keeps the literal comparison.
 |---|---|---:|---:|---|---|---|---|
 | guarded resolve-and-invoke | `0x100038E0` | `0x9E` | 59 | `__try/__except`: `push -1; push 0x10153EE8; push __except_handler4; … mov fs:[0],eax`, two funclets (`mov eax,1; ret` and the unwind path) | resolve a native handler by hash, call it with the one argument, answer `true`; a fault in the call is caught and answered `false` — that is the feature | `zp_native_guard` (ctest) runs it against a resolver the test installs: a target that returns 7 answers `1` and receives the block, a target that reads null or writes an unmapped address answers `0` with the process still usable, a *resolver* that faults answers `0` (the region covers `0x1000392B`), and a null handler skips the call and answers `1`. The bodies that call it are transcribed (`audio_call_*`, `bad_player_model_*`), and its consumers' cells are closed | high, by impact; the frame's four outcomes are now measured, so what stays unproven is that a real game fault always raises inside this region, and that the in-game consumer is the one the test models (a stand-in caller does the read) |
 | guarded resolve-only | `0x10003980` | `0x90` | 52 | same, scope table `0x10153F08` | resolve only, answer the handler pointer or 0 | `zp_native_guard` as above, plus this entry's own shape: it answers the handler address without calling it (`0x100039D0`..`0x100039EB`), a faulting resolver answers `0`, a null handler is answered as null (this entry has no `test`), and a child process shows a caller's `[eax+0Eh]` read through that null dying with `0xC0000005`. Called from the transcribed steer consumer, the popup shims and `MouseFix`'s helpers | high, same reason: the caller's unguarded read is the original's fault, and the test models that caller rather than running it |
-| DFA close-handle body | `0x10004790` | `0x81` | 45 | `__try/__except` around `CloseHandle`: `push -2; push 0x10153FC0; push __except_handler4 (0x1005FE4C); … mov fs:[0], eax`, with the filter (`or eax, -1; ret` at `0x100047EC`) and the unwind continuation (`0x100047F0`) inside the same byte range | `CloseHandle` behind the guard, answering `-1` when the call faults | the DFA stage's write set and the launcher cell (`oracle-verified`); the body runs when the game closes a file through DFA | low: a close that faults is caught either way. The frame is the feature, so it stays rebuilt; the four forwarders beside it are transcribed (§2a) |
+| DFA close-handle body | `0x10004790` | `0x81` | 45 | `__try/__except` around `CloseHandle`: `push -2; push 0x10153FC0; push __except_handler4 (0x1005FE4C); … mov fs:[0], eax`, with the filter (`or eax, -1; ret` at `0x100047EC`) and the unwind continuation (`0x100047F0`) inside the same byte range | `CloseHandle` behind the guard, with the filter's own disposition: `0x100047EC` answers `-1` (`EXCEPTION_CONTINUE_EXECUTION`), so a fault in the guarded call is **retried, not answered**, and the `return TRUE` handler at `0x100047F0` is unreachable; the normal path hands back `CloseHandle`'s `EAX`. The rebuild is byte-identical to the oracle except the four relocated operands (§2l) | `.scratch/dfa_close/module_body.py` compares the module's own object with the oracle: `129 byte(s)`, `45 instruction(s)`, `16 differing byte(s), all relocated` (`+0x06`, `+0x0B`, `+0x1D`, `+0x3F`), funclet bytes identical at `+0x5C`/`+0x60`; `zp_dfa_close` (§2l) drives it — the round trip on a real file through the four transcribed siblings, the closed/null/double/never-opened answers, the pass-through equality, `fs:[0]`, and a child whose faulting callee must never return | low: the frame's retry is measured in a child (1 s watchdog, the same shape measured hanging for 3 s in the probe); the guarded region is only `CloseHandle`, which no handle makes fault. What remains is the in-game call (§2l) |
 | SpeedupBugFix body | `0x10050540` | `0x16F` | 93 (+funclet at `0x10061981`) | C++ static-init EH: `push -1; push SEH_10050540; … fs:[0]`, funclet `jmp __CxxFrameHandler3` with throw info `0x10154358`, plus the `_Init_thread_header/footer` TLS guard (`0x1005FFC3`/`0x1005FF77`) around the one-time QPC/scan | the clock fix: QPC frequency → one-over-frequency into eight published float slots, then tail-call `sub_10003830`'s resolver result − 0x33 (the game's timer getter) and return its `(eax,edx)` pair in a 64-bit answer | the arm's eight operands are validated per site and the per-key dump is byte-identical to the pre-change dump on all nine images; the *body* never runs offline | moderate: the eight timer slots are the whole fix. A wrong slot or a float/double mix-up would show as a broken game clock, not a crash |
 | audio install body | `0x10050AD0` | `0xF9` | 75 | EH4 (`push __except_handler4`, scope `0x10154384`, funclet `0x100619C1`) + the CRT clock/seed block through `fs:[2Ch]` and `TlsIndex` | resolve the `6A 06 68 ? ? ? ? 8D 8C` site once and write `rand() % 5 + 1` into its `push` immediate, gated on the transcribed `0x10050A50` gate | `RestoreDeathMusic`'s cell is closed; the gate and the three native wrappers around it are transcribed and proven | **the one recorded 1:1 divergence in that key**: the original's guard compares `dword_101A84C0` with the CRT per-thread word and may skip the whole block on a fresh process; the rebuild always writes. Recorded in `parity.md` §RestoreDeathMusic |
 | save converter | `0x10051B30` | `0x489` | 337 | EH registration (`fs:[0]`) + three `_Init_thread_header/footer` TLS guards + CRT file API (`fopen_s`, `fread`, `fclose`, `operator new`, `free`) + `std::string` (IDA's per-function total is 363: 337 plus the out-of-line funclet/abort blocks) | open the save, check `SAVE` at +0xC, walk eighteen chunks with `fread(9)` / `operator new(size-9)` / `fread(payload)` / `free`, remember chunks 9/13/16 (`0x4C45`/`0x1741`/`0x0E77`), then patch the three sites (`0x872185`, `0x7D8C50`, `0x8DA090`) | the walk, the three flag tests and the three patch values are pinned by `zp_save_walk` on both real saves and on three synthetic layouts, against the file re-read by the test's own parser (§2i); its two faults are asserted too — `std::bad_alloc` in-process, the uninitialised magic in a child process. What the test cannot run is anything but the decision: the three writes and the two hooks still need a save load | **high**: a corrupt save already faults (preserved), and the chunk-size conditions decide whether the new-format hooks are installed. A wrong condition converts a save wrongly instead of failing |
@@ -1640,9 +1881,12 @@ deliberately after any change to the modules above.
 8. **The ROM service and the DFA close-handle body** (classes B/C). Exercise: launch
    through `PlayGTAIV.exe` and watch for the ROM message window to exist (no visible
    symptom); a hang here is the preserved original fault. Then open a save so the DFA
-   layer closes a file. Least likely to matter, hardest to see. The other four DFA
-   forwarders are transcribed (§2a) and need the same file-open exercise: a wrong
-   argument order would fail the open, not crash.
+   layer closes a file. Least likely to matter, hardest to see. The five DFA bodies are
+   now behaviourally tested offline (`zp_dfa_close`, §2l: a real file through the four
+   forwarders and the rebuilt close, plus the child that pins the frame's retry), so what
+   play adds is only that the game's five patched call sites reach them — the install rows
+   are the bytes `parity.md` counts, and a wrong argument order would fail the open, not
+   crash.
 9. **The arena** (class D). Exercise: any long session with `NewMemorySystem=1` — loading,
    a mission, a save. What to look for: an allocation fault or a heap-corruption crash,
    which the game shows immediately. `zp_nms_arena` (§2j) now pins the scheme, the fill
@@ -1681,6 +1925,20 @@ deliberately after any change to the modules above.
   caller faulted" are distinguished. `Native::SetResolverForTest` is the test-only
   single store that installs the resolver; the fake resolver is naked because the layer
   passes the hash in ESI.
+- `tests/dfa_close.cpp` — the DFA close-handle body's behavioural test (§2l, §3 class B),
+  ctest entry `zp_dfa_close` (27 checks, no game image): a real 32-byte file opened through
+  the transcribed create body, sized, seeked (forward and from the end) and read through
+  the transcribed ones, then closed through the rebuilt body; the closed handle's answer
+  from `DuplicateHandle` and from the transcribed reader (`FALSE`, `ERROR_INVALID_HANDLE`
+  6) and its equality with `ReadFile`'s own answer; null, double close and `0xDEADBEEF`
+  (all `FALSE`/`6`, because the body has no argument guard); the pass-through equality
+  with `CloseHandle`; `fs:[0]` unchanged across the call; and a child process
+  (`--child <report> <probe>`) whose `CloseHandle` import slot is replaced with a faulting
+  function that writes one probe byte on entry — the child must be **still running** at the
+  1000 ms watchdog, the probe byte must be there (the guarded call was entered) and no
+  answer may have been written; the parent then terminates and reaps it, and asserts the
+  exit code is its own. It writes one fixture file, one report and one probe file, all in
+  the binary directory, and removes them.
 - `tests/nms_arena.cpp` — the three rebuilt arena methods' behavioural test (§2j, §3
   class D), ctest entry `zp_nms_arena` (246 checks, no game image): 42 `(size, align)`
   pairs asserted for the `unit` rounding, the distance range, the `want + 2*unit` block,
@@ -1748,6 +2006,18 @@ deliberately after any change to the modules above.
   the `table` rows).
 - `.scratch/resolve_calls.py` — the call/operand-to-symbol check quoted in §2 and §2a
   (what the proof's call-as-immediate rule cannot see).
+- `.scratch/dfa_close/` — §2l's whole evidence. `probe.cpp` compiles four candidate C
+  shapes at the module's flags; `coff.py` byte-compares each function with the oracle
+  through the COFF symbol table (`VariantReturnExceptContinue1` matches: 16 bytes in 7
+  words, all relocations). `probe_fault.cpp` measures the disposition in a child: the
+  oracle's shape is still running at a 3 s watchdog, the old
+  `EXECUTE_HANDLER`/`return -1` shape answers `0xFFFFFFFF`. `probe_slot.cpp` repeats the
+  retry with the faulting callee in the exe's own `CloseHandle` IAT slot (the mechanism
+  `tests/dfa_close.cpp` uses). `module_body.py` compares the *shipped* `launcher.obj`
+  with the oracle and reads the object's relocations; `publish_check.py` disassembles the
+  built `RegisterLauncher` and finds the four forwarder-slot stores; `scope.py` dumps the
+  EH4 scope tables (`0x10153FC0`, `0x10153EE8`, `0x10153F08`); `values.cpp` is the
+  `CloseHandle`/`ReadFile` answer matrix the assertions name.
 - `.scratch/table_contents.py` — the registered table checked on its own (§2b): both
   sides' content hash over the registered length, the first and last entry of each, and
   every name in `source/model_names.inc` against the string the original's entry points

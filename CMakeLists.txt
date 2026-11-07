@@ -170,6 +170,29 @@ target_link_libraries(zp_nms_arena PRIVATE zp_modules)
 add_test(NAME zp_nms_arena COMMAND zp_nms_arena)
 set_tests_properties(zp_nms_arena PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
+# The DFA close-handle body (0x10004790, class B in docs/rebuilt.md) and its four
+# transcribed siblings, asserted by behaviour instead of by their disassembly: a real
+# 32-byte file opened through the create wrapper, sized, seeked and read through the
+# other three, then closed through the rebuilt one; the closed handle's answer (FALSE
+# and ERROR_INVALID_HANDLE 6) from the transcribed reader and from DuplicateHandle;
+# null, double close and a never-opened value, which have no guard because the body's
+# only instructions before the call are the frame and `push [ebp+8]`; the pass-through
+# equality with CloseHandle itself; and the frame's registration (`fs:[0]` unchanged
+# across the call). The unreachable half -- the filter's EXCEPTION_CONTINUE_EXECUTION
+# retrying a faulting call instead of answering -- runs in a child process whose
+# CloseHandle import slot is replaced with a callee that writes one probe byte on entry
+# and then faults: the parent's watchdog requires the child to be *still running*, the
+# probe byte to be there and no answer to have been written, then terminates and reaps
+# it. Offline: no game image, no ASI load; a fixture file, a report and a probe file in
+# the binary directory, all removed.
+add_executable(zp_dfa_close tests/dfa_close.cpp)
+set_target_properties(zp_dfa_close PROPERTIES CXX_SCAN_FOR_MODULES ON)
+target_link_libraries(zp_dfa_close PRIVATE zp_modules)
+add_test(NAME zp_dfa_close COMMAND zp_dfa_close)
+set_tests_properties(zp_dfa_close PROPERTIES
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  TIMEOUT 120)
+
 # The SpeedupBugFix body (0x10050540, class B in docs/rebuilt.md), asserted by
 # behaviour instead of by its disassembly: the four derived floats against the
 # formula recomputed in the test at five frequencies (bit patterns, not

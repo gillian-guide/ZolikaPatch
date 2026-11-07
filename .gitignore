@@ -11,3 +11,6 @@ native_guard_child.report
 fault_parity_child.report
 fault_parity_bom_child.report
 fault_parity_long_child.report
+dfa_close_child.report
+dfa_close_child.probe
+dfa_close_roundtrip.bin

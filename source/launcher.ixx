@@ -461,17 +461,23 @@ namespace
 
     // ---- hook bodies -------------------------------------------------------
 
-    // 0x10004790: CloseHandle behind an exception guard; the original's handler
-    // returns -1 when the call faults.
+    // 0x10004790: CloseHandle behind an EH4 frame. The original's scope table
+    // (0x10153FC0) names the filter at 0x100047EC (`83 C8 FF; C3` = `or eax,-1;
+    // ret`, i.e. EXCEPTION_CONTINUE_EXECUTION) and the handler at 0x100047F0
+    // (`mov eax,1` after the unwind, i.e. `return TRUE`). The filter's disposition
+    // is a resumption, so a fault inside the guarded call is retried, not answered:
+    // the handler is never entered. The rebuild must keep that shape -- a
+    // `__except (EXCEPTION_EXECUTE_HANDLER) { return -1; }` here would catch the
+    // fault and answer, a fault-parity bug (docs/rebuilt.md §2l).
     BOOL __cdecl CloseHandleBody(HANDLE handle)
     {
         __try
         {
             return CloseHandle(handle);
         }
-        __except (EXCEPTION_EXECUTE_HANDLER)
+        __except (EXCEPTION_CONTINUE_EXECUTION)
         {
-            return static_cast<BOOL>(-1);
+            return TRUE;
         }
     }
 
@@ -481,8 +487,8 @@ namespace
 // original is the kernel32 import through its own IAT; the module has no IAT (static
 // CRT), so the slot holds the same function. The create-file body also reads the
 // address the DFA capture recorded (the original's dword_10159D30), which the
-// capture writes before the install tier runs. All four are filled in
-// RegisterLauncher(), before any tier.
+// capture writes before the install tier runs. All four are filled by
+// PublishDfaForwarders() from RegisterLauncher(), before any tier.
 extern "C"
 {
     uint32_t zpatch_dfa_create_file = 0;          // the original's IAT slot 0x10063048
@@ -835,6 +841,23 @@ namespace
         InstallBranches(kRomInstalls);
     }
 
+    // The five DFA bodies' operands: the four `call ds:[…]` slots hold the same
+    // kernel32 functions the original imported (the static CRT has no IAT), and
+    // the create body's capture slot stays zero until the publish tier records the
+    // game's own IAT address. One function, so the shipped publish step and the
+    // test seam cannot drift: the bodies are reached only from the game's calls,
+    // but the DFA stage installs them from the install tier and nothing may read an
+    // empty slot.
+    void PublishDfaForwarders()
+    {
+        zpatch_dfa_create_file = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&CreateFileA));
+        zpatch_dfa_set_file_pointer =
+            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&SetFilePointer));
+        zpatch_dfa_get_file_size_ex =
+            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&GetFileSizeEx));
+        zpatch_dfa_read_file = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&ReadFile));
+    }
+
     // The original's one handler: the main table and the DFA stage are skipped
     // when the XLivelessAddon companion is loaded; the ROM stage always runs.
     void InstallSkipLauncher()
@@ -855,16 +878,9 @@ namespace
 // Registered like every other arm: the install tier owns the gate.
 export void RegisterLauncher()
 {
-    // The transcribed forwarders' targets, filled before any tier runs: the bodies
-    // are reached only from the game's own calls, but the DFA stage installs them
-    // from the install tier and nothing may read an empty slot. The capture slot
-    // (zpatch_dfa_create_file_slot) is the publish tier's, not this one's.
-    zpatch_dfa_create_file = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&CreateFileA));
-    zpatch_dfa_set_file_pointer =
-        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&SetFilePointer));
-    zpatch_dfa_get_file_size_ex =
-        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&GetFileSizeEx));
-    zpatch_dfa_read_file = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&ReadFile));
+    // The transcribed forwarders' targets, filled before any tier runs. The capture
+    // slot (zpatch_dfa_create_file_slot) is the publish tier's, not this one's.
+    PublishDfaForwarders();
 
     Loader::PublishEvent() += [] { PublishDfaCapture(); };
     Loader::InstallEvent() += []
@@ -883,4 +899,56 @@ export void RegisterLauncher()
     Bodies::Register(reinterpret_cast<uintptr_t>(&DfaReadFileBody), 0x10004740u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&RomResetBody), 0x10004570u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&RomSetBody), 0x10004610u);
+}
+
+// ---------------------------------------------------------------------------
+// The test-only seam over the five DFA file-API bodies (tests/dfa_close.cpp,
+// ctest `zp_dfa_close`). The four transcribed forwarders and the rebuilt
+// close-handle body are the callable part of the launcher stage: the game reaches
+// them only through the `E9` installs 0x10004850 writes at its own call sites, so
+// nothing offline can make them run. The seam hands a test exactly those five
+// addresses and the ABIs the originals have; it changes no body and adds no
+// behaviour. It publishes the four forwarder slots because the bodies read them
+// (the create body's fallback would otherwise `call` through zero), which is the
+// same store `RegisterLauncher` makes before any tier.
+//
+// Nothing here reaches the shipped image: the entries have no caller inside the ASI
+// and no PE export, so `/OPT:REF` drops them and the linker map gains no symbol,
+// while the test links the same object file and calls them.
+export namespace Launcher
+{
+    // The five entries, in the originals' ABIs (all `__cdecl`, the caller cleans):
+    //   create_file       0x10004820  7 arguments, CreateFileA's
+    //   read_file         0x10004740  5 arguments, ReadFile's
+    //   set_file_pointer  0x10004760  4 arguments, SetFilePointer's
+    //   get_file_size_ex  0x10004720  2 arguments, GetFileSizeEx's
+    //   close_handle      0x10004790  1 argument, the rebuilt CloseHandle behind EH4
+    struct DfaBodies
+    {
+        HANDLE(__cdecl* create_file)(LPCSTR file_name, DWORD access, DWORD share,
+            LPSECURITY_ATTRIBUTES security, DWORD disposition, DWORD flags, HANDLE template_file);
+        BOOL(__cdecl* read_file)(HANDLE file, LPVOID buffer, DWORD count, LPDWORD read,
+            LPOVERLAPPED overlapped);
+        DWORD(__cdecl* set_file_pointer)(HANDLE file, LONG distance, LONG* distance_high,
+            DWORD method);
+        BOOL(__cdecl* get_file_size_ex)(HANDLE file, LARGE_INTEGER* size);
+        BOOL(__cdecl* close_handle)(HANDLE handle);
+    };
+
+    // The five bodies, with the four forwarder slots published.
+    DfaBodies DfaBodiesForTest();
+}
+
+Launcher::DfaBodies Launcher::DfaBodiesForTest()
+{
+    PublishDfaForwarders();
+    return {
+        reinterpret_cast<HANDLE(__cdecl*)(LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD,
+            DWORD, HANDLE)>(&DfaCreateFileBody),
+        reinterpret_cast<BOOL(__cdecl*)(HANDLE, LPVOID, DWORD, LPDWORD, LPOVERLAPPED)>(
+            &DfaReadFileBody),
+        reinterpret_cast<DWORD(__cdecl*)(HANDLE, LONG, LONG*, DWORD)>(&DfaSetFilePointerBody),
+        reinterpret_cast<BOOL(__cdecl*)(HANDLE, LARGE_INTEGER*)>(&DfaGetFileSizeExBody),
+        reinterpret_cast<BOOL(__cdecl*)(HANDLE)>(&CloseHandleBody),
+    };
 }

@@ -1,15 +1,15 @@
-# Progress — readable-fusion
+# Progress â€” readable-fusion
 
 Newest last. One entry per work session; the exact gate output is what counts.
 
-## 2026-11-06 — the native-script call layer, and DrivebyFOVFix
+## 2026-11-06 â€” the native-script call layer, and DrivebyFOVFix
 
 **Closed:** `DrivebyFOVFix` (78 -> 79 keys on 1.0.8.0). The key was blocked on the
 original's native-script call layer; that layer now exists as `source/native.ixx`.
 
 **What was built**
 
-- `source/native.ixx` — the layer. Five pieces transcribed as `static
+- `source/native.ixx` â€” the layer. Five pieces transcribed as `static
   __declspec(naked)` bodies and proven whole:
   `sub_100038C0` (5), `sub_1005B3F0` (46), `sub_1005B150` (44), `sub_1005DE40`
   (21), `sub_1005DE80` (21). Two pieces rebuilt as C because they are compiler
@@ -20,12 +20,12 @@ original's native-script call layer; that layer now exists as `source/native.ixx
 - `Native::Register()` resolves `dword_1015BDE0` exactly as the original's loader
   preamble does (`0x10052E88..0x10052E9E`): scan the game image for
   `08 0B C2 8B F0 E8`, then `match + 10 + [match + 6]`. On the 1.0.8.0 image that
-  is `0x626AF0`, the game's native-handle resolver — verified through the real
+  is `0x626AF0`, the game's native-handle resolver â€” verified through the real
   code path in `zp_dump` (resolver RVA `0x226AF0`, probe removed afterwards).
 - The layer's ABI: hash in **ESI** for the game resolver (C++ cannot ask for a
   register, so a naked `ResolveInEsi` carries it), block in EDX, handler called
   cdecl with the block.
-- `source/misc.ixx` — the `DrivebyFOVFix` arm: `PublishDrivebyFOVFix` reads the
+- `source/misc.ixx` â€” the `DrivebyFOVFix` arm: `PublishDrivebyFOVFix` reads the
   site's own `subss xmm1, xmm2` at the anchor's +5 for the resume; the install
   jumps to the transcribed shim (`sub_100064B0`, 5) whose helper (`sub_10006450`,
   20) resolves the FOV native through the layer. Write set on 1.0.8.0: an `E9` at
@@ -39,11 +39,11 @@ original's native-script call layer; that layer now exists as `source/native.ixx
 
 **Gates (final runs)**
 
-- `cmake --build --preset release` — success.
-- `python tools/parity_report.py 9` — `build 9: 79 key(s) closed, 20 open`
+- `cmake --build --preset release` â€” success.
+- `python tools/parity_report.py 9` â€” `build 9: 79 key(s) closed, 20 open`
   (`OPEN DrivebyFOVFix` is gone; was 78 closed).
-- `ctest --preset release` — `100% tests passed out of 9`.
-- `python tools/verify_bodies.py ...` — `62 body(ies), 0 failure(s)`.
+- `ctest --preset release` â€” `100% tests passed out of 9`.
+- `python tools/verify_bodies.py ...` â€” `62 body(ies), 0 failure(s)`.
 
 **Not done / not verifiable here**
 
@@ -55,23 +55,23 @@ original's native-script call layer; that layer now exists as `source/native.ixx
   (`sub_1005B290`/`sub_1005B530`/the sprintf chain) and the original's
   38,455-entry model-name table; the layer it needed is now available.
 
-## 2026-11-06 — the misc keys: SpeedupBugFix, Patch4RemoveModChecks, CopSirensFlag, PopupHeadlightsFlag
+## 2026-11-06 â€” the misc keys: SpeedupBugFix, Patch4RemoveModChecks, CopSirensFlag, PopupHeadlightsFlag
 
-Four catalogue keys in `source/misc.ixx` closed on 1.0.8.0 (80 â†’ 84 keys,
-67 â†’ 73 proven bodies).
+Four catalogue keys in `source/misc.ixx` closed on 1.0.8.0 (80 Ã¢â€ â€™ 84 keys,
+67 Ã¢â€ â€™ 73 proven bodies).
 
 - `SpeedupBugFix`: the arm replaces the game's timer init (`0x4571B0`, anchor
-  `50 64 89 25 …` at `0x4571C5`) and publishes the eight absolute float pointers
+  `50 64 89 25 â€¦` at `0x4571C5`) and publishes the eight absolute float pointers
   at the anchor's `+26/+165/+188/+226/+234/+249/+264/+276`. The body
   (`sub_10050540`, 109 instructions) is compiled C (SEH + /GS + the thread-safe
   static guard around its own clock scan), so it is reimplemented in C++ with the
   original arithmetic (`1000.0 / QueryPerformanceFrequency`, then the four
-  `scale`/`scale*1000`/`scale*0.001…`/`0.001…/scale` floats and their four
-  copies) and the game clock at scan-match âˆ’ 51. **No proof row** (documented in
+  `scale`/`scale*1000`/`scale*0.001â€¦`/`0.001â€¦/scale` floats and their four
+  copies) and the game clock at scan-match Ã¢Ë†â€™ 51. **No proof row** (documented in
   `docs/parity.md`); the arm still registers `0x10050540` for the dump.
 - `Patch4RemoveModChecks`: the 8-instruction shared stub `sub_100054E0` is
   transcribed and proven; `misc.ixx` owns only the Patch4 branch of
-  `sub_10005340` (one-time scan for `33 C4 89 84 24 A8 01 …`, then zero the
+  `sub_10005340` (one-time scan for `33 C4 89 84 24 A8 01 â€¦`, then zero the
   dword at site+30). That signature has **no hit on 1.0.8.0**, so the branch is a
   scan and nothing else there; the GFWL branch stays in `loading.ixx`.
 - `CopSirensFlag`: three transcribed bodies (8/8/9) at `0x10006310`,
@@ -92,16 +92,16 @@ Four catalogue keys in `source/misc.ixx` closed on 1.0.8.0 (80 â†’ 84 keys,
   is 1:1.
 
 **Gates (final runs)**: `cmake --build --preset release` success;
-`python tools/parity_report.py 9` â†’ `build 9: 84 key(s) closed, 15 open`;
-`ctest --preset release` â†’ `100% tests passed out of 9`;
-`python tools/verify_bodies.py …` â†’ `73 body(ies), 0 failure(s)`.
+`python tools/parity_report.py 9` Ã¢â€ â€™ `build 9: 84 key(s) closed, 15 open`;
+`ctest --preset release` Ã¢â€ â€™ `100% tests passed out of 9`;
+`python tools/verify_bodies.py â€¦` Ã¢â€ â€™ `73 body(ies), 0 failure(s)`.
 
 **Not done / not verifiable here**: no game launch (the shims/rebuilt helpers are
 proven at instruction level where transcribed, but the rebuilt helpers' live
 behaviour is not executed); `AGENTS.md`'s "Current state" still says 79/62 and is
 outside this task's file scope, so the parent must refresh it (84/73 now).
 
-## 2026-11-06 — the loader preamble's salt rule, and the two wrong constants
+## 2026-11-06 â€” the loader preamble's salt rule, and the two wrong constants
 
 **What was wrong:** `Native::CallBool`'s body read a slot seeded with `0x62BFDB37`
 and `DrivebyFOVFix`'s helper read its own slot seeded with `0x09399528`. Both are
@@ -129,14 +129,14 @@ six supported images also hit); misses substitute `0x62BFDB37` / `0x09399528` /
 
 **Changes**
 
-- `source/native.ixx` — ten `zpatch_native_salt_10158xxx` words seeded with the
+- `source/native.ixx` â€” ten `zpatch_native_salt_10158xxx` words seeded with the
   shipped values; `Native::ResolveSalts()` scans the probe and applies the miss
   set; `Native::Register()` calls it before any arm. `NativeCallBoolBody` reads
   the resolved B8 slot; `Native::Salt(reference)` exposes a slot for the tools.
-- `source/misc.ixx` — only the DrivebyFOVFix salt declaration/comment and one
+- `source/misc.ixx` â€” only the DrivebyFOVFix salt declaration/comment and one
   `mov ecx` operand: the helper now reads the layer's D4 slot instead of a local
   `0x09399528`.
-- `source/stability.ixx` — `BadPlayerModelCrashFix`'s duplicate 46-instruction
+- `source/stability.ixx` â€” `BadPlayerModelCrashFix`'s duplicate 46-instruction
   `0x1005B3F0` body is retired. `BpmCheckBody` calls the layer's copy through a
   six-byte `jmp [zpatch_bpm_call_bool]` forwarder (slot filled by
   `RegisteredBody(0x1005B3F0)`), its local B8 salt and the now-unused
@@ -147,8 +147,8 @@ six supported images also hit); misses substitute `0x62BFDB37` / `0x09399528` /
   image; 33 checks. Also disassembly-confirmed in the built ASI that
   `NativeCallBoolBody` reads slot `0x1014714C` (B8) and `DrivebyFovHelperBody`
   reads `0x10147160` (D4).
-- `tests/bodies.tsv` — `bad_player_model_call_bool` row removed (73 -> 72).
-- `docs/parity.md` — the rule table, the two fixes and the retirement; body count
+- `tests/bodies.tsv` â€” `bad_player_model_call_bool` row removed (73 -> 72).
+- `docs/parity.md` â€” the rule table, the two fixes and the retirement; body count
   73 -> 72; public surface adds `Salt`/`ResolveSalts`.
 
 **Gates (final runs)**: `cmake --build --preset release` success;
@@ -162,12 +162,12 @@ against the real resolver need a running game; the input value and the body's
 slot operand are what were proven. `AGENTS.md` still says 73 bodies (now 72) and
 is outside this task's file scope.
 
-## 2026-11-06 — RestoreDeathMusic and MouseFix (audio.ixx)
+## 2026-11-06 â€” RestoreDeathMusic and MouseFix (audio.ixx)
 
 **Closed:** `MouseFix` (84 -> 85 keys on 1.0.8.0 in this module's share; the tree
 total was 88 after another pass closed three loading keys). `RestoreDeathMusic` was
-already *counted* closed — its whole baseline cell is branch displacements, which
-the scoreboard excludes — and now has its arm.
+already *counted* closed â€” its whole baseline cell is branch displacements, which
+the scoreboard excludes â€” and now has its arm.
 
 **What was built (source/audio.ixx, 12 new proven bodies)**
 
@@ -182,7 +182,7 @@ the scoreboard excludes — and now has its arm.
   with an EH4 frame (handler `0x100619C1`, scope table `0x10154384`) and a
   clock/seed block calling CRT-internal helpers (`0x1005FFC3`, `0x1005FF77`) that
   read `fs:[2Ch]` and the TLS index `dword_10159328`.
-- `MouseFix`: all eight pieces transcribed — `0x10024060` (30), `0x100240C0` (23),
+- `MouseFix`: all eight pieces transcribed â€” `0x10024060` (30), `0x100240C0` (23),
   `0x10024120` (22), `0x10024170` (28), `0x10024440` (62), `0x10024560` (25),
   `0x100243A0` (23), `0x100241E0` (138). None carries an EH frame, and the advance
   helper's only indirect call is the game's `VirtualProtect` through a published
@@ -197,7 +197,7 @@ the scoreboard excludes — and now has its arm.
 `sub_10050AD0` is **75** (0x10050AD0..0x10050BC8), not 91; 91 is the *handler*
 `0x10050BD0`'s count (0x10050BD0..0x10050D09), which is not a body.
 
-**Skipped — `OutOfCommissionFix`, exact blocker**: the payload is 163,796 bytes of
+**Skipped â€” `OutOfCommissionFix`, exact blocker**: the payload is 163,796 bytes of
 `.rdata` at `0x100B6798` decoded into a 179,536-byte table; carrying it needs a new
 ~1 MB recovered-data file outside this pass's edit set, and the code around it
 (`sub_1004C3F0`, 16,311 bytes; `sub_1004B750`; the archive builder) is C++ with EH4
@@ -211,13 +211,13 @@ script check to accept the magic the missing table produces.
 passed out of 10`; `verify_bodies.py` -> `96 body(ies), 0 failure(s)`; the full
 1.0.8.0 cell still has `0 differing`.
 
-**Not verifiable here**: no game launch — the death-music gate's three native calls
+**Not verifiable here**: no game launch â€” the death-music gate's three native calls
 and the mouse axis arithmetic are proven at instruction level where transcribed, but
 the rebuilt install body's runtime scan/`rand()` and the in-game mouse feel are not
 executed. `AGENTS.md`'s "Current state" (84 keys / 72 bodies) is outside this task's
 file scope and is stale.
 
-## 2026-11-06 — the three loading keys: NewMemorySystem, NewFilesCompatibility, LoadDLCs
+## 2026-11-06 â€” the three loading keys: NewMemorySystem, NewFilesCompatibility, LoadDLCs
 
 **Closed:** three of the four remaining loading keys: 84 -> 87 keys on 1.0.8.0 from
 this pass (the gate reads 88 because `audio.ixx`'s MouseFix landed in the same
@@ -249,10 +249,10 @@ below with its blocking condition named, not attempted.
   ret`, 4) is transcribed and proven; the two update bodies are rebuilt with the
   original ABI and call order, hashing through `Shared::ValueResolver()`
   (`sub_10003E50`), and the three helpers use the original's own signatures
-  (`8B 35 ? ? ? ? 6A 00 50 E8 …`, `85 C9 53 55 56 57 74 40 …` /
+  (`8B 35 ? ? ? ? 6A 00 50 E8 â€¦`, `85 C9 53 55 56 57 74 40 â€¦` /
   `53 55 8B 6C 24 0C 56 57 EB 06`, `8B 0F 85 C9 74 ? 0F B7 41 0A 66 85 C0` minus
   `0x14`), unguarded on a miss as the original is.
-- `LoadDLCs`: the handler does not scan — it switches on the build id and writes six
+- `LoadDLCs`: the handler does not scan â€” it switches on the build id and writes six
   fixed-RVA sites per build. The rows were read from the handler's own `cmp eax, 7/8/9`
   blocks and checked in all three images (1060/1070/1080, both the site shapes and the
   dump's write sets for builds 7 and 8). Three entry points published per build
@@ -266,7 +266,7 @@ below with its blocking condition named, not attempted.
 - **The EDX contract the earlier attempt refused is unobservable**, and that is
   measured, not assumed: `sub_10023150` returns with EDX = its last callee's (the only
   instructions after the last call are the object store, pops, `xor ecx,esp`,
-  `call __security_check_cookie` — ECX only — and the epilogue); the body passes it
+  `call __security_check_cookie` â€” ECX only â€” and the epilogue); the body passes it
   through untouched; and its only caller (game `0x4931FA`) is immediately followed by
   `call 0x8CCCD0`, which reads neither EAX nor EDX, while no other reference to
   `0x890320` exists in either image (checked as branch targets and as a dword). The
@@ -294,10 +294,10 @@ vtable's live behaviour, the file-registry helpers' scans and the DLC discovery'
 folder probes are proven at instruction level (or rebuilt faithfully) but not executed
 against a running game.
 
-## 2026-11-06 — the steer consumer `sub_10004C70`, and five keys
+## 2026-11-06 â€” the steer consumer `sub_10004C70`, and five keys
 
 **Closed:** `MovingSteeringWheelSupport`, `ShakingEngineBlock`, `MovingPlaneParts`,
-`GarageModelFix`, `NoLiveryLimit` — 88 -> 93 keys on 1.0.8.0, and each one's
+`GarageModelFix`, `NoLiveryLimit` â€” 88 -> 93 keys on 1.0.8.0, and each one's
 per-option cell is byte-identical to its baseline on all nine images (build 1 is
 measured with isolated single-key cells, because its per-option dump faults at
 `NoImpostorHeightCutoff` by design).
@@ -337,7 +337,7 @@ of matrices and its own state words (`byte_1015AD42`, `dword_1015AD3C`,
   by jumping to misc's body through `Bodies::All()` (no second copy): published slot
   `zpatch_ide_hook_slot`, same as CopSirens/PopupHeadlights.
 
-**Write sets on 1.0.8.0** — steer trio: `E9` at `0x6538A0` (detour) and `0x646546`
+**Write sets on 1.0.8.0** â€” steer trio: `E9` at `0x6538A0` (detour) and `0x646546`
 (IDE hook), publishing resume `0x6538AE`, part-drive `0x4F65F0`, IDE resume
 `0x64654F`. `GarageModelFix`: `E9` at `0x868BB0` (body `0x10046C80`) and `0x5659C3`
 (body `0x10046CA0`), resumes `0x868BB6`/`0x5659C8`. `NoLiveryLimit`: `E9` at
@@ -403,7 +403,7 @@ would use per-model offsets in the original and 2.0f here. Fixing it means the
 loader preamble's reader (`sub_100523C0`) plus its unguarded `std::stof`, which
 covers both sections and is a pass of its own.
 
-## 2026-11-06 — the loader preamble's light tables: `[HeadlightConeOffsets]` and `[PopupLightAngles]`
+## 2026-11-06 â€” the loader preamble's light tables: `[HeadlightConeOffsets]` and `[PopupLightAngles]`
 
 **Closed:** the gap the previous entry recorded. The two 512-slot tables are now
 read from the INI, so `ForceCarHeadlightShadows` and `PopupHeadlightsFlag` publish
@@ -416,12 +416,12 @@ identical loops, `[PopupLightAngles]` first (`0x10052419`) and
 `[HeadlightConeOffsets]` second (`0x10052901`):
 
 - `call sub_10055F10` (the section lookup) / `jz` skips a missing section's loop;
-- `mov edi,1` … `inc edi` / `cmp [ebp-5Ch],200h` / `jl` — `Car1`..`Car512`, 512
+- `mov edi,1` â€¦ `inc edi` / `cmp [ebp-5Ch],200h` / `jl` â€” `Car1`..`Car512`, 512
   iterations; `Car513` is never asked for;
 - the key is the literal `"Car"` (`sub_1005BEF0`, which prepends it to
   `std::to_string(ordinal)`) plus `"Name"` (`memmove ...,4`), then separately plus
   `"Angle"` (`...,5`) or `"Offset"` (`...,6`);
-- `sub_1005AF10(value, "")` / `jnz` — an absent or empty name skips the whole row,
+- `sub_1005AF10(value, "")` / `jnz` â€” an absent or empty name skips the whole row,
   so its value is never even fetched;
 - `sub_10003E50(name)` -> `dword_1015C628[slot]` / `dword_1015ADB8[slot]`, stored
   *before* the value (`0x1005265E` before `0x10052763`, `0x10052B0C` before
@@ -437,7 +437,7 @@ identical loops, `[PopupLightAngles]` first (`0x10052419`) and
 **Where it lives.** `Config::ReadModelTables(Config::Ini(), resolve)` in
 `source/config.ixx` (`ModelTable`: 512 hashes + 512 floats;
 `Config::PopupLightAngles()` / `Config::HeadlightConeOffsets()`), called once from
-the top of `RegisterVehicles()` — the first registration after `Shared::Register()`
+the top of `RegisterVehicles()` â€” the first registration after `Shared::Register()`
 has published the resolver's two CRT slots, and before anything reads an option or
 writes an image byte, so the tables are complete and a malformed row throws exactly
 where the original's preamble does. `vehicles.ixx` and `misc.ixx` lost their local
@@ -460,16 +460,16 @@ implementation of its body. Manually run against `game_refs/ZolikaPatch.ini`:
 
 **Gates (final runs).** `cmake --build --preset release` -> success;
 `python tools/parity_report.py 9` -> `build 9: 94 key(s) closed, 5 open` (the same
-five as before; no image byte moved — the tables are read-only startup state);
+five as before; no image byte moved â€” the tables are read-only startup state);
 `ctest --preset release` -> `100% tests passed out of 11`;
 `tools/verify_bodies.py` -> `114 body(ies), 0 failure(s)`.
 
 **Docs.** `docs/parity.md`: the gap paragraphs under `ForceCarHeadlightShadows` and
 the misc keys are replaced with the recovered grammar table, the fault rows are in
-Â§Preserved faults, and `zp_model_tables` is in Â§Contracts. `AGENTS.md`'s harness
+Ã‚Â§Preserved faults, and `zp_model_tables` is in Ã‚Â§Contracts. `AGENTS.md`'s harness
 sentence still lists the old executables and could name `zp_model_tables`.
 
-## 2026-11-06 — `OutOfCommissionFix`: the payload carried, the key closed
+## 2026-11-06 â€” `OutOfCommissionFix`: the payload carried, the key closed
 
 **Decided first, then built.** The key had been refused twice because its payload
 looked like game-side registration. It is not: `sub_1004B150` + `sub_1004B570` are a
@@ -494,21 +494,21 @@ Adler-32 trailer). `sub_1004B750` = malloc(0x2BD50) + decode + push_back into th
 
 **What was built**
 
-- `source/ooc_finale2.inc` — the 163,796-byte resource, verbatim, with the image
-  SHA-256 (`720fbceb…`), VA `0x100B6798`, file offset `0xB5B98`, the extraction
-  recipe, the decoded table's `sha256 86d2bb26…` / `fnv1a 0xC883859F`, and the
+- `source/ooc_finale2.inc` â€” the 163,796-byte resource, verbatim, with the image
+  SHA-256 (`720fbcebâ€¦`), VA `0x100B6798`, file offset `0xB5B98`, the extraction
+  recipe, the decoded table's `sha256 86d2bb26â€¦` / `fnv1a 0xC883859F`, and the
   archive's 182,272 bytes / `fnv1a 0xB5AF7B10` in its header (1,035,979 bytes of
   source). The decode was verified independently in Python first: 446 opcodes,
   ends at `0x27FCE`, trailer `0x41E794AB` matches, and the table is byte-identical
   to `../readable/data/finale2.sco`.
-- `source/ooc.ixx` (new module `ooc`) — the decoder (`OocStep`/`OocDecode`, the nine
+- `source/ooc.ixx` (new module `ooc`) â€” the decoder (`OocStep`/`OocDecode`, the nine
   opcode forms and the two fault paths), the Adler-32, the fake-pak entry/vector,
   the archive builder (`OocBuildArchive`: 20-byte header, 16-byte record, name,
   payload at `0x800`, padding to the page), the init (`OocInitialise`, re-running on
   every call like the original's writerless guard), a rebuilt `sub_10001280`
   formatter, and `OocSelfCheck()`.
 - The two bodies, transcribed: `OocBranchBody` (7, `0x1004C3C0`) and `OocWrapBody`
-  (41, `0x1004C350` — the brief's "29" does not survive measurement). Both proved
+  (41, `0x1004C350` â€” the brief's "29" does not survive measurement). Both proved
   whole, and a byte comparison shows them identical to the original apart from the
   six absolute operands.
 - The arm: publish tier reads the resume and the two call targets, install tier
@@ -521,14 +521,14 @@ Adler-32 trailer). `sub_1004B750` = malloc(0x2BD50) + decode + push_back into th
 
 **Gates (final runs)**
 
-- `cmake --build --preset release` — success.
-- `python tools/parity_report.py 9` — `build 9: 96 key(s) closed, 3 open`
+- `cmake --build --preset release` â€” success.
+- `python tools/parity_report.py 9` â€” `build 9: 96 key(s) closed, 3 open`
   (`OutOfCommissionFix` gone; 94 before this pass, 96 with the cutscene pass beside
   it).
-- `ctest --preset release` — `100% tests passed out of 11`.
-- `python tools/verify_bodies.py …` — `117 body(ies), 0 failure(s)` (both new rows
+- `ctest --preset release` â€” `100% tests passed out of 11`.
+- `python tools/verify_bodies.py â€¦` â€” `117 body(ies), 0 failure(s)` (both new rows
   PASS: `ooc_branch` 7, `ooc_wrap` 41).
-- `zp_dump --ooc-selftest` — `ooc selftest: PASS` (the rebuilt decode, the table's
+- `zp_dump --ooc-selftest` â€” `ooc selftest: PASS` (the rebuilt decode, the table's
   `fnv1a`, the archive's length and `fnv1a`, the header words).
 - The key's per-option cell is the baseline's 9 rows with our two displacements
   (excluded as branch bytes); the full shipped-INI cell differs from the same cell
@@ -539,7 +539,7 @@ in-memory archive and loads `finale2.sco` from it is a runtime property. The art
 is 1,637,376 bytes (the resource is 163,796 of them). `AGENTS.md`'s "Current state"
 (94 keys / 114 bodies) is outside this pass's file scope and is stale.
 
-## 2026-11-06 — HighQualityReflections, and the site arithmetic
+## 2026-11-06 â€” HighQualityReflections, and the site arithmetic
 
 **Closed:** `HighQualityReflections` (96 -> 97 keys on 1.0.8.0; the two remaining
 open keys are `NewSavesCompatibility` and `SkipLauncher`).
@@ -564,26 +564,26 @@ not match+1: `sub_10003290` computes `edx = 1 - length`, then
 
 **What was built**
 
-- `source/graphics.ixx` — `HqrBody` (`sub_1001F030`, 157 instructions / 858 bytes,
+- `source/graphics.ixx` â€” `HqrBody` (`sub_1001F030`, 157 instructions / 858 bytes,
   static naked, the original's eight-register dump and twelve builder calls),
   `PublishHighQualityReflections` (`match+0x13`, `match+0x13 + [match+0x0F]`) and
   `InstallHighQualityReflections` (`Bodies::Register(..., 0x1001F030)`, `E9` at the
   match).
-- `tests/bodies.tsv` — `hqr_body 1001F030 ?HqrBody@@YAXXZ 157`.
-- `tests/signatures.tsv` — the site row (`0xC51311`, the 15-byte signature).
-- `docs/parity.md` — the resolution section with the site and handler/scanner
+- `tests/bodies.tsv` â€” `hqr_body 1001F030 ?HqrBody@@YAXXZ 157`.
+- `tests/signatures.tsv` â€” the site row (`0xC51311`, the 15-byte signature).
+- `docs/parity.md` â€” the resolution section with the site and handler/scanner
   instruction boundaries, the status line (`97 closed, 2 open`) and the blocked
   list.
 
 **Gates (final runs)**
 
-- `cmake --build --preset release` — success (exit 0); `--preset trace` also built
+- `cmake --build --preset release` â€” success (exit 0); `--preset trace` also built
   and its suite passed.
-- `python tools/parity_report.py 9` — `build 9: 97 key(s) closed, 2 open`; the two
+- `python tools/parity_report.py 9` â€” `build 9: 97 key(s) closed, 2 open`; the two
   OPEN lines are `NewSavesCompatibility` and `SkipLauncher` (both known baseline
   gaps), `HighQualityReflections` is not among them.
-- `ctest --preset release` — `100% tests passed out of 11`.
-- `python tools/verify_bodies.py …` — `118 body(ies), 0 failure(s)`
+- `ctest --preset release` â€” `100% tests passed out of 11`.
+- `python tools/verify_bodies.py â€¦` â€” `118 body(ies), 0 failure(s)`
   (`PASS hqr_body (157 instruction(s), 133 absolute operand(s))`).
 
 **Not verifiable here.** No game launch: the twelve draw-command-builder calls and
@@ -591,7 +591,7 @@ the resume are transcribed/proven but not executed in the running game.
 `AGENTS.md`'s "Current state" (96 keys / 117 bodies) is outside this pass's file
 scope and is stale.
 
-## 2026-11-06 — NewSavesCompatibility, closed on its rebuilt converter
+## 2026-11-06 â€” NewSavesCompatibility, closed on its rebuilt converter
 
 **Closed:** `NewSavesCompatibility` (`build 9: 97 -> 98 key(s) closed, 1 open`; the
 one open key is `SkipLauncher`'s baseline gap).
@@ -627,7 +627,7 @@ rebuildable.
 
 **What was built**
 
-- `source/loading.ixx` — the arm (`PublishNewSavesCompatibility` /
+- `source/loading.ixx` â€” the arm (`PublishNewSavesCompatibility` /
   `InstallNewSavesCompatibility`, the install gated on the *first* anchor as the
   original returns before its second scan), the eight-instruction trampoline
   (`NewSavesTrampoline`, `pusha`/`popa` as `__emit 0x60/0x61`), and the four
@@ -635,22 +635,22 @@ rebuildable.
   `NewSavesSecondLoadHook` (0x10051AD0), `NewSavesPatchSites`, `NewSavesConvert`
   (0x10051B30), `NewSavesPrepare` (0x10051FD0). Everything is registered in
   `Bodies::Register`; the arm is `Loader::Enabled`-gated.
-- `tests/bodies.tsv` — `new_saves_tramp 100521E0 ?NewSavesTrampoline@@YAXXZ 8`;
+- `tests/bodies.tsv` â€” `new_saves_tramp 100521E0 ?NewSavesTrampoline@@YAXXZ 8`;
   the four rebuilt pieces are named in the comment as rebuilds with no row.
-- `tests/signatures.tsv` — the six recovered scans (name, load, branch, read,
+- `tests/signatures.tsv` â€” the six recovered scans (name, load, branch, read,
   reload, directory) with the per-image absence note.
-- `docs/parity.md` — status (98/1, 119 bodies), the key's section with the quoted
+- `docs/parity.md` â€” status (98/1, 119 bodies), the key's section with the quoted
   instructions and the transcribed/rebuilt table, and two new preserved-fault rows
   (the corrupt-save allocation throw / uninitialised header check, and the
   trampoline's unspecified-EAX store).
 
 **Gates (final runs)**
 
-- `cmake --build --preset release` — success (exit 0).
-- `python tools/parity_report.py 9` — `build 9: 98 key(s) closed, 1 open`; the only
+- `cmake --build --preset release` â€” success (exit 0).
+- `python tools/parity_report.py 9` â€” `build 9: 98 key(s) closed, 1 open`; the only
   OPEN line is `SkipLauncher`, `NewSavesCompatibility` is gone (was 97 closed).
-- `ctest --preset release` — `100% tests passed out of 11`.
-- `python tools/verify_bodies.py …` — `119 body(ies), 0 failure(s)`
+- `ctest --preset release` â€” `100% tests passed out of 11`.
+- `python tools/verify_bodies.py â€¦` â€” `119 body(ies), 0 failure(s)`
   (`PASS new_saves_tramp (8 instruction(s), 1 absolute operand(s))`).
 - Cross-build parity spot check: `NewSavesCompatibility` has no OPEN line on builds
   1, 5, 6, 7, 8, 11, 12 and 13 either (1.0.0.4.0 writes nothing because its image
@@ -663,7 +663,7 @@ file walk was replayed offline against the two real saves in
 at `0x0C`, eighteen `BLOCK` chunks, sizes `0x3AB1`/`0x1729`/`0x0CC7`, i.e. the older
 layout), which validates the walk and the size conditions only.
 
-## 2026-11-06 — SpeedupBugFix: per-build recovery, and the fault that was not this key
+## 2026-11-06 â€” SpeedupBugFix: per-build recovery, and the fault that was not this key
 
 **The reported bug was misattributed.** `zp_dump --exe ..\game_refs\GTAIV_1000.exe
 --build 1 out.txt build\win-x86\only-speedup.ini` does fault `0xC0000005`, but not
@@ -714,10 +714,10 @@ open key is still `SkipLauncher`); `ctest --preset release` -> 11/11;
 (`NoImpostorHeightCutoff` on 1.0.0.0). SpeedupBugFix's per-key dump is
 byte-identical to the pre-change dump on all nine images (build 9: 4 bytes).
 
-## 2026-11-06 — the rebuilt set: six pieces upgraded, the rest catalogued
+## 2026-11-06 â€” the rebuilt set: six pieces upgraded, the rest catalogued
 
 **What this pass was for.** Ten-odd pieces of the tree were C++ rebuilds with no proof
-row — the weakest evidence in the project. The rule for "cannot be transcribed" was
+row â€” the weakest evidence in the project. The rule for "cannot be transcribed" was
 re-derived from the comparator instead of from "it is compiler output": a body is
 blocked only by an *indexed absolute* table operand, an exception frame, a TLS
 static-init guard, or a call graph of other rebuilds. A `/GS` cookie and SSE code are
@@ -726,17 +726,17 @@ not blockers, and three `/GS` bodies were transcribed as part of this pass.
 **Upgraded (six new proof rows, 119 -> 125 bodies).** The bounded formatter
 (`0x10001280` 13, `0x10001240` 21, `0x10001230` 2), NewSaves' two installed hooks
 (`0x10051A90` 20, `0x10051AD0` 33) and LoadDLCs' discovery (`0x10023150` 223). Five
-C++ rebuilds are gone: the three copies of `_vsnprintf_s` (stability, vehicles, ooc —
+C++ rebuilds are gone: the three copies of `_vsnprintf_s` (stability, vehicles, ooc â€”
 the other two now reach the one transcribed body through a six-byte
 `jmp [zpatch_format_entry]`), the two save hooks, and `DlcDiscovery` +
 `BuildEpisodeSuffix`. The DLC body is the only rebuilt piece with no EH frame, no TLS
 guard and no indexed absolute, so it is now the original's own instructions.
 
 **How it was verified.** Proof rows (exact counts); a byte comparison
-(`.scratch/byte_compare.py`) that classifies every differing instruction — the DLC
+(`.scratch/byte_compare.py`) that classifies every differing instruction â€” the DLC
 body is 187/223 byte-identical, the rest differ only in absolute operands and two
 branch encodings; a probe of the original's engine call (`__stdio_common_vsprintf`
-with options 2) against the old `_vsnprintf_s` rebuild — identical buffer contents at
+with options 2) against the old `_vsnprintf_s` rebuild â€” identical buffer contents at
 every truncation, a different unused return value; and a call-to-symbol check
 (`.scratch/resolve_calls.py`) so a `call` that lands on the wrong helper cannot hide
 behind the proof's call-as-immediate rule.
@@ -746,7 +746,7 @@ size, instruction count, the specific operand/frame pattern that blocks it, what
 rebuild reproduces, how that was verified, residual risk, and a risk-ordered "check
 these first in play" list (save converter/prepare first). `docs/parity.md` now points
 at it instead of repeating the reasons, and its body count and stale rebuild claims are corrected.
-Follow-ups ranked in `rebuilt.md` Â§4: the OOC decoder pair (transcribable today),
+Follow-ups ranked in `rebuilt.md` Ã‚Â§4: the OOC decoder pair (transcribable today),
 the NewFiles updates (two `__fastcall` shims), the three transcribable DFA wrappers
 (launcher.ixx, not this pass's file), the NMS arena methods.
 
@@ -758,7 +758,7 @@ the NewFiles updates (two `__fastcall` shims), the three transcribable DFA wrapp
 
 **Not verifiable here.** None of the six bodies can be made to run offline: the
 formatter runs on livery/OOC/DLC paths, the save hooks on a savegame load, and the
-discovery pass on DLC-manager init. `rebuilt.md` Â§2 and Â§5 say so per piece.
+discovery pass on DLC-manager init. `rebuilt.md` Ã‚Â§2 and Ã‚Â§5 say so per piece.
 
 **One defect was caught by the new checks, not by the proof.** The first
 `dlc_discovery` transcription attached `dlc_tlad_exists`/`dlc_tbogt_exists` to the
@@ -768,13 +768,13 @@ registration). `zp_body_proof` passed it because a `jcc` immediate compares as a
 so the target is never compared. The byte comparison showed two `jne` displacements 18
 bytes off; after moving the labels, `.scratch/branch_targets.py` (new) reports
 `125 row(s), 154 internal branch target(s), 0 failure(s)`. That check is the top
-follow-up in `rebuilt.md` §4 — it belongs in `tools/verify_bodies.py`, and the whole
+follow-up in `rebuilt.md` Â§4 â€” it belongs in `tools/verify_bodies.py`, and the whole
 row set already passes it.
 
 
-## 2026-11-06 — the transcribable backlog: OOC decoder pair and four DFA forwarders
+## 2026-11-06 â€” the transcribable backlog: OOC decoder pair and four DFA forwarders
 
-**Transcribed, six pieces (125 → 131 proof rows).** The pieces `docs/rebuilt.md` §4
+**Transcribed, six pieces (125 â†’ 131 proof rows).** The pieces `docs/rebuilt.md` Â§4
 listed as transcribable are now the original's own instructions, registered with
 their recovered VAs and proved whole:
 
@@ -788,30 +788,30 @@ their recovered VAs and proved whole:
 | `dfa_read_file` | `0x10004740` | 10 | `0x1A` | 9 |
 
 Every non-identical instruction differs in an absolute operand or a `call`
-immediate — no opcode, register, frame offset or branch (`.scratch/byte_compare.py`
+immediate â€” no opcode, register, frame offset or branch (`.scratch/byte_compare.py`
 with the row names as arguments; it used to be limited to the six rows of the last
 pass, now it takes an optional name list). The five C++ rebuilds are gone from
 `source/ooc.ixx` and `source/launcher.ixx`.
 
 **One blocker in the old catalogue was not real.** `0x10004820` was filed as class C
-with a `__try/__except` frame; the binary has none — 19 instructions, `test eax,eax;
+with a `__try/__except` frame; the binary has none â€” 19 instructions, `test eax,eax;
 je` between the captured-slot call and the `CreateFileA` fallback. Under the tree's
 own rule it had no reason to stay rebuilt, so it is transcribed too and moved to the
 proof rows. `0x10004790` (close-handle) does have the EH4 frame (filter at
 `0x100047EC`, continuation at `0x100047F0`, 45 instructions in `0x81` bytes) and stays
-the one rebuilt DFA body; `docs/rebuilt.md` §3 now files it under class B where the
+the one rebuilt DFA body; `docs/rebuilt.md` Â§3 now files it under class B where the
 blocker actually is, with corrected counts.
 
 **The OOC pair is behaviourally proven, not just shape-proven.**
 `zp_dump --ooc-selftest` now runs the original's own 565 instructions against the
-recovered resource and still prints `ooc selftest: PASS` — the decoded table's
+recovered resource and still prints `ooc selftest: PASS` â€” the decoded table's
 `fnv1a 0xC883859F`, the archive's 182,272 bytes and `fnv1a 0xB5AF7B10`, the header's
 `16`/`0xE9` words. That is the first rebuilt body in this tree whose *behaviour* is
 pinned offline.
 
 **Two assembly details worth keeping.** (1) The decoder's three `call memcpy` sites
 go through `OocCopyBlock` because the inline assembler refuses the intrinsic; `/OPT:ICF`
-folds it into `loading.ixx`'s identical `SavegameCopyBlock` — same arguments, same
+folds it into `loading.ixx`'s identical `SavegameCopyBlock` â€” same arguments, same
 caller-cleans `add esp, 0Ch`. (2) The original's alignment NOPs (`0F 1F 00` and
 `66 0F 1F 44 00 00`) cannot be written as `nop dword ptr [eax]` in the inline
 assembler and are emitted as `_emit` bytes; the five-byte one is load-bearing because
@@ -819,17 +819,17 @@ the assembler only forms the four-byte encoding and every later instruction woul
 a byte earlier, failing the branch-target check.
 
 **Gates (final runs).** `cmake --build --preset release` exit 0 (Trace also builds);
-`ctest --preset release` 12/12; `python tools/parity_report.py 9` →
+`ctest --preset release` 12/12; `python tools/parity_report.py 9` â†’
 `build 9: 98 key(s) closed, 0 open, 1 oracle-verified (baseline incomplete)`;
-`python tools/verify_bodies.py ...` → `131 body(ies), 0 failure(s)`;
-`zp_dump --ooc-selftest` → `ooc selftest: PASS`; `.scratch/branch_targets.py` →
+`python tools/verify_bodies.py ...` â†’ `131 body(ies), 0 failure(s)`;
+`zp_dump --ooc-selftest` â†’ `ooc selftest: PASS`; `.scratch/branch_targets.py` â†’
 `131 row(s), 206 internal branch target(s), 0 failure(s)`.
 
-**Docs.** `docs/rebuilt.md`: new §2a with the table, the corrected `0x10004820`
-diagnosis and the verification steps; §3 loses the two OOC decoder rows, the
-create-file row and gains the close-handle row in class B; §4 drops the two done
+**Docs.** `docs/rebuilt.md`: new Â§2a with the table, the corrected `0x10004820`
+diagnosis and the verification steps; Â§3 loses the two OOC decoder rows, the
+create-file row and gains the close-handle row in class B; Â§4 drops the two done
 items and records that the internal-branch check is now in `verify_bodies.py`;
-§6 says 131. `docs/parity.md`: 125 → 131 bodies, both OOC decoder rows marked
+Â§6 says 131. `docs/parity.md`: 125 â†’ 131 bodies, both OOC decoder rows marked
 transcribed, the launcher paragraph rewritten (four of five forwarders transcribed),
 and the "same reason the DFA helpers are rebuilt" references narrowed to
 close-handle.
@@ -875,10 +875,10 @@ of the proof hash to `57ad8796b1b2652c` although their entries point at
 `zp_dump --ooc-selftest` -> `ooc selftest: PASS`; `.scratch/branch_targets.py` ->
 `132 row(s), 208 internal branch target(s), 0 failure(s)`.
 
-**Docs.** `docs/rebuilt.md`: §1's operand table and class A rewritten around the
-registry, new §2b (the piece, the mechanism, the hash, the recipe for the remaining
-class-A pieces), §3 class A loses the model-name row, §4 item 3 rewritten, §5 item 2
-extended, §6 counts 131 -> 132 and the table rows. `docs/parity.md`: 131 -> 132
+**Docs.** `docs/rebuilt.md`: Â§1's operand table and class A rewritten around the
+registry, new Â§2b (the piece, the mechanism, the hash, the recipe for the remaining
+class-A pieces), Â§3 class A loses the model-name row, Â§4 item 3 rewritten, Â§5 item 2
+extended, Â§6 counts 131 -> 132 and the table rows. `docs/parity.md`: 131 -> 132
 bodies, the `BadPlayerModelCrashFix` section rewritten (the name table is no longer
 a rebuild), "Transcribing a body" gains the table registration as its fifth part, the
 call-target list names `BpmModelNameBody`.
@@ -888,7 +888,7 @@ bodies transcribed"; it is 132 now. `docs/review.md` still lists the DLC discove
 the model-name lookup and the bounded formatter as rebuilt-in-C++; the first two were
 already transcribed before this pass.
 
-## 2026-11-06 (later) — class A closed: the IDE payload, the popup checker, the cone check
+## 2026-11-06 (later) â€” class A closed: the IDE payload, the popup checker, the cone check
 
 **Closed:** the last three rebuilt class-A pieces are transcribed. 135 -> 138 proof
 rows; 98 keys closed / 0 open / 1 oracle-verified unchanged.
@@ -909,7 +909,7 @@ the same relative offset (`138 row(s), 292 internal branch target(s), 0 failures
 - `tools/verify_bodies.py`: `Tables.resolve` now also resolves a displacement that
   falls *inside* a registered table to that table plus its offset, and the offset is
   part of the compared operand (`[eax+table:<hash>+4]`). That is what the popup
-  checker's eight interleaved columns need — a 32-bit module cannot make the linker
+  checker's eight interleaved columns need â€” a 32-bit module cannot make the linker
   emit a symbol four bytes into an array. A wrong column is an *instruction*
   difference; the self-test gained the case (`in-table column offset PASS (26 operands
   resolved), changed column offset FAIL (instruction)`) and the other thirteen cases
@@ -919,8 +919,8 @@ the same relative offset (`138 row(s), 292 internal branch target(s), 0 failures
   `zpatch_headlight_cone_hashes`/`_values`), because the map names an object and never
   a member at an offset inside one. Storage-neutral: `ReadModelTables` fills the same
   arrays at the same slots. The cone block also holds, in the original's order, the
-  two words between its hashes and its offsets — `zpatch_carparts_shadow_fn`
-  (dword_1015B5B8) and `zpatch_fchs_resume` (dword_1015B5BC) — so the cone walk's read
+  two words between its hashes and its offsets â€” `zpatch_carparts_shadow_fn`
+  (dword_1015B5B8) and `zpatch_fchs_resume` (dword_1015B5BC) â€” so the cone walk's read
   past slot 511 lands on the same word the original's does.
 - Nine registered tables (up from six), all content-equal on both sides
   (`.scratch/table_report.py`): `100DE770` `57ad8796b1b2652c` (real names), the cone
@@ -946,9 +946,9 @@ placeholder.
 `zp_dump --ooc-selftest` -> `ooc selftest: PASS`; `.scratch/branch_targets.py` ->
 `138 row(s), 292 internal branch target(s), 0 failure(s)`.
 
-**Docs.** `docs/rebuilt.md`: new §2e/§2f/§2g, §2d's "what stays rebuilt" now points at
-§2e, §3 class A emptied, §4 item 3 gains the fourth registry property, §5 item 7
-rewritten, §6 counts 135 -> 138 and the new tools. `docs/parity.md`: 135 -> 138
+**Docs.** `docs/rebuilt.md`: new Â§2e/Â§2f/Â§2g, Â§2d's "what stays rebuilt" now points at
+Â§2e, Â§3 class A emptied, Â§4 item 3 gains the fourth registry property, Â§5 item 7
+rewritten, Â§6 counts 135 -> 138 and the new tools. `docs/parity.md`: 135 -> 138
 bodies, the `ForceCarHeadlightShadows` "what is transcribed" table and its
 "unavoidable divergence" paragraph rewritten (the divergence is gone),
 `CopSirensFlag`/`PopupHeadlightsFlag` note rewritten.
@@ -1006,8 +1006,8 @@ push SEH_1005C610; ... mov fs:[0], eax` at `0x1005C613`-`0x1005C632`) - class B.
 (`dword_101A8424` / `dword_101A8418` / `dword_101A8410` at `0x100384CC` onward), and
 `0x100385A0` calls the `std::_Hash::find` `0x1005C5A0` over those globals. A
 transcription would have to read this module's `std::unordered_set` at the original's
-offsets - an unchecked layout assumption, not a proof. Named in `docs/rebuilt.md` §3
-class D, §4 item 2 and `docs/parity.md`'s NewMemorySystem section.
+offsets - an unchecked layout assumption, not a proof. Named in `docs/rebuilt.md` Â§3
+class D, Â§4 item 2 and `docs/parity.md`'s NewMemorySystem section.
 
 **Gates (final runs).** `cmake --build --preset release` exit 0;
 `ctest --preset release` 12/12; `python tools/parity_report.py 9` ->
@@ -1017,10 +1017,10 @@ class D, §4 item 2 and `docs/parity.md`'s NewMemorySystem section.
 `zp_dump --ooc-selftest` -> `ooc selftest: PASS`; `.scratch/branch_targets.py` ->
 `151 row(s), 321 internal branch target(s), 0 failure(s)`.
 
-**Docs.** `docs/rebuilt.md`: new §2h (the 13 bodies, the method, the folds, the one
-rebuilt destroy loop), §1 class D rewritten (the builder was the class's example and
-is gone), §2's branch counts, §3's OOC init row and class-D table, §4 item 2, §5 item
-6, §6 counts 138 -> 151 and the two new tools. `docs/parity.md`: 138 -> 151, the OOC
+**Docs.** `docs/rebuilt.md`: new Â§2h (the 13 bodies, the method, the folds, the one
+rebuilt destroy loop), Â§1 class D rewritten (the builder was the class's example and
+is gone), Â§2's branch counts, Â§3's OOC init row and class-D table, Â§4 item 2, Â§5 item
+6, Â§6 counts 138 -> 151 and the two new tools. `docs/parity.md`: 138 -> 151, the OOC
 table row, the "decoder and builder are transcribed and behaviourally proven" bullet,
 the NewMemorySystem blocker paragraph, and the transcription-decision list.
 `docs/review.md`: 119 -> 151 bodies, the rebuilt/transcribed lists, the stale
@@ -1055,8 +1055,8 @@ behavioural test, and the test runs the production code's own walk.
   oracle is the test's own parser (`std::ifstream`, written from the recovered format):
   it re-reads every file and computes the expected flags and the expected patch values
   from the literals recovered off the original's instructions.
-- `docs/rebuilt.md` §2i (what is now proven and what is not), §3 class B's converter and
-  prepare rows, §5 item 1, §6; `docs/parity.md`'s contracts table (one new row), the
+- `docs/rebuilt.md` Â§2i (what is now proven and what is not), Â§3 class B's converter and
+  prepare rows, Â§5 item 1, Â§6; `docs/parity.md`'s contracts table (one new row), the
   preserved-fault row for the corrupt save, and the NewSavesCompatibility section.
 
 **The real data.** Two saves, one account
@@ -1105,7 +1105,7 @@ three site patches and the two hooks run only on a savegame load, so nothing her
 the image; the prepare step (`0x10051FD0`, the `"<dir>\<name>"` path build and the game's
 save-directory call) is not in reach either, since the seam takes a path; and whether the
 walk's answer is the *right* answer for the data behind each chunk is a game-side
-question. §5 item 1 keeps the in-game exercise.
+question. Â§5 item 1 keeps the in-game exercise.
 
 **Open, not mine to edit.** `docs/review.md` still says "12 tests" and
 `ctest --preset release # 12/12`; it is 13. `readable-fusion/AGENTS.md` line 11's body
@@ -1383,3 +1383,51 @@ a working guard 4 failures, fail-closed decode 3, wrong mount count 4, renamed e
 
 Gates: build exit 0; ctest 19/19 twice; 98 closed / 0 open / 1 oracle-verified;
 151 bodies 0 failure; ooc-selftest PASS; check_fault_dialogs 11 sources 0 failures.
+
+## 2026-11-07 - the DFA close wrapper: identified from the scope table, fixed, and pinned
+
+sub_10004790 (45 instructions, 0x81 bytes, EH4) was the last DFA body without a
+behavioural test - and its description in docs/rebuilt.md was wrong. The scope table
+0x10153FC0 names the filter 0x100047EC (`83 C8 FF; C3` = `or eax,-1; ret`) and the
+handler 0x100047F0 (`mov eax,1`, the `return TRUE` arm), so the filter answers
+EXCEPTION_CONTINUE_EXECUTION: a fault in the guarded `CloseHandle` call is retried, not
+answered, and the handler is unreachable. The class-B row said "answering -1 when the
+call faults"; that was the *disposition*, not an answer.
+
+Which C shape that is, proved in bytes: compiling four candidate shapes at /O2 /MT /GS,
+`__try { return CloseHandle(h); } __except (EXCEPTION_CONTINUE_EXECUTION) { return
+TRUE; }` reproduces the oracle exactly - 45 instructions, 0x81 bytes, funclet bytes
+identical at +0x5C/+0x60 - and differs in 16 bytes in 7 words, all four relocated
+operands (+0x06 scope table, +0x0B handler, +0x1D cookie, +0x3F CloseHandle slot). The
+tree's EXECUTE_HANDLER/-1 shape differed at +0x5C..+0x6F (the funclets swapped), and a
+child with a faulting callee measured the difference: the oracle's shape never returns,
+the tree's answered 0xFFFFFFFF. Per the parent's decision the rebuild now uses the
+oracle's shape; module_body.py compares the shipped launcher.obj with the oracle and
+reports `16 differing byte(s), all relocated; IDENTICAL except the relocated operands`.
+
+tests/dfa_close.cpp (zp_dfa_close, 27 checks) drives the five bodies through a new
+test-only seam, Launcher::DfaBodiesForTest in source/launcher.ixx (five addresses, the
+four forwarder slots published by the same PublishDfaForwarders RegisterLauncher now
+calls): a real 32-byte file opened by the create body, sized/seeked/read by the
+transcribed ones, closed by the rebuilt one; the closed handle's FALSE/6 from
+DuplicateHandle and from the reader, equal to ReadFile's own answer; null, double close
+and 0xDEADBEEF all FALSE/6 (no argument guard - the only instructions before the call
+are `mov [ebp-4],0` and `push [ebp+8]`); pass-through equality with CloseHandle;
+fs:[0] unchanged across the call. The fault half runs in a child that replaces the
+exe's own CloseHandle import slot (found through the PE import directory) with a callee
+that writes one probe byte on entry and then faults: the parent's 1000 ms watchdog
+requires it to be STILL RUNNING, the probe byte to be present and no ANSWERED line, then
+terminates, reaps and asserts its own exit code. Writing the report before the patch
+matters - the stream's close is the import being replaced.
+
+Falsified twice: "does not close" -> 12 failures (closed-handle, null, double,
+never-opened, frame failure path, whole child class); the divergent guard -> 5 failures,
+all in the child class (ANSWERED=FFFFFFFF), the reachable surface still green - which is
+exactly the unreachable-divergence shape. Seam dropped from the shipped image: 0 map
+occurrences of DfaBodiesForTest/DfaBodies, and publish_check.py finds RegisterLauncher's
+four slot stores still in the built ASI (4 of 4).
+
+Gates: build exit 0; ctest 20/20 twice (zp_dfa_close 1.3 s); 98 closed / 0 open / 1
+oracle-verified; 151 bodies 0 failure; ooc-selftest PASS; check_fault_dialogs 12
+sources 0 failures.
+
