@@ -63,8 +63,14 @@ single-key matrix: 891 cell(s): 890 exit 0, 1 expected fault (NoImpostorHeightCu
   the original ASI, whole, with immediates, displacements and lengths compared as
   values. Four also carry a byte-diff audit (`.agents/rewrite/05-body-audit.md`).
 - **Faults**: each preserved fault is recorded in `docs/parity.md` with VA, instruction
-  and what triggers it - the INI grammar faults, the 1.0.0.0 fault (which is why one
-  matrix cell is partial), the corrupt-save paths, and the unguarded lookups.
+  and what triggers it, and the INI ones are now *measured* rather than described
+  (`zp_fault_parity`): `std::stoi` throws by exact type; a first-line BOM loses the whole
+  `[Options]` header and then dies on the null-section store at `0x1005A2DA` (0xC0000005
+  at startup, as the oracle does); and a line of 256+ bytes makes the parse re-read the
+  same buffer forever, because that is what the oracle does - `getline` sets `failbit`
+  and never `eofbit`, and the exit test is the only exit. The 1.0.0.0 fault (which makes
+  one matrix cell partial), the corrupt-save paths and the unguarded lookups are recorded
+  the same way.
 - **Builds**: nine images, 891 single-key cells; the only fault is the original's own.
 
 ## What is *not* established, and cannot be from here
