@@ -56,7 +56,7 @@ are not; `fault` names the cell that died.
 `GTAIV_1000.exe` (1.0.0.0) dies in the per-option cell at
 `NoImpostorHeightCutoff`, 0xC0000005 ACCESS_VIOLATION: the original's own fault -- an uninitialised vector entry,
 write `66 89 06` at the original's `0x100536F1` -- which `docs/parity.md`
-records as deliberate and unguarded. The cell wrote 15346 byte(s) before it died, so its rows are not a scoreboard: the
+records as deliberate and unguarded. The cell wrote 8192 byte(s) before it died, so its rows are not a scoreboard: the
 first 48 keys ran, and the 51 after it
 were never reached. It is scored one key per subprocess instead, and
 `NoImpostorHeightCutoff` is the only key whose cell faults alone -- so no other cell faults on
@@ -71,16 +71,3 @@ completes does so over all 99 keys, so any fault inside it would have shown up
 as an abort; the one fault recorded is the reproduced original fault, not a
 harness failure. Every residual full-cell byte has a key named behind it, and
 the per-option column is the scoreboard that says whether that key is done.
-
-## Reading build 1's row
-
-The full cell on `GTAIV_1000.exe` is a **partial** measurement: the run dies at
-`NoImpostorHeightCutoff`, the original's own 1.0.0.0 fault, so the byte count in the
-row above is not the build's real write set (the dump stops there). The per-option
-table is the authoritative view of that build: it re-runs each key in its own process,
-so 93 keys close, five stay open, and the one fault is recorded against
-`NoImpostorHeightCutoff` rather than hiding every key after it.
-
-Nothing else on any image faults: 890 of the 891 isolated cells exit 0
-(`tools/single_key_matrix.py`), and the matrix's own `differing` column is 0 for all
-nine images, which is the statement the table exists to make.

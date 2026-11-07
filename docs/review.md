@@ -11,7 +11,7 @@ sibling repositories:
 | repository | purpose | state |
 |---|---|---|
 | `../fusionfix-skeleton/` | the featureless infrastructure image: FusionFix's `Event<Args...>` tiers, `Log`, `Game`, module/path helpers, the INI settings boundary, image-ranged scan/patch primitives, and a driver that installs nothing | complete, 6 commits, `ctest` 3/3 Release + Debug, artifact verified PE32/i386, base `0x10000000`, GUI subsystem, static CRT |
-| this one | the 1:1 replacement, built on the same shape | 98 of 99 catalogue keys, 151 bodies, 15 tests |
+| this one | the 1:1 replacement, built on the same shape | 98 of 99 catalogue keys, 151 bodies, 17 tests |
 
 The oracle for behaviour is `../game_refs/ZolikaPatch_original.asi.off`; `../readable/`
 is a reference to read, never to copy.
@@ -21,7 +21,7 @@ is a reference to read, never to copy.
 ```
 cmake --preset win-x86
 cmake --build --preset release
-ctest --preset release                                   # 15/15
+ctest --preset release                                   # 17/17
 
 python tools/parity_report.py 9                          # per-key scoreboard
 python tools/verify_bodies.py --original ../game_refs/ZolikaPatch_original.asi.off \
