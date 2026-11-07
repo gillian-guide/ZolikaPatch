@@ -14,17 +14,40 @@ same launcher stages, and the original's faults.
 
 ## Status
 
-Foundation, no arms yet:
+Complete against the oracle as far as static evidence reaches: **98 of 99 catalogue
+keys** closed on 1.0.8.0 (the 99th is implemented in full and measured against the
+original rather than a baseline that records a partial arm), **151 hook bodies**
+transcribed and proven instruction for instruction, **18 tests**, and every differing
+byte of every proof row classified as a slot, an immediate or a registered table with
+nothing unclassified.
 
 | path | responsibility |
 | --- | --- |
-| `source/common.ixx` | `FusionFix::Event<Args...>` and its tiers, the trace `Log`, `Game` (module, executable, image, version, paths), module/path helpers |
-| `source/patch.ixx` | image-ranged `find_pattern`, recovered-signature normalisation, `pattern_str`, `to_bytes`/`from_bytes`, `IATHook`, `raw_mem` |
-| `source/config.ixx` | the original's INI grammar (feather-ini-parser 1.41) and the `std::stoi` read boundary |
-| `source/game.ixx` | build classification, build masks, the image scan range |
-| `source/dllmain.cpp` | synchronous startup: context, INI, build, init tier |
-| `tests/test_main.cpp` | the offline contract suite (63 checks) |
-| `tests/pe_check.cpp` | PE32 / base / subsystem / static-CRT checks on the artifact |
+| source/common.ixx | FusionFix::Event<Args...> and its tiers, the trace Log, Game (module, executable, image, version, paths), module/path helpers |
+| source/patch.ixx | image-ranged ind_pattern, recovered-signature normalisation, pattern_str, 	o_bytes/rom_bytes, IATHook, 
+aw_mem |
+| source/config.ixx | the original's INI grammar, the per-model light tables, and the std::stoi read boundary - including the faults |
+| source/game.ixx | build classification, build masks, the image scan range |
+| source/loader.ixx | the publish / install / post tiers and the option gate |
+| source/options.ixx | the generated catalogue of 99 keys (source/options.inc) |
+| source/stability.ixx, ehicles.ixx, graphics.ixx, loading.ixx | the four largest feature modules: crash fixes, vehicle and steer, rendering and lights, loading and saves |
+| source/audio.ixx, misc.ixx, launcher.ixx, useless_checks.ixx | audio keys, the misc fixes, the launcher stage (table, DFA, ROM), the recovered useless-check tables |
+| source/native.ixx | the original's script-native call layer and its salt-probe rule |
+| source/ooc.ixx | the OutOfCommissionFix payload: the decoder, the archive builder and the mount |
+| source/shared.ixx, odies.ixx, ytes.ixx | the recovered config-value resolver, the body and table registries, the opcode constants |
+| 	ests/*.cpp | the contract suite, the PE checks, and the behavioural harnesses (bodies, saves, arena, native guards, speedup clock, INI faults, matrix, oracle-verified) |
+
+## Evidence
+
+Everything claimable here is reproducible; start with the review page, then the two
+measurements behind the numbers.
+
+| document | what it establishes |
+| --- | --- |
+| docs/review.md | the one-page review: what exists, how to reproduce every number, what is *not* established |
+| docs/matrix.md | the generated 18-cell per-build dump table, every residual attributed to a key |
+| docs/parity.md | contracts, preserved faults, the baseline-incompleteness cases, and the transcription decision for every body |
+| docs/rebuilt.md | the pieces that are rebuilt rather than transcribed, each with the instruction that blocks it, how it was verified, and what stays unproven |
 
 ## Build and test
 
