@@ -182,11 +182,12 @@ namespace
 }
 
 // The published state of the two build-gated arms below, in C linkage because the
-// transcribed code names the slots directly.
+// transcribed code names the slots directly. Each comment names the original's own
+// resume word, the dword its body's `jmp` reads (0x10005659 and 0x10005679).
 extern "C"
 {
-    uint32_t zpatch_benchmark_resume_a = 0;  // dword_10159CC4
-    uint32_t zpatch_benchmark_resume_b = 0;  // dword_10159CC8
+    uint32_t zpatch_benchmark_resume_a = 0;  // dword_1015AD50
+    uint32_t zpatch_benchmark_resume_b = 0;  // dword_1015AD54
 }
 
 // sub_10005650, recovered VA 0x10005650: BenchmarkFix's first match-site shim. It

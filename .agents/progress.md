@@ -1320,3 +1320,45 @@ closed, 0 open, 1 oracle-verified (baseline incomplete)`; `python tools/verify_b
 ...` -> `151 body(ies), 0 failure(s)`; `build\win-x86\Release\zp_dump.exe --ooc-selftest`
 -> `ooc selftest: PASS`; `python tools/check_fault_dialogs.py` -> `10 test source(s), 0
 failure(s)`.
+
+## 2026-11-07 - the full byte audit: 151 rows, 2,965 differing bytes, 0 unclassified
+
+An independent second implementation (own PE reader, own map reader, own comparator - it
+does not import `tools/verify_bodies.py`) audited every row of `tests/bodies.tsv` against
+the oracle, at the byte level: 151 rows, 4,846 instructions, 16,392 bytes on each side,
+2,965 differing bytes. Every differing byte is charged to a class and the classes add up
+exactly: 717 slot fields / 2,135 bytes (an absolute operand now naming our own storage), 241
+immediate fields / 674 bytes (a call/push/mov value naming our own code or a literal), 57
+registered-table fields / 156 bytes, and **0 unexplained**. 314 internal branch targets land
+on the same body-relative offsets (an independent re-derivation, not the shipped proof).
+All nine registered tables resolve through the linker map at their declared length (the
+headlight hash pair's `sizeof(array) + sizeof(uint32_t)` = 2,052 included) and compare by
+content. 33 pushed string literals compare equal. 512 of the 958 slot/immediate operands
+resolve to a declared symbol or an interior address whose comment documents the original VA,
+and all 512 pairs match.
+
+The auditor was falsified per row before its clean run: 614/614 injected mutations detected
+(opcode byte 151/151, plain immediate 119/119, internal branch 79/79, slot moved out of the
+image 107/107, table displacement moved inside its table 7/7, budget one instruction short
+151/151).
+
+**One defect, fixed.** `source/loading.ixx` documented the two BenchmarkFix resumes as
+`dword_10159CC4`/`dword_10159CC8`; those are EmissiveLerpFix's scale and resume words.
+The bodies read `0x1015AD50`/`0x1015AD54` (`jmp dword ptr [0x1015AD50]` at
+`0x10005659` and `[0x1015AD54]` at `0x10005679`), which is what the tree's slots and
+arm already did - comment-only, fixed. This was F8 of `.agents/rewrite/05-body-audit.md`;
+F1 and F13 there are also closed (the manifest budgets are the true lengths, checked in both
+directions). The arm/write-set findings of 05 (F2, F3, F5) are untouched and out of this
+audit's scope; F4's resolver thunk is still present and is recorded as O3 in the report.
+
+Report: `.agents/rewrite/06-body-audit-full.md` (per-row table with VA, instruction count,
+byte size both sides, class counts and verdict). Tool: scratch, outside the tree
+(`.scratch/body-audit/audit_full.py`), JSON with every finding
+(`.scratch/body-audit/audit.json`).
+
+**Gates.** `cmake --build --preset release` exit 0; `ctest --preset release` 18/18 twice;
+`python tools/parity_report.py 9` -> `build 9: 98 key(s) closed, 0 open, 1
+oracle-verified (baseline incomplete)`; `python tools/verify_bodies.py ...` -> `151
+body(ies), 0 failure(s)`; `build\win-x86\Release\zp_dump.exe --ooc-selftest` -> `ooc
+selftest: PASS`; `python tools/check_fault_dialogs.py` -> `10 test source(s), 0
+failure(s)`.

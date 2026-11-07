@@ -1519,6 +1519,18 @@ the registration, and the body is transcribed with the operand absolute:
    `table contents differ`, and a displacement no row names still compares literally.
    `0x10003F00`'s `bpm_model_name` row is the worked example (`rebuilt.md` §2b).
 
+**Independent byte audit (2026-11-07).** A second implementation — its own PE reader, map
+reader and comparator, which charges every differing byte to a *slot* (a memory operand's
+absolute displacement), an *immediate* (a `call`/`push`/`mov` value naming our own code or
+storage) or a registered-*table* displacement and fails on anything else — re-audited all 151
+proof rows and found every one of the 2,965 differing bytes accounted for (717 slot fields /
+2,135 bytes, 241 immediate fields / 674 bytes, 57 table fields / 156 bytes, 0 unclassified),
+with 314 internal branch targets landing on the same relative offsets, all nine registered
+tables resolving through the linker map at their declared length, 33 pushed string literals
+identical, 614/614 injected mutations detected, and its one finding — two `BenchmarkFix` slot
+comments naming the EmissiveLerp slots — a documentation defect, now fixed; the report is
+`../../.agents/rewrite/06-body-audit-full.md`, outside this repository.
+
 ## What the scoreboard can and cannot compare
 
 `parity_report.py` compares a key's changed bytes against the stored baseline and
