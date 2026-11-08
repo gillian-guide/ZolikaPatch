@@ -217,7 +217,10 @@ extern "C"
 // are written.
 extern "C"
 {
-    uint32_t zpatch_spawns_kind = 0xFFFFFFFFu;  // dword_10158058 (on-disk -1)
+    // 0x10158058: -1 means "no spawn kind chosen yet"; any other value is the
+    // kind the body picked. Signed, because the value is a sentinel and a small
+    // enumerator, not a bit mask.
+    int32_t zpatch_spawns_kind = -1;
     uint32_t zpatch_spawns_class = 0;           // dword_10159C80 (captured arg2 byte)
     uint32_t zpatch_spawns_skip = 0;            // dword_10159CB4
     uint32_t zpatch_spawns_orig_a = 0;          // dword_10159CB0 (probe resume)
