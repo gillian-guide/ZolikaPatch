@@ -332,3 +332,28 @@ ooc_vector_end 100564E0 ?OocVectorEndBody@@YAXXZ 2
 ooc_vector_size 100564C0 ?OocVectorSizeBody@@YAXXZ 9
 ooc_vector_clear 10056500 ?OocVectorClearBody@@YAXXZ 11
 ooc_entry_name 10057710 ?OocEntryNameBody@@YAXXZ 6
+
+# FreezeCarFix / DebugPrintSpawns (source/vehicles.ixx): the spawn guard, the ten
+# factory-dispatch thunks and the 394-instruction spawn probe the original's handler
+# 0x10037C70 installs through sixteen `E8` detours (seventeen rows: the primary and
+# its short prefix name the same site). The probe's name/who/print helpers are
+# compiler output and rebuilt in C++; its formatter is the body source/stability.ixx
+# already proves. docs/parity.md.
+spawns_guard 100372F0 ?SpawnsGuardBody@@YAXXZ 16
+spawns_case_0x24 10037330 ?SpawnsCase0x24Body@@YAXXZ 9
+spawns_case_0xCA 10037360 ?SpawnsCase0xCABody@@YAXXZ 9
+spawns_case_0x6F 10037390 ?SpawnsCase0x6FBody@@YAXXZ 9
+spawns_case_0xE0 100373C0 ?SpawnsCase0xE0Body@@YAXXZ 9
+spawns_case_0x3D 100373F0 ?SpawnsCase0x3DBody@@YAXXZ 9
+spawns_case_0x56 10037420 ?SpawnsCase0x56Body@@YAXXZ 9
+spawns_case_0x88 10037450 ?SpawnsCase0x88Body@@YAXXZ 9
+spawns_case_0x9E 10037480 ?SpawnsCase0x9EBody@@YAXXZ 9
+spawns_case_0xF6 100374B0 ?SpawnsCase0xF6Body@@YAXXZ 9
+spawns_case_0xB4 100374E0 ?SpawnsCase0xB4Body@@YAXXZ 9
+spawns_probe 10037510 ?SpawnsProbeBody@@YAXXZ 394
+
+# VRAMFix (source/misc.ixx): the argument/verdict shim the original's handler
+# 0x1004AAE0 jumps to from its single matched site. Its verdict helper is compiler
+# output and rebuilt in C++. docs/parity.md.
+vram_fix_shim 1004AAB0 ?VramFixShimBody@@YAXXZ 13
+

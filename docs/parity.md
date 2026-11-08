@@ -22,6 +22,7 @@ fix.
 | The `OutOfCommissionFix` init (`sub_1004B750`): `dword_10159C00` has no writer, so three calls build three archives (one 182,272-byte archive allocation each) and not one is ever freed; after every call `dword_10159C78` is the archive's 182,272 bytes and `dword_10159BFC` is that same count, and the archive the count covers hashes to the pinned `fnv1a 0xB5AF7B10` with its header's `16`/`0xE9` words, one entry, a 179,536-byte record and the name `"finale2.sco"`; a resource whose Adler-32 trailer is damaged (the decode answers 0 with the table complete) and one whose first opcode can never terminate (the decode answers 0 having written nothing) are both registered and built into an archive, with no throw; the fake-pak entry is `"finale2.sco"`, an 11-byte name of capacity 15, `file_size` 179,536 and the table it was handed | `zp_ooc_init` (54 checks, driven through `OocInit`; the init, the decode, the push_back, the vector's clear and the resource are the module's own, and the two damaged-resource runs damage the recovered resource in place) |
 | The DFA file-API bodies (`0x10004820` create, `0x10004720` size, `0x10004760` seek, `0x10004740` read, `0x10004790` close): a real file opened through the create body, sized, seeked forward and from the end, read at each position, then closed through the rebuilt body; the value is really closed (`DuplicateHandle` answers `FALSE`/`6`), the transcribed reader answers `FALSE`/`6` for it and that answer equals `ReadFile`'s own, null / already-closed / `0xDEADBEEF` all answer `FALSE`/`6` because the body has no argument guard, the success path leaves last error untouched, and `fs:[0]` is the same before and after every call; the frame's filter is `EXCEPTION_CONTINUE_EXECUTION`, so a fault in the guarded call never answers -- a child process whose callee writes one probe byte on entry and then faults must still be running at the test's watchdog, with the probe byte present and no answer written | `zp_dfa_close` (27 checks, driven through `Launcher::DfaBodiesForTest`; the fault case is a child the test terminates and reaps) |
 | The generated catalogue and INI cannot drift from their sources | `zp_catalogue_drift`, `zp_ini_drift` |
+| Every signature an arm scans is the original handler's own string: its per-image hit count and first-hit RVA equal that string's, so an arm cannot patch a site the original never touches | `zp_signature_parity` (`tools/check_signature_parity.py`; the class, the falsification and the per-arm record are in the signature-parity section) |
 ## Preserved faults
 
 | fault | condition | site |
@@ -90,7 +91,8 @@ An indexed absolute table access used to be on that list and no longer is: the t
 registers the table (`Bodies::RegisterTable`) and the proof compares the operand's
 table *contents* instead of its displacement, so a body that reads a registered table
 is transcribed like any other (`rebuilt.md` §1, §2b and §2c; the model-name lookup
-`0x10003F00` was the first, the steer consumer `0x10004C70` the largest). A table is
+`0x10003F00` was the first, the steer consumer `0x10004C70` the largest until the
+`FreezeCarFix` spawn probe `0x10037510` (394 instructions) took the row). A table is
 nameable whether the map calls it `?name` (a C++ object) or `_name` (an `extern "C"`
 array owned by another module), and a table the original keeps in the uninitialised
 tail of a section reads as the zeros the loader maps there -- two properties the
@@ -109,16 +111,17 @@ feature key, is closed by the converter recorded in its own section below;
 `HighQualityReflections` closed with the site-arithmetic resolution recorded below.
 
 - **98 of 99 option keys closed**;
-- **151 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **164 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe, and the compiled bodies listed in
   [`rebuilt.md`](rebuilt.md) are rebuilt in C++ instead, with no proof row. That file
   is the catalogue of rebuilt pieces: what blocks each transcription, what the rebuild
   reproduces, how that was verified and what it leaves unproven. The longest is the
-  steer/engine/plane consumer (`0x10004C70`, 320 instructions / 1,343 bytes; see the
-  section below); before it `HighQualityReflections`' detour
-  (`0x1001F030`, 157 instructions / 858 bytes) held the row, and before that
-  `CutsceneFixes` chain B's body
+  `FreezeCarFix` spawn probe (`0x10037510`, 394 instructions / 1,453 bytes; see the
+  section below); before it the steer/engine/plane consumer
+  (`0x10004C70`, 320 instructions / 1,343 bytes) held the row, and before that
+  `HighQualityReflections`' detour
+  (`0x1001F030`, 157 instructions / 858 bytes), `CutsceneFixes` chain B's body
   (`0x100388C0`, 146 instructions / 592 bytes) and the livery counter
   (`0x1003D270`, 37 instructions). The pair at 78 instructions / 309
   bytes each (`DualVehicleHeadlights`) is what exposed the proof tool's old
@@ -160,8 +163,128 @@ feature key, is closed by the converter recorded in its own section below;
   WM_ROM service and its two bodies). The write set matches the original's recovered
   handlers byte for byte on all nine images (see the section below); the key reads
   OPEN only because the stored baseline is a partial recording of this feature;
+- every signature an arm scans is now the original handler's own string, and its
+  per-image hit set is pinned against it (`zp_signature_parity`). Four arms had been
+  scanning a shortened copy that selected the original's site only on 1.0.8.0; see
+  the signature-parity section;
 - the 18 full/per-option per-build dump hashes and the oracle differential are not
   yet produced.
+
+### `FreezeCarFix` and `VRAMFix`, the two keys the empty-cell scoreboard hid
+
+Both keys were counted closed on 1.0.8.0 while writing **nothing**, and the reason
+is specific: `parity_report.py` excludes every byte that is a branch displacement
+(the four bytes after an `E8`/`E9`, found from either cell or the pristine image),
+because the baseline recorded one stand-in address for every body target. Every row
+of `FreezeCarFix`'s baseline cell on 1.0.8.0 is such a displacement byte -- the
+sixteen sites were already `E8`s, so only their operands changed -- so the key
+closed with an empty cell, and it would have kept closing whatever target an `E8`
+named. `VRAMFix`'s cell is empty on 1.0.8.0 because its signature is absent there,
+which is the original's own skip. The scoreboard's closure is therefore necessary
+but not sufficient for these two keys; the site and body-target evidence is the
+independent cross-check against `ZolikaPatch_reconstruction`
+(`.agents/rewrite/08-independent-crosscheck.md`) together with the oracle
+disassembly of the two handlers, and it is what this section records.
+
+**`FreezeCarFix`** (shipped default 1, catalogue mask all builds). The original's
+handler `0x10037C70` makes seventeen `E8` installs at sixteen distinct sites: the
+primary signature's `+7`, the guard's `+11`, the ten dispatch arms at `+0x24`/
+`+0x3D`/`+0x56`/`+0x6F`/`+0x88`/`+0x9E`/`+0xB4`/`+0xCA`/`+0xE0`/`+0xF6`, four
+one-call patterns, and the short prefix's `+7` -- the same site as the primary, so
+the original writes that one twice. The arm reproduces that shape exactly
+(`source/vehicles.ixx`):
+
+| piece | recovered VA | instructions | how |
+|---|---:|---:|---|
+| spawn guard | `0x100372F0` | 16 | transcribed |
+| dispatch thunk 0x24 (object) | `0x10037330` | 9 | transcribed |
+| dispatch thunk 0xCA (heli) | `0x10037360` | 9 | transcribed |
+| dispatch thunk 0x6F (car) | `0x10037390` | 9 | transcribed |
+| dispatch thunk 0xE0 (boat) | `0x100373C0` | 9 | transcribed |
+| dispatch thunk 0x3D (ped) | `0x100373F0` | 9 | transcribed |
+| dispatch thunk 0x56 (ped) | `0x10037420` | 9 | transcribed |
+| dispatch thunk 0x88 (vehicle object) | `0x10037450` | 9 | transcribed |
+| dispatch thunk 0x9E (bike) | `0x10037480` | 9 | transcribed |
+| dispatch thunk 0xF6 (plane) | `0x100374B0` | 9 | transcribed |
+| dispatch thunk 0xB4 (train) | `0x100374E0` | 9 | transcribed |
+| spawn probe | `0x10037510` | 394 | transcribed |
+| model-name lookup | `0x10003F00` | 21 | **rebuilt in C++** |
+| "who" wrapper | `0x1005B290` | 61 | **rebuilt in C++** |
+| chat print | `0x1005B530` | 45 | **rebuilt in C++** |
+| bounded formatter | `0x10001280` | 13 | reused: `source/stability.ixx` proves it |
+| `/GS` cookie check | `0x1005FE7B` | 5 | reused: the CRT's `__security_check_cookie` |
+
+The three rebuilds are compiler output, not a hand-written instruction stream:
+the name lookup carries an indexed absolute operand in a `/GS` frame
+(`push [0x100DE770 + esi*4]`), the "who" wrapper builds a 0xA0-byte native call
+block around `sub_100038E0` (`lea esi,[esp+30h]` over four records), and the print
+wrapper is the same block with the cleanup call (`call 0x1005DE40`). They are
+rebuilt on the native layer's exported `Native::Invoke`/`Native::Salt` with the
+recovered block layout, and the probe calls them through the same `E8 rel32` shape
+the original uses. One unobservable difference: the original's `memset` covers
+`0xA0` bytes, so the block's seventeenth argument word (`args[16]`, at `+0xA0`)
+keeps stack garbage, while the rebuild zero-initialises the whole struct. Both
+wrappers pass one argument, so the word is never read on either side.
+
+Recovered detail that is behaviour, kept 1:1:
+
+- The primary signature is the gate. On 1.0.0.0, 1.0.4.0 and 1.0.0.4 it has no
+  hit, and the original wraps every later scan in the same `if (result)`, so those
+  builds write nothing -- no arm is invented for them.
+- `DebugPrintSpawns` is read **only** inside the `FreezeCarFix` gate and only
+  raises the flag: `movzx ecx,[0x10159C15]; cmp esi,1; cmove ecx,1;
+  mov [0x10159C15],cl`. `FreezeCarFix=0, DebugPrintSpawns=1` leaves it 0.
+- The resume words are the targets of the `E8`s the install overwrites, read in
+  the publish tier; the short prefix's write is the original's own duplicate.
+- The ped-object array `dword_1015AD78` is resolved by this arm's own publish
+  (the operand four bytes before the recovered anchor), because the original's
+  loader preamble resolves it unconditionally and the `BadPlayerModelCrashFix`
+  arm's copy is behind that key.
+- The probe's cookie check keeps the original's `EAX` contract: the model index
+  is answered past a final `call __security_check_cookie`, and the guard keeps the
+  original callee's `EBP` frame and `ret 0Ch`.
+
+**`VRAMFix`** (shipped default 1). The original's handler `0x1004AAE0` scans
+`8B 44 24 10 D9 2C 24 83 C4 1C C3` and writes `E9` + rel32 to `0x1004AAB0` at the
+match. The signature is present on 1.0.4.0, 1.0.0.4, 1.0.6.0, 1.0.7.0, 1.1.1.0 and
+1.1.2.0, and absent on 1.0.0.0, 1.0.8.0 and 1.1.3.0. The handler has no build gate
+-- the scan is the gate -- so this arm adds none; a miss writes nothing. The shim
+(`0x1004AAB0`, 13 instructions) is transcribed; its verdict helper (`0x1004AA80`,
+12 instructions) is rebuilt in C++ -- compiler output whose compares are
+`test eax,eax / js set`, `cmp dword_1015D630,0 / jne set`,
+`cmp eax,3E800000h / jge clear` (a signed compare of the float bits against
+0.25f) -- and the shim keeps the original's `fldcw [esp]` tail, which reads the
+`E9` site's return address as the FPU control word. The arm lives in
+`source/misc.ixx` with the other one-off installers although the catalogue
+attributes the key to the graphics module; moving it is only a move.
+
+**Attribution.** `tools/gen_body_targets.py` now reads each `Apply<Key>` function
+as a block instead of line by line, so an install call split over two lines
+(`BenchmarkFix`, `ImprovedShaderStreaming`, `SuperLODFix`), a helper install
+(`WriteCallNoRead` in `BorderlessWindowed`), a `target = &abi_x` assignment
+(`LoadDLCs`) and a file-scope case table the block iterates (`FreezeCarFix`'s
+`kSpawnCases`) all attribute their bodies. That filled the nine rows the
+cross-check found missing (`BorderlessWindowed` x2, `SuperLODFix`,
+`ImprovedShaderStreaming` x2, `BenchmarkFix` x2, `LoadDLCs` x2) and the ten
+`FreezeCarFix` thunks; `tests/body_targets.tsv` is generated, so the drift guard
+(`zp_body_targets_drift`) stays meaningful.
+
+**Measured.** `parity_report.py 9` is `98 key(s) closed, 0 open, 1 oracle-verified`
+(the same closed count as before -- the cell was already scored closed -- now with
+64 displacement rows behind it); `dump_matrix.py --only 9` is `947` full-cell
+bytes, `differing 0`, `extra 57` (SkipLauncher), `98/99`; `verify_bodies.py` is
+`164 body(ies), 0 failure(s)` (the 13 new rows included; the probe is the largest
+transcribed body at 394 instructions). `parity_report.py` on builds 5, 6, 7, 8, 11
+and 12 no longer lists `VRAMFix` open (the remaining open keys there are the
+pre-existing `CarDynamicShadowFix` on 1.0.4.0 and the `Patch7RemoveModChecks`
+catalogue alias on 1.0.6.0/1.0.7.0, plus the oracle-verified `SkipLauncher`). The
+independent cross-check now reports build 9 `confirmed 89, different 0, recon_only
+0, ours_only 0` (`FreezeCarFix` counted confirmed), no `VRAMFix` recon-only row on
+any of the six builds, and part 2 `173 row(s): 2 disagreement(s), 0 with no key in
+our body_targets.tsv` -- the two remaining attribution disagreements are the two
+the cross-check report already resolved against the ASI (`LocalSettingsPath`'s
+`0x100512F0` and the shared steer detour `0x100051B0`).
+
 
 ### The native-script call layer, and the key it closed
 
@@ -1719,6 +1842,117 @@ called, so on 1.0.0.0/1.0.4.0 the baseline lacks the six-byte NOP fill this tree
 writes from the recovered `@noE` row. `CarDynamicShadowFix` therefore reports six
 extra bytes on 1.0.4.0; it is a baseline omission, not a difference in the bytes
 both sides write.
+
+## Signature parity: the original's own pattern strings
+
+A byte comparison cannot see a **shortened** signature. On the build the baselines
+were taken from (1.0.8.0) a shortened copy of a handler's signature happened to
+select the original's first match, so every baseline byte agreed; on another build it
+selected a different function, and the arm patched a site the original never touches
+(or missed the one it does). The independent cross-check against
+`ZolikaPatch_reconstruction`'s recovered tables
+(`.agents/rewrite/08-independent-crosscheck.md` §2.2/§3) found four arms in this class.
+All four were real. Each now scans the string its own handler passes to the scanner
+(the handler decompilation is the source: `0x100055C0`, `0x10046B30`, `0x10037290`,
+`0x10036FD0`):
+
+| arm | the handler's own signature | what the shortened string did |
+| --- | --- | --- |
+| `AimProjectileCrashFix` | `8B 44 24 08 89 41 20 8B 44 24 0C 89 41 24 F7 D8` | `8B 44 24 ? 89 41 ? 8B 44 24 ? 89 41`: two hits on 1.0.0.4/1.0.4.0, the first at a different `ret 0Ch` function |
+| `TryToSkipAllErrors` | `81 EC 40 08 00 00 53 55 8B AC 24 4C 08 00 00` | `81 EC 40 08 00 00`: two hits on seven images, the first at a different `sub esp,840h` |
+| `MPNikoCrashFix` | `74 2B 57 E8 ? ? ? ? 8B BE A8 0E 00 00` | wildcarded the bytes that distinguish the site and lengthened the tail: a hit on 1.0.0.0/1.0.0.4/1.0.4.0 and on no 1.0.6.0 build, where the original matches nothing |
+| `BlackscreenFix` | `75 54 8B 48 28 8B 40 2C` | `75 ? 8B 48 ? 8B 40 ? 51 8B 0D`: a hit on 1.0.0.4/1.1.1.0/1.1.2.0 where the original matches nothing |
+
+The same check over every arm found 17 further literals that were a truncation or a
+wildcarding of the original's string: `FreezeGunFix`, `GroupHackFix`,
+`PathNodeCrashFix`, `WantedLevelCrashFix`, `EpisodeSwitchFreezeFix` (three strings),
+`SCOSignatureFix`, `RemoveAllWeaponsProtection`, `HighFPSSpeedupFix`,
+`BuildingDynamicShadows` (two), `InfiniteCarBottomDistance`, `BikeFeetFix`,
+`BikePhoneAnimsFix`, `PipeBombDropIconSupport` and `TeleportProtection`. Every one of
+them selected the same sites as the original's string on all nine images, so no
+baseline could distinguish them either; they are the original's own strings now.
+Those 21 signatures are the only source changes: 14 in `source/stability.ixx` (22 call
+sites, because a publish and its install share a string), 2 in `source/graphics.ixx`
+(3 call sites) and 5 in `source/vehicles.ixx`. 21 rows of `tests/signatures.tsv`
+recorded the shortened strings and are corrected; its `IncreaseVehicleStructLimit`
+row still spelled out the relocated operand (`68 34 EE DA 00`) that the arm itself had
+already replaced with `68 ? ? ? ? 6A 32 8B C8`.
+
+**Anchor movement.** A signature's length is not the anchor: an arm's sites are
+offsets from the match, so only a first-hit change moves a write. These are the four
+arms whose first hit moved, and the only images on which it did (RVA of the pattern's
+first byte; the arm writes at that RVA, or at +81 for `BlackscreenFix`):
+
+| arm | 1.0.0.0 | 1.0.0.4 | 1.0.4.0 | 1.0.6.0 | 1.0.7.0 | 1.0.8.0 | 1.1.1.0 | 1.1.2.0 | 1.1.3.0 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `AimProjectileCrashFix` | 0x5d6780 | **0x5ac560** (was 0x1bc88) | **0x6e3150** (was 0x1abd8) | 0x64c440 | 0x64c330 | 0x632620 | 0x67aa00 | 0x679e70 | 0x5fcfb0 |
+| `TryToSkipAllErrors` | **none** (was 0x1ff800) | **0x55f60** (was 0x3700) | **0x53240** (was 0x1e10) | 0x1a89f0 | 0x1a8cb0 | 0x56680 | **0x526b0** (was 0x1e50) | **0x52700** (was 0x1e70) | 0x1a8510 |
+| `MPNikoCrashFix` | **none** (was 0x591541) | **none** (was 0x496371) | **none** (was 0x42d451) | 0x5c1ef1 | 0x5c1e71 | 0x59a7f1 | 0x60df61 | 0x618b91 | 0x565291 |
+| `BlackscreenFix` | 0x7b218 | **none** (was 0x885e8) | 0x2beba8 | 0x889c8 | 0x889d8 | 0x2c6ef8 | **none** (was 0x10a448) | **none** (was 0xf1ea8) | 0xc828 |
+
+Every other literal's first hit is unchanged on every image, so the 1.0.8.0 bytes are
+unchanged by the whole change. Measured, not only argued: the per-option 1.0.8.0 dump
+written with the pre-fix strings and the one written with the fixed strings hash
+identically (`SHA-256 E20AF4EAD811021BAB1D6475A3EC3E0900C9CDF341CD328515F7E76CC2845327`).
+Every one of the 21 new strings is also present **verbatim** in the original ASI's own
+image (an ASCII string search over `game_refs/ZolikaPatch_original.asi.off`), so the
+provenance is the binary itself, not only the reconstruction's recovered tables.
+
+**The gate.** None of the four handlers has a build ladder: each scans one signature
+and tests the scan's answer (`if (result)`). The exact signature *is* the gate — a
+build where it has no hit gets no write because there is no site to write. That is
+what the tree does now: an arm writes only when its `find_pattern` on the original's
+own string is non-empty. The other fourteen handlers were checked the same way: each
+one's decompilation has no build-id comparison except `0x1001BE40`
+(`PipeBombDropIconSupport`), whose guard is `if (dword_1015BE04 >= 6)`; that key's
+catalogue mask is `0x4BFC0` (build ids 6, 7, 8, 9, 10, 11, 12, 13, 15, 18 — every id
+the loader can produce that is >= 6), so `Loader::Enabled` already applies exactly
+that gate. `RemoveRGSCLoginRequirement` is the one arm in this set with a real
+either/or ladder: its handler (`0x10045490`) patches its primary signature when it
+hits and otherwise, only when the build id is 9, patches the fixed fallback site;
+`source/loading.ixx` has the same shape (the original's primary string, and a
+`Build::v1080`-gated fallback site).
+
+**The guard.** `tools/check_signature_parity.py` (ctest `zp_signature_parity`) keeps the
+class out. Per `find_pattern` literal in `source/*.ixx` it names the catalogue key from
+the installer/publisher function, takes the key's original signature strings from the
+recovered tables (`handler_table.json`'s handler strings, `option_signatures.json`,
+and the ASI's own stored strings for a key neither covers), associates the literal when
+it is an exact copy or a loosening of one, and requires the literal's hit set (count
+and every RVA, hence the first-hit RVA) to equal the original's on all nine images. A
+recovered association that differs is a failure; `--strict` also fails on a harmless
+loosening and on a stale `signatures.tsv` row. It is falsified against this bug class:
+on the tree before the fix it exits 1 naming exactly the four arms, for example
+
+```
+FAIL stability.ixx:1469 (InstallAimProjectileCrashFix -> AimProjectileCrashFix)
+  ours    : 8B 44 24 ? 89 41 ? 8B 44 24 ? 89 41
+  original: 8B 44 24 08 89 41 20 8B 44 24 0C 89 41 24 F7 D8
+    GTAIV_1004: hit count 2 vs 1; ours 2 hit(s), first RVA 0x1bc88, original 1 hit(s), first RVA 0x5ac560
+    GTAIV_1040: hit count 2 vs 1; ours 2 hit(s), first RVA 0x1abd8, original 1 hit(s), first RVA 0x6e3150
+```
+
+and on the fixed tree it exits 0 (`132 signature(s) measured on 9 image(s): 0
+mismatch(es), 0 loosening(s), 100 without an original signature`). The literals it
+reports as "no recovered original signature" are derived anchors — a pool lookup, a
+site's own bytes, or a multi-scan arm's row group such as `EpisodicVehicleSupport` —
+and are outside its claim by design.
+
+**Scoreboard.** The stored baselines already carried the original's sites for these
+arms (the reference tree's arms scan the original's strings), so the fix *closes* the
+keys per build instead of moving them. With a binary built from this tree:
+1.0.8.0 is `98 closed / 0 open / 1 oracle-verified`; 1.0.0.4, 1.1.1.0, 1.1.2.0 and
+1.1.3.0 are `98 / 0 / 1`; 1.0.4.0 is `97 / 1` and 1.0.6.0/1.0.7.0 are `97 / 1`, the open
+key in each case being the `CarDynamicShadowFix` baseline omission above or the
+`Patch7RemoveModChecks` attribution alias (`Patch6and7RemoveModChecks` is closed with
+the same sites). 1.0.0.0 cannot be scored by the one-process dump: its post-loop
+full-cell run faults at `NoImpostorHeightCutoff` by design, so `parity_report.py 1`
+raises after writing a *complete* per-option file; scored from that file it is `96
+closed, 2 open` (`CarDynamicShadowFix`'s baseline omission and the designed fault
+cell), with every arm above closed. The comparison also ran against a freshly built
+binary while the artifacts in `build/` were older than `source/`, which closed
+`VRAMFix` on the six builds where its signature exists; that arm was already in the
+tree and is not part of this change.
 
 ## A second incomplete baseline: `SkipLauncher`
 

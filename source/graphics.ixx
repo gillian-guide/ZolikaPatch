@@ -1149,7 +1149,7 @@ namespace
         if (!Loader::Enabled("BuildingDynamicShadows"))
             return;
 
-        auto pattern = find_pattern("8B 47 ? C1 E8 06 83 E0 0F 83 C0 FF");
+        auto pattern = find_pattern("8B 47 28 C1 E8 06 83 E0 0F 83 C0");
         if (pattern.empty())
             return;
 
@@ -1174,11 +1174,11 @@ namespace
         if (!Loader::Enabled("BuildingDynamicShadows"))
             return;
 
-        auto pattern = find_pattern("50 68 04 01 00 00 6A 02");
+        auto pattern = find_pattern("50 68 04 01 00 00 6A 02 6A 00 E8");
         if (!pattern.empty())
             injector::WriteMemory<std::byte>(pattern.get_first(2), Bytes::Zero, true);
 
-        pattern = find_pattern("8B 47 ? C1 E8 06 83 E0 0F 83 C0 FF");
+        pattern = find_pattern("8B 47 28 C1 E8 06 83 E0 0F 83 C0");
         if (pattern.empty())
             return;
 

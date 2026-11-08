@@ -201,6 +201,705 @@ extern "C"
     extern uint32_t zpatch_format_entry;  // sub_10001280 (source/stability.ixx)
 }
 
+// ---- FreezeCarFix / DebugPrintSpawns ----------------------------------------
+//
+// The original's handler 0x10037C70 installs sixteen `E8` detours, at seventeen
+// rows (the primary and the short prefix name the same site) across six recovered
+// signatures. The guard, the ten factory-dispatch thunks and the 394-instruction
+// spawn probe are 0x100372F0 / 0x10037330..0x100374E0 / 0x10037510; the probe's
+// diagnostic calls its own name/who/print helpers, which are compiler output and
+// are rebuilt in C++ below. The arm is gated exactly like the original's: on the
+// primary signature (absent on 1.0.0.0 / 1.0.4.0 / 1.0.0.4, so those builds write
+// nothing), and the DebugPrintSpawns flag is read *inside* this gate.
+//
+// The state words keep the original's on-disk seeds: the selector starts at -1,
+// the suppress flag at 0, and the six resume words are published before the sites
+// are written.
+extern "C"
+{
+    uint32_t zpatch_spawns_kind = 0xFFFFFFFFu;  // dword_10158058 (on-disk -1)
+    uint32_t zpatch_spawns_class = 0;           // dword_10159C80 (captured arg2 byte)
+    uint32_t zpatch_spawns_skip = 0;            // dword_10159CB4
+    uint32_t zpatch_spawns_orig_a = 0;          // dword_10159CB0 (probe resume)
+    uint32_t zpatch_spawns_orig_b = 0;          // dword_10159C98 (guard resume)
+    uint32_t zpatch_spawns_case0_resume = 0;    // dword_10159CBC (site +0x24)
+    uint32_t zpatch_spawns_case1_resume = 0;    // dword_10159C9C (site +0x3D)
+    uint32_t zpatch_spawns_case2_resume = 0;    // dword_10159CA0 (site +0x56)
+    uint32_t zpatch_spawns_case3_resume = 0;    // dword_10159CA8 (site +0x6F)
+    uint32_t zpatch_spawns_case4_resume = 0;    // dword_10159C7C (site +0x88)
+    uint32_t zpatch_spawns_case5_resume = 0;    // dword_10159C88 (site +0x9E)
+    uint32_t zpatch_spawns_case6_resume = 0;    // dword_10159CAC (site +0xB4)
+    uint32_t zpatch_spawns_case7_resume = 0;    // dword_10159C90 (site +0xCA)
+    uint32_t zpatch_spawns_case8_resume = 0;    // dword_10159C94 (site +0xE0)
+    uint32_t zpatch_spawns_case9_resume = 0;    // dword_10159C84 (site +0xF6)
+
+    // The original's IAT slot for GetModuleHandleW (0x10063074), which the probe's
+    // GTAC.dll test calls through; filled unconditionally by the publish arm.
+    uint32_t zpatch_spawns_getmodulehandlew = 0;
+    // byte_10159C15: DebugPrintSpawns, read only inside the FreezeCarFix gate
+    // (`movzx ecx,[0x10159C15]; cmp esi,1; cmove ecx,1; mov [0x10159C15],cl`).
+    uint8_t zpatch_spawns_debug = 0;
+    // sub_10003E50 (source/shared.ixx), the original's own model-name hash.
+    uint32_t zpatch_spawns_resolver = 0;
+    // dword_1015AD78: the ped-model object array the probe walks. The original's
+    // loader preamble resolves it on every run, so this arm resolves it under its
+    // own gate too (the BadPlayerModelCrashFix arm carries the same slot for its
+    // own bodies).
+    uint32_t zpatch_spawns_ped_array = 0;
+
+    // The probe's diagnostic text, at the original's recovered strings: the two
+    // names, the module test, and the format each spawn class prints.
+    const wchar_t zpatch_spawns_gtac[] = L"GTAC.dll";
+    const char zpatch_spawns_fmt_car[] = "%s spawned a car (%s)";
+    const char zpatch_spawns_fmt_noncar[] = "%s spawned a non-car car (%s)";
+    const char zpatch_spawns_fmt_heli[] = "%s spawned a heli (%s)";
+    const char zpatch_spawns_fmt_nonheli[] = "%s spawned a non-heli heli (%s)";
+    const char zpatch_spawns_fmt_boat[] = "%s spawned a boat (%s)";
+    const char zpatch_spawns_fmt_nonboat[] = "%s spawned a non-boat boat (%s)";
+    const char zpatch_spawns_fmt_bike[] = "%s spawned a bike (%s)";
+    const char zpatch_spawns_fmt_nonbike[] = "%s spawned a non-bike bike (%s)";
+    const char zpatch_spawns_fmt_train[] = "%s spawned a train (%s)";
+    const char zpatch_spawns_fmt_nontrain[] = "%s spawned a non-train train (%s)";
+    const char zpatch_spawns_fmt_plane[] = "%s spawned a plane (%s)";
+    const char zpatch_spawns_fmt_nonplane[] = "%s spawned a non-plane plane (%s)";
+    const char zpatch_spawns_fmt_ped[] = "%s spawned a ped (%s)";
+    const char zpatch_spawns_fmt_nonped[] = "%s spawned a non-ped ped (%s)";
+    const char zpatch_spawns_fmt_vehicleobject[] = "%s spawned a vehicle object (%s)";
+    const char zpatch_spawns_fmt_object[] = "%s spawned an object (%s)";
+    const char zpatch_spawns_fmt_generic[] = "%s spawned (%s)";
+    const char zpatch_spawns_fmt_used_nonped[] = "%s used a non-ped model (%s)";
+}
+
+// The 38,455-entry name table the probe's name helper walks. This module needs its
+// own copy: source/stability.ixx owns the same recovered array for
+// BadPlayerModelCrashFix, and that arm registers it with the body registry only
+// when its own key is on, so FreezeCarFix cannot reach it. The data is recovered
+// (source/model_names.inc) and the lookup below is a C++ rebuild of sub_10003F00,
+// whose blocking instruction is the indexed absolute `push [0x100DE770 + esi*4]`
+// in a compiler-generated /GS frame.
+static const char* const kSpawnsModelNames[] = {
+#include "model_names.inc"
+};
+static_assert(sizeof(kSpawnsModelNames) / sizeof(kSpawnsModelNames[0]) == 0x9637,
+    "the recovered model-name table is the original's 38455 entries");
+
+namespace
+{
+    // sub_10003F00's payload, rebuilt: first table name whose game hash matches, or
+    // "**UNKNOWN**" on a miss (the original answers its own literal at 0x10128D20).
+    const char* SpawnsModelName(uint32_t hash)
+    {
+        using HashFn = uint32_t(__cdecl*)(const char*);
+        const auto hash_name = reinterpret_cast<HashFn>(zpatch_spawns_resolver);
+        for (uint32_t index = 0; index < 0x9637u; ++index)
+        {
+            if (hash_name(kSpawnsModelNames[index]) == hash)
+                return kSpawnsModelNames[index];
+        }
+        return "**UNKNOWN**";
+    }
+
+    // The original's native call block (sub_1005B290 / sub_1005B530 build it), and
+    // the one builder both wrappers share: zero the 0xA0 bytes, point the return and
+    // argument words at args, invoke the hash through the guarded entry, copy every
+    // pending record out and answer args[0]. The blocked instruction is the
+    // compiler's own frame; the block layout is the recovered one.
+    struct SpawnsNativeBlock final
+    {
+        uint32_t p_return;    // +0x00
+        uint32_t arg_count;   // +0x04
+        uint32_t p_args;      // +0x08
+        uint32_t out_count;   // +0x0C
+        uint32_t out_ptrs[4]; // +0x10
+        struct Record final { uint32_t value[3]; uint32_t padding; };
+        Record records[4];    // +0x20
+        uint32_t args[17];    // +0x60 (arg 0 is the return slot)
+    };
+
+    uint32_t SpawnsScriptCall(uint32_t hash, uint32_t nargs, const uint32_t* arguments)
+    {
+        SpawnsNativeBlock block{};
+        const auto base = static_cast<uint32_t>(
+            reinterpret_cast<uintptr_t>(&block.args[0]));
+        block.p_return = base;
+        block.p_args = base;
+        block.arg_count = nargs;
+        for (uint32_t index = 0; index < nargs && index < 17u; ++index)
+            block.args[index] = arguments[index];
+        Native::Invoke(hash, &block);
+        while (block.out_count != 0u)
+        {
+            --block.out_count;
+            auto* destination = reinterpret_cast<uint32_t*>(
+                static_cast<uintptr_t>(block.out_ptrs[block.out_count]));
+            const auto& source = block.records[block.out_count];
+            destination[0] = source.value[0];
+            destination[1] = source.value[1];
+            destination[2] = source.value[2];
+        }
+        return block.args[0];
+    }
+
+    // sub_1005B290 and sub_1005B530, rebuilt: the "who spawned it" script call (the
+    // original's hash is dword_101580C8, published by the loader's salt rule) and the
+    // chat print (fixed hash 0x79023CFC). Both take their one argument in EDX and are
+    // entered through the naked thunks below.
+    const char* SpawnsWho(uint32_t id)
+    {
+        return reinterpret_cast<const char*>(
+            static_cast<uintptr_t>(SpawnsScriptCall(Native::Salt(0x101580C8u), 1, &id)));
+    }
+
+    void SpawnsPrint(const char* text)
+    {
+        const auto argument = static_cast<uint32_t>(
+            reinterpret_cast<uintptr_t>(text));
+        SpawnsScriptCall(0x79023CFCu, 1, &argument);
+    }
+}
+
+// The probe's four helper entries. The original calls the compiler-generated
+// helpers directly (sub_10003F00 / sub_1005B290 / sub_1005B530 / sub_10001280); a
+// module interface cannot export a naked function, so the calls name these
+// four-to-six-byte thunks, which reach the rebuilt helper (or the formatter body
+// source/stability.ixx already proved) with the stack and registers untouched.
+// The call instruction itself stays the original's `E8 rel32`.
+static __declspec(naked) void SpawnsNameEntry()
+{
+    __asm
+    {
+        push ecx
+        call SpawnsModelName
+        add esp, 4
+        ret
+    }
+}
+
+static __declspec(naked) void SpawnsWhoEntry()
+{
+    __asm
+    {
+        push edx
+        call SpawnsWho
+        add esp, 4
+        ret
+    }
+}
+
+static __declspec(naked) void SpawnsPrintEntry()
+{
+    __asm
+    {
+        push edx
+        call SpawnsPrint
+        add esp, 4
+        ret
+    }
+}
+
+static __declspec(naked) void SpawnsFormatEntry()
+{
+    __asm
+    {
+        jmp DWORD PTR [zpatch_format_entry]
+    }
+}
+
+// sub_100372F0, recovered VA 0x100372F0 (16 instructions): the spawn guard. It
+// keeps the original callee's EBP frame and `ret 0Ch` cleanup.
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void SpawnsGuardBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        cmp DWORD PTR [zpatch_spawns_skip], 0
+        jne spawns_guard_taken
+        push DWORD PTR [ebp + 10h]
+        mov eax, DWORD PTR [zpatch_spawns_orig_b]
+        push DWORD PTR [ebp + 0Ch]
+        push DWORD PTR [ebp + 8]
+        call eax
+        mov DWORD PTR [zpatch_spawns_skip], 0
+        pop ebp
+        ret 0Ch
+    spawns_guard_taken:
+        xor eax, eax
+        mov DWORD PTR [zpatch_spawns_skip], eax
+        pop ebp
+        ret 0Ch
+    }
+}
+
+// The ten factory-dispatch thunks, recovered VAs 0x10037330..0x100374E0 (9
+// instructions each): the selector the probe dispatches on, the argument's sign
+// byte, and the site's own resume. Cases 1 (+0x3D) and 2 (+0x56) both set selector
+// 3 in the original bytes; kept 1:1.
+#define ZP_SPAWNS_CASE(name, selector, resume)                 \
+    static __declspec(naked) void name()                       \
+    {                                                          \
+        __asm push ebp                                         \
+        __asm mov ebp, esp                                     \
+        __asm mov ecx, DWORD PTR [ebp + 0Ch]                   \
+        __asm movsx eax, cl                                    \
+        __asm mov DWORD PTR [zpatch_spawns_kind], selector     \
+        __asm mov DWORD PTR [zpatch_spawns_class], eax         \
+        __asm mov DWORD PTR [ebp + 0Ch], ecx                   \
+        __asm pop ebp                                          \
+        __asm jmp DWORD PTR [resume]                           \
+    }
+
+ZP_SPAWNS_CASE(SpawnsCase0x24Body, 5, zpatch_spawns_case0_resume)
+ZP_SPAWNS_CASE(SpawnsCase0x3DBody, 3, zpatch_spawns_case1_resume)
+ZP_SPAWNS_CASE(SpawnsCase0x56Body, 3, zpatch_spawns_case2_resume)
+ZP_SPAWNS_CASE(SpawnsCase0x6FBody, 0, zpatch_spawns_case3_resume)
+ZP_SPAWNS_CASE(SpawnsCase0x88Body, 4, zpatch_spawns_case4_resume)
+ZP_SPAWNS_CASE(SpawnsCase0x9EBody, 6, zpatch_spawns_case5_resume)
+ZP_SPAWNS_CASE(SpawnsCase0xB4Body, 7, zpatch_spawns_case6_resume)
+ZP_SPAWNS_CASE(SpawnsCase0xCABody, 1, zpatch_spawns_case7_resume)
+ZP_SPAWNS_CASE(SpawnsCase0xE0Body, 2, zpatch_spawns_case8_resume)
+ZP_SPAWNS_CASE(SpawnsCase0xF6Body, 8, zpatch_spawns_case9_resume)
+
+#undef ZP_SPAWNS_CASE
+
+// sub_10037510, recovered VA 0x10037510 (394 instructions, 0x10037510..0x10037ABC):
+// the spawn probe, transcribed instruction for instruction from the original. It
+// is reached through nine of the arm's detours; ECX at the vtable +0Ch call is the
+// selector, exactly as the original leaves it.
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void SpawnsProbeBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        sub esp, 4Ch
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, ebp
+        mov DWORD PTR [ebp - 8], eax
+        push esi
+        mov esi, DWORD PTR [zpatch_spawns_ped_array]
+        xor eax, eax
+        push edi
+        mov edi, DWORD PTR [ebp + 8]
+        __emit 0x0F
+        __emit 0x1F
+        __emit 0x00
+    spawns_walk:
+        mov ecx, DWORD PTR [esi + eax * 4]
+        test ecx, ecx
+        je spawns_walk_next
+        cmp DWORD PTR [ecx + 3Ch], edi
+        je spawns_found
+    spawns_walk_next:
+        inc eax
+        cmp eax, 7918h
+        jl spawns_walk
+        or eax, 0FFFFFFFFh
+    spawns_dispatch:
+        mov ecx, DWORD PTR [zpatch_spawns_kind]
+        cwde
+        mov DWORD PTR [zpatch_spawns_kind], 0FFFFFFFFh
+        mov esi, DWORD PTR [esi + eax * 4]
+        cmp eax, -1
+        je spawns_original
+        test esi, esi
+        je spawns_original
+        cmp esi, 0Ch
+        je spawns_original
+        cmp esi, 0CDCDCDCDh
+        je spawns_original
+        mov eax, DWORD PTR [esi]
+        test eax, eax
+        je spawns_original
+        cmp eax, 0Ch
+        je spawns_original
+        cmp eax, 0CDCDCDCDh
+        je spawns_original
+        test ecx, ecx
+        jne spawns_case_heli
+        mov eax, DWORD PTR [eax + 0Ch]
+        call eax
+        cmp al, 5
+        jne spawns_noncar
+        cmp DWORD PTR [esi + 6Ch], 0
+        jne spawns_noncar
+        cmp BYTE PTR [zpatch_spawns_debug], 0
+        je spawns_original
+        push OFFSET zpatch_spawns_gtac
+        call DWORD PTR [zpatch_spawns_getmodulehandlew]
+        test eax, eax
+        je spawns_original
+        mov ecx, edi
+        call SpawnsNameEntry
+        mov edx, DWORD PTR [zpatch_spawns_class]
+        mov esi, eax
+        call SpawnsWhoEntry
+        push esi
+        push eax
+        push OFFSET zpatch_spawns_fmt_car
+        jmp spawns_print_spawned
+    spawns_found:
+        movzx eax, ax
+        jmp spawns_dispatch
+    spawns_noncar:
+        push OFFSET zpatch_spawns_gtac
+        call DWORD PTR [zpatch_spawns_getmodulehandlew]
+        test eax, eax
+        je spawns_suppress
+        mov ecx, edi
+        call SpawnsNameEntry
+        mov edx, DWORD PTR [zpatch_spawns_class]
+        mov esi, eax
+        call SpawnsWhoEntry
+        push esi
+        push eax
+        push OFFSET zpatch_spawns_fmt_noncar
+        jmp spawns_print_plain
+    spawns_case_heli:
+        cmp ecx, 1
+        jne spawns_case_boat
+        mov eax, DWORD PTR [eax + 0Ch]
+        call eax
+        cmp al, 5
+        jne spawns_nonheli
+        cmp DWORD PTR [esi + 6Ch], 4
+        jne spawns_nonheli
+        cmp BYTE PTR [zpatch_spawns_debug], 0
+        je spawns_original
+        push OFFSET zpatch_spawns_gtac
+        call DWORD PTR [zpatch_spawns_getmodulehandlew]
+        test eax, eax
+        je spawns_original
+        mov ecx, edi
+        call SpawnsNameEntry
+        mov edx, DWORD PTR [zpatch_spawns_class]
+        mov esi, eax
+        call SpawnsWhoEntry
+        push esi
+        push eax
+        push OFFSET zpatch_spawns_fmt_heli
+        jmp spawns_print_spawned
+    spawns_nonheli:
+        push OFFSET zpatch_spawns_gtac
+        call DWORD PTR [zpatch_spawns_getmodulehandlew]
+        test eax, eax
+        je spawns_suppress
+        mov ecx, edi
+        call SpawnsNameEntry
+        mov edx, DWORD PTR [zpatch_spawns_class]
+        mov esi, eax
+        call SpawnsWhoEntry
+        push esi
+        push eax
+        push OFFSET zpatch_spawns_fmt_nonheli
+        jmp spawns_print_plain
+    spawns_case_boat:
+        cmp ecx, 2
+        jne spawns_case_bike
+        mov eax, DWORD PTR [eax + 0Ch]
+        call eax
+        cmp al, 5
+        jne spawns_nonboat
+        cmp DWORD PTR [esi + 6Ch], 2
+        jne spawns_nonboat
+        cmp BYTE PTR [zpatch_spawns_debug], 0
+        je spawns_original
+        push OFFSET zpatch_spawns_gtac
+        call DWORD PTR [zpatch_spawns_getmodulehandlew]
+        test eax, eax
+        je spawns_original
+        mov ecx, edi
+        call SpawnsNameEntry
+        mov edx, DWORD PTR [zpatch_spawns_class]
+        mov esi, eax
+        call SpawnsWhoEntry
+        push esi
+        push eax
+        push OFFSET zpatch_spawns_fmt_boat
+        jmp spawns_print_spawned
+    spawns_nonboat:
+        push OFFSET zpatch_spawns_gtac
+        call DWORD PTR [zpatch_spawns_getmodulehandlew]
+        test eax, eax
+        je spawns_suppress
+        mov ecx, edi
+        call SpawnsNameEntry
+        mov edx, DWORD PTR [zpatch_spawns_class]
+        mov esi, eax
+        call SpawnsWhoEntry
+        push esi
+        push eax
+        push OFFSET zpatch_spawns_fmt_nonboat
+        jmp spawns_print_plain
+    spawns_case_bike:
+        cmp ecx, 6
+        jne spawns_case_train
+        mov eax, DWORD PTR [eax + 0Ch]
+        call eax
+        cmp al, 5
+        jne spawns_nonbike
+        cmp DWORD PTR [esi + 6Ch], 1
+        jne spawns_nonbike
+        cmp BYTE PTR [zpatch_spawns_debug], 0
+        je spawns_original
+        push OFFSET zpatch_spawns_gtac
+        call DWORD PTR [zpatch_spawns_getmodulehandlew]
+        test eax, eax
+        je spawns_original
+        mov ecx, edi
+        call SpawnsNameEntry
+        mov edx, DWORD PTR [zpatch_spawns_class]
+        mov esi, eax
+        call SpawnsWhoEntry
+        push esi
+        push eax
+        push OFFSET zpatch_spawns_fmt_bike
+        jmp spawns_print_spawned
+    spawns_nonbike:
+        push OFFSET zpatch_spawns_gtac
+        call DWORD PTR [zpatch_spawns_getmodulehandlew]
+        test eax, eax
+        je spawns_suppress
+        mov ecx, edi
+        call SpawnsNameEntry
+        mov edx, DWORD PTR [zpatch_spawns_class]
+        mov esi, eax
+        call SpawnsWhoEntry
+        push esi
+        push eax
+        push OFFSET zpatch_spawns_fmt_nonbike
+        jmp spawns_print_plain
+    spawns_case_train:
+        cmp ecx, 7
+        jne spawns_case_plane
+        mov eax, DWORD PTR [eax + 0Ch]
+        call eax
+        cmp al, 5
+        jne spawns_nontrain
+        cmp DWORD PTR [esi + 6Ch], 3
+        jne spawns_nontrain
+        cmp BYTE PTR [zpatch_spawns_debug], 0
+        je spawns_original
+        push OFFSET zpatch_spawns_gtac
+        call DWORD PTR [zpatch_spawns_getmodulehandlew]
+        test eax, eax
+        je spawns_original
+        mov ecx, edi
+        call SpawnsNameEntry
+        mov edx, DWORD PTR [zpatch_spawns_class]
+        mov esi, eax
+        call SpawnsWhoEntry
+        push esi
+        push eax
+        push OFFSET zpatch_spawns_fmt_train
+        jmp spawns_print_spawned
+    spawns_nontrain:
+        push OFFSET zpatch_spawns_gtac
+        call DWORD PTR [zpatch_spawns_getmodulehandlew]
+        test eax, eax
+        je spawns_suppress
+        mov ecx, edi
+        call SpawnsNameEntry
+        mov edx, DWORD PTR [zpatch_spawns_class]
+        mov esi, eax
+        call SpawnsWhoEntry
+        push esi
+        push eax
+        push OFFSET zpatch_spawns_fmt_nontrain
+        jmp spawns_print_plain
+    spawns_case_plane:
+        cmp ecx, 8
+        jne spawns_case_ped
+        mov eax, DWORD PTR [eax + 0Ch]
+        call eax
+        cmp al, 5
+        jne spawns_nonplane
+        cmp DWORD PTR [esi + 6Ch], 5
+        jne spawns_nonplane
+        cmp BYTE PTR [zpatch_spawns_debug], 0
+        je spawns_original
+        push OFFSET zpatch_spawns_gtac
+        call DWORD PTR [zpatch_spawns_getmodulehandlew]
+        test eax, eax
+        je spawns_original
+        mov ecx, edi
+        call SpawnsNameEntry
+        mov edx, DWORD PTR [zpatch_spawns_class]
+        mov esi, eax
+        call SpawnsWhoEntry
+        push esi
+        push eax
+        push OFFSET zpatch_spawns_fmt_plane
+        jmp spawns_print_spawned
+    spawns_nonplane:
+        push OFFSET zpatch_spawns_gtac
+        call DWORD PTR [zpatch_spawns_getmodulehandlew]
+        test eax, eax
+        je spawns_suppress
+        mov ecx, edi
+        call SpawnsNameEntry
+        mov edx, DWORD PTR [zpatch_spawns_class]
+        mov esi, eax
+        call SpawnsWhoEntry
+        push esi
+        push eax
+        push OFFSET zpatch_spawns_fmt_nonplane
+        jmp spawns_print_plain
+    spawns_case_ped:
+        cmp ecx, 3
+        jne spawns_case_object
+        mov eax, DWORD PTR [eax + 0Ch]
+        call eax
+        cmp al, 6
+        je spawns_ped_ok
+        push OFFSET zpatch_spawns_gtac
+        call DWORD PTR [zpatch_spawns_getmodulehandlew]
+        test eax, eax
+        je spawns_suppress
+        mov ecx, edi
+        call SpawnsNameEntry
+        mov edx, DWORD PTR [zpatch_spawns_class]
+        mov esi, eax
+        call SpawnsWhoEntry
+        push esi
+        push eax
+        push OFFSET zpatch_spawns_fmt_nonped
+        jmp spawns_print_plain
+    spawns_ped_ok:
+        cmp BYTE PTR [zpatch_spawns_debug], 0
+        je spawns_original
+        push OFFSET zpatch_spawns_gtac
+        call DWORD PTR [zpatch_spawns_getmodulehandlew]
+        test eax, eax
+        je spawns_original
+        mov ecx, edi
+        call SpawnsNameEntry
+        mov edx, DWORD PTR [zpatch_spawns_class]
+        mov esi, eax
+        call SpawnsWhoEntry
+        push esi
+        push eax
+        push OFFSET zpatch_spawns_fmt_ped
+        jmp spawns_print_spawned
+    spawns_case_object:
+        cmp ecx, 4
+        jne spawns_case_vehicleobject
+        mov eax, DWORD PTR [eax + 0Ch]
+        call eax
+        cmp al, 5
+        jne spawns_nonvehicleobject
+        push OFFSET zpatch_spawns_gtac
+        call DWORD PTR [zpatch_spawns_getmodulehandlew]
+        test eax, eax
+        je spawns_suppress
+        mov ecx, edi
+        call SpawnsNameEntry
+        mov edx, DWORD PTR [zpatch_spawns_class]
+        mov esi, eax
+        call SpawnsWhoEntry
+        push esi
+        push eax
+        push OFFSET zpatch_spawns_fmt_vehicleobject
+        jmp spawns_print_plain
+    spawns_nonvehicleobject:
+        cmp BYTE PTR [zpatch_spawns_debug], 0
+        je spawns_original
+        push OFFSET zpatch_spawns_gtac
+        call DWORD PTR [zpatch_spawns_getmodulehandlew]
+        test eax, eax
+        je spawns_original
+        mov ecx, edi
+        call SpawnsNameEntry
+        mov edx, DWORD PTR [zpatch_spawns_class]
+        mov esi, eax
+        call SpawnsWhoEntry
+        push esi
+        push eax
+        push OFFSET zpatch_spawns_fmt_object
+        jmp spawns_print_spawned
+    spawns_case_vehicleobject:
+        cmp ecx, 5
+        jne spawns_original
+        mov eax, DWORD PTR [eax + 0Ch]
+        call eax
+        cmp al, 6
+        je spawns_generic
+        push OFFSET zpatch_spawns_gtac
+        call DWORD PTR [zpatch_spawns_getmodulehandlew]
+        test eax, eax
+        je spawns_suppress
+        mov ecx, edi
+        call SpawnsNameEntry
+        mov edx, DWORD PTR [zpatch_spawns_class]
+        mov esi, eax
+        call SpawnsWhoEntry
+        push esi
+        push eax
+        push OFFSET zpatch_spawns_fmt_used_nonped
+    spawns_print_plain:
+        lea eax, [ebp - 4Ch]
+        push 40h
+        push eax
+        call SpawnsFormatEntry
+        add esp, 14h
+        lea edx, [ebp - 4Ch]
+        call SpawnsPrintEntry
+    spawns_suppress:
+        mov DWORD PTR [zpatch_spawns_skip], 1
+        xor eax, eax
+        pop edi
+        pop esi
+        mov ecx, DWORD PTR [ebp - 8]
+        xor ecx, ebp
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    spawns_generic:
+        cmp BYTE PTR [zpatch_spawns_debug], 0
+        je spawns_original
+        push OFFSET zpatch_spawns_gtac
+        call DWORD PTR [zpatch_spawns_getmodulehandlew]
+        test eax, eax
+        je spawns_original
+        mov ecx, edi
+        call SpawnsNameEntry
+        mov edx, DWORD PTR [zpatch_spawns_class]
+        mov esi, eax
+        call SpawnsWhoEntry
+        push esi
+        push eax
+        push OFFSET zpatch_spawns_fmt_generic
+    spawns_print_spawned:
+        lea eax, [ebp - 4Ch]
+        push 40h
+        push eax
+        call SpawnsFormatEntry
+        add esp, 14h
+        lea edx, [ebp - 4Ch]
+        call SpawnsPrintEntry
+    spawns_original:
+        mov eax, DWORD PTR [zpatch_spawns_orig_a]
+        push edi
+        call eax
+        mov ecx, DWORD PTR [ebp - 8]
+        add esp, 4
+        xor ecx, ebp
+        pop edi
+        pop esi
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
 // abi_collision_deadlock_walk, recovered VA 0x10005D80: the whole node-walk of
 // sub_4E6250 with an iteration cap in it. The walk is the game's own, instruction
 // for instruction -- the only additions are the counter word (zeroed at entry,
@@ -1848,6 +2547,160 @@ namespace
         }
     }
 
+    // FreezeCarFix / DebugPrintSpawns: the original's handler 0x10037C70 scans the
+    // primary signature first and wraps every other scan in its `if (result)`, so a
+    // miss on 1.0.0.0 / 1.0.4.0 / 1.0.0.4 installs nothing at all. The arm keeps
+    // that shape: the DebugPrintSpawns flag and the probe's operands are read here,
+    // before the install tier writes any site, and every resume is the target of the
+    // `E8` the install is about to overwrite.
+    void PublishFreezeCarFix()
+    {
+        if (!Loader::Enabled("FreezeCarFix"))
+            return;
+
+        // The original reads DebugPrintSpawns only inside this gate and only raises
+        // the flag (`movzx ecx,[0x10159C15]; cmp esi,1; cmove ecx,1; mov [...],cl`),
+        // so a value other than 1 leaves it at the BSS zero.
+        zpatch_spawns_debug = Catalogue::Read("DebugPrintSpawns") == 1 ? 1 : 0;
+        zpatch_spawns_getmodulehandlew = static_cast<uint32_t>(
+            reinterpret_cast<uintptr_t>(&GetModuleHandleW));
+        zpatch_spawns_resolver = static_cast<uint32_t>(Shared::ValueResolver());
+
+        auto primary = find_pattern("32 DB 8B 54 24 24 52 E8 ? ? ? ? 8B F0");
+        if (primary.empty())
+            return;
+
+        auto* primaryMatch = primary.get_first<std::byte>(0);
+        zpatch_spawns_orig_a = Rel32Target(primaryMatch, 8, 12);
+
+        // dword_1015AD78, the ped-model object array, is the operand four bytes
+        // before the original's own anchor (the same recovered read the
+        // BadPlayerModelCrashFix arm makes). It is a live VA: the loader has already
+        // relocated the image, and the dump relocates its copy too.
+        auto pedArray = find_pattern("85 C0 C6 44 24 0C 00 C6 44 24 0D 00 75 07");
+        if (!pedArray.empty())
+            zpatch_spawns_ped_array = *pedArray.get_first<uint32_t>(-4);
+
+        auto guard = find_pattern(
+            "8B 4C 24 28 8B 54 24 24 50 51 52 E8 ? ? ? ? 5F 5E 5D 5B");
+        if (!guard.empty())
+            zpatch_spawns_orig_b = Rel32Target(guard.get_first<std::byte>(0), 12, 16);
+
+        // The probe's ten jump-table arms: each site's own `call` target is the
+        // resume the thunk tail-jumps to, in case order 0..9.
+        auto dispatch = find_pattern("E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00");
+        if (!dispatch.empty())
+        {
+            auto* match = dispatch.get_first<std::byte>(0);
+            zpatch_spawns_case0_resume = Rel32Target(match, 37, 41);
+            zpatch_spawns_case1_resume = Rel32Target(match, 62, 66);
+            zpatch_spawns_case2_resume = Rel32Target(match, 87, 91);
+            zpatch_spawns_case3_resume = Rel32Target(match, 112, 116);
+            zpatch_spawns_case4_resume = Rel32Target(match, 137, 141);
+            zpatch_spawns_case5_resume = Rel32Target(match, 159, 163);
+            zpatch_spawns_case6_resume = Rel32Target(match, 181, 185);
+            zpatch_spawns_case7_resume = Rel32Target(match, 203, 207);
+            zpatch_spawns_case8_resume = Rel32Target(match, 225, 229);
+            zpatch_spawns_case9_resume = Rel32Target(match, 247, 251);
+        }
+    }
+
+    void InstallFreezeCarFix()
+    {
+        if (!Loader::Enabled("FreezeCarFix"))
+            return;
+
+        auto primary = find_pattern("32 DB 8B 54 24 24 52 E8 ? ? ? ? 8B F0");
+        if (primary.empty())
+            return;
+
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsProbeBody), 0x10037510u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsGuardBody), 0x100372F0u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0x24Body), 0x10037330u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0x6FBody), 0x10037390u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0xE0Body), 0x100373C0u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0x3DBody), 0x100373F0u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0x56Body), 0x10037420u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0x88Body), 0x10037450u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0x9EBody), 0x10037480u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0xF6Body), 0x100374B0u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0xB4Body), 0x100374E0u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0xCABody), 0x10037360u);
+
+        injector::MakeCALL(primary.get_first<std::byte>(7),
+            reinterpret_cast<void*>(&SpawnsProbeBody), true);
+
+        auto guard = find_pattern(
+            "8B 4C 24 28 8B 54 24 24 50 51 52 E8 ? ? ? ? 5F 5E 5D 5B");
+        if (!guard.empty())
+        {
+            injector::MakeCALL(guard.get_first<std::byte>(11),
+                reinterpret_cast<void*>(&SpawnsGuardBody), true);
+        }
+
+        struct SpawnCase final
+        {
+            std::ptrdiff_t dispatchOffset;
+            void (*body)();
+        };
+        constexpr SpawnCase kSpawnCases[] = {
+            { 0x24, &SpawnsCase0x24Body },
+            { 0x3D, &SpawnsCase0x3DBody },
+            { 0x56, &SpawnsCase0x56Body },
+            { 0x6F, &SpawnsCase0x6FBody },
+            { 0x88, &SpawnsCase0x88Body },
+            { 0x9E, &SpawnsCase0x9EBody },
+            { 0xB4, &SpawnsCase0xB4Body },
+            { 0xCA, &SpawnsCase0xCABody },
+            { 0xE0, &SpawnsCase0xE0Body },
+            { 0xF6, &SpawnsCase0xF6Body },
+        };
+
+        auto dispatch = find_pattern("E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00");
+        if (!dispatch.empty())
+        {
+            auto* match = dispatch.get_first<std::byte>(0);
+            for (const SpawnCase& spawn : kSpawnCases)
+            {
+                injector::MakeCALL(match + spawn.dispatchOffset,
+                    reinterpret_cast<void*>(spawn.body), true);
+            }
+        }
+
+        auto probeA = find_pattern("88 87 40 01 00 00 E8");
+        if (!probeA.empty())
+        {
+            injector::MakeCALL(probeA.get_first<std::byte>(6),
+                reinterpret_cast<void*>(&SpawnsProbeBody), true);
+        }
+
+        auto probeB = find_pattern("88 5C 24 1F 8B 54 24 28 52 E8");
+        if (!probeB.empty())
+        {
+            injector::MakeCALL(probeB.get_first<std::byte>(9),
+                reinterpret_cast<void*>(&SpawnsProbeBody), true);
+            injector::MakeCALL(probeB.get_first<std::byte>(254),
+                reinterpret_cast<void*>(&SpawnsProbeBody), true);
+        }
+
+        auto probeC = find_pattern("38 98 8C 00 00 00 75 2D 57 E8");
+        if (!probeC.empty())
+        {
+            injector::MakeCALL(probeC.get_first<std::byte>(9),
+                reinterpret_cast<void*>(&SpawnsProbeBody), true);
+        }
+
+        // The second row of the original's own table: a shorter prefix of the
+        // primary, installed at the same +7 site, so the write is the duplicate the
+        // original makes (17 rows, 16 distinct sites).
+        auto shortPrimary = find_pattern("32 DB 8B 54 24 24 52 E8");
+        if (!shortPrimary.empty())
+        {
+            injector::MakeCALL(shortPrimary.get_first<std::byte>(7),
+                reinterpret_cast<void*>(&SpawnsProbeBody), true);
+        }
+    }
+
     // CarPartsShadowFix's published resumes: the site's own bytes -- the `jle` it
     // would have run (match+2) and the loop exit that `jle` jumps to (match+0x45).
     // The shared detour is installed under either key, so the publish uses the same
@@ -2092,7 +2945,7 @@ namespace
         if (!Loader::Enabled("InfiniteCarBottomDistance"))
             return;
 
-        auto pattern = find_pattern("0F 2F D0 76 ? 0F 28 C2 EB ? 0F 2F CD");
+        auto pattern = find_pattern("0F 2F D0 76 25 0F 28 C2");
         if (pattern.empty())
             return;
 
@@ -2120,7 +2973,7 @@ namespace
         if (!Loader::Enabled("BikeFeetFix"))
             return;
 
-        auto pattern = find_pattern("39 82 ? ? ? ? 0F 85 ? ? ? ? 39 05");
+        auto pattern = find_pattern("39 82 54 13 00 00 0F 85 94 04 00 00");
         if (!pattern.empty())
             injector::MakeNOP(pattern.get_first(12), 12, true);
     }
@@ -2131,7 +2984,7 @@ namespace
         if (!Loader::Enabled("BikePhoneAnimsFix"))
             return;
 
-        auto pattern = find_pattern("80 BE ? ? ? ? ? 0F 85 ? ? ? ? 80 BE ? ? ? ? ? 0F 84 ? ? ? ? 83 3D");
+        auto pattern = find_pattern("80 BE 18 02 00 00 00 0F 85 36 01 00 00 80 BE");
         if (!pattern.empty())
             injector::MakeNOP(pattern.get_first(33), 6, true);
     }
@@ -2143,7 +2996,7 @@ namespace
         if (!Loader::Enabled("PipeBombDropIconSupport"))
             return;
 
-        auto pattern = find_pattern("83 7D ? ? 75 ? 8B 15");
+        auto pattern = find_pattern("83 7D 18 1C 75 14");
         if (!pattern.empty())
             injector::MakeNOP(pattern.get_first(-9), 9, true);
     }
@@ -2316,7 +3169,7 @@ namespace
         if (!Loader::Enabled("TeleportProtection"))
             return;
 
-        auto pattern = find_pattern("55 8B EC 83 E4 F8 51 53 8B 5D ? 56 57 6A 08");
+        auto pattern = find_pattern("55 8B EC 83 E4 F8 51 53 8B 5D 08 56 57 6A 08 8D 44 24 10 8B F1 8D 7B 04 50 8B CF C7 44 24 14 00");
         if (pattern.empty())
             return;
 
@@ -2670,6 +3523,7 @@ export void RegisterVehicles()
         PublishMovingPlaneParts();
         PublishGarageModelFix();
         PublishNoLiveryLimit();
+        PublishFreezeCarFix();
     };
     Loader::InstallEvent() += []
     {
@@ -2697,6 +3551,7 @@ export void RegisterVehicles()
         InstallMovingPlaneParts();
         InstallGarageModelFix();
         InstallNoLiveryLimit();
+        InstallFreezeCarFix();
     };
 
     // The bodies' recovered VAs, so the dump expresses each arm's branch in the

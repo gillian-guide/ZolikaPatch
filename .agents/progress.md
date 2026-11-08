@@ -1581,3 +1581,69 @@ which is why the address-based check is the strong one). `steer_consumer` and
 `ooc selftest: PASS`; `check_fault_dialogs.py` -> `12 test source(s), 0 failure(s)`.
 
 
+
+
+## 2026-11-08 - signature parity: the original handlers' own pattern strings
+
+The class: an arm rescans a *shortened* (or wildcarded) copy of the signature its
+handler scans. On 1.0.8.0 it happens to select the original's first match, so the
+per-build byte baselines cannot see it; on another build it selects a different
+function, and the arm patches a site the original never touches. The independent
+cross-check found four such arms (`.agents/rewrite/08-independent-crosscheck.md`
+§2.2/§3).
+
+**Changed:** `source/stability.ixx` (14 literals), `source/graphics.ixx` (2),
+`source/vehicles.ixx` (5) - each now the string the handler itself passes to its
+scanner (`0x100055C0`, `0x10046B30`, `0x10037290`, `0x10036FD0`, `0x10037070`,
+`0x10036F30`, `0x1003D7D0`, `0x100504B0`, `0x1001B0E0` ×3, `0x10045980`,
+`0x10037100`, `0x10023B30`, `0x10005B20` ×2, `0x10022D80`, `0x1001BDD0`,
+`0x1001BD60`, `0x1001BE40`, `0x10037170`). `tests/signatures.tsv` (21 rows
+corrected, including the stale relocated `68 34 EE DA 00` row of
+`IncreaseVehicleStructLimit`), `docs/parity.md` (new signature-parity section, one
+contract row, one Status bullet), `CMakeLists.txt` (ctest `zp_signature_parity`),
+new `tools/check_signature_parity.py`.
+
+- Four arms patched a different site off 1.0.8.0: `AimProjectileCrashFix`
+  (1.0.0.4/1.0.4.0 wrote at 0x1BC88/0x1ABD8; the original's only match is
+  0x5AC560/0x6E3150), `TryToSkipAllErrors` (1.0.0.0/1.0.0.4/1.0.4.0/1.1.1.0/1.1.2.0
+  wrote at 0x1FF800/0x3700/0x1E10/0x1E50/0x1E70; the original's only match is
+  0x55F60/0x53240/0x526B0/0x52700, and on 1.0.0.0 it has *no* match, so the original
+  writes nothing), `MPNikoCrashFix` (wrote `EB` on 1.0.0.0/1.0.0.4/1.0.4.0 where the
+  exact signature is absent) and `BlackscreenFix` (wrote `E9`+rel32 on
+  1.0.0.4/1.1.1.0/1.1.2.0 where it is absent).
+- The 17 other literals selected the same sites as the original's string on all nine
+  images (truncations and wildcards that never mattered), and are now the original's
+  strings too. First-hit anchors moved on exactly the four arms above; every other
+  arm's anchor is unchanged on every image.
+- Gate: none of the four handlers has a build ladder - it scans one signature and
+  tests the answer (`if (result)`), so the exact signature *is* the gate and a build
+  with no hit gets no write. That is now the arm's behaviour. The arm with a real
+  ladder in this area, `RemoveRGSCLoginRequirement` (`0x10045490`: primary signature,
+  else the fixed fallback site only when build == 9), already reproduced it.
+- Guard: `tools/check_signature_parity.py` maps each `find_pattern` literal to its
+  catalogue key, takes the key's original strings from `handler_table.json`,
+  `option_signatures.json` and (for keys neither covers) the ASI's own stored
+  strings, associates exact copies and loosenings, and requires the per-image hit
+  set (count and every RVA) to equal the original's on all nine images. Falsified
+  against the bug: before the fix it exits 1 with e.g. `GTAIV_1004: hit count 2 vs 1;
+  ours 2 hit(s), first RVA 0x1bc88, original 1 hit(s), first RVA 0x5ac560`; after it
+  exits 0 (132 measured, 0 mismatches, 0 loosenings, 100 derived anchors outside the
+  check). Re-shortening the Aim literal reproduces the failure.
+- The 1.0.8.0 dump is byte-identical across the change: the per-option dump with the
+  pre-fix strings and with the fixed strings both hash to
+  `E20AF4EAD811021BAB1D6475A3EC3E0900C9CDF341CD328515F7E76CC2845327`.
+
+**Gates:** build exit 0; ctest 22/22 (154-190 s); `parity_report.py 9` ->
+`98 closed / 0 open / 1 oracle-verified`; 6 -> `98/0/1`; 5 -> `97/1`
+(`CarDynamicShadowFix`'s documented baseline omission); 7 and 8 -> `97/1` (the
+`Patch7RemoveModChecks` attribution alias); 11, 12, 13 -> `98/0/1`; 1 can only be
+scored from its written per-option file (the dump's post-loop full-cell run faults at
+`NoImpostorHeightCutoff` by design) -> `96 closed, 2 open` (the CarDynamicShadow
+omission and the designed fault cell), every arm above closed. `verify_bodies` ->
+164 bodies, 0 failures; `zp_dump --ooc-selftest` PASS; `check_fault_dialogs` 12
+sources, 0 failures; `check_relocated_literals` 1781 hits, 0 findings;
+`crosscheck_reconstruction`: the four arms' disagreements are gone (build 1/5/6/12/13
+now zero different/ours-only; build 11's only difference is the documented
+SkipLauncher DFA-stage over-claim, 7/8's only recon-only key the Patch7 alias), and
+with the already-present `FreezeCarFix`/`VRAMFix` arms the reconstruction agrees with
+build 9 (89 confirmed, 0 different).

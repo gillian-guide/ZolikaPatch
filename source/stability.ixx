@@ -990,7 +990,7 @@ namespace
         if (!Loader::Enabled("MPNikoCrashFix"))
             return;
 
-        auto pattern = find_pattern("74 ? 57 E8 ? ? ? ? 8B BE ? ? ? ? 85 FF 74 ? 8B CF E8 ? ? ? ? 57 E8 ? ? ? ? 83 C4 04 C7 86 ? ? ? ? ? ? ? ? 5F 8B 86 ? ? ? ? 85 C0 74 ? 8D 48");
+        auto pattern = find_pattern("74 2B 57 E8 ? ? ? ? 8B BE A8 0E 00 00");
         if (!pattern.empty())
             injector::WriteMemory<std::byte>(pattern.get_first(0), Bytes::ShortJmp, true);
     }
@@ -1003,7 +1003,7 @@ namespace
         if (!Loader::Enabled("FreezeGunFix"))
             return;
 
-        auto pattern = find_pattern("2B C2 D1 F8 39 3C C6");
+        auto pattern = find_pattern("2B C2 D1 F8 39 3C C6 7D 0D 83 CA FF");
         if (pattern.empty())
             return;
 
@@ -1018,7 +1018,7 @@ namespace
         if (!Loader::Enabled("FreezeGunFix"))
             return;
 
-        auto pattern = find_pattern("2B C2 D1 F8 39 3C C6");
+        auto pattern = find_pattern("2B C2 D1 F8 39 3C C6 7D 0D 83 CA FF");
         if (pattern.empty())
             return;
 
@@ -1032,7 +1032,7 @@ namespace
         if (!Loader::Enabled("GroupHackFix"))
             return;
 
-        auto pattern = find_pattern("33 C0 83 C1 04 8D 50");
+        auto pattern = find_pattern("33 C0 83 C1 04 8D 50 07 83 39 00 75 06 83 79 04");
         if (pattern.empty())
             return;
 
@@ -1047,7 +1047,7 @@ namespace
         if (!Loader::Enabled("GroupHackFix"))
             return;
 
-        auto pattern = find_pattern("33 C0 83 C1 04 8D 50");
+        auto pattern = find_pattern("33 C0 83 C1 04 8D 50 07 83 39 00 75 06 83 79 04");
         if (pattern.empty())
             return;
 
@@ -1063,7 +1063,7 @@ namespace
         if (!Loader::Enabled("PathNodeCrashFix"))
             return;
 
-        auto pattern = find_pattern("8B 04 B1 0F B7 D0");
+        auto pattern = find_pattern("8B 04 B1 0F B7 D0 81 FA FF FF 00 00");
         if (pattern.empty())
             return;
 
@@ -1079,7 +1079,7 @@ namespace
         if (!Loader::Enabled("PathNodeCrashFix"))
             return;
 
-        auto pattern = find_pattern("8B 04 B1 0F B7 D0");
+        auto pattern = find_pattern("8B 04 B1 0F B7 D0 81 FA FF FF 00 00");
         if (pattern.empty())
             return;
 
@@ -1127,7 +1127,7 @@ namespace
         if (!Loader::Enabled("BlackscreenFix"))
             return;
 
-        auto pattern = find_pattern("75 ? 8B 48 ? 8B 40 ? 51 8B 0D");
+        auto pattern = find_pattern("75 54 8B 48 28 8B 40 2C");
         if (pattern.empty())
             return;
 
@@ -1144,7 +1144,7 @@ namespace
         if (!Loader::Enabled("BlackscreenFix"))
             return;
 
-        auto pattern = find_pattern("75 ? 8B 48 ? 8B 40 ? 51 8B 0D");
+        auto pattern = find_pattern("75 54 8B 48 28 8B 40 2C");
         if (pattern.empty())
             return;
 
@@ -1206,7 +1206,7 @@ namespace
         if (!Loader::Enabled("WantedLevelCrashFix"))
             return;
 
-        auto pattern = find_pattern("8B 01 8B 90 ? ? ? ? FF D2 84 C0 0F 84 ? ? ? ? 8B 83");
+        auto pattern = find_pattern("8B 01 8B 90 28 01 00 00 FF D2 84 C0 0F 84 88 00 00 00");
         if (pattern.empty())
             return;
 
@@ -1221,7 +1221,7 @@ namespace
         if (!Loader::Enabled("WantedLevelCrashFix"))
             return;
 
-        auto pattern = find_pattern("8B 01 8B 90 ? ? ? ? FF D2 84 C0 0F 84 ? ? ? ? 8B 83");
+        auto pattern = find_pattern("8B 01 8B 90 28 01 00 00 FF D2 84 C0 0F 84 88 00 00 00");
         if (pattern.empty())
             return;
 
@@ -1236,19 +1236,19 @@ namespace
         if (!Loader::Enabled("EpisodeSwitchFreezeFix"))
             return;
 
-        auto pattern = find_pattern("56 8B F1 83 7E ? ? 75 ? 83 7E ? ? 74");
+        auto pattern = find_pattern("56 8B F1 83 7E 14 00 75 0B 83 7E 10 00 74 05");
         if (pattern.empty())
             return;
         zpatch_episode_switch_resume_c = static_cast<uint32_t>(
             reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 7);
 
-        pattern = find_pattern("89 43 ? 8B 10 8B 52 ? 57 8D 4C 24 ? 51 8B C8 FF D2 83 F8 FF");
+        pattern = find_pattern("89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84");
         if (pattern.empty())
             return;
         zpatch_episode_switch_resume_a = static_cast<uint32_t>(
             reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 5);
 
-        pattern = find_pattern("8B 4B ? 3B 4B ? 7D");
+        pattern = find_pattern("8B 4B 10 3B 4B 14 7D 0F");
         if (pattern.empty())
             return;
         zpatch_episode_switch_resume_b = static_cast<uint32_t>(
@@ -1263,17 +1263,17 @@ namespace
         if (!Loader::Enabled("EpisodeSwitchFreezeFix"))
             return;
 
-        auto pattern = find_pattern("56 8B F1 83 7E ? ? 75 ? 83 7E ? ? 74");
+        auto pattern = find_pattern("56 8B F1 83 7E 14 00 75 0B 83 7E 10 00 74 05");
         if (pattern.empty())
             return;
         auto* shimC = pattern.get_first<std::byte>(0);
 
-        pattern = find_pattern("89 43 ? 8B 10 8B 52 ? 57 8D 4C 24 ? 51 8B C8 FF D2 83 F8 FF");
+        pattern = find_pattern("89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84");
         if (pattern.empty())
             return;
         auto* store = pattern.get_first<std::byte>(0);
 
-        pattern = find_pattern("8B 4B ? 3B 4B ? 7D");
+        pattern = find_pattern("8B 4B 10 3B 4B 14 7D 0F");
         if (pattern.empty())
             return;
         auto* shimB = pattern.get_first<std::byte>(0);
@@ -1392,7 +1392,7 @@ namespace
         if (!Loader::Enabled("SCOSignatureFix"))
             return;
 
-        auto pattern = find_pattern("8B 6C 24 ? 66 89 6E");
+        auto pattern = find_pattern("8B 6C 24 1C 66 89 6E 14 64 8B 0D 2C 00 00 00 8B");
         if (!pattern.empty())
             injector::WriteMemory<std::byte>(pattern.get_first(-32), Bytes::ShortJmp, true);
     }
@@ -1404,7 +1404,7 @@ namespace
         if (!Loader::Enabled("TryToSkipAllErrors"))
             return;
 
-        auto pattern = find_pattern("81 EC 40 08 00 00");
+        auto pattern = find_pattern("81 EC 40 08 00 00 53 55 8B AC 24 4C 08 00 00");
         if (!pattern.empty())
             injector::WriteMemory<std::byte>(pattern.get_first(0), Bytes::Ret, true);
     }
@@ -1416,7 +1416,7 @@ namespace
         if (!Loader::Enabled("RemoveAllWeaponsProtection"))
             return;
 
-        auto pattern = find_pattern("E9 ? ? ? ? 57 8D 8F");
+        auto pattern = find_pattern("E9 ? ? ? ? 57 8D 8F ? ? 00 00");
         if (!pattern.empty())
             injector::MakeNOP(pattern.get_first(5), 12, true);
     }
@@ -1446,7 +1446,7 @@ namespace
         if (!Loader::Enabled("HighFPSSpeedupFix"))
             return;
 
-        auto pattern = find_pattern("0F 2F C1 76 ? 0F 28 C8 F3 0F 10 15");
+        auto pattern = find_pattern("0F 2F C1 76 03 0F 28 C8 F3 0F 10 15");
         if (pattern.empty())
             return;
 
@@ -1466,7 +1466,7 @@ namespace
         if (!Loader::Enabled("AimProjectileCrashFix"))
             return;
 
-        auto pattern = find_pattern("8B 44 24 ? 89 41 ? 8B 44 24 ? 89 41");
+        auto pattern = find_pattern("8B 44 24 08 89 41 20 8B 44 24 0C 89 41 24 F7 D8");
         if (!pattern.empty())
         {
             Bodies::Register(reinterpret_cast<uintptr_t>(&AimProjectileShim), 0x10005590u);

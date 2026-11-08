@@ -308,6 +308,15 @@ if(Python3_Interpreter_FOUND)
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_relocated_literals.py
               --game ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs)
   endif()
+  # The other half of "does the scan mean what the original's does": a shortened
+  # copy of a handler's signature picks the original's first match on 1.0.8.0 and a
+  # different function elsewhere. This compares our per-image hit sets with the
+  # original handler's own signature (docs/parity.md, signature parity).
+  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/ZolikaPatch_original.asi.off)
+    add_test(NAME zp_signature_parity
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_signature_parity.py
+              --game ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs)
+  endif()
 endif()
 if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/EFLC_1110.exe)
   add_test(NAME zp_launcher_slots

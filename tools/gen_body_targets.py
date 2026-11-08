@@ -6,6 +6,13 @@ table maps that symbol to the original ASI VA. That pairing is the attribution:
 it comes from the reference's own code, not from decoding dump displacements,
 which cannot distinguish bodies (its canonicalisation collapses them).
 
+The arm is read as a *function block*, not line by line: an install call that
+wraps its `reinterpret_cast` onto the next line, or one that goes through a
+helper (`WriteCallNoRead`) or a `target = &abi_x` assignment, names its body
+just as directly as a one-line `MakeJMP`. A file-scope table the block iterates
+(`kSpawnCases`) is followed too, because the arm installs those bodies through
+it.
+
     python tools/gen_body_targets.py [--check]
 
 Writes `tests/body_targets.tsv`: key, body symbol, original VA.
@@ -21,9 +28,11 @@ TABLE = REFERENCE / "source" / "hook_bodies.cpp"
 SOURCES = REFERENCE / "source"
 OUTPUT = ROOT / "tests" / "body_targets.tsv"
 
-BODY_ROW = re.compile(r"^\s*([a-z0-9_]+)\s*=\s*(0x[0-9A-Fa-f]+)u,\s*//")
-FUNCTION = re.compile(r"^\s*(?:void|std::?)+\s+Apply([A-Za-z0-9_]+)\s*\(")
-JUMP = re.compile(r"Make(?:JMP|CALL)\([^,]+,\s*reinterpret_cast<void\s*\*>\(&(abi_[a-z0-9_]+)\)")
+BODY_ROW = re.compile(r"^\s*([A-Za-z0-9_]+)\s*=\s*(0x[0-9A-Fa-f]+)u,\s*//")
+FUNCTION = re.compile(r"\b(?:void|std::[A-Za-z0-9_:<>]+)\s+Apply([A-Za-z0-9_]+)\s*\([^;{]*\)\s*\{")
+BODY_REF = re.compile(r"&\s*(abi_[A-Za-z0-9_]+)\b")
+IDENTIFIER = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\b")
+COMMENT = re.compile(r"//[^\n]*")
 
 
 def bodies():
@@ -35,20 +44,47 @@ def bodies():
     return found
 
 
+def block_after(text, start):
+    """The brace-balanced block that opens at or after `start`, or ''."""
+    opening = text.find("{", start)
+    if opening < 0:
+        return ""
+    depth = 0
+    for index in range(opening, len(text)):
+        if text[index] == "{":
+            depth += 1
+        elif text[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[opening:index + 1]
+    return ""
+
+
+def table_bodies(text, name):
+    """The `&abi_...` symbols in the file-scope initializer of `name[]`."""
+    match = re.search(rf"\b{re.escape(name)}\s*\[[^\]]*\]\s*=\s*", text)
+    if not match:
+        return set()
+    return set(BODY_REF.findall(COMMENT.sub("", block_after(text, match.end()))))
+
+
 def arm_bodies():
     pairs = {}
     for path in sorted(SOURCES.glob("*.ixx")):
-        key = None
-        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-            function = FUNCTION.match(line)
-            if function:
-                key = function.group(1)
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for definition in FUNCTION.finditer(text):
+            key = definition.group(1)
+            block = COMMENT.sub("", block_after(text, definition.end() - 1))
+            if not block:
                 continue
-            if key is None:
-                continue
-            jump = JUMP.search(line)
-            if jump:
-                pairs.setdefault(key, set()).add(jump.group(1))
+            symbols = set(BODY_REF.findall(block))
+            # Follow a file-scope table the block iterates (`for (const SpawnCase&
+            # spawn : kSpawnCases)`), whose initializer names the bodies instead.
+            for identifier in set(IDENTIFIER.findall(block)):
+                if identifier.startswith("k") and text.count(identifier) > 1:
+                    symbols |= table_bodies(text, identifier)
+            for symbol in symbols:
+                pairs.setdefault(key, set()).add(symbol)
     return pairs
 
 

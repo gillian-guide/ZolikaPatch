@@ -4,7 +4,7 @@ Every other piece of this module is **transcribed**: a body is written instructi
 instruction from the original ASI, and `tools/verify_bodies.py` decodes the same
 instruction count on both sides and compares mnemonic, registers, memory shape and
 immediate *class*. That proof is what `tests/bodies.tsv` is for, and it currently
-covers **151 bodies**. A transcribed body whose original stream reads a table through
+covers **164 bodies**. A transcribed body whose original stream reads a table through
 an indexed absolute operand is provable too, because the tree registers the table and
 the comparator compares its *contents*: §1 and §2b describe that, and the model-name
 lookup (`0x10003F00`) is the first piece transcribed that way. §2c is the largest: the
@@ -207,7 +207,7 @@ six rows §2a adds bring the current total to 206). That check lives in
    transcription's mis-attached label (§2); it passes for the 125 rows of that pass
    (154 internal targets), for the 131 rows of §2a (206), for the 132 rows of §2b
    (208), for the 133 rows of §2c (228), for the 135 rows of §2b–§2d (249), for the
-   138 rows of §2b–§2g (292) and for today's 151 rows (321).
+   138 rows of §2b–§2g (292) and for today's 164 rows (321).
 
 **What remains unproven even for these six.** The bodies now execute only on the
 game's own calls, and no offline harness can make the game call them:
@@ -1021,7 +1021,7 @@ transcribed bodies name one short `_name` symbol.
    `PASS ooc_pak_page_count (6, 0)`, `PASS ooc_vector_begin (2, 0)`,
    `PASS ooc_vector_end (2, 0)`, `PASS ooc_vector_size (9, 0)`,
    `PASS ooc_vector_clear (11, 0)` and `PASS ooc_entry_name (6, 0)`, and
-   `python tools/verify_bodies.py …` → `151 body(ies), 0 failure(s)`.
+   `python tools/verify_bodies.py …` → `164 body(ies), 0 failure(s)`.
 2. **Byte comparison** (`.scratch/ooc_builder/compare.py`): 392 of 439 instructions
    byte-identical, every body the original's exact byte size, `slot 47, branch 0,
    other 0`.
@@ -1041,7 +1041,7 @@ transcribed bodies name one short `_name` symbol.
    `fnv1a 0xB5AF7B10` and the header's `16`/`0xE9` words, from the decoded table whose
    `fnv1a` is `0xC883859F`. That is a behavioural proof of the whole builder, not only
    a shape proof — the strongest evidence any piece in this file has.
-5. **The branch targets.** `151 row(s), 321 internal branch target(s), 0 failure(s)`.
+5. **The branch targets.** `164 row(s), 321 internal branch target(s), 0 failure(s)`.
 6. **The surrounding behaviour is unchanged.** `ctest --preset release` is 12/12,
    `python tools/parity_report.py 9` is `98 key(s) closed, 0 open, 1
    oracle-verified`, and `OutOfCommissionFix`'s two arm writes are the same bytes as
@@ -1185,7 +1185,7 @@ layout.
 **Gates.** `cmake --build --preset release` exit 0; `ctest --preset release` 13/13 (the
 new test is `zp_save_walk`, 258 checks, 0 failures); `python tools/parity_report.py 9` →
 `build 9: 98 key(s) closed, 0 open, 1 oracle-verified (baseline incomplete)`;
-`python tools/verify_bodies.py …` → `151 body(ies), 0 failure(s)`;
+`python tools/verify_bodies.py …` → `164 body(ies), 0 failure(s)`;
 `zp_dump --ooc-selftest` → `ooc selftest: PASS`.
 
 **What stays unproven, and it is still most of the risk.** The test proves the *decision*,
@@ -1285,7 +1285,7 @@ block (measured: `0x8` to `0x10` on this heap).
 **Gates.** `cmake --build --preset release` exit 0; `ctest --preset release` 15/15 twice
 (the new test is `zp_nms_arena`, 246 checks, 0 failures);
 `python tools/parity_report.py 9` → `build 9: 98 key(s) closed, 0 open, 1
-oracle-verified (baseline incomplete)`; `python tools/verify_bodies.py …` → `151
+oracle-verified (baseline incomplete)`; `python tools/verify_bodies.py …` → `164
 body(ies), 0 failure(s)`; `zp_dump --ooc-selftest` → `ooc selftest: PASS`.
 
 **What stays unproven.**
@@ -1370,7 +1370,7 @@ state a call changes is the state the game's own call changes. The clear takes i
 `ooc_build_done` does. **None of this reaches the shipped image**: the namespace's entries
 have no caller inside the ASI and no PE export, so `/OPT:REF` drops them — the linker map
 has no `OocInit` symbol at all — while the test links the same object file and calls them.
-The shipped ASI's write set and its 151 proof rows are unchanged with the seam in the tree
+The shipped ASI's write set and its 164 proof rows are unchanged with the seam in the tree
 (`zp_dump_empty`, `zp_body_proof`).
 
 **The measurement that makes "twice" a count, not an impression.** `OocAllocate` is
@@ -1429,7 +1429,7 @@ checks; both are what the original's discarded answer makes possible.
 **Gates.** `cmake --build --preset release` exit 0; `ctest --preset release` 19/19 twice
 (the new test is `zp_ooc_init`, 54 checks, 0 failures); `python tools/parity_report.py 9` →
 `build 9: 98 key(s) closed, 0 open, 1 oracle-verified (baseline incomplete)`;
-`python tools/verify_bodies.py …` → `151 body(ies), 0 failure(s)`; `zp_dump --ooc-selftest`
+`python tools/verify_bodies.py …` → `164 body(ies), 0 failure(s)`; `zp_dump --ooc-selftest`
 → `ooc selftest: PASS`; `python tools/check_fault_dialogs.py` → `0 failure(s)`.
 
 **What stays unproven.**
@@ -1649,7 +1649,7 @@ the except clause: `.scratch/dfa_close/publish_check.py` disassembles the built
 reaches the shipped image**: the seam has no caller inside the ASI and no PE export, so
 `/OPT:REF` drops it — `ZolikaPatch.map` has 0 occurrences of `DfaBodiesForTest`, of the
 `DfaBodies` type and of the helper — while the test links the same object file and calls
-them. The write set and the 151 proof rows are unchanged.
+them. The write set and the 164 proof rows are unchanged.
 
 **The test can fail.** Two mutations, each reverted:
 
@@ -1669,7 +1669,7 @@ them. The write set and the 151 proof rows are unchanged.
 **Gates.** `cmake --build --preset release` exit 0; `ctest --preset release` 20/20 twice
 (the new test is `zp_dfa_close`, 27 checks, 0 failures, 1.3 s including the watchdog);
 `python tools/parity_report.py 9` → `build 9: 98 key(s) closed, 0 open, 1 oracle-verified
-(baseline incomplete)`; `python tools/verify_bodies.py …` → `151 body(ies), 0 failure(s)`;
+(baseline incomplete)`; `python tools/verify_bodies.py …` → `164 body(ies), 0 failure(s)`;
 `zp_dump --ooc-selftest` → `ooc selftest: PASS`; `python tools/check_fault_dialogs.py` →
 `12 test source(s), 0 failure(s)`.
 
@@ -2093,7 +2093,7 @@ caller to read them.
 
 **Gates.** `cmake --build --preset release` exit 0; `ctest --preset release` 20/20 twice;
 `python tools/parity_report.py 9` → `build 9: 98 key(s) closed, 0 open, 1
-oracle-verified (baseline incomplete)`; `python tools/verify_bodies.py …` → `151
+oracle-verified (baseline incomplete)`; `python tools/verify_bodies.py …` → `164
 body(ies), 0 failure(s)`; `zp_dump --ooc-selftest` → `ooc selftest: PASS`;
 `python tools/check_fault_dialogs.py` → `12 test source(s), 0 failure(s)`.
 
@@ -2224,7 +2224,7 @@ which the rebuild already reproduces.
    it is `tools/verify_bodies.py::internal_branch_mismatch`, it runs on every row, and
    it is what §2a's six transcriptions were proved with. `.scratch/branch_targets.py`
    stays as the independent reference implementation (it skips the `table` rows); the
-   two agree at `151 row(s), 321 internal branch target(s), 0 failure(s)`.
+   two agree at `164 row(s), 321 internal branch target(s), 0 failure(s)`.
 
 ---
 
@@ -2325,7 +2325,7 @@ deliberately after any change to the modules above.
 
 ## 6. Where the numbers live
 
-- `tests/bodies.tsv` — the 151 proof rows; a row's count is the body's exact
+- `tests/bodies.tsv` — the 164 proof rows; a row's count is the body's exact
   instruction count, so it cannot silently shrink. Its `table` rows are the offline
   projection of the arms' `Bodies::RegisterTable` calls (recovered VA, candidate
   symbol, registered length), one per table a transcribed body reads; a symbol may be

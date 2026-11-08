@@ -3,8 +3,12 @@
 AimProjectileCrashFix	abi_aim_projectile_crash_fix	10005590
 AllowHashesForIDE	abi_game_hash	10003E50
 BadPlayerModelCrashFix	abi_bad_player_model	10037BA0
+BenchmarkFix	abi_benchmark_a	10005650
+BenchmarkFix	abi_benchmark_b	10005670
 BetterMPSync	abi_better_mp_sync	100057F0
 BlackscreenFix	abi_blackscreen_shim	10036EE0
+BorderlessWindowed	abi_borderless_a	10005900
+BorderlessWindowed	abi_borderless_w	10005890
 BuildingDynamicShadows	abi_building_dynamic_shadows	10005AF0
 CarDecalsFix	abi_car_decals_fix	1001B2E0
 CarDynamicShadowFix	abi_carparts_shadow_2	100068A0
@@ -27,6 +31,16 @@ EpisodeSwitchFreezeFix	abi_episode_switch_store_shim	1001B040
 EpisodeSwitchFreezeFix	abi_episode_switch_sum	1001B080
 EpisodeSwitchFreezeFix	abi_episode_switch_vcall	1001B0A0
 ForceCarHeadlightShadows	abi_fchs_shim	1001ADB0
+FreezeCarFix	abi_spawns_case_0x24	10037330
+FreezeCarFix	abi_spawns_case_0x3D	100373F0
+FreezeCarFix	abi_spawns_case_0x56	10037420
+FreezeCarFix	abi_spawns_case_0x6F	10037390
+FreezeCarFix	abi_spawns_case_0x88	10037450
+FreezeCarFix	abi_spawns_case_0x9E	10037480
+FreezeCarFix	abi_spawns_case_0xB4	100374E0
+FreezeCarFix	abi_spawns_case_0xCA	10037360
+FreezeCarFix	abi_spawns_case_0xE0	100373C0
+FreezeCarFix	abi_spawns_case_0xF6	100374B0
 FreezeCarFix	abi_spawns_guard	100372F0
 FreezeCarFix	abi_spawns_probe	10037510
 FreezeGunFix	abi_freeze_gun_shim	10036EB0
@@ -35,6 +49,10 @@ GarageModelFix	abi_garage_body_b	10046CA0
 GroupHackFix	abi_group_hack_shim	10036E90
 HighFPSBikePhysicsFix	abi_bike_physics_detour	1001EF60
 HighQualityReflections	abi_hqr_body	1001F030
+ImprovedShaderStreaming	abi_improved_shader_streaming_find_hpe	10045A30
+ImprovedShaderStreaming	abi_improved_shader_streaming_find_v	10045A80
+LoadDLCs	abi_load_dlcs_dummy	10023480
+LoadDLCs	abi_load_dlcs_struct_fixup	10023490
 LocalSettingsPath	abi_local_settings_detour	100512F0
 LocalSettingsPath	abi_local_settings_fallback_detour	10051300
 MouseFix	abi_mouse_advance	100243A0
@@ -79,5 +97,6 @@ SpeedupBugFix	abi_speedup_body	10050540
 SteerSites	abi_copsirens_ide	100040E0
 SteerSites	abi_steer_detour_eax	100051B0
 SteerSites	abi_steer_detour_edx	100051E0
+SuperLODFix	abi_super_lod_fix_shim	100469E0
 VRAMFix	abi_vram_fix_shim	1004AAB0
 WantedLevelCrashFix	abi_wanted_level_shim	10050490
