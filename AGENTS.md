@@ -67,6 +67,13 @@ a full-cell difference to keys) and `tools/compare_dumps.py`.
   `ZolikaPatch.trace.log` next to the ASI in the format the parity tools read.
 - **A check is never deleted or weakened to get green.** If a check is wrong,
   say why and strengthen it.
+- **Readable first, assembly in a marked tail.** Each module reads: header, published
+  state with the original's addresses, plain C++ helpers, Publish<Key>, Install<Key>,
+  Register<Key>, then a Transcribed bodies section holding every __asm block and
+  naked body. A body used above its definition gets a plain static prototype - MSVC
+  rejects __declspec(naked) on a declaration (C2488) - and only the definition in the
+  tail keeps the attribute. Registration order inside Register<Key> is behavioural and
+  never changes: arms that touch the same site depend on it.
 
 ## Build and test
 

@@ -47,6 +47,7 @@ static_assert(sizeof(kBadPlayerModelNames) / sizeof(kBadPlayerModelNames[0]) == 
 // The published state of the arms below, in C linkage because the transcribed
 // code names the slots directly (the original keeps them in its own .bss beside
 // its bodies).
+
 extern "C"
 {
     uint32_t zpatch_freeze_gun_resume = 0;  // dword_1015AD64
@@ -127,6 +128,7 @@ extern "C"
 // module name the GTAC.dll test asks for (0x1012C71C), the diagnostic format
 // (0x1012CDD8), the fallback model name the payload hashes (0x100A0E78) and the
 // name table's miss answer (0x10128D20).
+
 extern "C"
 {
     const wchar_t zpatch_bpm_gtac[] = L"GTAC.dll";
@@ -134,6 +136,703 @@ extern "C"
     const char zpatch_bpm_multiplayer[] = "m_y_multiplayer";
     const char zpatch_bpm_unknown[] = "**UNKNOWN**";
 }
+
+// The transcribed bodies are defined in the tail of this file. MSVC rejects a
+// __declspec(naked) declaration (C2488: "'naked' can only be applied to non-member
+// function definitions"), so the readable code above them takes each body's address
+// through one of these accessors; their definitions follow the bodies.
+static uintptr_t AimProjectileShimAddress();
+static uintptr_t Smpa60ShimAddress();
+static uintptr_t Smpa60TailShimAddress();
+static uintptr_t WantedLevelShimAddress();
+static uintptr_t EpisodeSwitchStoreShimAddress();
+static uintptr_t EpisodeSwitchShimBAddress();
+static uintptr_t EpisodeSwitchShimCAddress();
+static uintptr_t EpisodeSwitchSumAddress();
+static uintptr_t EpisodeSwitchVcallAddress();
+static uintptr_t PlaneCrashShimAddress();
+static uintptr_t CrashMsgShimAddress();
+static uintptr_t BlackscreenShimAddress();
+static uintptr_t PathNodeShimAddress();
+static uintptr_t GroupHackShimAddress();
+static uintptr_t FreezeGunShimAddress();
+static uintptr_t BpmFormatAddress();
+static uintptr_t BpmModelNameBodyAddress();
+static uintptr_t BpmWhoBodyAddress();
+static uintptr_t BpmPrintBodyAddress();
+static uintptr_t BpmCheckBodyAddress();
+static uintptr_t BpmTrampolineAddress();
+
+// The block zeroing the wrappers open with. The original calls the CRT `memset`
+// through its IAT thunk (0x10060D6E) with the same argument order; the inline
+// assembler rejects a direct call to the intrinsic's name, so the call names this
+// cdecl forwarder, which is still one `E8`.
+static void __cdecl BpmZeroBlock(void* destination, int value, unsigned int count)
+{
+    std::memset(destination, value, count);
+}
+
+namespace
+{
+    // The thunk the CrashMsgFix anchor's -4 points at. The operand is a 32-bit VA of
+    // the image *as loaded*: the loader has already applied the image's relocations
+    // before this runs, so it is a live address and the cast is the whole
+    // conversion. The offline dump relocates its own copy (tests/dump_main.cpp), so
+    // the same identity holds there; rebasing through the preferred base would move
+    // the thunk by the run's whole relocation distance.
+    std::byte* CrashMsgSite()
+    {
+        auto pattern = find_pattern("68 6A 10 4E 31");
+        if (pattern.empty())
+            return nullptr;
+
+        return reinterpret_cast<std::byte*>(
+            static_cast<uintptr_t>(*pattern.get_first<uint32_t>(-4)));
+    }
+
+    // HighFPSSpeedupFix: the nine frame-time clamps inside CTimer::Update. One
+    // becomes a short jump (skipping the following test), the other eight are
+    // two-byte NOPs.
+    struct SpeedupSite final
+    {
+        ptrdiff_t offset;
+        bool shortJump;
+    };
+    constexpr SpeedupSite kSpeedupSites[] = {
+        { -7, false },
+        { 3, false },
+        { 224, true },
+        { 231, false },
+        { 367, false },
+        { 377, false },
+        { 607, false },
+        { 614, false },
+        { 764, false },
+    };
+
+    // The address of a body another module transcribed, by its recovered VA. The
+    // native-call layer publishes only its C entries, and a module interface cannot
+    // export a naked function, so the body registry is what makes its pieces
+    // reachable from here.
+    uint32_t RegisteredBody(uint32_t reference)
+    {
+        for (const auto& entry : Bodies::All())
+        {
+            if (entry.reference == reference)
+                return static_cast<uint32_t>(entry.address);
+        }
+        return 0;
+    }
+}
+
+namespace
+{
+    // FreezeGunFix's published resume: the anchor's -12 (the instruction after the
+    // `push edi` the body replays). It reads the site the install overwrites, so it
+    // belongs to the publish tier.
+    void PublishFreezeGunFix()
+    {
+        if (!Loader::Enabled("FreezeGunFix"))
+            return;
+
+        auto pattern = find_pattern("2B C2 D1 F8 39 3C C6 7D 0D 83 CA FF");
+        if (pattern.empty())
+            return;
+
+        zpatch_freeze_gun_resume = static_cast<uint32_t>(
+            reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) - 12);
+    }
+
+    // GroupHackFix's published resume: the anchor's +11 (the loop's `jnz`).
+    void PublishGroupHackFix()
+    {
+        if (!Loader::Enabled("GroupHackFix"))
+            return;
+
+        auto pattern = find_pattern("33 C0 83 C1 04 8D 50 07 83 39 00 75 06 83 79 04");
+        if (pattern.empty())
+            return;
+
+        zpatch_group_hack_resume = static_cast<uint32_t>(
+            reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 11);
+    }
+
+    // PathNodeCrashFix's published resumes: the anchor itself (the walk's next
+    // iteration) and the anchor's +59 (the `jz` the original test sets the flags
+    // for).
+    void PublishPathNodeCrashFix()
+    {
+        if (!Loader::Enabled("PathNodeCrashFix"))
+            return;
+
+        auto pattern = find_pattern("8B 04 B1 0F B7 D0 81 FA FF FF 00 00");
+        if (pattern.empty())
+            return;
+
+        const auto match = reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0));
+        zpatch_path_node_resume_ok = static_cast<uint32_t>(match);
+        zpatch_path_node_resume_fail = static_cast<uint32_t>(match + 59);
+    }
+
+    // PlaneCrashFix's published resumes: the normal one is the anchor's +14 (after
+    // the vtable read the body replays), the null one is the anchor's -705, the head
+    // of the same function.
+    void PublishPlaneCrashFix()
+    {
+        if (!Loader::Enabled("PlaneCrashFix"))
+            return;
+
+        auto pattern = find_pattern("83 C4 04 88 58 26 8B 16 8B 82 F4 00 00 00");
+        if (pattern.empty())
+            return;
+
+        const auto match = reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0));
+        zpatch_plane_crash_resume_b = static_cast<uint32_t>(match + 14);
+        zpatch_plane_crash_resume_a = static_cast<uint32_t>(match - 705);
+    }
+
+    // BlackscreenFix's published state: the resume is the tail jump's own target and
+    // the value slot is the dword the resume's first instruction loads. Both are read
+    // from the site before the install overwrites the jump.
+    void PublishBlackscreenFix()
+    {
+        if (!Loader::Enabled("BlackscreenFix"))
+            return;
+
+        auto pattern = find_pattern("75 54 8B 48 28 8B 40 2C");
+        if (pattern.empty())
+            return;
+
+        const auto match = reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0));
+        zpatch_blackscreen_resume =
+            static_cast<uint32_t>(match + 86 + *pattern.get_first<int32_t>(82));
+        zpatch_blackscreen_value_ptr =
+            *reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(zpatch_blackscreen_resume) + 1);
+    }
+
+    // CrashMsgFix's published getter: the target of the branch at the thunk's entry,
+    // whose displacement is at +1 and is measured from +5.
+    void PublishCrashMsgFix()
+    {
+        if (!Loader::Enabled("CrashMsgFix"))
+            return;
+
+        std::byte* site = CrashMsgSite();
+        if (site == nullptr)
+            return;
+
+        zpatch_crash_msg_getter = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(site) + 5 +
+            *reinterpret_cast<const int32_t*>(site + 1));
+    }
+
+    // WantedLevelCrashFix's published resume: the anchor's +12 (the `jz` its
+    // `test al,al` feeds).
+    void PublishWantedLevelCrashFix()
+    {
+        if (!Loader::Enabled("WantedLevelCrashFix"))
+            return;
+
+        auto pattern = find_pattern("8B 01 8B 90 28 01 00 00 FF D2 84 C0 0F 84 88 00 00 00");
+        if (pattern.empty())
+            return;
+
+        zpatch_wanted_level_resume = static_cast<uint32_t>(
+            reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 12);
+    }
+
+    // EpisodeSwitchFreezeFix's published resumes: the ECX reader's +7, the archive
+    // store's +5 and the EBX reader's +6, read from the sites the install overwrites.
+    void PublishEpisodeSwitchFreezeFix()
+    {
+        if (!Loader::Enabled("EpisodeSwitchFreezeFix"))
+            return;
+
+        auto pattern = find_pattern("56 8B F1 83 7E 14 00 75 0B 83 7E 10 00 74 05");
+        if (pattern.empty())
+            return;
+        zpatch_episode_switch_resume_c = static_cast<uint32_t>(
+            reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 7);
+
+        pattern = find_pattern("89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84");
+        if (pattern.empty())
+            return;
+        zpatch_episode_switch_resume_a = static_cast<uint32_t>(
+            reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 5);
+
+        pattern = find_pattern("8B 4B 10 3B 4B 14 7D 0F");
+        if (pattern.empty())
+            return;
+        zpatch_episode_switch_resume_b = static_cast<uint32_t>(
+            reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 6);
+    }
+
+    // SMPA60Fix's published resumes: the tail shim's resume is the primary anchor's
+    // +136, and the streaming loop's loader call is the second anchor, whose sentinel
+    // path and normal path use +28 and +14.
+    void PublishSMPA60Fix()
+    {
+        if (!Loader::Enabled("SMPA60Fix"))
+            return;
+
+        auto pattern = find_pattern("01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C");
+        if (pattern.empty())
+            return;
+
+        zpatch_smpa60_resume_c = static_cast<uint32_t>(
+            reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 136);
+
+        pattern = find_pattern("8B 48 70 83 C0 40 50 51 8D 51 10");
+        if (pattern.empty())
+            return;
+
+        const auto shim = reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0));
+        zpatch_smpa60_resume_a = static_cast<uint32_t>(shim + 28);
+        zpatch_smpa60_resume_b = static_cast<uint32_t>(shim + 14);
+    }
+
+    // PlayerAsPedComponentsFix's published resume: the anchor's +14 (the
+    // `add ecx,80h` after the two pushes the shim replays).
+    void PublishPlayerAsPedComponentsFix()
+    {
+        if (!Loader::Enabled("PlayerAsPedComponentsFix"))
+            return;
+
+        auto pattern = find_pattern("8B 54 24 10 52 0F B6 90 19 02 00 00");
+        if (pattern.empty())
+            return;
+
+        Shared::PublishPlayerPedComponentsResume(static_cast<uint32_t>(
+            reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 14));
+    }
+
+    // BadPlayerModelCrashFix's published state, read before the install overwrites
+    // the site: the resume is the site's +10 (the `mov ebx,[ebp+0Ch]` the jump
+    // covers). The rest is what the original's unconditional loader preamble
+    // resolves on every run and this key's bodies read -- the ped array, the
+    // model-class lookup, and the three hash salts whose build probe decides - plus
+    // the addresses of the layer pieces the transcribed wrappers call.
+    void PublishBadPlayerModelCrashFix()
+    {
+        if (!Loader::Enabled("BadPlayerModelCrashFix"))
+            return;
+
+        auto pattern = find_pattern("83 E4 F0 83 EC 54 0F 57 C0 53 8B 5D 0C");
+        if (pattern.empty())
+            return;
+
+        zpatch_bpm_resume = static_cast<uint32_t>(
+            reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 10);
+
+        // dword_1015AD78: the ped-model object array, the absolute operand four
+        // bytes before the original's own anchor (game 0x49EC0F). The operand is a
+        // live VA -- the loader has already relocated the image, and the offline
+        // dump relocates its copy too -- so the captured dword is the address.
+        pattern = find_pattern("85 C0 C6 44 24 0C 00 C6 44 24 0D 00 75 07");
+        if (!pattern.empty())
+            zpatch_bpm_ped_array = *pattern.get_first<uint32_t>(-4);
+
+        // dword_10159C74: the model-class lookup the fallback calls, the
+        // original's anchor - 42 (game 0xB191D0).
+        pattern = find_pattern("85 F6 74 30 8B 16 8B 42 0C 8B CE FF D0 3C 02 75 23");
+        if (!pattern.empty())
+        {
+            zpatch_bpm_fn_59c74 = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) - 42);
+        }
+
+        // The build probe. The original's loader installs its ten fallback hash
+        // salts only when this pattern is absent (0x10052E1A jumps the ten stores
+        // on a hit), so on 1.0.8.0 the shipped .data values stand. The two salts
+        // this key's own bodies read are seeded with those; a missed probe
+        // substitutes the recovered fallback set. The third, dword_101580B8, is
+        // the native layer's resolved slot (source/native.ixx).
+        pattern = find_pattern("68 ? ? ? ? 68 A9 54 14 51 E8");
+        if (pattern.empty())
+        {
+            zpatch_bpm_salt_c8 = 0x406B4B20u;
+            zpatch_bpm_salt_40 = 0xC9DBDA90u;
+        }
+
+        // 0x10063074: the original's GetModuleHandleW slot, which its GTAC.dll
+        // test calls through.
+        zpatch_bpm_getmodulehandle = static_cast<uint32_t>(
+            reinterpret_cast<uintptr_t>(&GetModuleHandleW));
+
+        // The layer's transcribed pieces, by their recovered VAs. The wrapper is
+        // the layer's copy of sub_1005B3F0; only one body can carry that recovered
+        // VA, so this arm does not register a second one.
+        zpatch_bpm_context_init = RegisteredBody(0x100038C0u);
+        zpatch_bpm_cleanup_dword = RegisteredBody(0x1005DE40u);
+        zpatch_bpm_call_hash = RegisteredBody(0x1005B150u);
+        zpatch_bpm_call_bool = RegisteredBody(0x1005B3F0u);
+        zpatch_bpm_resolver = static_cast<uint32_t>(Shared::ValueResolver());
+    }
+}
+
+namespace
+{
+    // MPNikoCrashFix: a `jz` in the player-model check becomes an unconditional
+    // jump, so a model the game cannot resolve no longer falls through.
+    void InstallMPNikoCrashFix()
+    {
+        if (!Loader::Enabled("MPNikoCrashFix"))
+            return;
+
+        auto pattern = find_pattern("74 2B 57 E8 ? ? ? ? 8B BE A8 0E 00 00");
+        if (!pattern.empty())
+            injector::WriteMemory<std::byte>(pattern.get_first(0), Bytes::ShortJmp, true);
+    }
+
+    // FreezeGunFix: the anchor's -21 is the entry of the weapon check, which is
+    // replaced by the shim.
+    void InstallFreezeGunFix()
+    {
+        if (!Loader::Enabled("FreezeGunFix"))
+            return;
+
+        auto pattern = find_pattern("2B C2 D1 F8 39 3C C6 7D 0D 83 CA FF");
+        if (pattern.empty())
+            return;
+
+        Bodies::Register(FreezeGunShimAddress(), 0x10036EB0u);
+        injector::MakeJMP(pattern.get_first(-21), reinterpret_cast<void*>(FreezeGunShimAddress()), true);
+    }
+
+    // GroupHackFix: the group walk's entry becomes a jump into the shim, which
+    // repeats the anchor's first three instructions and the table compare.
+    void InstallGroupHackFix()
+    {
+        if (!Loader::Enabled("GroupHackFix"))
+            return;
+
+        auto pattern = find_pattern("33 C0 83 C1 04 8D 50 07 83 39 00 75 06 83 79 04");
+        if (pattern.empty())
+            return;
+
+        Bodies::Register(GroupHackShimAddress(), 0x10036E90u);
+        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(GroupHackShimAddress()), true);
+    }
+
+    // PathNodeCrashFix: the `mov dl,[eax+1Fh]; test dl,1` at the anchor's +53 is
+    // replaced by the shim, which rejects the sentinel.
+    void InstallPathNodeCrashFix()
+    {
+        if (!Loader::Enabled("PathNodeCrashFix"))
+            return;
+
+        auto pattern = find_pattern("8B 04 B1 0F B7 D0 81 FA FF FF 00 00");
+        if (pattern.empty())
+            return;
+
+        Bodies::Register(PathNodeShimAddress(), 0x1003D7B0u);
+        injector::MakeJMP(pattern.get_first(53), reinterpret_cast<void*>(PathNodeShimAddress()), true);
+    }
+
+    // PlaneCrashFix: the anchor's +3 is the state store the body replays after its
+    // null check.
+    void InstallPlaneCrashFix()
+    {
+        if (!Loader::Enabled("PlaneCrashFix"))
+            return;
+
+        auto pattern = find_pattern("83 C4 04 88 58 26 8B 16 8B 82 F4 00 00 00");
+        if (pattern.empty())
+            return;
+
+        Bodies::Register(PlaneCrashShimAddress(), 0x1003D870u);
+        injector::MakeJMP(pattern.get_first(3), reinterpret_cast<void*>(PlaneCrashShimAddress()), true);
+    }
+
+    // BlackscreenFix: the tail jump at the anchor's +81 becomes a jump into the shim.
+    void InstallBlackscreenFix()
+    {
+        if (!Loader::Enabled("BlackscreenFix"))
+            return;
+
+        auto pattern = find_pattern("75 54 8B 48 28 8B 40 2C");
+        if (pattern.empty())
+            return;
+
+        Bodies::Register(BlackscreenShimAddress(), 0x10036EE0u);
+        injector::MakeJMP(pattern.get_first(81), reinterpret_cast<void*>(BlackscreenShimAddress()), true);
+    }
+
+    // CrashMsgFix: the thunk loses its branch to the message getter; a call into the
+    // shim replaces it, and the shim calls the getter itself, replaces the '~'
+    // format markers in place and returns to the instruction after the thunk's call.
+    void InstallCrashMsgFix()
+    {
+        if (!Loader::Enabled("CrashMsgFix"))
+            return;
+
+        std::byte* site = CrashMsgSite();
+        if (site == nullptr)
+            return;
+
+        Bodies::Register(CrashMsgShimAddress(), 0x10036F00u);
+        injector::MakeCALL(site, reinterpret_cast<void*>(CrashMsgShimAddress()), true);
+    }
+
+    // WantedLevelCrashFix: the update's entry becomes the shim, which skips it for a
+    // null object.
+    void InstallWantedLevelCrashFix()
+    {
+        if (!Loader::Enabled("WantedLevelCrashFix"))
+            return;
+
+        auto pattern = find_pattern("8B 01 8B 90 28 01 00 00 FF D2 84 C0 0F 84 88 00 00 00");
+        if (pattern.empty())
+            return;
+
+        Bodies::Register(WantedLevelShimAddress(), 0x10050490u);
+        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(WantedLevelShimAddress()), true);
+    }
+
+    // EpisodeSwitchFreezeFix: five sites, rewritten in the original's order: the ECX
+    // reader, the archive store, the stream position, the EBX reader, the virtual
+    // call.
+    void InstallEpisodeSwitchFreezeFix()
+    {
+        if (!Loader::Enabled("EpisodeSwitchFreezeFix"))
+            return;
+
+        auto pattern = find_pattern("56 8B F1 83 7E 14 00 75 0B 83 7E 10 00 74 05");
+        if (pattern.empty())
+            return;
+        auto* shimC = pattern.get_first<std::byte>(0);
+
+        pattern = find_pattern("89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84");
+        if (pattern.empty())
+            return;
+        auto* store = pattern.get_first<std::byte>(0);
+
+        pattern = find_pattern("8B 4B 10 3B 4B 14 7D 0F");
+        if (pattern.empty())
+            return;
+        auto* shimB = pattern.get_first<std::byte>(0);
+
+        Bodies::Register(EpisodeSwitchShimCAddress(), 0x1001B0C0u);
+        injector::MakeJMP(shimC, reinterpret_cast<void*>(EpisodeSwitchShimCAddress()), true);
+
+        Bodies::Register(EpisodeSwitchStoreShimAddress(), 0x1001B040u);
+        injector::MakeJMP(store, reinterpret_cast<void*>(EpisodeSwitchStoreShimAddress()), true);
+
+        pattern = find_pattern("8B 41 10 03 41 0C C3");
+        if (pattern.empty())
+            return;
+        Bodies::Register(EpisodeSwitchSumAddress(), 0x1001B080u);
+        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(EpisodeSwitchSumAddress()), true);
+
+        Bodies::Register(EpisodeSwitchShimBAddress(), 0x1001B060u);
+        injector::MakeJMP(shimB, reinterpret_cast<void*>(EpisodeSwitchShimBAddress()), true);
+
+        pattern = find_pattern("8B C1 8B 08 8B 11 8B 40 04 8B 52 30 50 FF D2 C3");
+        if (pattern.empty())
+            return;
+        Bodies::Register(EpisodeSwitchVcallAddress(), 0x1001B0A0u);
+        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(EpisodeSwitchVcallAddress()), true);
+    }
+
+    // SMPA60Fix: two bodies. The `jz` at the primary anchor's -38 becomes an
+    // unconditional short jump, the tail body replaces the primary anchor's +123 and
+    // the second body the streaming loop's loader call.
+    void InstallSMPA60Fix()
+    {
+        if (!Loader::Enabled("SMPA60Fix"))
+            return;
+
+        auto pattern = find_pattern("01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C");
+        if (pattern.empty())
+            return;
+
+        auto* primary = pattern.get_first<std::byte>(0);
+
+        pattern = find_pattern("8B 48 70 83 C0 40 50 51 8D 51 10");
+        if (pattern.empty())
+            return;
+
+        auto* shim = pattern.get_first<std::byte>(0);
+
+        Bodies::Register(Smpa60TailShimAddress(), 0x10046780u);
+        injector::MakeJMP(primary + 123, reinterpret_cast<void*>(Smpa60TailShimAddress()), true);
+        injector::WriteMemory<std::byte>(primary - 38, Bytes::ShortJmp, true);
+
+        Bodies::Register(Smpa60ShimAddress(), 0x10046750u);
+        injector::MakeJMP(shim, reinterpret_cast<void*>(Smpa60ShimAddress()), true);
+    }
+
+    // PlayerAsPedComponentsFix: the anchor's +5 is the `movzx edx,[eax+219h]` whose
+    // result becomes CPedVariationMgr::SetVariation's `bool` argument; the site
+    // becomes a jump into the shared shim (recovered VA 0x1003D9A0, hosted in
+    // shared.ixx), which pushes the computed "this is the player model" flag and the
+    // `push ecx` at the anchor's +13 instead.
+    void InstallPlayerAsPedComponentsFix()
+    {
+        if (!Loader::Enabled("PlayerAsPedComponentsFix"))
+            return;
+
+        auto pattern = find_pattern("8B 54 24 10 52 0F B6 90 19 02 00 00");
+        if (pattern.empty())
+            return;
+
+        injector::MakeJMP(pattern.get_first(5),
+            reinterpret_cast<void*>(Shared::PlayerPedComponentsShim()), true);
+    }
+
+    // SCOSignatureFix: the instruction 32 bytes before the anchor becomes a short
+    // jump, so the signature check that follows is skipped.
+    void InstallSCOSignatureFix()
+    {
+        if (!Loader::Enabled("SCOSignatureFix"))
+            return;
+
+        auto pattern = find_pattern("8B 6C 24 1C 66 89 6E 14 64 8B 0D 2C 00 00 00 8B");
+        if (!pattern.empty())
+            injector::WriteMemory<std::byte>(pattern.get_first(-32), Bytes::ShortJmp, true);
+    }
+
+    // TryToSkipAllErrors: the error handler returns immediately instead of walking
+    // its own path.
+    void InstallTryToSkipAllErrors()
+    {
+        if (!Loader::Enabled("TryToSkipAllErrors"))
+            return;
+
+        auto pattern = find_pattern("81 EC 40 08 00 00 53 55 8B AC 24 4C 08 00 00");
+        if (!pattern.empty())
+            injector::WriteMemory<std::byte>(pattern.get_first(0), Bytes::Ret, true);
+    }
+
+    // RemoveAllWeaponsProtection: the 12-byte block the anchor jumps over is deleted,
+    // so the weapon-clearing path it guarded is no longer taken.
+    void InstallRemoveAllWeaponsProtection()
+    {
+        if (!Loader::Enabled("RemoveAllWeaponsProtection"))
+            return;
+
+        auto pattern = find_pattern("E9 ? ? ? ? 57 8D 8F ? ? 00 00");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(5), 12, true);
+    }
+
+    void InstallHighFPSSpeedupFix()
+    {
+        if (!Loader::Enabled("HighFPSSpeedupFix"))
+            return;
+
+        auto pattern = find_pattern("0F 2F C1 76 03 0F 28 C8 F3 0F 10 15");
+        if (pattern.empty())
+            return;
+
+        for (const auto& site : kSpeedupSites)
+        {
+            if (site.shortJump)
+                injector::WriteMemory<std::byte>(pattern.get_first(site.offset), Bytes::ShortJmp, true);
+            else
+                injector::MakeNOP(pattern.get_first(site.offset), 2, true);
+        }
+    }
+
+    // AimProjectileCrashFix: the site jumps into this module's shim (recovered VA
+    // 0x10005590), which stores the caller's dwords and derives the flag.
+    void InstallAimProjectileCrashFix()
+    {
+        if (!Loader::Enabled("AimProjectileCrashFix"))
+            return;
+
+        auto pattern = find_pattern("8B 44 24 08 89 41 20 8B 44 24 0C 89 41 24 F7 D8");
+        if (!pattern.empty())
+        {
+            Bodies::Register(AimProjectileShimAddress(), 0x10005590u);
+            injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(AimProjectileShimAddress()),
+                true);
+        }
+    }
+
+    // BadPlayerModelCrashFix: the game's model-resolution entry becomes a jump to
+    // the trampoline. The jump is made only after the resume above is published,
+    // because the resume is read from the site the jump overwrites.
+    void InstallBadPlayerModelCrashFix()
+    {
+        if (!Loader::Enabled("BadPlayerModelCrashFix"))
+            return;
+
+        auto pattern = find_pattern("83 E4 F0 83 EC 54 0F 57 C0 53 8B 5D 0C");
+        if (pattern.empty())
+            return;
+
+        Bodies::Register(BpmTrampolineAddress(), 0x10037BA0u);
+        Bodies::Register(BpmCheckBodyAddress(), 0x10037AC0u);
+        Bodies::Register(BpmWhoBodyAddress(), 0x1005B290u);
+        Bodies::Register(BpmPrintBodyAddress(), 0x1005B530u);
+        Bodies::Register(BpmModelNameBodyAddress(), 0x10003F00u);
+
+        // The 38,455-entry name table the transcribed lookup reads. Its operand is
+        // the original's `[table + esi*4]`, so the table is named here (the
+        // original's VA and its length in that image) and the offline proof
+        // compares the table's contents through the registration instead of the
+        // displacement. Nothing at run time reads this entry; it is what makes the
+        // operand provable (docs/rebuilt.md).
+        Bodies::RegisterTable(reinterpret_cast<uintptr_t>(kBadPlayerModelNames),
+            0x100DE770u, sizeof(kBadPlayerModelNames));
+
+        injector::MakeJMP(pattern.get_first<std::byte>(0),
+            reinterpret_cast<void*>(BpmTrampolineAddress()), true);
+    }
+}
+
+// Registered like every other arm: the publish tier reads every site the install
+// tier is about to overwrite, and the install tier owns the gate and the writes.
+export void RegisterStability()
+{
+    // The bounded formatter's data, filled before any tier runs. The body is
+    // reached from three modules, so neither slot may sit behind a key's gate: a
+    // run with BadPlayerModelCrashFix off still formats livery, OOC and DLC paths.
+    zpatch_format_entry = static_cast<uint32_t>(
+        BpmFormatAddress());
+    zpatch_bpm_stdio_common_vsprintf = static_cast<uint32_t>(
+        reinterpret_cast<uintptr_t>(&__stdio_common_vsprintf));
+
+    Loader::PublishEvent() += []
+    {
+        PublishFreezeGunFix();
+        PublishGroupHackFix();
+        PublishPathNodeCrashFix();
+        PublishPlaneCrashFix();
+        PublishBlackscreenFix();
+        PublishCrashMsgFix();
+        PublishWantedLevelCrashFix();
+        PublishEpisodeSwitchFreezeFix();
+        PublishSMPA60Fix();
+        PublishPlayerAsPedComponentsFix();
+        PublishBadPlayerModelCrashFix();
+    };
+    Loader::InstallEvent() += []
+    {
+        InstallMPNikoCrashFix();
+        InstallBlackscreenFix();
+        InstallCrashMsgFix();
+        InstallFreezeGunFix();
+        InstallGroupHackFix();
+        InstallPathNodeCrashFix();
+        InstallPlaneCrashFix();
+        InstallPlayerAsPedComponentsFix();
+        InstallWantedLevelCrashFix();
+        InstallEpisodeSwitchFreezeFix();
+        InstallSMPA60Fix();
+        InstallSCOSignatureFix();
+        InstallTryToSkipAllErrors();
+        InstallRemoveAllWeaponsProtection();
+        InstallHighFPSSpeedupFix();
+        InstallAimProjectileCrashFix();
+        InstallBadPlayerModelCrashFix();
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Transcribed bodies. Each is the original's instruction stream, kept as asm
+// because that is what it is; the code above is what installs it.
+// ---------------------------------------------------------------------------
 
 // abi_aim_projectile_crash_fix, recovered VA 0x10005590 (sub_10005590): a
 // __thiscall that stores the caller's two dwords into the object in ECX, derives a
@@ -503,15 +1202,6 @@ static __declspec(naked) void FreezeGunShim()
 // `[table + esi*4]` shape and the proof compares the table's *contents* through
 // the registration instead of its displacement. docs/rebuilt.md §2b records it.
 // ---------------------------------------------------------------------------
-
-// The block zeroing the wrappers open with. The original calls the CRT `memset`
-// through its IAT thunk (0x10060D6E) with the same argument order; the inline
-// assembler rejects a direct call to the intrinsic's name, so the call names this
-// cdecl forwarder, which is still one `E8`.
-static void __cdecl BpmZeroBlock(void* destination, int value, unsigned int count)
-{
-    std::memset(destination, value, count);
-}
 
 // sub_10001230, recovered VA 0x10001230 (2 instructions): the UCRT printf options
 // block the engine reads. The original answers the address of its own zeroed .data
@@ -981,653 +1671,26 @@ static __declspec(naked) void BpmTrampoline()
     }
 }
 
-namespace
-{
-    // MPNikoCrashFix: a `jz` in the player-model check becomes an unconditional
-    // jump, so a model the game cannot resolve no longer falls through.
-    void InstallMPNikoCrashFix()
-    {
-        if (!Loader::Enabled("MPNikoCrashFix"))
-            return;
-
-        auto pattern = find_pattern("74 2B 57 E8 ? ? ? ? 8B BE A8 0E 00 00");
-        if (!pattern.empty())
-            injector::WriteMemory<std::byte>(pattern.get_first(0), Bytes::ShortJmp, true);
-    }
-
-    // FreezeGunFix's published resume: the anchor's -12 (the instruction after the
-    // `push edi` the body replays). It reads the site the install overwrites, so it
-    // belongs to the publish tier.
-    void PublishFreezeGunFix()
-    {
-        if (!Loader::Enabled("FreezeGunFix"))
-            return;
-
-        auto pattern = find_pattern("2B C2 D1 F8 39 3C C6 7D 0D 83 CA FF");
-        if (pattern.empty())
-            return;
-
-        zpatch_freeze_gun_resume = static_cast<uint32_t>(
-            reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) - 12);
-    }
-
-    // FreezeGunFix: the anchor's -21 is the entry of the weapon check, which is
-    // replaced by the shim.
-    void InstallFreezeGunFix()
-    {
-        if (!Loader::Enabled("FreezeGunFix"))
-            return;
-
-        auto pattern = find_pattern("2B C2 D1 F8 39 3C C6 7D 0D 83 CA FF");
-        if (pattern.empty())
-            return;
-
-        Bodies::Register(reinterpret_cast<uintptr_t>(&FreezeGunShim), 0x10036EB0u);
-        injector::MakeJMP(pattern.get_first(-21), reinterpret_cast<void*>(&FreezeGunShim), true);
-    }
-
-    // GroupHackFix's published resume: the anchor's +11 (the loop's `jnz`).
-    void PublishGroupHackFix()
-    {
-        if (!Loader::Enabled("GroupHackFix"))
-            return;
-
-        auto pattern = find_pattern("33 C0 83 C1 04 8D 50 07 83 39 00 75 06 83 79 04");
-        if (pattern.empty())
-            return;
-
-        zpatch_group_hack_resume = static_cast<uint32_t>(
-            reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 11);
-    }
-
-    // GroupHackFix: the group walk's entry becomes a jump into the shim, which
-    // repeats the anchor's first three instructions and the table compare.
-    void InstallGroupHackFix()
-    {
-        if (!Loader::Enabled("GroupHackFix"))
-            return;
-
-        auto pattern = find_pattern("33 C0 83 C1 04 8D 50 07 83 39 00 75 06 83 79 04");
-        if (pattern.empty())
-            return;
-
-        Bodies::Register(reinterpret_cast<uintptr_t>(&GroupHackShim), 0x10036E90u);
-        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(&GroupHackShim), true);
-    }
-
-    // PathNodeCrashFix's published resumes: the anchor itself (the walk's next
-    // iteration) and the anchor's +59 (the `jz` the original test sets the flags
-    // for).
-    void PublishPathNodeCrashFix()
-    {
-        if (!Loader::Enabled("PathNodeCrashFix"))
-            return;
-
-        auto pattern = find_pattern("8B 04 B1 0F B7 D0 81 FA FF FF 00 00");
-        if (pattern.empty())
-            return;
-
-        const auto match = reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0));
-        zpatch_path_node_resume_ok = static_cast<uint32_t>(match);
-        zpatch_path_node_resume_fail = static_cast<uint32_t>(match + 59);
-    }
-
-    // PathNodeCrashFix: the `mov dl,[eax+1Fh]; test dl,1` at the anchor's +53 is
-    // replaced by the shim, which rejects the sentinel.
-    void InstallPathNodeCrashFix()
-    {
-        if (!Loader::Enabled("PathNodeCrashFix"))
-            return;
-
-        auto pattern = find_pattern("8B 04 B1 0F B7 D0 81 FA FF FF 00 00");
-        if (pattern.empty())
-            return;
-
-        Bodies::Register(reinterpret_cast<uintptr_t>(&PathNodeShim), 0x1003D7B0u);
-        injector::MakeJMP(pattern.get_first(53), reinterpret_cast<void*>(&PathNodeShim), true);
-    }
-
-    // PlaneCrashFix's published resumes: the normal one is the anchor's +14 (after
-    // the vtable read the body replays), the null one is the anchor's -705, the head
-    // of the same function.
-    void PublishPlaneCrashFix()
-    {
-        if (!Loader::Enabled("PlaneCrashFix"))
-            return;
-
-        auto pattern = find_pattern("83 C4 04 88 58 26 8B 16 8B 82 F4 00 00 00");
-        if (pattern.empty())
-            return;
-
-        const auto match = reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0));
-        zpatch_plane_crash_resume_b = static_cast<uint32_t>(match + 14);
-        zpatch_plane_crash_resume_a = static_cast<uint32_t>(match - 705);
-    }
-
-    // PlaneCrashFix: the anchor's +3 is the state store the body replays after its
-    // null check.
-    void InstallPlaneCrashFix()
-    {
-        if (!Loader::Enabled("PlaneCrashFix"))
-            return;
-
-        auto pattern = find_pattern("83 C4 04 88 58 26 8B 16 8B 82 F4 00 00 00");
-        if (pattern.empty())
-            return;
-
-        Bodies::Register(reinterpret_cast<uintptr_t>(&PlaneCrashShim), 0x1003D870u);
-        injector::MakeJMP(pattern.get_first(3), reinterpret_cast<void*>(&PlaneCrashShim), true);
-    }
-
-    // BlackscreenFix's published state: the resume is the tail jump's own target and
-    // the value slot is the dword the resume's first instruction loads. Both are read
-    // from the site before the install overwrites the jump.
-    void PublishBlackscreenFix()
-    {
-        if (!Loader::Enabled("BlackscreenFix"))
-            return;
-
-        auto pattern = find_pattern("75 54 8B 48 28 8B 40 2C");
-        if (pattern.empty())
-            return;
-
-        const auto match = reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0));
-        zpatch_blackscreen_resume =
-            static_cast<uint32_t>(match + 86 + *pattern.get_first<int32_t>(82));
-        zpatch_blackscreen_value_ptr =
-            *reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(zpatch_blackscreen_resume) + 1);
-    }
-
-    // BlackscreenFix: the tail jump at the anchor's +81 becomes a jump into the shim.
-    void InstallBlackscreenFix()
-    {
-        if (!Loader::Enabled("BlackscreenFix"))
-            return;
-
-        auto pattern = find_pattern("75 54 8B 48 28 8B 40 2C");
-        if (pattern.empty())
-            return;
-
-        Bodies::Register(reinterpret_cast<uintptr_t>(&BlackscreenShim), 0x10036EE0u);
-        injector::MakeJMP(pattern.get_first(81), reinterpret_cast<void*>(&BlackscreenShim), true);
-    }
-
-    // The thunk the CrashMsgFix anchor's -4 points at. The operand is a 32-bit VA of
-    // the image *as loaded*: the loader has already applied the image's relocations
-    // before this runs, so it is a live address and the cast is the whole
-    // conversion. The offline dump relocates its own copy (tests/dump_main.cpp), so
-    // the same identity holds there; rebasing through the preferred base would move
-    // the thunk by the run's whole relocation distance.
-    std::byte* CrashMsgSite()
-    {
-        auto pattern = find_pattern("68 6A 10 4E 31");
-        if (pattern.empty())
-            return nullptr;
-
-        return reinterpret_cast<std::byte*>(
-            static_cast<uintptr_t>(*pattern.get_first<uint32_t>(-4)));
-    }
-
-    // CrashMsgFix's published getter: the target of the branch at the thunk's entry,
-    // whose displacement is at +1 and is measured from +5.
-    void PublishCrashMsgFix()
-    {
-        if (!Loader::Enabled("CrashMsgFix"))
-            return;
-
-        std::byte* site = CrashMsgSite();
-        if (site == nullptr)
-            return;
-
-        zpatch_crash_msg_getter = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(site) + 5 +
-            *reinterpret_cast<const int32_t*>(site + 1));
-    }
-
-    // CrashMsgFix: the thunk loses its branch to the message getter; a call into the
-    // shim replaces it, and the shim calls the getter itself, replaces the '~'
-    // format markers in place and returns to the instruction after the thunk's call.
-    void InstallCrashMsgFix()
-    {
-        if (!Loader::Enabled("CrashMsgFix"))
-            return;
-
-        std::byte* site = CrashMsgSite();
-        if (site == nullptr)
-            return;
-
-        Bodies::Register(reinterpret_cast<uintptr_t>(&CrashMsgShim), 0x10036F00u);
-        injector::MakeCALL(site, reinterpret_cast<void*>(&CrashMsgShim), true);
-    }
-
-    // WantedLevelCrashFix's published resume: the anchor's +12 (the `jz` its
-    // `test al,al` feeds).
-    void PublishWantedLevelCrashFix()
-    {
-        if (!Loader::Enabled("WantedLevelCrashFix"))
-            return;
-
-        auto pattern = find_pattern("8B 01 8B 90 28 01 00 00 FF D2 84 C0 0F 84 88 00 00 00");
-        if (pattern.empty())
-            return;
-
-        zpatch_wanted_level_resume = static_cast<uint32_t>(
-            reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 12);
-    }
-
-    // WantedLevelCrashFix: the update's entry becomes the shim, which skips it for a
-    // null object.
-    void InstallWantedLevelCrashFix()
-    {
-        if (!Loader::Enabled("WantedLevelCrashFix"))
-            return;
-
-        auto pattern = find_pattern("8B 01 8B 90 28 01 00 00 FF D2 84 C0 0F 84 88 00 00 00");
-        if (pattern.empty())
-            return;
-
-        Bodies::Register(reinterpret_cast<uintptr_t>(&WantedLevelShim), 0x10050490u);
-        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(&WantedLevelShim), true);
-    }
-
-    // EpisodeSwitchFreezeFix's published resumes: the ECX reader's +7, the archive
-    // store's +5 and the EBX reader's +6, read from the sites the install overwrites.
-    void PublishEpisodeSwitchFreezeFix()
-    {
-        if (!Loader::Enabled("EpisodeSwitchFreezeFix"))
-            return;
-
-        auto pattern = find_pattern("56 8B F1 83 7E 14 00 75 0B 83 7E 10 00 74 05");
-        if (pattern.empty())
-            return;
-        zpatch_episode_switch_resume_c = static_cast<uint32_t>(
-            reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 7);
-
-        pattern = find_pattern("89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84");
-        if (pattern.empty())
-            return;
-        zpatch_episode_switch_resume_a = static_cast<uint32_t>(
-            reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 5);
-
-        pattern = find_pattern("8B 4B 10 3B 4B 14 7D 0F");
-        if (pattern.empty())
-            return;
-        zpatch_episode_switch_resume_b = static_cast<uint32_t>(
-            reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 6);
-    }
-
-    // EpisodeSwitchFreezeFix: five sites, rewritten in the original's order: the ECX
-    // reader, the archive store, the stream position, the EBX reader, the virtual
-    // call.
-    void InstallEpisodeSwitchFreezeFix()
-    {
-        if (!Loader::Enabled("EpisodeSwitchFreezeFix"))
-            return;
-
-        auto pattern = find_pattern("56 8B F1 83 7E 14 00 75 0B 83 7E 10 00 74 05");
-        if (pattern.empty())
-            return;
-        auto* shimC = pattern.get_first<std::byte>(0);
-
-        pattern = find_pattern("89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84");
-        if (pattern.empty())
-            return;
-        auto* store = pattern.get_first<std::byte>(0);
-
-        pattern = find_pattern("8B 4B 10 3B 4B 14 7D 0F");
-        if (pattern.empty())
-            return;
-        auto* shimB = pattern.get_first<std::byte>(0);
-
-        Bodies::Register(reinterpret_cast<uintptr_t>(&EpisodeSwitchShimC), 0x1001B0C0u);
-        injector::MakeJMP(shimC, reinterpret_cast<void*>(&EpisodeSwitchShimC), true);
-
-        Bodies::Register(reinterpret_cast<uintptr_t>(&EpisodeSwitchStoreShim), 0x1001B040u);
-        injector::MakeJMP(store, reinterpret_cast<void*>(&EpisodeSwitchStoreShim), true);
-
-        pattern = find_pattern("8B 41 10 03 41 0C C3");
-        if (pattern.empty())
-            return;
-        Bodies::Register(reinterpret_cast<uintptr_t>(&EpisodeSwitchSum), 0x1001B080u);
-        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(&EpisodeSwitchSum), true);
-
-        Bodies::Register(reinterpret_cast<uintptr_t>(&EpisodeSwitchShimB), 0x1001B060u);
-        injector::MakeJMP(shimB, reinterpret_cast<void*>(&EpisodeSwitchShimB), true);
-
-        pattern = find_pattern("8B C1 8B 08 8B 11 8B 40 04 8B 52 30 50 FF D2 C3");
-        if (pattern.empty())
-            return;
-        Bodies::Register(reinterpret_cast<uintptr_t>(&EpisodeSwitchVcall), 0x1001B0A0u);
-        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(&EpisodeSwitchVcall), true);
-    }
-
-    // SMPA60Fix's published resumes: the tail shim's resume is the primary anchor's
-    // +136, and the streaming loop's loader call is the second anchor, whose sentinel
-    // path and normal path use +28 and +14.
-    void PublishSMPA60Fix()
-    {
-        if (!Loader::Enabled("SMPA60Fix"))
-            return;
-
-        auto pattern = find_pattern("01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C");
-        if (pattern.empty())
-            return;
-
-        zpatch_smpa60_resume_c = static_cast<uint32_t>(
-            reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 136);
-
-        pattern = find_pattern("8B 48 70 83 C0 40 50 51 8D 51 10");
-        if (pattern.empty())
-            return;
-
-        const auto shim = reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0));
-        zpatch_smpa60_resume_a = static_cast<uint32_t>(shim + 28);
-        zpatch_smpa60_resume_b = static_cast<uint32_t>(shim + 14);
-    }
-
-    // SMPA60Fix: two bodies. The `jz` at the primary anchor's -38 becomes an
-    // unconditional short jump, the tail body replaces the primary anchor's +123 and
-    // the second body the streaming loop's loader call.
-    void InstallSMPA60Fix()
-    {
-        if (!Loader::Enabled("SMPA60Fix"))
-            return;
-
-        auto pattern = find_pattern("01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C");
-        if (pattern.empty())
-            return;
-
-        auto* primary = pattern.get_first<std::byte>(0);
-
-        pattern = find_pattern("8B 48 70 83 C0 40 50 51 8D 51 10");
-        if (pattern.empty())
-            return;
-
-        auto* shim = pattern.get_first<std::byte>(0);
-
-        Bodies::Register(reinterpret_cast<uintptr_t>(&Smpa60TailShim), 0x10046780u);
-        injector::MakeJMP(primary + 123, reinterpret_cast<void*>(&Smpa60TailShim), true);
-        injector::WriteMemory<std::byte>(primary - 38, Bytes::ShortJmp, true);
-
-        Bodies::Register(reinterpret_cast<uintptr_t>(&Smpa60Shim), 0x10046750u);
-        injector::MakeJMP(shim, reinterpret_cast<void*>(&Smpa60Shim), true);
-    }
-
-    // PlayerAsPedComponentsFix's published resume: the anchor's +14 (the
-    // `add ecx,80h` after the two pushes the shim replays).
-    void PublishPlayerAsPedComponentsFix()
-    {
-        if (!Loader::Enabled("PlayerAsPedComponentsFix"))
-            return;
-
-        auto pattern = find_pattern("8B 54 24 10 52 0F B6 90 19 02 00 00");
-        if (pattern.empty())
-            return;
-
-        Shared::PublishPlayerPedComponentsResume(static_cast<uint32_t>(
-            reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 14));
-    }
-
-    // PlayerAsPedComponentsFix: the anchor's +5 is the `movzx edx,[eax+219h]` whose
-    // result becomes CPedVariationMgr::SetVariation's `bool` argument; the site
-    // becomes a jump into the shared shim (recovered VA 0x1003D9A0, hosted in
-    // shared.ixx), which pushes the computed "this is the player model" flag and the
-    // `push ecx` at the anchor's +13 instead.
-    void InstallPlayerAsPedComponentsFix()
-    {
-        if (!Loader::Enabled("PlayerAsPedComponentsFix"))
-            return;
-
-        auto pattern = find_pattern("8B 54 24 10 52 0F B6 90 19 02 00 00");
-        if (pattern.empty())
-            return;
-
-        injector::MakeJMP(pattern.get_first(5),
-            reinterpret_cast<void*>(Shared::PlayerPedComponentsShim()), true);
-    }
-
-    // SCOSignatureFix: the instruction 32 bytes before the anchor becomes a short
-    // jump, so the signature check that follows is skipped.
-    void InstallSCOSignatureFix()
-    {
-        if (!Loader::Enabled("SCOSignatureFix"))
-            return;
-
-        auto pattern = find_pattern("8B 6C 24 1C 66 89 6E 14 64 8B 0D 2C 00 00 00 8B");
-        if (!pattern.empty())
-            injector::WriteMemory<std::byte>(pattern.get_first(-32), Bytes::ShortJmp, true);
-    }
-
-    // TryToSkipAllErrors: the error handler returns immediately instead of walking
-    // its own path.
-    void InstallTryToSkipAllErrors()
-    {
-        if (!Loader::Enabled("TryToSkipAllErrors"))
-            return;
-
-        auto pattern = find_pattern("81 EC 40 08 00 00 53 55 8B AC 24 4C 08 00 00");
-        if (!pattern.empty())
-            injector::WriteMemory<std::byte>(pattern.get_first(0), Bytes::Ret, true);
-    }
-
-    // RemoveAllWeaponsProtection: the 12-byte block the anchor jumps over is deleted,
-    // so the weapon-clearing path it guarded is no longer taken.
-    void InstallRemoveAllWeaponsProtection()
-    {
-        if (!Loader::Enabled("RemoveAllWeaponsProtection"))
-            return;
-
-        auto pattern = find_pattern("E9 ? ? ? ? 57 8D 8F ? ? 00 00");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(5), 12, true);
-    }
-
-    // HighFPSSpeedupFix: the nine frame-time clamps inside CTimer::Update. One
-    // becomes a short jump (skipping the following test), the other eight are
-    // two-byte NOPs.
-    struct SpeedupSite final
-    {
-        ptrdiff_t offset;
-        bool shortJump;
-    };
-    constexpr SpeedupSite kSpeedupSites[] = {
-        { -7, false },
-        { 3, false },
-        { 224, true },
-        { 231, false },
-        { 367, false },
-        { 377, false },
-        { 607, false },
-        { 614, false },
-        { 764, false },
-    };
-
-    void InstallHighFPSSpeedupFix()
-    {
-        if (!Loader::Enabled("HighFPSSpeedupFix"))
-            return;
-
-        auto pattern = find_pattern("0F 2F C1 76 03 0F 28 C8 F3 0F 10 15");
-        if (pattern.empty())
-            return;
-
-        for (const auto& site : kSpeedupSites)
-        {
-            if (site.shortJump)
-                injector::WriteMemory<std::byte>(pattern.get_first(site.offset), Bytes::ShortJmp, true);
-            else
-                injector::MakeNOP(pattern.get_first(site.offset), 2, true);
-        }
-    }
-
-    // AimProjectileCrashFix: the site jumps into this module's shim (recovered VA
-    // 0x10005590), which stores the caller's dwords and derives the flag.
-    void InstallAimProjectileCrashFix()
-    {
-        if (!Loader::Enabled("AimProjectileCrashFix"))
-            return;
-
-        auto pattern = find_pattern("8B 44 24 08 89 41 20 8B 44 24 0C 89 41 24 F7 D8");
-        if (!pattern.empty())
-        {
-            Bodies::Register(reinterpret_cast<uintptr_t>(&AimProjectileShim), 0x10005590u);
-            injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(&AimProjectileShim),
-                true);
-        }
-    }
-
-    // The address of a body another module transcribed, by its recovered VA. The
-    // native-call layer publishes only its C entries, and a module interface cannot
-    // export a naked function, so the body registry is what makes its pieces
-    // reachable from here.
-    uint32_t RegisteredBody(uint32_t reference)
-    {
-        for (const auto& entry : Bodies::All())
-        {
-            if (entry.reference == reference)
-                return static_cast<uint32_t>(entry.address);
-        }
-        return 0;
-    }
-
-    // BadPlayerModelCrashFix's published state, read before the install overwrites
-    // the site: the resume is the site's +10 (the `mov ebx,[ebp+0Ch]` the jump
-    // covers). The rest is what the original's unconditional loader preamble
-    // resolves on every run and this key's bodies read -- the ped array, the
-    // model-class lookup, and the three hash salts whose build probe decides - plus
-    // the addresses of the layer pieces the transcribed wrappers call.
-    void PublishBadPlayerModelCrashFix()
-    {
-        if (!Loader::Enabled("BadPlayerModelCrashFix"))
-            return;
-
-        auto pattern = find_pattern("83 E4 F0 83 EC 54 0F 57 C0 53 8B 5D 0C");
-        if (pattern.empty())
-            return;
-
-        zpatch_bpm_resume = static_cast<uint32_t>(
-            reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 10);
-
-        // dword_1015AD78: the ped-model object array, the absolute operand four
-        // bytes before the original's own anchor (game 0x49EC0F). The operand is a
-        // live VA -- the loader has already relocated the image, and the offline
-        // dump relocates its copy too -- so the captured dword is the address.
-        pattern = find_pattern("85 C0 C6 44 24 0C 00 C6 44 24 0D 00 75 07");
-        if (!pattern.empty())
-            zpatch_bpm_ped_array = *pattern.get_first<uint32_t>(-4);
-
-        // dword_10159C74: the model-class lookup the fallback calls, the
-        // original's anchor - 42 (game 0xB191D0).
-        pattern = find_pattern("85 F6 74 30 8B 16 8B 42 0C 8B CE FF D0 3C 02 75 23");
-        if (!pattern.empty())
-        {
-            zpatch_bpm_fn_59c74 = static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) - 42);
-        }
-
-        // The build probe. The original's loader installs its ten fallback hash
-        // salts only when this pattern is absent (0x10052E1A jumps the ten stores
-        // on a hit), so on 1.0.8.0 the shipped .data values stand. The two salts
-        // this key's own bodies read are seeded with those; a missed probe
-        // substitutes the recovered fallback set. The third, dword_101580B8, is
-        // the native layer's resolved slot (source/native.ixx).
-        pattern = find_pattern("68 ? ? ? ? 68 A9 54 14 51 E8");
-        if (pattern.empty())
-        {
-            zpatch_bpm_salt_c8 = 0x406B4B20u;
-            zpatch_bpm_salt_40 = 0xC9DBDA90u;
-        }
-
-        // 0x10063074: the original's GetModuleHandleW slot, which its GTAC.dll
-        // test calls through.
-        zpatch_bpm_getmodulehandle = static_cast<uint32_t>(
-            reinterpret_cast<uintptr_t>(&GetModuleHandleW));
-
-        // The layer's transcribed pieces, by their recovered VAs. The wrapper is
-        // the layer's copy of sub_1005B3F0; only one body can carry that recovered
-        // VA, so this arm does not register a second one.
-        zpatch_bpm_context_init = RegisteredBody(0x100038C0u);
-        zpatch_bpm_cleanup_dword = RegisteredBody(0x1005DE40u);
-        zpatch_bpm_call_hash = RegisteredBody(0x1005B150u);
-        zpatch_bpm_call_bool = RegisteredBody(0x1005B3F0u);
-        zpatch_bpm_resolver = static_cast<uint32_t>(Shared::ValueResolver());
-    }
-
-    // BadPlayerModelCrashFix: the game's model-resolution entry becomes a jump to
-    // the trampoline. The jump is made only after the resume above is published,
-    // because the resume is read from the site the jump overwrites.
-    void InstallBadPlayerModelCrashFix()
-    {
-        if (!Loader::Enabled("BadPlayerModelCrashFix"))
-            return;
-
-        auto pattern = find_pattern("83 E4 F0 83 EC 54 0F 57 C0 53 8B 5D 0C");
-        if (pattern.empty())
-            return;
-
-        Bodies::Register(reinterpret_cast<uintptr_t>(&BpmTrampoline), 0x10037BA0u);
-        Bodies::Register(reinterpret_cast<uintptr_t>(&BpmCheckBody), 0x10037AC0u);
-        Bodies::Register(reinterpret_cast<uintptr_t>(&BpmWhoBody), 0x1005B290u);
-        Bodies::Register(reinterpret_cast<uintptr_t>(&BpmPrintBody), 0x1005B530u);
-        Bodies::Register(reinterpret_cast<uintptr_t>(&BpmModelNameBody), 0x10003F00u);
-
-        // The 38,455-entry name table the transcribed lookup reads. Its operand is
-        // the original's `[table + esi*4]`, so the table is named here (the
-        // original's VA and its length in that image) and the offline proof
-        // compares the table's contents through the registration instead of the
-        // displacement. Nothing at run time reads this entry; it is what makes the
-        // operand provable (docs/rebuilt.md).
-        Bodies::RegisterTable(reinterpret_cast<uintptr_t>(kBadPlayerModelNames),
-            0x100DE770u, sizeof(kBadPlayerModelNames));
-
-        injector::MakeJMP(pattern.get_first<std::byte>(0),
-            reinterpret_cast<void*>(&BpmTrampoline), true);
-    }
-}
-
-// Registered like every other arm: the publish tier reads every site the install
-// tier is about to overwrite, and the install tier owns the gate and the writes.
-export void RegisterStability()
-{
-    // The bounded formatter's data, filled before any tier runs. The body is
-    // reached from three modules, so neither slot may sit behind a key's gate: a
-    // run with BadPlayerModelCrashFix off still formats livery, OOC and DLC paths.
-    zpatch_format_entry = static_cast<uint32_t>(
-        reinterpret_cast<uintptr_t>(&BpmFormat));
-    zpatch_bpm_stdio_common_vsprintf = static_cast<uint32_t>(
-        reinterpret_cast<uintptr_t>(&__stdio_common_vsprintf));
-
-    Loader::PublishEvent() += []
-    {
-        PublishFreezeGunFix();
-        PublishGroupHackFix();
-        PublishPathNodeCrashFix();
-        PublishPlaneCrashFix();
-        PublishBlackscreenFix();
-        PublishCrashMsgFix();
-        PublishWantedLevelCrashFix();
-        PublishEpisodeSwitchFreezeFix();
-        PublishSMPA60Fix();
-        PublishPlayerAsPedComponentsFix();
-        PublishBadPlayerModelCrashFix();
-    };
-    Loader::InstallEvent() += []
-    {
-        InstallMPNikoCrashFix();
-        InstallBlackscreenFix();
-        InstallCrashMsgFix();
-        InstallFreezeGunFix();
-        InstallGroupHackFix();
-        InstallPathNodeCrashFix();
-        InstallPlaneCrashFix();
-        InstallPlayerAsPedComponentsFix();
-        InstallWantedLevelCrashFix();
-        InstallEpisodeSwitchFreezeFix();
-        InstallSMPA60Fix();
-        InstallSCOSignatureFix();
-        InstallTryToSkipAllErrors();
-        InstallRemoveAllWeaponsProtection();
-        InstallHighFPSSpeedupFix();
-        InstallAimProjectileCrashFix();
-        InstallBadPlayerModelCrashFix();
-    };
-}
+// The body accessors the readable code above uses: each body is defined above, so
+// its address can be taken here (a declaration cannot carry __declspec(naked)).
+static uintptr_t AimProjectileShimAddress() { return reinterpret_cast<uintptr_t>(&AimProjectileShim); }
+static uintptr_t Smpa60ShimAddress() { return reinterpret_cast<uintptr_t>(&Smpa60Shim); }
+static uintptr_t Smpa60TailShimAddress() { return reinterpret_cast<uintptr_t>(&Smpa60TailShim); }
+static uintptr_t WantedLevelShimAddress() { return reinterpret_cast<uintptr_t>(&WantedLevelShim); }
+static uintptr_t EpisodeSwitchStoreShimAddress() { return reinterpret_cast<uintptr_t>(&EpisodeSwitchStoreShim); }
+static uintptr_t EpisodeSwitchShimBAddress() { return reinterpret_cast<uintptr_t>(&EpisodeSwitchShimB); }
+static uintptr_t EpisodeSwitchShimCAddress() { return reinterpret_cast<uintptr_t>(&EpisodeSwitchShimC); }
+static uintptr_t EpisodeSwitchSumAddress() { return reinterpret_cast<uintptr_t>(&EpisodeSwitchSum); }
+static uintptr_t EpisodeSwitchVcallAddress() { return reinterpret_cast<uintptr_t>(&EpisodeSwitchVcall); }
+static uintptr_t PlaneCrashShimAddress() { return reinterpret_cast<uintptr_t>(&PlaneCrashShim); }
+static uintptr_t CrashMsgShimAddress() { return reinterpret_cast<uintptr_t>(&CrashMsgShim); }
+static uintptr_t BlackscreenShimAddress() { return reinterpret_cast<uintptr_t>(&BlackscreenShim); }
+static uintptr_t PathNodeShimAddress() { return reinterpret_cast<uintptr_t>(&PathNodeShim); }
+static uintptr_t GroupHackShimAddress() { return reinterpret_cast<uintptr_t>(&GroupHackShim); }
+static uintptr_t FreezeGunShimAddress() { return reinterpret_cast<uintptr_t>(&FreezeGunShim); }
+static uintptr_t BpmFormatAddress() { return reinterpret_cast<uintptr_t>(&BpmFormat); }
+static uintptr_t BpmModelNameBodyAddress() { return reinterpret_cast<uintptr_t>(&BpmModelNameBody); }
+static uintptr_t BpmWhoBodyAddress() { return reinterpret_cast<uintptr_t>(&BpmWhoBody); }
+static uintptr_t BpmPrintBodyAddress() { return reinterpret_cast<uintptr_t>(&BpmPrintBody); }
+static uintptr_t BpmCheckBodyAddress() { return reinterpret_cast<uintptr_t>(&BpmCheckBody); }
+static uintptr_t BpmTrampolineAddress() { return reinterpret_cast<uintptr_t>(&BpmTrampoline); }

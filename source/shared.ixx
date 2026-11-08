@@ -25,8 +25,32 @@ import patch;
 // unit. They are exported by address; the arm that installs them lives in
 // stability.ixx, where the key does.
 
+// The exported surface. The functions are declared here and defined below out of
+// line: an exported *inline* body would be written to the module's interface and
+// would drag the naked declarations into it, which every importer then rejects
+// (C2488).
+
+export namespace Shared
+{
+    // sub_10003E50's address, for the arms that ask it to resolve a config value.
+    uintptr_t ValueResolver();
+
+    // sub_1003D9A0's address: the body the PlayerAsPedComponentsFix arm installs.
+    uintptr_t PlayerPedComponentsShim();
+
+    // dword_10159D2C. Published before the site is written: the original reads the
+    // resume from the site it is about to overwrite.
+    void PublishPlayerPedComponentsResume(uint32_t resume);
+
+    // Runs once, before any arm: it resolves the shared game lookup and publishes
+    // the bodies' recovered addresses. Called from the startup drivers next to the
+    // other Register functions.
+    void Register();
+}
+
 // The published state, in C linkage because the transcribed code names the slots
 // directly (the original keeps them in its own .bss beside its bodies).
+
 extern "C"
 {
     // dword_10159C0C (original 0x10159C0C): the game's model-index lookup,
@@ -53,11 +77,51 @@ extern "C"
 
 // The two literals the transcribed code pushes: the "hash:" prefix (original
 // 0x10128CD8) and the "player" model name (original 0x1013A038).
+
 extern "C"
 {
     const char zpatch_resolver_hash_prefix[] = "hash:";
     const char zpatch_resolver_player_name[] = "player";
 }
+
+// PlayerPedHelperBody's address, for the arm's registration below. It is
+// defined with the transcribed bodies at the end of the file, because a
+// declaration cannot carry __declspec(naked) (C2488).
+static uintptr_t PlayerPedHelperBodyAddress();
+
+namespace Shared
+{
+    void PublishPlayerPedComponentsResume(uint32_t resume)
+    {
+        zpatch_player_ped_resume = resume;
+    }
+}
+
+namespace Shared
+{
+    void Register()
+    {
+        // The original's resolver calls the CRT through its IAT; ours calls through
+        // these slots, which is what keeps the instruction shape.
+        zpatch_resolver_strnicmp = reinterpret_cast<uintptr_t>(&_strnicmp);
+        zpatch_resolver_strtoul = reinterpret_cast<uintptr_t>(&strtoul);
+
+        // dword_10159C0C, from the byte pattern the original scans for in the game
+        // image (game 0x8DD2D0 on 1.0.8.0). A miss keeps the slot as it was.
+        auto pattern = find_pattern("8B 44 24 04 89 44 24 04 66 A1 ? ? ? ? 66 85 C0 76 3E");
+        if (!pattern.empty())
+            zpatch_model_lookup = reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0));
+
+        Bodies::Register(Shared::ValueResolver(), 0x10003E50u);
+        Bodies::Register(Shared::PlayerPedComponentsShim(), 0x1003D9A0u);
+        Bodies::Register(PlayerPedHelperBodyAddress(), 0x1003D930u);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Transcribed bodies. Each is the original's instruction stream, kept as asm
+// because that is what it is; the code above is what installs it.
+// ---------------------------------------------------------------------------
 
 // sub_10003E50, recovered VA 0x10003E50 (162 bytes, 67 instructions): the
 // config-value resolver. A string that starts with "hash:" (case-insensitive,
@@ -227,28 +291,6 @@ static __declspec(naked) void PlayerPedComponentsShimBody()
     }
 }
 
-// The exported surface. The functions are declared here and defined below out of
-// line: an exported *inline* body would be written to the module's interface and
-// would drag the naked declarations into it, which every importer then rejects
-// (C2488).
-export namespace Shared
-{
-    // sub_10003E50's address, for the arms that ask it to resolve a config value.
-    uintptr_t ValueResolver();
-
-    // sub_1003D9A0's address: the body the PlayerAsPedComponentsFix arm installs.
-    uintptr_t PlayerPedComponentsShim();
-
-    // dword_10159D2C. Published before the site is written: the original reads the
-    // resume from the site it is about to overwrite.
-    void PublishPlayerPedComponentsResume(uint32_t resume);
-
-    // Runs once, before any arm: it resolves the shared game lookup and publishes
-    // the bodies' recovered addresses. Called from the startup drivers next to the
-    // other Register functions.
-    void Register();
-}
-
 namespace Shared
 {
     uintptr_t ValueResolver()
@@ -260,27 +302,10 @@ namespace Shared
     {
         return reinterpret_cast<uintptr_t>(&PlayerPedComponentsShimBody);
     }
+}
 
-    void PublishPlayerPedComponentsResume(uint32_t resume)
-    {
-        zpatch_player_ped_resume = resume;
-    }
-
-    void Register()
-    {
-        // The original's resolver calls the CRT through its IAT; ours calls through
-        // these slots, which is what keeps the instruction shape.
-        zpatch_resolver_strnicmp = reinterpret_cast<uintptr_t>(&_strnicmp);
-        zpatch_resolver_strtoul = reinterpret_cast<uintptr_t>(&strtoul);
-
-        // dword_10159C0C, from the byte pattern the original scans for in the game
-        // image (game 0x8DD2D0 on 1.0.8.0). A miss keeps the slot as it was.
-        auto pattern = find_pattern("8B 44 24 04 89 44 24 04 66 A1 ? ? ? ? 66 85 C0 76 3E");
-        if (!pattern.empty())
-            zpatch_model_lookup = reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0));
-
-        Bodies::Register(reinterpret_cast<uintptr_t>(&ValueResolverBody), 0x10003E50u);
-        Bodies::Register(reinterpret_cast<uintptr_t>(&PlayerPedComponentsShimBody), 0x1003D9A0u);
-        Bodies::Register(reinterpret_cast<uintptr_t>(&PlayerPedHelperBody), 0x1003D930u);
-    }
+// PlayerPedHelperBody's address accessor, defined here beside the body.
+static uintptr_t PlayerPedHelperBodyAddress()
+{
+    return reinterpret_cast<uintptr_t>(&PlayerPedHelperBody);
 }

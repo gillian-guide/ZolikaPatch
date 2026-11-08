@@ -56,15 +56,6 @@ import patch;
 // loader-shaped scan/publish/write code, EH4 + `std::string`), rebuilt in C++ with
 // the original's arithmetic, bounds and call order.
 
-// The recovered resource, verbatim. source/ooc_finale2.inc carries the pinned
-// image SHA-256, the source VA and length, the extraction recipe and the decoded
-// table's own hashes.
-static const uint8_t kOocResource[] = {
-#include "ooc_finale2.inc"
-};
-static_assert(sizeof(kOocResource) == 163796,
-    "the recovered resource is the original's 163,796 bytes at 0x100B6798");
-
 // The original's own state, in C linkage because the transcribed bodies name the
 // slots directly (the original keeps them in its .bss beside its bodies).
 extern "C"
@@ -107,6 +98,41 @@ extern "C"
     extern uint32_t zpatch_format_entry;
 }
 
+// Forward declarations for the transcribed bodies at the bottom of this
+// file: the readable code above installs them (and a body may branch to
+// another), so every one is named here. MSVC rejects `__declspec(naked)`
+// on a declaration (C2488), so these carry the signature only; each
+// definition in the tail is naked.
+static void OocStepBody();
+static int __fastcall OocDecodeBody(uint8_t*);
+static void OocDestroyEntriesBody();
+static void OocZeroHeaderBody();
+static void OocZeroRecordBody();
+static void OocSetRecordPadBody();
+static void OocPageCountBody();
+static void OocAppendBody();
+static void OocNameBytesBody();
+static void OocPageTotalBody();
+static void OocVectorBeginBody();
+static void OocVectorEndBody();
+static void OocVectorSizeBody();
+static void OocEntryNameBody();
+static void OocVectorClearBody();
+static void* OocBuildArchiveBody();
+static void OocFormat();
+static void OocClearPakBody();
+static void OocBranchBody();
+static void OocWrapBody();
+
+// The recovered resource, verbatim. source/ooc_finale2.inc carries the pinned
+// image SHA-256, the source VA and length, the extraction recipe and the decoded
+// table's own hashes.
+static const uint8_t kOocResource[] = {
+#include "ooc_finale2.inc"
+};
+static_assert(sizeof(kOocResource) == 163796,
+    "the recovered resource is the original's 163,796 bytes at 0x100B6798");
+
 namespace
 {
     // sub_1004B750's malloc argument and sub_1004B570's output bound
@@ -126,6 +152,430 @@ static void __cdecl OocCopyBlock(void* destination, const void* source, std::siz
 {
     std::memcpy(destination, source, size);
 }
+
+namespace
+{
+    // One entry of the original's fake-pak vector (a `std::vector` at 0x1016E43C
+    // with its three pointers at 0x1016E43C/40/44). The name is a std::string
+    // there; the only name ever registered is the eleven-character "finale2.sco",
+    // which fits its 16-byte small-string buffer, so the entry keeps that buffer
+    // as a fixed array and the layout stays the 44 bytes the builder walks.
+    struct OocPakEntry
+    {
+        char name[16];           // +0x00 the std::string's small-string buffer
+        uint32_t name_size;      // +0x10
+        uint32_t name_capacity;  // +0x14
+        uint32_t file_size;      // +0x18
+        uint32_t stored_offset;  // +0x1C
+        uint32_t stored_size;    // +0x20
+        uint32_t padding;        // +0x24
+        uint32_t data;           // +0x28
+    };
+    static_assert(sizeof(OocPakEntry) == 44, "the original's fake-pak entry is 44 bytes");
+
+    // The original's fake-pak vector, at a fixed address because the transcribed
+    // builder names its storage the way the original does: `mov [ebp-60h], offset
+    // Block` and `mov ecx, offset Block`, with the vector's begin/end read as
+    // `[Block]` / `[Block+4]`. It is a real `std::vector` so the C++ side of the
+    // module (the rebuilt init's push_back, the self-check) keeps using the
+    // container's own growth, and its three pointers are the original's three
+    // pointers at 0x1016E43C/40/44. C linkage gives the object the short `_name`
+    // symbol the proof and the operand map resolve; the layout is the same either
+    // way, and `OocPakTable()` is the only C++ path to it.
+    extern "C"
+    {
+        std::vector<OocPakEntry> zpatch_ooc_pak;
+    }
+
+    std::vector<OocPakEntry>& OocPakTable()
+    {
+        return zpatch_ooc_pak;
+    }
+}
+
+// The archive's 20-byte header and its 16-byte per-entry record are built on
+// the builder's own stack (`[ebp-28h]` and `[ebp-14h]`) by the two original
+// helpers below; their field order is the stores the transcription keeps:
+//
+//   header  +0x00 magic 0x86723DFF   +0x04 version 3   +0x08 entry count
+//           +0x0C name bytes        +0x10 page 0x10   +0x12 opcode 0xE9
+//   record  +0x00 stored size       +0x04 stored offset
+//           +0x08 index (1-based first page)  +0x0C pages | pad (0x2000 flag)
+//
+// The chunks the builder stamps are what OocInitialise and the self-check
+// measure: the header's two words at +0x10 are the `16`/`0xE9` pair.
+
+// The three CRT boundaries the builder crosses. The original calls a thunk to the
+// CRT's scalar `operator new` (0x100603F1), `memset` (0x10060D6E) and `free`
+// (0x1005FE89); the inline assembler cannot name the first two, and a direct call
+// would not keep the original's argument order, so each site calls one of these
+// cdecl forwarders instead -- one `E8`, the same arguments and the same routine.
+static void* __cdecl OocAllocate(unsigned int size)
+{
+    return ::operator new(size);
+}
+
+static void __cdecl OocZeroBlock(void* destination, int value, unsigned int count)
+{
+    std::memset(destination, value, count);
+}
+
+static void __cdecl OocFreeBlock(void* block)
+{
+    std::free(block);
+}
+
+// 0x1005CD50, the destroy loop the vector's clear runs over its elements
+// (`std::_Destroy_range` for the fake-pak entry). It is the one callee of the
+// transcribed set that stays rebuilt: it is the CRT's std::string destructor
+// loop, and its free path reads the string's internal capacity and, past
+// 0x1000, the allocator's block header, before calling `_invalid_parameter_
+// noinfo_noreturn` -- image-internal CRT state this module cannot name. The
+// loop below performs the same stores on the same 44-byte stride, and frees a
+// heap-allocated name the way the original does. Every entry this module ever
+// registers keeps its name in the inline buffer (capacity 0x0F), so the free
+// branch is unreachable from the tree's own data, exactly as it is in the
+// original for the single "finale2.sco" entry.
+static void __cdecl OocDestroyEntries(void* first, void* last)
+{
+    auto* entry = static_cast<uint8_t*>(first);
+    const auto* end = static_cast<const uint8_t*>(last);
+    while (entry != end)
+    {
+        const auto capacity = *reinterpret_cast<uint32_t*>(entry + 0x14);
+        if (capacity >= 0x10u)
+            std::free(*reinterpret_cast<void**>(entry));
+        *reinterpret_cast<uint32_t*>(entry + 0x10) = 0;
+        *reinterpret_cast<uint32_t*>(entry + 0x14) = 0x0Fu;
+        *entry = 0;
+        entry += 0x2C;
+    }
+}
+
+// sub_1004B750's push_back: the name's fields, the payload's size at +0x18 and
+// the table at +0x28. The three offsets the builder recomputes stay zero.
+static void OocRegister(uint8_t* table)
+{
+    OocPakEntry entry{};
+    std::memcpy(entry.name, kOocName, sizeof(kOocName));
+    entry.name_size = static_cast<uint32_t>(sizeof(kOocName) - 1);
+    entry.name_capacity = static_cast<uint32_t>(sizeof(entry.name) - 1);
+    entry.file_size = static_cast<uint32_t>(kOocTableSize);
+    entry.data = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(table));
+    OocPakTable().push_back(entry);
+}
+
+// sub_1004B750: decode, register the entry, build the archive, publish the byte
+// count the mount string carries and return the archive. Its one-shot guard
+// dword_10159C00 is read and never written anywhere in the original, so every
+// call re-runs all of this and leaks the previous archive: kept 1:1.
+static uint32_t OocInitialise()
+{
+    // Unchecked, like the original: the decode writes through the block whether
+    // or not the allocation succeeded.
+    auto* table = static_cast<uint8_t*>(std::malloc(kOocTableSize));
+    static_cast<void>(OocDecodeBody(table));  // the original discards the answer
+    OocRegister(table);
+    // The builder clears the vector itself (its last call), and its final write
+    // cursor is the archive's byte count: the original's `mov ecx,
+    // dword_10159C78 / mov dword_10159BFC, ecx` after the call.
+    uint8_t* archive = static_cast<uint8_t*>(OocBuildArchiveBody());
+    zpatch_ooc_state = zpatch_ooc_offset;
+    return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(archive));
+}
+
+// fnv1a over a recovered block, for the self-check below only: it is the
+// fingerprint the recovered data's own header records.
+    static uint32_t OocFnv1a(const uint8_t* data, size_t size)
+    {
+        uint32_t hash = 2166136261u;
+        for (size_t index = 0; index < size; ++index)
+        {
+            hash ^= data[index];
+            hash *= 16777619u;
+        }
+        return hash;
+    }
+
+// The offline proof of the three rebuilt transforms: decode the recovered
+// resource, register the table, build the archive, and compare each result with
+// the fingerprint the recovered bytes must produce. Answers nullptr on success and
+// a short description of the first difference otherwise.
+//
+// The shipped ASI never calls this. The payload path only runs when the game
+// calls the wrapper at 0xB70733, which no offline tool can reach, so the decoder
+// and the builder would otherwise be unexecuted code; `zp_dump --ooc-selftest`
+// runs them against the pinned data instead (docs/parity.md). The two fnv1a
+// values are recomputed from `game_refs/ZolikaPatch_original.asi.off` by the
+// recipe in source/ooc_finale2.inc's header.
+export const char* OocSelfCheck()
+{
+    auto* table = static_cast<uint8_t*>(std::malloc(kOocTableSize));
+    if (table == nullptr)
+        return "the decoded table's allocation failed";
+    if (OocDecodeBody(table) == 0)
+    {
+        std::free(table);
+        return "the resource did not decode: terminator, output length or Adler-32 trailer";
+    }
+    const uint32_t table_hash = OocFnv1a(table, kOocTableSize);
+    OocRegister(table);
+    uint8_t* archive = static_cast<uint8_t*>(OocBuildArchiveBody());
+    const uint32_t final_offset = zpatch_ooc_offset;
+
+    const char* failure = nullptr;
+    if (table_hash != 0xC883859Fu)
+        failure = "the decoded table is not the recovered 179,536 bytes";
+    else if (final_offset != 182272u)
+        failure = "the archive is not the recovered 182,272 bytes";
+    else if (OocFnv1a(archive, final_offset) != 0xB5AF7B10u)
+        failure = "the archive is not the recovered layout";
+    else if ((archive[16] | (archive[17] << 8)) != 0x10u ||
+             (archive[18] | (archive[19] << 8)) != 0xE9u)
+        failure = "the archive header's page and opcode words are not 16 and 0xE9";
+    std::free(archive);
+    return failure;
+}
+
+// The test-only seam over the rebuilt init (tests/ooc_init.cpp, ctest
+// `zp_ooc_init`). Every entry names something this unit already has: `Initialise`
+// is the function `OocWrapBody` (0x1004C350) calls, `Decode` is the transcribed
+// driver 0x1004B570, `Register` is the push_back `sub_1004B750` makes at
+// 0x1004C287 (the five field stores and the `add dword_1016E440, 2Ch`),
+// `FrontEntry` reads the fake-pak vector at 0x1016E43C, `ClearEntries` is the
+// transcribed vector clear 0x10056500 that every init call ends with, and
+// `ResourceBytes` is the decoded resource itself. Nothing here is a second
+// implementation and nothing is instrumented: the init's own code is untouched, so
+// a test that drives it measures the shipped sequence.
+//
+// What it can change: a call writes the module's own slots (`zpatch_ooc_offset`,
+// `zpatch_ooc_state`, the fake-pak vector) exactly as the game's call would, and
+// hands the caller the archive the init built -- a block the original never frees
+// either, so a test that runs it N times owns N archives. It installs no arm, writes
+// no site, and scans nothing. Nor does it reach the shipped image: nothing in the ASI
+// calls these entries and they have no PE export, so /OPT:REF drops them (the linker
+// map has no `OocInit` symbol), while a test links the same object and calls them.
+//
+// One fact the seam exists to make visible: `dword_10159C00` (the original's
+// one-shot guard) has **no writer** -- it is named exactly once in the whole
+// image, at the read itself -- so the init re-runs on every call. This rebuild has
+// no guard variable at all, which is that fact stated in code: the second call
+// does the whole body again and leaks the previous archive, and `Run.slots` is what
+// lets a test watch each call leave the same 182,272-byte cursor behind.
+export namespace OocInit
+{
+    // The three slots a call leaves, by the ASI dword each one is.
+    struct Slots
+    {
+        uint32_t bytes;    // dword_10159C78: the builder's write cursor
+        uint32_t state;    // dword_10159BFC: the archive's byte count the mount carries
+        uint32_t entries;  // zpatch_ooc_pak.size(): the fake-pak registration
+    };
+
+    // A call's answer plus the slots it left. `archive` is EAX, the pointer the
+    // wrapper mounts; the archive is the caller's and is never freed.
+    struct Run
+    {
+        uint32_t archive;
+        Slots slots;
+    };
+
+    // The entry the init registers, read back out of zpatch_ooc_pak (44 bytes, the
+    // original's 0x1016E43C element). `entries` is the vector's size, not a field.
+    struct PakEntry
+    {
+        char name[16];           // +0x00 the std::string's inline buffer
+        uint32_t name_size;      // +0x10
+        uint32_t name_capacity;  // +0x14
+        uint32_t file_size;      // +0x18 the decoded table's size
+        uint32_t stored_offset;  // +0x1C
+        uint32_t stored_size;    // +0x20
+        uint32_t padding;        // +0x24
+        uint32_t data;           // +0x28 the decoded table
+        uint32_t entries;
+    };
+
+    // The recovered resource the decode reads (source/ooc_finale2.inc), so a test
+    // can hand the production init a damaged one.
+    struct Resource
+    {
+        uint32_t address;
+        uint32_t size;
+    };
+
+    // One call of the rebuilt init: the same function the mounting wrapper calls.
+    export Run Initialise();
+
+    // The slots as they stand, without calling anything.
+    export Slots Current();
+
+    // The transcribed decode driver (0x1004B570): 0x2BD50 on success, 0 otherwise.
+    export uint32_t Decode(uint32_t table);
+
+    // The init's registration step: answers zpatch_ooc_pak.size() afterwards.
+    export uint32_t Register(uint32_t table);
+
+    // The front entry of zpatch_ooc_pak; false when the vector is empty.
+    export bool FrontEntry(PakEntry& entry);
+
+    // The builder's own clear (0x10056500), which every init call ends with.
+    export uint32_t ClearEntries();
+
+    // The recovered resource's address and size, as the decode body names it.
+    export Resource ResourceBytes();
+}
+
+OocInit::Run OocInit::Initialise()
+{
+    Run run{};
+    run.archive = OocInitialise();
+    run.slots = Current();
+    return run;
+}
+
+OocInit::Slots OocInit::Current()
+{
+    return { zpatch_ooc_offset, zpatch_ooc_state,
+        static_cast<uint32_t>(zpatch_ooc_pak.size()) };
+}
+
+uint32_t OocInit::Decode(uint32_t table)
+{
+    return static_cast<uint32_t>(OocDecodeBody(reinterpret_cast<uint8_t*>(table)));
+}
+
+uint32_t OocInit::Register(uint32_t table)
+{
+    OocRegister(reinterpret_cast<uint8_t*>(table));
+    return static_cast<uint32_t>(zpatch_ooc_pak.size());
+}
+
+bool OocInit::FrontEntry(PakEntry& entry)
+{
+    if (zpatch_ooc_pak.empty())
+        return false;
+    const OocPakEntry& front = zpatch_ooc_pak.front();
+    std::memcpy(entry.name, front.name, sizeof(entry.name));
+    entry.name_size = front.name_size;
+    entry.name_capacity = front.name_capacity;
+    entry.file_size = front.file_size;
+    entry.stored_offset = front.stored_offset;
+    entry.stored_size = front.stored_size;
+    entry.padding = front.padding;
+    entry.data = front.data;
+    entry.entries = static_cast<uint32_t>(zpatch_ooc_pak.size());
+    return true;
+}
+
+uint32_t OocInit::ClearEntries()
+{
+    OocClearPakBody();
+    return static_cast<uint32_t>(zpatch_ooc_pak.size());
+}
+
+OocInit::Resource OocInit::ResourceBytes()
+{
+    return { static_cast<uint32_t>(reinterpret_cast<uintptr_t>(kOocResource)),
+        static_cast<uint32_t>(sizeof(kOocResource)) };
+}
+
+namespace
+{
+    // The two anchors, as the original handler's own scan strings name them. The
+    // first is five bytes starting inside the `mov eax, <magic>` that precedes the
+    // resource compare; the second is the device-lookup call the wrapper replaces.
+    constexpr std::string_view kOocBranchSignature = "A9 39 44 24 18";
+    constexpr std::string_view kOocWrapperSignature =
+        "E8 ? ? ? ? 8B 74 24 14 83 C4 08 6A 00 56";
+
+    // sub_10001670: the target a `call` at `site` names (`site + 5 + disp32`).
+    uint32_t CallTarget(const std::byte* site)
+    {
+        int32_t displacement{};
+        std::memcpy(&displacement, site + 1, sizeof(displacement));
+        return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(site) + 5 + displacement);
+    }
+
+    // The publish tier reads what the install tier overwrites: the resume is two
+    // instructions past the five bytes the E9 covers, and the wrapper replays the
+    // call at the site, so its original target has to be read before the retarget.
+    void PublishOutOfCommissionFix()
+    {
+        if (!Loader::Enabled("OutOfCommissionFix"))
+            return;
+
+        auto pattern = find_pattern(kOocBranchSignature);
+        if (!pattern.empty())
+        {
+            zpatch_ooc_resume = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 0x11);
+        }
+
+        pattern = find_pattern(kOocWrapperSignature);
+        if (!pattern.empty())
+        {
+            const auto* match = pattern.get_first<std::byte>(0);
+            zpatch_ooc_mount = CallTarget(match - 0x33);
+            zpatch_ooc_original = CallTarget(match);
+        }
+    }
+
+    // The install tier: the E9 at the first anchor's +7 and the E8 retarget at the
+    // second anchor, which is the original handler's write set on every build its
+    // scan hits.
+    void InstallOutOfCommissionFix()
+    {
+        if (!Loader::Enabled("OutOfCommissionFix"))
+            return;
+
+        auto pattern = find_pattern(kOocBranchSignature);
+        if (!pattern.empty())
+        {
+            Bodies::Register(reinterpret_cast<uintptr_t>(&OocBranchBody), 0x1004C3C0u);
+            injector::MakeJMP(pattern.get_first(7), reinterpret_cast<void*>(&OocBranchBody), true);
+        }
+
+        pattern = find_pattern(kOocWrapperSignature);
+        if (!pattern.empty())
+        {
+            Bodies::Register(reinterpret_cast<uintptr_t>(&OocWrapBody), 0x1004C350u);
+            injector::MakeCALL(pattern.get_first(0), reinterpret_cast<void*>(&OocWrapBody), true);
+        }
+    }
+}
+
+// Registered like every other arm: the publish tier reads the two sites the
+// install tier overwrites, and the install tier owns the writes. The decoder pair
+// carries its recovered VAs too, so a tool that ever branches into it can express
+// the branch in the original's coordinates.
+export void RegisterOoc()
+{
+    Bodies::Register(reinterpret_cast<uintptr_t>(&OocStepBody), 0x1004B150u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&OocDecodeBody), 0x1004B570u);
+
+    Loader::PublishEvent() += []
+    {
+        PublishOutOfCommissionFix();
+    };
+
+    Loader::InstallEvent() += []
+    {
+        InstallOutOfCommissionFix();
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Transcribed bodies. Each is the original's instruction stream, kept as asm
+// because that is what it is; the code above is what installs it.
+// ---------------------------------------------------------------------------
+
+// The transcribed bodies. They are file-scope `static` rather than members of the
+// anonymous namespace above for one reason: a proof row names a body's symbol in
+// the linker map, and MSVC decorates an anonymous-namespace function with a
+// generated `?A0x…` scope this file's edits would churn. A file-scope `static`
+// keeps the plain `?Ooc…@@YAXXZ` name the other transcribed bodies have, and it
+// still cannot be exported (a naked function with external linkage in a module
+// interface unit is written to the BMI and every importer fails with C2488).
 
 // sub_1004B150, recovered VA 0x1004B150 (406 instructions): the decoder's opcode
 // step. ECX is the stream's source cursor on entry and EAX the next one on exit --
@@ -786,105 +1236,6 @@ static __declspec(naked) int __fastcall OocDecodeBody(uint8_t* table)
     }
 }
 
-namespace
-{
-    // One entry of the original's fake-pak vector (a `std::vector` at 0x1016E43C
-    // with its three pointers at 0x1016E43C/40/44). The name is a std::string
-    // there; the only name ever registered is the eleven-character "finale2.sco",
-    // which fits its 16-byte small-string buffer, so the entry keeps that buffer
-    // as a fixed array and the layout stays the 44 bytes the builder walks.
-    struct OocPakEntry
-    {
-        char name[16];           // +0x00 the std::string's small-string buffer
-        uint32_t name_size;      // +0x10
-        uint32_t name_capacity;  // +0x14
-        uint32_t file_size;      // +0x18
-        uint32_t stored_offset;  // +0x1C
-        uint32_t stored_size;    // +0x20
-        uint32_t padding;        // +0x24
-        uint32_t data;           // +0x28
-    };
-    static_assert(sizeof(OocPakEntry) == 44, "the original's fake-pak entry is 44 bytes");
-
-    // The original's fake-pak vector, at a fixed address because the transcribed
-    // builder names its storage the way the original does: `mov [ebp-60h], offset
-    // Block` and `mov ecx, offset Block`, with the vector's begin/end read as
-    // `[Block]` / `[Block+4]`. It is a real `std::vector` so the C++ side of the
-    // module (the rebuilt init's push_back, the self-check) keeps using the
-    // container's own growth, and its three pointers are the original's three
-    // pointers at 0x1016E43C/40/44. C linkage gives the object the short `_name`
-    // symbol the proof and the operand map resolve; the layout is the same either
-    // way, and `OocPakTable()` is the only C++ path to it.
-    extern "C"
-    {
-        std::vector<OocPakEntry> zpatch_ooc_pak;
-    }
-
-    std::vector<OocPakEntry>& OocPakTable()
-    {
-        return zpatch_ooc_pak;
-    }
-}
-
-// The archive's 20-byte header and its 16-byte per-entry record are built on
-// the builder's own stack (`[ebp-28h]` and `[ebp-14h]`) by the two original
-// helpers below; their field order is the stores the transcription keeps:
-//
-//   header  +0x00 magic 0x86723DFF   +0x04 version 3   +0x08 entry count
-//           +0x0C name bytes        +0x10 page 0x10   +0x12 opcode 0xE9
-//   record  +0x00 stored size       +0x04 stored offset
-//           +0x08 index (1-based first page)  +0x0C pages | pad (0x2000 flag)
-//
-// The chunks the builder stamps are what OocInitialise and the self-check
-// measure: the header's two words at +0x10 are the `16`/`0xE9` pair.
-
-// The three CRT boundaries the builder crosses. The original calls a thunk to the
-// CRT's scalar `operator new` (0x100603F1), `memset` (0x10060D6E) and `free`
-// (0x1005FE89); the inline assembler cannot name the first two, and a direct call
-// would not keep the original's argument order, so each site calls one of these
-// cdecl forwarders instead -- one `E8`, the same arguments and the same routine.
-static void* __cdecl OocAllocate(unsigned int size)
-{
-    return ::operator new(size);
-}
-
-static void __cdecl OocZeroBlock(void* destination, int value, unsigned int count)
-{
-    std::memset(destination, value, count);
-}
-
-static void __cdecl OocFreeBlock(void* block)
-{
-    std::free(block);
-}
-
-// 0x1005CD50, the destroy loop the vector's clear runs over its elements
-// (`std::_Destroy_range` for the fake-pak entry). It is the one callee of the
-// transcribed set that stays rebuilt: it is the CRT's std::string destructor
-// loop, and its free path reads the string's internal capacity and, past
-// 0x1000, the allocator's block header, before calling `_invalid_parameter_
-// noinfo_noreturn` -- image-internal CRT state this module cannot name. The
-// loop below performs the same stores on the same 44-byte stride, and frees a
-// heap-allocated name the way the original does. Every entry this module ever
-// registers keeps its name in the inline buffer (capacity 0x0F), so the free
-// branch is unreachable from the tree's own data, exactly as it is in the
-// original for the single "finale2.sco" entry.
-static void __cdecl OocDestroyEntries(void* first, void* last)
-{
-    auto* entry = static_cast<uint8_t*>(first);
-    const auto* end = static_cast<const uint8_t*>(last);
-    while (entry != end)
-    {
-        const auto capacity = *reinterpret_cast<uint32_t*>(entry + 0x14);
-        if (capacity >= 0x10u)
-            std::free(*reinterpret_cast<void**>(entry));
-        *reinterpret_cast<uint32_t*>(entry + 0x10) = 0;
-        *reinterpret_cast<uint32_t*>(entry + 0x14) = 0x0Fu;
-        *entry = 0;
-        entry += 0x2C;
-    }
-}
-
 // The adapter between 0x10056500's call shape (first in ECX, last in EDX, the
 // allocator pushed as a third argument the original ignores) and the cdecl
 // helper above. The caller cleans the pushed word, as the original's
@@ -903,14 +1254,6 @@ static __declspec(naked) void OocDestroyEntriesBody()
         ret
     }
 }
-
-// The transcribed bodies. They are file-scope `static` rather than members of the
-// anonymous namespace above for one reason: a proof row names a body's symbol in
-// the linker map, and MSVC decorates an anonymous-namespace function with a
-// generated `?A0x…` scope this file's edits would churn. A file-scope `static`
-// keeps the plain `?Ooc…@@YAXXZ` name the other transcribed bodies have, and it
-// still cannot be exported (a naked function with external linkage in a module
-// interface unit is written to the BMI and every importer fails with C2488).
 
 // 0x1004AB70 (5 instructions, 16 bytes): zero the 20-byte header -- one SSE
 // 16-byte store and the dword at +0x10.
@@ -1167,19 +1510,6 @@ static __declspec(naked) void OocVectorClearBody()
         pop esi
         ret
     }
-}
-
-// sub_1004B750's push_back: the name's fields, the payload's size at +0x18 and
-// the table at +0x28. The three offsets the builder recomputes stay zero.
-static void OocRegister(uint8_t* table)
-{
-    OocPakEntry entry{};
-    std::memcpy(entry.name, kOocName, sizeof(kOocName));
-    entry.name_size = static_cast<uint32_t>(sizeof(kOocName) - 1);
-    entry.name_capacity = static_cast<uint32_t>(sizeof(entry.name) - 1);
-    entry.file_size = static_cast<uint32_t>(kOocTableSize);
-    entry.data = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(table));
-    OocPakTable().push_back(entry);
 }
 
 // sub_1004ACE0, recovered VA 0x1004ACE0 (314 instructions, 1,121 bytes): the
@@ -1556,25 +1886,6 @@ static __declspec(naked) void* OocBuildArchiveBody()
     }
 }
 
-// sub_1004B750: decode, register the entry, build the archive, publish the byte
-// count the mount string carries and return the archive. Its one-shot guard
-// dword_10159C00 is read and never written anywhere in the original, so every
-// call re-runs all of this and leaks the previous archive: kept 1:1.
-static uint32_t OocInitialise()
-{
-    // Unchecked, like the original: the decode writes through the block whether
-    // or not the allocation succeeded.
-    auto* table = static_cast<uint8_t*>(std::malloc(kOocTableSize));
-    static_cast<void>(OocDecodeBody(table));  // the original discards the answer
-    OocRegister(table);
-    // The builder clears the vector itself (its last call), and its final write
-    // cursor is the archive's byte count: the original's `mov ecx,
-    // dword_10159C78 / mov dword_10159BFC, ecx` after the call.
-    uint8_t* archive = static_cast<uint8_t*>(OocBuildArchiveBody());
-    zpatch_ooc_state = zpatch_ooc_offset;
-    return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(archive));
-}
-
 // sub_10001280, recovered VA 0x10001280: the bounded formatter, transcribed once
 // in source/stability.ixx and proved there instruction for instruction
 // (docs/rebuilt.md). A module interface cannot export a naked function, so this
@@ -1589,147 +1900,6 @@ static __declspec(naked) void OocFormat()
     }
 }
 
-// fnv1a over a recovered block, for the self-check below only: it is the
-// fingerprint the recovered data's own header records.
-    static uint32_t OocFnv1a(const uint8_t* data, size_t size)
-    {
-        uint32_t hash = 2166136261u;
-        for (size_t index = 0; index < size; ++index)
-        {
-            hash ^= data[index];
-            hash *= 16777619u;
-        }
-        return hash;
-    }
-
-// The offline proof of the three rebuilt transforms: decode the recovered
-// resource, register the table, build the archive, and compare each result with
-// the fingerprint the recovered bytes must produce. Answers nullptr on success and
-// a short description of the first difference otherwise.
-//
-// The shipped ASI never calls this. The payload path only runs when the game
-// calls the wrapper at 0xB70733, which no offline tool can reach, so the decoder
-// and the builder would otherwise be unexecuted code; `zp_dump --ooc-selftest`
-// runs them against the pinned data instead (docs/parity.md). The two fnv1a
-// values are recomputed from `game_refs/ZolikaPatch_original.asi.off` by the
-// recipe in source/ooc_finale2.inc's header.
-export const char* OocSelfCheck()
-{
-    auto* table = static_cast<uint8_t*>(std::malloc(kOocTableSize));
-    if (table == nullptr)
-        return "the decoded table's allocation failed";
-    if (OocDecodeBody(table) == 0)
-    {
-        std::free(table);
-        return "the resource did not decode: terminator, output length or Adler-32 trailer";
-    }
-    const uint32_t table_hash = OocFnv1a(table, kOocTableSize);
-    OocRegister(table);
-    uint8_t* archive = static_cast<uint8_t*>(OocBuildArchiveBody());
-    const uint32_t final_offset = zpatch_ooc_offset;
-
-    const char* failure = nullptr;
-    if (table_hash != 0xC883859Fu)
-        failure = "the decoded table is not the recovered 179,536 bytes";
-    else if (final_offset != 182272u)
-        failure = "the archive is not the recovered 182,272 bytes";
-    else if (OocFnv1a(archive, final_offset) != 0xB5AF7B10u)
-        failure = "the archive is not the recovered layout";
-    else if ((archive[16] | (archive[17] << 8)) != 0x10u ||
-             (archive[18] | (archive[19] << 8)) != 0xE9u)
-        failure = "the archive header's page and opcode words are not 16 and 0xE9";
-    std::free(archive);
-    return failure;
-}
-
-// The test-only seam over the rebuilt init (tests/ooc_init.cpp, ctest
-// `zp_ooc_init`). Every entry names something this unit already has: `Initialise`
-// is the function `OocWrapBody` (0x1004C350) calls, `Decode` is the transcribed
-// driver 0x1004B570, `Register` is the push_back `sub_1004B750` makes at
-// 0x1004C287 (the five field stores and the `add dword_1016E440, 2Ch`),
-// `FrontEntry` reads the fake-pak vector at 0x1016E43C, `ClearEntries` is the
-// transcribed vector clear 0x10056500 that every init call ends with, and
-// `ResourceBytes` is the decoded resource itself. Nothing here is a second
-// implementation and nothing is instrumented: the init's own code is untouched, so
-// a test that drives it measures the shipped sequence.
-//
-// What it can change: a call writes the module's own slots (`zpatch_ooc_offset`,
-// `zpatch_ooc_state`, the fake-pak vector) exactly as the game's call would, and
-// hands the caller the archive the init built -- a block the original never frees
-// either, so a test that runs it N times owns N archives. It installs no arm, writes
-// no site, and scans nothing. Nor does it reach the shipped image: nothing in the ASI
-// calls these entries and they have no PE export, so /OPT:REF drops them (the linker
-// map has no `OocInit` symbol), while a test links the same object and calls them.
-//
-// One fact the seam exists to make visible: `dword_10159C00` (the original's
-// one-shot guard) has **no writer** -- it is named exactly once in the whole
-// image, at the read itself -- so the init re-runs on every call. This rebuild has
-// no guard variable at all, which is that fact stated in code: the second call
-// does the whole body again and leaks the previous archive, and `Run.slots` is what
-// lets a test watch each call leave the same 182,272-byte cursor behind.
-export namespace OocInit
-{
-    // The three slots a call leaves, by the ASI dword each one is.
-    struct Slots
-    {
-        uint32_t bytes;    // dword_10159C78: the builder's write cursor
-        uint32_t state;    // dword_10159BFC: the archive's byte count the mount carries
-        uint32_t entries;  // zpatch_ooc_pak.size(): the fake-pak registration
-    };
-
-    // A call's answer plus the slots it left. `archive` is EAX, the pointer the
-    // wrapper mounts; the archive is the caller's and is never freed.
-    struct Run
-    {
-        uint32_t archive;
-        Slots slots;
-    };
-
-    // The entry the init registers, read back out of zpatch_ooc_pak (44 bytes, the
-    // original's 0x1016E43C element). `entries` is the vector's size, not a field.
-    struct PakEntry
-    {
-        char name[16];           // +0x00 the std::string's inline buffer
-        uint32_t name_size;      // +0x10
-        uint32_t name_capacity;  // +0x14
-        uint32_t file_size;      // +0x18 the decoded table's size
-        uint32_t stored_offset;  // +0x1C
-        uint32_t stored_size;    // +0x20
-        uint32_t padding;        // +0x24
-        uint32_t data;           // +0x28 the decoded table
-        uint32_t entries;
-    };
-
-    // The recovered resource the decode reads (source/ooc_finale2.inc), so a test
-    // can hand the production init a damaged one.
-    struct Resource
-    {
-        uint32_t address;
-        uint32_t size;
-    };
-
-    // One call of the rebuilt init: the same function the mounting wrapper calls.
-    export Run Initialise();
-
-    // The slots as they stand, without calling anything.
-    export Slots Current();
-
-    // The transcribed decode driver (0x1004B570): 0x2BD50 on success, 0 otherwise.
-    export uint32_t Decode(uint32_t table);
-
-    // The init's registration step: answers zpatch_ooc_pak.size() afterwards.
-    export uint32_t Register(uint32_t table);
-
-    // The front entry of zpatch_ooc_pak; false when the vector is empty.
-    export bool FrontEntry(PakEntry& entry);
-
-    // The builder's own clear (0x10056500), which every init call ends with.
-    export uint32_t ClearEntries();
-
-    // The recovered resource's address and size, as the decode body names it.
-    export Resource ResourceBytes();
-}
-
 // 0x10056500 takes its vector in ECX (the original's own frame: `push esi; mov
 // esi, ecx`), and a C++ call cannot pass one there, so the seam's clear enters it
 // exactly the way the builder does at its `ooc_build_done`: `mov ecx, OFFSET
@@ -1741,60 +1911,6 @@ static __declspec(naked) void OocClearPakBody()
         mov ecx, OFFSET zpatch_ooc_pak
         jmp OocVectorClearBody
     }
-}
-
-OocInit::Run OocInit::Initialise()
-{
-    Run run{};
-    run.archive = OocInitialise();
-    run.slots = Current();
-    return run;
-}
-
-OocInit::Slots OocInit::Current()
-{
-    return { zpatch_ooc_offset, zpatch_ooc_state,
-        static_cast<uint32_t>(zpatch_ooc_pak.size()) };
-}
-
-uint32_t OocInit::Decode(uint32_t table)
-{
-    return static_cast<uint32_t>(OocDecodeBody(reinterpret_cast<uint8_t*>(table)));
-}
-
-uint32_t OocInit::Register(uint32_t table)
-{
-    OocRegister(reinterpret_cast<uint8_t*>(table));
-    return static_cast<uint32_t>(zpatch_ooc_pak.size());
-}
-
-bool OocInit::FrontEntry(PakEntry& entry)
-{
-    if (zpatch_ooc_pak.empty())
-        return false;
-    const OocPakEntry& front = zpatch_ooc_pak.front();
-    std::memcpy(entry.name, front.name, sizeof(entry.name));
-    entry.name_size = front.name_size;
-    entry.name_capacity = front.name_capacity;
-    entry.file_size = front.file_size;
-    entry.stored_offset = front.stored_offset;
-    entry.stored_size = front.stored_size;
-    entry.padding = front.padding;
-    entry.data = front.data;
-    entry.entries = static_cast<uint32_t>(zpatch_ooc_pak.size());
-    return true;
-}
-
-uint32_t OocInit::ClearEntries()
-{
-    OocClearPakBody();
-    return static_cast<uint32_t>(zpatch_ooc_pak.size());
-}
-
-OocInit::Resource OocInit::ResourceBytes()
-{
-    return { static_cast<uint32_t>(reinterpret_cast<uintptr_t>(kOocResource)),
-        static_cast<uint32_t>(sizeof(kOocResource)) };
 }
 
 // sub_1004C3C0, recovered VA 0x1004C3C0 (7 instructions): the branch body the E9
@@ -1879,89 +1995,4 @@ static __declspec(naked) void OocWrapBody()
         pop ebp
         ret
     }
-}
-
-namespace
-{
-    // The two anchors, as the original handler's own scan strings name them. The
-    // first is five bytes starting inside the `mov eax, <magic>` that precedes the
-    // resource compare; the second is the device-lookup call the wrapper replaces.
-    constexpr std::string_view kOocBranchSignature = "A9 39 44 24 18";
-    constexpr std::string_view kOocWrapperSignature =
-        "E8 ? ? ? ? 8B 74 24 14 83 C4 08 6A 00 56";
-
-    // sub_10001670: the target a `call` at `site` names (`site + 5 + disp32`).
-    uint32_t CallTarget(const std::byte* site)
-    {
-        int32_t displacement{};
-        std::memcpy(&displacement, site + 1, sizeof(displacement));
-        return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(site) + 5 + displacement);
-    }
-
-    // The publish tier reads what the install tier overwrites: the resume is two
-    // instructions past the five bytes the E9 covers, and the wrapper replays the
-    // call at the site, so its original target has to be read before the retarget.
-    void PublishOutOfCommissionFix()
-    {
-        if (!Loader::Enabled("OutOfCommissionFix"))
-            return;
-
-        auto pattern = find_pattern(kOocBranchSignature);
-        if (!pattern.empty())
-        {
-            zpatch_ooc_resume = static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 0x11);
-        }
-
-        pattern = find_pattern(kOocWrapperSignature);
-        if (!pattern.empty())
-        {
-            const auto* match = pattern.get_first<std::byte>(0);
-            zpatch_ooc_mount = CallTarget(match - 0x33);
-            zpatch_ooc_original = CallTarget(match);
-        }
-    }
-
-    // The install tier: the E9 at the first anchor's +7 and the E8 retarget at the
-    // second anchor, which is the original handler's write set on every build its
-    // scan hits.
-    void InstallOutOfCommissionFix()
-    {
-        if (!Loader::Enabled("OutOfCommissionFix"))
-            return;
-
-        auto pattern = find_pattern(kOocBranchSignature);
-        if (!pattern.empty())
-        {
-            Bodies::Register(reinterpret_cast<uintptr_t>(&OocBranchBody), 0x1004C3C0u);
-            injector::MakeJMP(pattern.get_first(7), reinterpret_cast<void*>(&OocBranchBody), true);
-        }
-
-        pattern = find_pattern(kOocWrapperSignature);
-        if (!pattern.empty())
-        {
-            Bodies::Register(reinterpret_cast<uintptr_t>(&OocWrapBody), 0x1004C350u);
-            injector::MakeCALL(pattern.get_first(0), reinterpret_cast<void*>(&OocWrapBody), true);
-        }
-    }
-}
-
-// Registered like every other arm: the publish tier reads the two sites the
-// install tier overwrites, and the install tier owns the writes. The decoder pair
-// carries its recovered VAs too, so a tool that ever branches into it can express
-// the branch in the original's coordinates.
-export void RegisterOoc()
-{
-    Bodies::Register(reinterpret_cast<uintptr_t>(&OocStepBody), 0x1004B150u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&OocDecodeBody), 0x1004B570u);
-
-    Loader::PublishEvent() += []
-    {
-        PublishOutOfCommissionFix();
-    };
-
-    Loader::InstallEvent() += []
-    {
-        InstallOutOfCommissionFix();
-    };
 }

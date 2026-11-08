@@ -20,33 +20,6 @@ import shared;
 
 // The load-time arms: the fixes the original applies while the game is loading,
 // one arm per INI key, each anchored to its own recovered signature.
-namespace
-{
-    // FastLoading: the ten-millisecond sleep the streaming code takes between
-    // batches. The arm zeroes the pushed `sleep(10)` argument; the original handler
-    // writes the one byte at the anchor's +1.
-    void InstallFastLoading()
-    {
-        if (!Loader::Enabled("FastLoading"))
-            return;
-
-        auto pattern = find_pattern("6A 0A E8 ? ? ? ? 83 C7 0A 83 C4 04 81 FF E8 03 00 00 75 02 33 FF");
-        if (!pattern.empty())
-            injector::WriteMemory<std::byte>(pattern.get_first<std::byte>(1), Bytes::Zero, true);
-    }
-
-    // NoLoadingSleep: the loading screen's five-second `Sleep(5000)` becomes
-    // `Sleep(0)`. The arm zeroes the pushed immediate at the anchor's +1.
-    void InstallNoLoadingSleep()
-    {
-        if (!Loader::Enabled("NoLoadingSleep"))
-            return;
-
-        auto pattern = find_pattern("68 88 13 00 00 FF 15");
-        if (!pattern.empty())
-            injector::WriteMemory<uint32_t>(pattern.get_first<uint32_t>(1), 0u, true);
-    }
-}
 
 // RemoveGFWLUpdatePopup, as the original handler sub_10005500 applies it: the
 // update window's date arithmetic at game 0x7CBF70 is replaced by a stub that
@@ -55,103 +28,11 @@ namespace
 // The published state of the arms below, in C linkage because the transcribed
 // code names the slots directly (the original keeps them in its own .bss beside
 // its bodies).
+
 extern "C"
 {
     uint32_t zpatch_gfwl_resume = 0;  // dword_10159C18
     uint32_t zpatch_xlive_base = 0;   // dword_10159C10
-}
-
-// sub_10005340's RemoveGFWLUpdatePopup branch: store the "update disabled" dword
-// into the four xlive.dll flag slots. `zpatch_xlive_base` is the module the
-// loader captured; when xlive.dll is absent it is null and the write lands on the
-// low 0x66F770 page, which is the original's fault (preserved, not guarded).
-static void GfwlPatch()
-{
-    for (const uint32_t offset : { 0x66F770u, 0x66F774u, 0x6B55D0u, 0x6B55F0u })
-        injector::WriteMemory<uint32_t>(zpatch_xlive_base + offset, 0x10000E83u, true);
-}
-
-// sub_100054E0, recovered VA 0x100054E0 (8 instructions): the shared
-// Patch4RemoveModChecks / RemoveGFWLUpdatePopup stub. It runs the flag-gated
-// helper between pusha/popa, replays the 64-bit ECX:ESI subtraction from EDX:EAX
-// the site held (and the two stores of its result into the caller's argument
-// slots), then tail-jumps to the replayed site's continuation. `pusha`/`popa` are
-// emitted as bytes: the inline assembler renders both with a 0x66 operand-size
-// prefix, which the original does not have.
-static __declspec(naked) void GfwlStubBody()
-{
-    __asm
-    {
-        __emit 0x60  // pusha
-        call GfwlPatch
-        __emit 0x61  // popa
-        sub eax, ecx
-        sbb edx, esi
-        mov DWORD PTR [esp + 0Ch], eax
-        mov DWORD PTR [esp + 10h], edx
-        jmp DWORD PTR [zpatch_gfwl_resume]
-    }
-}
-
-namespace
-{
-    // RemoveGFWLUpdatePopup: the anchor's first twelve bytes are the subtraction
-    // and its two stores; the stub replays them and resumes at match + 12.
-    void InstallRemoveGFWLUpdatePopup()
-    {
-        if (!Loader::Enabled("RemoveGFWLUpdatePopup"))
-            return;
-
-        // dword_10159C10: the xlive.dll module the original's loader captures.
-        zpatch_xlive_base =
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(GetModuleHandleA("xlive.dll")));
-
-        auto pattern = find_pattern("2B C1 1B D6 89 44 24 0C 89 54 24 10 DF 6C 24 0C D8 0D ? ? ? ? D9 5C 24 08");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            zpatch_gfwl_resume = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match) + 12);
-            injector::MakeJMP(match, reinterpret_cast<void*>(&GfwlStubBody), true);
-        }
-    }
-}
-
-// sub_10038550, recovered VA 0x10038550 (2 instructions): the RGSC login check's
-// replacement. It sets only AL, so the caller sees "already signed in" and the
-// upper 24 bits of EAX stay whatever the caller had, exactly as the original.
-static __declspec(naked) void RgscLoginRemovedBody()
-{
-    __asm
-    {
-        mov al, 1
-        ret
-    }
-}
-
-namespace
-{
-    // RemoveRGSCLoginRequirement: the login-required branch of the RGSC launch
-    // path. On 1.0.8.0 the original writes the same five-byte jump twice (the
-    // duplicate is kept); the second anchor never matches on that build but does
-    // on the ones the key was gated for.
-    void InstallRemoveRGSCLoginRequirement()
-    {
-        if (!Loader::Enabled("RemoveRGSCLoginRequirement"))
-            return;
-
-        auto pattern = find_pattern("8B 44 24 ? 85 C0 74 ? F3 0F 7E 05 ? ? ? ? 66 0F D6 00");
-        if (Loader::Current() == Build::v1080 && !pattern.empty())
-        {
-            auto* site = pattern.get_first<std::byte>(0);  // 0x498460
-            injector::MakeJMP(site, reinterpret_cast<void*>(&RgscLoginRemovedBody), true);
-            injector::MakeJMP(site, reinterpret_cast<void*>(&RgscLoginRemovedBody), true);
-        }
-
-        pattern = find_pattern("83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53 8B 5C 24 4C 56 68 ? ? ? ? E8 ? ? ? ? 83 C4");
-        if (!pattern.empty())
-            injector::MakeJMP(pattern.get_first<std::byte>(0),
-                reinterpret_cast<void*>(&RgscLoginRemovedBody), true);
-    }
 }
 
 namespace
@@ -160,80 +41,16 @@ namespace
     // pointer; the original retargets every one of them (its handler collects all
     // matches) to its own timing word at the anchor's +6. The word itself is zero.
     uint32_t zpatch_startup_time = 0;
-
-    void InstallStartupTimeFix()
-    {
-        if (!Loader::Enabled("StartupTimeFix"))
-            return;
-
-        // Three sites on 1.0.8.0: the scan hint has to ask for all of them (the
-        // scanner stops at the hint).
-        auto pattern = find_pattern<3>("68 00 C2 EC 80 68");
-        if (!pattern.empty())
-        {
-            for (size_t index = 0; index < pattern.size(); ++index)
-            {
-                injector::WriteMemory<uint32_t>(pattern.get(index).get<std::byte>(6),
-                    static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&zpatch_startup_time)), true);
-                Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(pattern.get(index).get<std::byte>(6)));
-            }
-        }
-    }
 }
 
 // The published state of the two build-gated arms below, in C linkage because the
 // transcribed code names the slots directly. Each comment names the original's own
 // resume word, the dword its body's `jmp` reads (0x10005659 and 0x10005679).
+
 extern "C"
 {
     uint32_t zpatch_benchmark_resume_a = 0;  // dword_1015AD50
     uint32_t zpatch_benchmark_resume_b = 0;  // dword_1015AD54
-}
-
-// sub_10005650, recovered VA 0x10005650: BenchmarkFix's first match-site shim. It
-// checks the benchmark object, runs the interposed callback (ESI with EDI), then
-// resumes, or unwinds through the enclosing function's tail when the object is
-// null.
-static __declspec(naked) void BenchmarkBodyA()
-{
-    __asm
-    {
-        test eax, eax
-        jz benchmark_a_zero
-        push edi
-        mov ebx, eax
-        call esi
-        jmp DWORD PTR [zpatch_benchmark_resume_a]
-    benchmark_a_zero:
-        xor al, al
-        pop esi
-        pop ebp
-        pop ebx
-        add esp, 10h
-        ret
-    }
-}
-
-// sub_10005670, recovered VA 0x10005670: BenchmarkFix's second match-site shim,
-// the same shape as the first with its own resume.
-static __declspec(naked) void BenchmarkBodyB()
-{
-    __asm
-    {
-        test eax, eax
-        jz benchmark_b_zero
-        push edi
-        mov ebx, eax
-        call esi
-        jmp DWORD PTR [zpatch_benchmark_resume_b]
-    benchmark_b_zero:
-        xor al, al
-        pop esi
-        pop ebp
-        pop ebx
-        add esp, 10h
-        ret
-    }
 }
 
 namespace
@@ -243,86 +60,245 @@ namespace
     // neither anchor exists, so the arm is inert on that image.
     uint32_t zpatch_vsync_flag = 0;
 
-    void InstallVSyncFix()
-    {
-        if (!Loader::Enabled("VSyncFix"))
-            return;
-
-        auto pattern = find_pattern("8B 08 8B 51 0C 6A 01 6A 00 6A 00 6A 00 6A 00 50 FF D2 8B F0 81 FE ? ? ? ? 74");
-        if (!pattern.empty())
-        {
-            injector::WriteMemory<uint32_t>(pattern.get_first<std::byte>(30),
-                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&zpatch_vsync_flag)), true);
-            Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(30)));
-        }
-
-        pattern = find_pattern("8B 10 50 8B 82 A8 00 00 00 FF D0 83");
-        if (!pattern.empty())
-        {
-            injector::WriteMemory<uint32_t>(pattern.get_first<std::byte>(13),
-                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&zpatch_vsync_flag)), true);
-            Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(13)));
-        }
-    }
-
-    // BenchmarkFix: two match sites eight bytes into the matched call sequence.
-    // The resume is the anchor's +13, read before the sites are overwritten; the
-    // key's build mask excludes 1.0.8.0, so this arm is inert on that image.
-    void InstallBenchmarkFix()
-    {
-        if (!Loader::Enabled("BenchmarkFix"))
-            return;
-
-        auto pattern = find_pattern<2>("E8 ? ? ? ? 83 C4 04 57 8B D8 FF D6 8B 77 20");
-        if (!pattern.empty())
-        {
-            const auto resume = static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(pattern.get(0).get<std::byte>(0)) + 13);
-            zpatch_benchmark_resume_a = resume;
-            zpatch_benchmark_resume_b = resume;
-
-            injector::MakeJMP(pattern.get(0).get<std::byte>(8), reinterpret_cast<void*>(&BenchmarkBodyA), true);
-            if (pattern.size() > 1)
-                injector::MakeJMP(pattern.get(1).get<std::byte>(8), reinterpret_cast<void*>(&BenchmarkBodyB), true);
-        }
-    }
-}
-
-namespace
-{
     // OverrideGTADatPath's sibling key: the path the game's gta.dat push is
     // retargeted to. The original's buffer is 64 bytes and its static initializer
     // holds the stock path; the loader overwrites it from OverrideGTADatPathTo
     // with strcpy_s, so a value of 64 bytes or more faults through the CRT's
     // invalid-parameter path (preserved). Absent or "0" leaves the initializer.
     char zpatch_dat_path[64] = "common:/data/gta.dat";
-
-    void CopyOverrideDatPath()
-    {
-        const std::string fallback("0");
-        const auto& value = Feather::Value(Config::Ini(), "Options", "OverrideGTADatPathTo", fallback);
-        if (value == "0")
-            return;
-
-        strcpy_s(zpatch_dat_path, sizeof(zpatch_dat_path), value.c_str());
-    }
-
-    // OverrideGTADatPath: the anchor is the gta.dat loader's `push <char*>`, and
-    // the original rewrites just that immediate (the anchor's +1).
-    void InstallOverrideGTADatPath()
-    {
-        if (!Loader::Enabled("OverrideGTADatPath"))
-            return;
-
-        auto pattern = find_pattern("68 ? ? ? ? E8 ? ? ? ? 83 C4 04 E8 ? ? ? ? E8 ? ? ? ? E8");
-        if (!pattern.empty())
-        {
-            injector::WriteMemory<uint32_t>(pattern.get_first<std::byte>(1),
-                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(zpatch_dat_path)), true);
-            Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(1)));
-        }
-    }
 }
+
+extern "C"
+{
+    uint32_t zpatch_skip_intro_match = 0;    // dword_1015AD74
+    uint32_t zpatch_skip_menu_resume = 0;    // dword_10159348
+    uint8_t zpatch_skip_menu_flag = 0;       // byte_101A8450
+}
+
+// SavegameFix's four replacement functions, transcribed from the original's
+// bodies. They replace game functions the save pipeline calls; each keeps the
+// original's __stdcall argument cleanup.
+
+extern "C"
+{
+    uintptr_t zpatch_savegame_close_handle = 0;   // &CloseHandle
+    uintptr_t zpatch_savegame_create_mutex = 0;   // &CreateMutexA
+}
+
+// LocalSettingsPath, as the original handler sub_100513A0 applies it:
+//
+//   * two operand writes at the game's local-settings function (game 0x61E770):
+//     the `call dword ptr [SHGetFolderPathA]` slot becomes this module's four-byte
+//     call slot (original off_10158064, which pointed the game at its replacement
+//     path helper sub_10051320), and the `push "Rockstar Games\GTA IV"` argument
+//     becomes the "\GTA IV" suffix this module owns;
+//   * a jump at the epilogue of the wide path initializer (game 0x856EE6) to the
+//     detour body, and the same at the fallback epilogue (a site that does not
+//     exist on 1.0.8.0);
+//   * five captured game pointers the detour's step helper rewrites.
+
+namespace
+{
+    // The size the original's strcpy_s/wcscpy_s copies pass, and the size of the
+    // CWD buffer its replacement path helper formats into.
+    constexpr std::size_t kLocalPathCapacity = 0x200u;
+    constexpr std::size_t kLocalCwdCapacity = 260u;
+
+    // The published state, in C linkage because the detour body's helper reads the
+    // slots the way the original's bodies read its own .bss.
+    char zpatch_local_ansi_cwd[kLocalCwdCapacity] = {};
+    char zpatch_local_iv_suffix[8] = "\\GTA IV";
+    uint32_t zpatch_local_saves_slot = 0;
+    char* zpatch_local_path_08 = nullptr;          // szPathLocalAppdata
+    wchar_t* zpatch_local_path_10 = nullptr;       // wszPathLocalAppdataW_EP
+    const int* zpatch_local_episode_ptr = nullptr; // __dwCurrentEpisode
+    char* zpatch_local_path_18 = nullptr;          // szPathLocalAppdata_EP
+    wchar_t* zpatch_local_path_1c = nullptr;       // wszPathLocalAppdataW
+}
+
+// ---------------------------------------------------------------------------
+// NewMemorySystem, as the original handler applies it: the allocator-initialisation
+// call at game 0x107A is retargeted to this module's vtable installer, and a jump
+// at 0x107F skips the five-slot clear the installer replaces, resuming at 0x108C.
+//
+// The table is the original's CRageAllocator vtable (original 0x100B5038, 24
+// slots). Ten of its methods are transcribed below as bodies; the three arena
+// methods (allocate 0x10038360, free 0x10038430, "is this mine" 0x100385A0) are
+// compiled code in the original and are rebuilt in C++; five slots point at
+// bodies another arm already installs, because the original's table does exactly
+// that (0x10038550 RGSC login, 0x10038570 savegame null path, 0x100057F0 MP sync).
+
+namespace
+{
+    constexpr uint32_t kNmsVtableSlots = 24;
+    constexpr uint8_t kNmsHeapPoison = 0xCD;  // the fill the original memsets with
+}
+
+extern "C"
+{
+    // dword_10159CD8: the address the arm reads from the allocator init's
+    // `mov esi, <singleton>` operand.
+    uint32_t zpatch_nms_object = 0;
+
+    // 0x100B5038: the vtable the installer writes into that singleton.
+    uint32_t zpatch_nms_vtable[kNmsVtableSlots] = {};
+}
+
+// ---------------------------------------------------------------------------
+// NewFilesCompatibility, as the original handler applies it: the two sides are the
+// script native it registers and the radio-HUD texture lookups. The two radio-HUD
+// update calls become this module's bodies and the registrar's own `ret` becomes a
+// jump to the registration body. Both arms are gated on the two modules the original
+// refuses to run beside. What the three radio-HUD pieces resolve to - the current
+// texture dictionary, pgDictionary::Lookup and CSprite2d::SetTexture - is recorded in
+// docs/rebuilt.md 2m, since none of them can be driven offline.
+
+extern "C"
+{
+    // dword_10159C08: the game's file-registration entry, published from the
+    // `call` operand the registrar site carries.
+    uint32_t zpatch_newfiles_register_slot = 0;
+}
+
+// ---------------------------------------------------------------------------
+// NewSavesCompatibility, as the original handler sub_10052200 applies it: the
+// savegame-load entry is jumped to a trampoline that runs the prepare step, then
+// replays the thirteen bytes the jump swallowed and resumes at the entry's +0xD.
+//
+// The two steps behind the trampoline are compiled C in the original and are
+// rebuilt here with the same call sequence, the same conditions and the same
+// writes:
+//
+//   * sub_10051FD0 (prepare) asks the game's own save-directory function for the
+//     directory, builds "<directory>\<name>" from the buffer the handler captured,
+//     and hands that path to the converter;
+//   * sub_10051B30 (converter) opens the file, checks the 0x110-byte header's
+//     "SAVE" magic at +0xC, walks the eighteen 9-byte chunk headers (allocating,
+//     reading and freeing each payload), keeps three chunk sizes, and then patches
+//     the three game sites whose reads depend on the save layout: the branch
+//     opcode at 0x872185, the read call + pushed read size + branch at 0x7D8C50,
+//     and the second LoadData call at 0x8DA090.
+//
+// The converter takes from the game exactly what the original takes: the
+// directory function (called, not imitated) and the save-name buffer named by the
+// handler's first anchor. Everything else is the save file itself, so the three
+// writes are a deterministic function of the file's chunk sizes and of signatures
+// that occur exactly once wherever they exist (checked against every image in
+// game_refs).
+//
+// The two hooks the converter installs are compiled C in the original as well:
+// sub_10051A90 reads the caller's bytes into its own 0xE78-byte scratch and keeps
+// only the return value, and sub_10051AD0 consumes the newer save's extra twelve
+// bytes on both sides of the original LoadData call. Both are rebuilt here with
+// the same stack buffers and the same return-value rules.
+
+extern "C"
+{
+    // The published state, by the names the original keeps in its own .bss.
+    uint32_t zpatch_new_saves_src = 0;          // dword_1015AD9C: the game's save-name buffer
+    uint32_t zpatch_new_saves_resume = 0;       // dword_1015AD88: the load entry's +0xD
+    uint32_t zpatch_new_saves_loaddata = 0;     // dword_1015AD94: the game's LoadData entry
+    uint32_t zpatch_new_saves_p3_original = 0;  // dword_1015AD8C: the second LoadData call
+    uint8_t zpatch_new_saves_force_read = 0;    // byte_1015AD98: chunk 9 has the newer size
+    uint8_t zpatch_new_saves_new_chunk16 = 0;   // byte_1015AD9A: chunk 16 has the newer size
+    uint8_t zpatch_new_saves_extra_block = 0;   // byte_1015AD99: chunk 13 has the newer size
+}
+
+// ---------------------------------------------------------------------------
+// LoadDLCs, as the original handler sub_100234E0 applies it.
+//
+// The handler does not scan: per build it stores three game entry points and then
+// rewrites six sites, each at a fixed RVA, with the instruction it computes in
+// place (an optional jump/call to another fixed RVA, a jump/call to one of the two
+// bodies below, or a twelve-byte NOP fill). The rows were read from the handler
+// itself, which switches on the build id; 1.0.8.0 is the `cmp eax, 9` block and
+// its `lea`/`add` immediates are the RVAs recorded here. The sites were checked
+// against GTAIV_1060.exe, GTAIV_1070.exe and GTAIV.exe: each carries the shape the
+// row replaces (`E8` for a call site, `E8` for the two rewritten call sites, `B8`
+// for the struct-fixup site, and the register/callback body of the loader for the
+// tail NOPs).
+//
+// The two bodies: 0x10023480 replaces the loader callback the register function
+// calls (it reports success), and 0x10023490 replaces the DLC manager's
+// initialisation tail, clearing five request slots and - the first time - running
+// the discovery pass before marking the object loaded.
+
+extern "C"
+{
+    // dword_1015BDDC: the loader callback, an absolute address.
+    uint32_t zpatch_dlc_load_callback = 0;
+    // dword_1015804C / dword_101580D0: the register and apply entry points, which
+    // the original stores as RVAs and adds the image base to at the call.
+    uint32_t zpatch_dlc_register_rva = 0;
+    uint32_t zpatch_dlc_apply_rva = 0;
+    // dword_1015AD70: the image base the discovery adds those RVAs to.
+    uint32_t zpatch_dlc_game_base = 0;
+}
+
+// The bounded formatter's entry, published by source/stability.ixx (sub_10001280).
+
+extern "C"
+{
+    extern uint32_t zpatch_format_entry;
+}
+
+// The discovery pass's data (original sub_10023150): the five imported entries it
+// calls through the original's own IAT slots, and the five literals it pushes. Each
+// IAT operand is an absolute address, so the transcription names these slots and the
+// instructions keep the original's `call ds:[...]` / `mov reg, ds:[...]` shapes.
+
+extern "C"
+{
+    uint32_t zpatch_dlc_get_module_file_name = 0;   // 0x10063004 GetModuleFileNameA
+    uint32_t zpatch_dlc_path_remove_file_spec = 0;  // 0x10063250 PathRemoveFileSpecA
+    uint32_t zpatch_dlc_path_file_exists = 0;       // 0x1006324C PathFileExistsA
+    uint32_t zpatch_dlc_strcpy_s = 0;               // 0x10063388 strcpy_s
+    uint32_t zpatch_dlc_strcat_s = 0;               // 0x100633A8 strcat_s
+
+    // The original's own text: the two "content" layouts at 0x1012BD08/0x1012BDB0,
+    // their legacy fallbacks at 0x1012BD60/0x1012BE08, and the episode format at
+    // 0x1012BE54.
+    const char zpatch_dlc_tlad_content[] = "\\dlc\\tlad\\content\\";
+    const char zpatch_dlc_tlad_legacy[] = "\\TLAD\\";
+    const char zpatch_dlc_tbogt_content[] = "\\dlc\\TBoGT\\content\\";
+    const char zpatch_dlc_tbogt_legacy[] = "\\TBoGT\\";
+    const char zpatch_dlc_episode_format[] = "\\Episode%d\\";
+}
+
+// The transcribed bodies are defined in the tail of this file. MSVC rejects a
+// __declspec(naked) declaration (C2488: "'naked' can only be applied to non-member
+// function definitions"), so the readable code above them takes each body's address
+// through one of these accessors; their definitions follow the bodies.
+static uintptr_t GfwlStubBodyAddress();
+static uintptr_t RgscLoginRemovedBodyAddress();
+static uintptr_t BenchmarkBodyAAddress();
+static uintptr_t BenchmarkBodyBAddress();
+static uintptr_t SkipIntroBodyAddress();
+static uintptr_t SkipMenuBodyAddress();
+static uintptr_t SavegameNullBodyAddress();
+static uintptr_t SavegameCloseBodyAddress();
+static uintptr_t SavegameMutexBodyAddress();
+static uintptr_t SavegameCopyBodyAddress();
+static uintptr_t LocalSettingsDetourBodyAddress();
+static uintptr_t LocalSettingsFallbackBodyAddress();
+static uintptr_t NmsNoopRet0BodyAddress();
+static uintptr_t NmsCtorBodyAddress();
+static uintptr_t NmsRejectPtrBodyAddress();
+static uintptr_t NmsSelfBodyAddress();
+static uintptr_t NmsZeroBodyAddress();
+static uintptr_t NmsNoopPairBodyAddress();
+static uintptr_t NmsRejectBodyAddress();
+static uintptr_t NmsSyncBodyAddress();
+static uintptr_t NmsNoopArgBodyAddress();
+static uintptr_t NmsThunk18BodyAddress();
+static uintptr_t NmsApplyBodyAddress();
+static uintptr_t NewfilesRegisterBodyAddress();
+static uintptr_t NewSavesReadHookAddress();
+static uintptr_t NewSavesSecondLoadHookAddress();
+static uintptr_t NewSavesTrampolineAddress();
+static uintptr_t DlcDiscoveryAddress();
+static uintptr_t DlcDummyBodyAddress();
+static uintptr_t DlcStructFixupBodyAddress();
 
 // The original's FusionFix probe (sub_10003E20): a loaded
 // GTAIV.EFLC.FusionFix.asi whose two signature dwords do not match the known
@@ -342,179 +318,14 @@ static bool FusionFixGateClosed()
     return first != 0xC7C47589u || second != 0x00002446u;
 }
 
-extern "C"
+// sub_10005340's RemoveGFWLUpdatePopup branch: store the "update disabled" dword
+// into the four xlive.dll flag slots. `zpatch_xlive_base` is the module the
+// loader captured; when xlive.dll is absent it is null and the write lands on the
+// low 0x66F770 page, which is the original's fault (preserved, not guarded).
+static void GfwlPatch()
 {
-    uint32_t zpatch_skip_intro_match = 0;    // dword_1015AD74
-    uint32_t zpatch_skip_menu_resume = 0;    // dword_10159348
-    uint8_t zpatch_skip_menu_flag = 0;       // byte_101A8450
-}
-
-// sub_10045C30, recovered VA 0x10045C30 (6 instructions): the intro-screen
-// detour. Entered through a jump from the anchor's -6 with the site's ECX and
-// EDX; it scales ECX by 400 and zeroes EDX below the 8000 threshold, which is
-// what skips the intro outright, then resumes at the anchor.
-static __declspec(naked) void SkipIntroBody()
-{
-    __asm
-    {
-        imul ecx, ecx, 190h
-        cmp edx, 1F40h
-        jge skip_intro_ok
-        xor edx, edx
-    skip_intro_ok:
-        jmp DWORD PTR [zpatch_skip_intro_match]
-    }
-}
-
-// sub_10046610, recovered VA 0x10046610 (12 instructions): the menu detour. The
-// site's call is retargeted to this body, whose first call with a zero argument
-// switches the menu id to 6 (one-shot through the flag), then tail-jumps to the
-// original call's target; the call's own return address stays on the stack, so
-// the target returns to the game's next instruction.
-static __declspec(naked) void SkipMenuBody()
-{
-    __asm
-    {
-        push ebp
-        mov ebp, esp
-        cmp BYTE PTR [zpatch_skip_menu_flag], 0
-        mov eax, DWORD PTR [ebp + 8]
-        jne skip_menu_go
-        test eax, eax
-        jne skip_menu_go
-        mov eax, 6
-        mov BYTE PTR [zpatch_skip_menu_flag], 1
-    skip_menu_go:
-        mov DWORD PTR [ebp + 8], eax
-        pop ebp
-        jmp DWORD PTR [zpatch_skip_menu_resume]
-    }
-}
-
-namespace
-{
-    // SkipIntro: the anchor is the intro sequence's store; the arm jumps from the
-    // anchor's -6, and the body resumes at the anchor itself.
-    void InstallSkipIntro()
-    {
-        if (!Loader::Enabled("SkipIntro") || FusionFixGateClosed())
-            return;
-
-        auto pattern = find_pattern("89 91 ? ? ? ? 8D 44 24 ? 68 ? ? ? ? 50");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            zpatch_skip_intro_match = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match));
-            injector::MakeJMP(match - 6, reinterpret_cast<void*>(&SkipIntroBody), true);
-        }
-    }
-
-    // SkipMenu: each anchor's call is retargeted to the body, and the resume is
-    // the call's original target (the call's displacement is read before the
-    // site is overwritten).
-    void InstallSkipMenu()
-    {
-        if (!Loader::Enabled("SkipMenu") || FusionFixGateClosed())
-            return;
-
-        auto pattern = find_pattern("83 F8 03 75 ? A1 ? ? ? ? 80 88 ? ? ? ? ? 84 DB 74 0A 6A 00 E8 ? ? ? ? 83 C4 04 5F 5E");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            int32_t displacement{};
-            std::memcpy(&displacement, match + 24, sizeof(displacement));
-            zpatch_skip_menu_resume = static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(match) + 28 + displacement);
-            injector::MakeCALL(match + 23, reinterpret_cast<void*>(&SkipMenuBody), true);
-        }
-
-        pattern = find_pattern("6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5D 5B 33 CC E8 ? ? ? ? 81 C4 ? ? ? ? C3");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            int32_t displacement{};
-            std::memcpy(&displacement, match + 3, sizeof(displacement));
-            zpatch_skip_menu_resume = static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(match) + 7 + displacement);
-            injector::MakeCALL(match + 2, reinterpret_cast<void*>(&SkipMenuBody), true);
-        }
-
-        pattern = find_pattern("6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC E8 ? ? ? ? 8B E5 5D C3");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            int32_t displacement{};
-            std::memcpy(&displacement, match + 3, sizeof(displacement));
-            zpatch_skip_menu_resume = static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(match) + 7 + displacement);
-            injector::MakeCALL(match + 2, reinterpret_cast<void*>(&SkipMenuBody), true);
-        }
-    }
-}
-
-// SavegameFix's four replacement functions, transcribed from the original's
-// bodies. They replace game functions the save pipeline calls; each keeps the
-// original's __stdcall argument cleanup.
-extern "C"
-{
-    uintptr_t zpatch_savegame_close_handle = 0;   // &CloseHandle
-    uintptr_t zpatch_savegame_create_mutex = 0;   // &CreateMutexA
-}
-
-// sub_10038570, recovered VA 0x10038570 (2 instructions): the "no savegame"
-// path returns 0.
-static __declspec(naked) void SavegameNullBody()
-{
-    __asm
-    {
-        xor eax, eax
-        ret 8
-    }
-}
-
-// sub_10045580, recovered VA 0x10045580 (7 instructions): close the save
-// handle and report success.
-static __declspec(naked) void SavegameCloseBody()
-{
-    __asm
-    {
-        push ebp
-        mov ebp, esp
-        push DWORD PTR [ebp + 8]
-        call DWORD PTR [zpatch_savegame_close_handle]
-        xor eax, eax
-        pop ebp
-        ret 4
-    }
-}
-
-// sub_100455E0, recovered VA 0x100455E0 (19 instructions): create the save
-// mutex into the caller's handle slot; a null slot reports 1.
-static __declspec(naked) void SavegameMutexBody()
-{
-    __asm
-    {
-        push ebp
-        mov ebp, esp
-        push esi
-        mov esi, DWORD PTR [ebp + 0Ch]
-        test esi, esi
-        jz savegame_mutex_null
-        push 0
-        push 0
-        push 0
-        call DWORD PTR [zpatch_savegame_create_mutex]
-        mov DWORD PTR [esi], eax
-        xor eax, eax
-        pop esi
-        pop ebp
-        ret 8
-    savegame_mutex_null:
-        mov eax, 1
-        pop esi
-        pop ebp
-        ret 8
-    }
+    for (const uint32_t offset : { 0x66F770u, 0x66F774u, 0x6B55D0u, 0x6B55F0u })
+        injector::WriteMemory<uint32_t>(zpatch_xlive_base + offset, 0x10000E83u, true);
 }
 
 // The inline assembler refuses `call memcpy` (it is a compiler intrinsic), so the
@@ -526,110 +337,8 @@ static void __cdecl SavegameCopyBlock(void* destination, const void* source, std
     std::memcpy(destination, source, size);
 }
 
-// sub_100455A0, recovered VA 0x100455A0 (28 instructions): the read/copy path.
-// It refuses when the destination buffer is smaller than the requested size
-// (0x8007007A), otherwise copies through the CRT and records the size.
-static __declspec(naked) void SavegameCopyBody()
-{
-    __asm
-    {
-        push ebp
-        mov ebp, esp
-        push esi
-        mov esi, DWORD PTR [ebp + 0Ch]
-        push edi
-        mov edi, DWORD PTR [ebp + 14h]
-        cmp DWORD PTR [edi], esi
-        jnb savegame_copy_room
-        mov DWORD PTR [edi], esi
-        mov eax, 8007007Ah
-        pop edi
-        pop esi
-        pop ebp
-        ret 14h
-    savegame_copy_room:
-        mov eax, DWORD PTR [ebp + 10h]
-        test eax, eax
-        jz savegame_copy_skip
-        push esi
-        push DWORD PTR [ebp + 8]
-        push eax
-        call SavegameCopyBlock
-        add esp, 0Ch
-    savegame_copy_skip:
-        mov DWORD PTR [edi], esi
-        xor eax, eax
-        pop edi
-        pop esi
-        pop ebp
-        ret 14h
-    }
-}
-
 namespace
 {
-    // SavegameFix: two anchors, eleven call retargets and one two-byte NOP, in
-    // the original handler's write order. The call displacements are excluded
-    // from the parity comparison; the NOP is not.
-    void InstallSavegameFix()
-    {
-        if (!Loader::Enabled("SavegameFix"))
-            return;
-
-        auto pattern = find_pattern("75 ? 83 C1 01 83 C0 01 83 F9 04");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            injector::MakeCALL(match - 73, reinterpret_cast<void*>(&SavegameCloseBody), true);
-            injector::MakeCALL(match - 143, reinterpret_cast<void*>(&SavegameCopyBody), true);
-            injector::MakeCALL(match - 176, reinterpret_cast<void*>(&SavegameCopyBody), true);
-            injector::MakeCALL(match - 280, reinterpret_cast<void*>(&SavegameMutexBody), true);
-            injector::MakeCALL(match - 240, reinterpret_cast<void*>(&SavegameNullBody), true);
-            injector::MakeNOP(match, 2, true);
-        }
-
-        pattern = find_pattern("8D 4C 24 18 51 6A 00 6A 0C 57");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            injector::MakeCALL(match - 86, reinterpret_cast<void*>(&SavegameMutexBody), true);
-            injector::MakeCALL(match - 47, reinterpret_cast<void*>(&SavegameNullBody), true);
-            injector::MakeCALL(match + 10, reinterpret_cast<void*>(&SavegameCopyBody), true);
-            injector::MakeCALL(match + 90, reinterpret_cast<void*>(&SavegameCopyBody), true);
-            injector::MakeCALL(match + 128, reinterpret_cast<void*>(&SavegameCloseBody), true);
-        }
-    }
-}
-
-// LocalSettingsPath, as the original handler sub_100513A0 applies it:
-//
-//   * two operand writes at the game's local-settings function (game 0x61E770):
-//     the `call dword ptr [SHGetFolderPathA]` slot becomes this module's four-byte
-//     call slot (original off_10158064, which pointed the game at its replacement
-//     path helper sub_10051320), and the `push "Rockstar Games\GTA IV"` argument
-//     becomes the "\GTA IV" suffix this module owns;
-//   * a jump at the epilogue of the wide path initializer (game 0x856EE6) to the
-//     detour body, and the same at the fallback epilogue (a site that does not
-//     exist on 1.0.8.0);
-//   * five captured game pointers the detour's step helper rewrites.
-namespace
-{
-    // The size the original's strcpy_s/wcscpy_s copies pass, and the size of the
-    // CWD buffer its replacement path helper formats into.
-    constexpr std::size_t kLocalPathCapacity = 0x200u;
-    constexpr std::size_t kLocalCwdCapacity = 260u;
-
-    // The published state, in C linkage because the detour body's helper reads the
-    // slots the way the original's bodies read its own .bss.
-    char zpatch_local_ansi_cwd[kLocalCwdCapacity] = {};
-    char zpatch_local_iv_suffix[8] = "\\GTA IV";
-    uint32_t zpatch_local_saves_slot = 0;
-    char* zpatch_local_path_08 = nullptr;          // szPathLocalAppdata
-    wchar_t* zpatch_local_path_10 = nullptr;       // wszPathLocalAppdataW_EP
-    const int* zpatch_local_episode_ptr = nullptr; // __dwCurrentEpisode
-    char* zpatch_local_path_18 = nullptr;          // szPathLocalAppdata_EP
-    wchar_t* zpatch_local_path_1c = nullptr;       // wszPathLocalAppdataW
-
     // A captured pattern operand is a 32-bit VA of the image *as loaded* (the same
     // helper as misc.ixx's): the loader has already applied the image's relocations,
     // so the dword is a live address and the cast is the whole conversion. The game
@@ -727,49 +436,6 @@ static void LocalSettingsStep()
         CopyWideText(zpatch_local_path_10, kLocalPathCapacity, wideEpisode);
 }
 
-// sub_100512F0, recovered VA 0x100512F0 (7 instructions): the wide path
-// initializer's epilogue detour (game 0x856EE6). It runs the step helper between
-// pusha/popa and replays the three pops and the return the five-byte jump
-// swallowed. `pusha`/`popa` are emitted as bytes: the inline assembler renders
-// both mnemonics with a 0x66 operand-size prefix, which the original does not
-// have.
-static __declspec(naked) void LocalSettingsDetourBody()
-{
-    __asm
-    {
-        __emit 0x60  // pusha
-        call LocalSettingsStep
-        __emit 0x61  // popa
-        pop edi
-        pop esi
-        pop ebx
-        ret
-    }
-}
-
-// sub_10051300, recovered VA 0x10051300 (11 instructions): the fallback epilogue
-// detour (a site that does not exist on 1.0.8.0). It runs the same helper, then
-// re-issues the four-argument call the site held through ESI and replays the two
-// pops and the return. Register ESI is the call target on entry, so the body
-// saves it through pusha/popa and uses the live value.
-static __declspec(naked) void LocalSettingsFallbackBody()
-{
-    __asm
-    {
-        __emit 0x60  // pusha
-        call LocalSettingsStep
-        __emit 0x61  // popa
-        push 0
-        push 0
-        push 1Ch
-        push 0
-        call esi
-        pop esi
-        pop edi
-        ret
-    }
-}
-
 namespace
 {
     // The replacement for the game's SHGetFolderPathA call at 0x61E770 (the
@@ -808,245 +474,6 @@ namespace
             static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&LocalSettingsCopySaves));
     }
 
-    void PublishLocalSettingsPath()
-    {
-        if (!Loader::Enabled("LocalSettingsPath"))
-            return;
-
-        CaptureLocalSettings();
-
-        auto pattern = find_pattern("7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D6 5F 5E 5B C3");
-        if (!pattern.empty())
-        {
-            // The wide path initializer's epilogue: each operand pushes one game
-            // path buffer, or loads the episode counter.
-            zpatch_local_path_1c = GamePointer<wchar_t>(*pattern.get_first<uint32_t>(-178));
-            zpatch_local_path_10 = GamePointer<wchar_t>(*pattern.get_first<uint32_t>(-190));
-            zpatch_local_episode_ptr = GamePointer<const int>(*pattern.get_first<uint32_t>(-151));
-            zpatch_local_path_18 = GamePointer<char>(*pattern.get_first<uint32_t>(-444));
-            zpatch_local_path_08 = GamePointer<char>(*pattern.get_first<uint32_t>(-432));
-        }
-
-        pattern = find_pattern("7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D7 5F C3");
-        if (!pattern.empty())
-        {
-            // The alternate epilogue (absent on 1.0.8.0) stores the same two
-            // LocalAppdata buffers the wide pattern captures.
-            zpatch_local_path_18 = GamePointer<char>(*pattern.get_first<uint32_t>(-160));
-            zpatch_local_path_1c = GamePointer<wchar_t>(*pattern.get_first<uint32_t>(-55));
-        }
-    }
-
-    void InstallLocalSettingsPath()
-    {
-        if (!Loader::Enabled("LocalSettingsPath"))
-            return;
-
-        auto pattern = find_pattern("53 8B 5C 24 08 56 6A 00 6A 00");
-        if (!pattern.empty())
-        {
-            // +16 is the call's memory operand, +32 the pushed path-name operand.
-            // Both addresses point into this module; the write-set dump expresses
-            // them in the baseline's coordinates.
-            auto* match = pattern.get_first<std::byte>(0);
-            injector::WriteMemory<uint32_t>(match + 16,
-                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&zpatch_local_saves_slot)), true);
-            injector::WriteMemory<uint32_t>(match + 32,
-                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(zpatch_local_iv_suffix)), true);
-            Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(match + 16));
-            Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(match + 32));
-        }
-
-        pattern = find_pattern("7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D6 5F 5E 5B C3");
-        if (!pattern.empty())
-            injector::MakeJMP(pattern.get_first<std::byte>(14),
-                reinterpret_cast<void*>(&LocalSettingsDetourBody), true);
-
-        pattern = find_pattern("7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D7 5F C3");
-        if (!pattern.empty())
-            injector::MakeJMP(pattern.get_first<std::byte>(-13),
-                reinterpret_cast<void*>(&LocalSettingsFallbackBody), true);
-
-        // The detour body's inline `call` is invisible to C++; naming the helper
-        // here keeps its out-of-line definition in the image.
-        const auto step = reinterpret_cast<uintptr_t>(&LocalSettingsStep);
-        (void)step;
-    }
-}
-
-// ---------------------------------------------------------------------------
-// NewMemorySystem, as the original handler applies it: the allocator-initialisation
-// call at game 0x107A is retargeted to this module's vtable installer, and a jump
-// at 0x107F skips the five-slot clear the installer replaces, resuming at 0x108C.
-//
-// The table is the original's CRageAllocator vtable (original 0x100B5038, 24
-// slots). Ten of its methods are transcribed below as bodies; the three arena
-// methods (allocate 0x10038360, free 0x10038430, "is this mine" 0x100385A0) are
-// compiled code in the original and are rebuilt in C++; five slots point at
-// bodies another arm already installs, because the original's table does exactly
-// that (0x10038550 RGSC login, 0x10038570 savegame null path, 0x100057F0 MP sync).
-namespace
-{
-    constexpr uint32_t kNmsVtableSlots = 24;
-    constexpr uint8_t kNmsHeapPoison = 0xCD;  // the fill the original memsets with
-}
-
-extern "C"
-{
-    // dword_10159CD8: the address the arm reads from the allocator init's
-    // `mov esi, <singleton>` operand.
-    uint32_t zpatch_nms_object = 0;
-
-    // 0x100B5038: the vtable the installer writes into that singleton.
-    uint32_t zpatch_nms_vtable[kNmsVtableSlots] = {};
-}
-
-// sub_10038560, recovered VA 0x10038560 (1 instruction): the table's release
-// hook. It cleans no stack argument (`ret 0`), which is why it is written as an
-// immediate rather than a plain `ret` (that is `ret`, opcode C3).
-static __declspec(naked) void NmsNoopRet0Body()
-{
-    __asm
-    {
-        ret 0
-    }
-}
-
-// sub_10038640, recovered VA 0x10038640 (17 instructions): the CRageAllocator
-// constructor, __thiscall with one stack argument the callee pops. It installs
-// this module's vtable in the object and, for the `& 5 == 5` selector, runs the
-// release hook on a stack scratch slot.
-static __declspec(naked) void* NmsCtorBody()
-{
-    __asm
-    {
-        push ebp
-        mov ebp, esp
-        mov eax, DWORD PTR [ebp + 8]
-        push esi
-        mov esi, ecx
-        and eax, 5
-        mov DWORD PTR [esi], OFFSET zpatch_nms_vtable
-        cmp al, 5
-        jne nms_ctor_done
-        push 4
-        push esi
-        call NmsNoopRet0Body
-        add esp, 8
-    nms_ctor_done:
-        mov eax, esi
-        pop esi
-        pop ebp
-        ret 4
-    }
-}
-
-// sub_10038350, recovered VA 0x10038350 (2 instructions): reject a pointer.
-static __declspec(naked) void NmsRejectPtrBody()
-{
-    __asm
-    {
-        xor al, al
-        ret 4
-    }
-}
-
-// sub_10038540, recovered VA 0x10038540 (2 instructions): the "self" slot.
-static __declspec(naked) void* NmsSelfBody()
-{
-    __asm
-    {
-        mov eax, ecx
-        ret 4
-    }
-}
-
-// sub_10001950, recovered VA 0x10001950 (2 instructions): the null slot.
-static __declspec(naked) void* NmsZeroBody()
-{
-    __asm
-    {
-        xor eax, eax
-        ret 4
-    }
-}
-
-// sub_10038580, recovered VA 0x10038580 (1 instruction): paired no-op, two
-// stack arguments.
-static __declspec(naked) void NmsNoopPairBody()
-{
-    __asm
-    {
-        ret 8
-    }
-}
-
-// sub_10038590, recovered VA 0x10038590 (2 instructions): the reject slot. It
-// sets only AL, so the upper 24 bits of EAX stay whatever the caller had.
-static __declspec(naked) void NmsRejectBody()
-{
-    __asm
-    {
-        xor al, al
-        ret
-    }
-}
-
-// sub_100057F0, recovered VA 0x100057F0 (2 instructions): the MP-sync stub, which
-// the original's table shares with BetterMPSync. audio.ixx owns that body but
-// keeps it inside its own unit, so the table gets this copy of the same two
-// instructions.
-static __declspec(naked) void NmsSyncBody()
-{
-    __asm
-    {
-        xor eax, eax
-        ret
-    }
-}
-
-// sub_10038630, recovered VA 0x10038630 (1 instruction): no-op with one stack
-// argument.
-static __declspec(naked) void NmsNoopArgBody()
-{
-    __asm
-    {
-        ret 4
-    }
-}
-
-// sub_10038620, recovered VA 0x10038620 (5 instructions): forward through the
-// object's slot 18. The tail jump keeps the caller's return address and EBP.
-static __declspec(naked) void NmsThunk18Body()
-{
-    __asm
-    {
-        push ebp
-        mov ebp, esp
-        mov eax, DWORD PTR [ecx]
-        pop ebp
-        jmp DWORD PTR [eax + 18h]
-    }
-}
-
-// sub_10038670, recovered VA 0x10038670 (5 instructions): the installer. It
-// writes this module's vtable into the published singleton and returns without
-// cleaning a stack argument (the site's call is replaced wholesale).
-static __declspec(naked) void NmsApplyBody()
-{
-    __asm
-    {
-        mov eax, DWORD PTR [zpatch_nms_object]
-        test eax, eax
-        je nms_apply_done
-        mov DWORD PTR [eax], OFFSET zpatch_nms_vtable
-    nms_apply_done:
-        ret
-    }
-}
-
-namespace
-{
     // The allocation registry. The original keeps the pointers it handed out in a
     // hash map (FNV-1a over the pointer's four bytes) behind the recursive
     // critical section at 0x101A0808; only membership is observable, so the keys
@@ -1124,73 +551,32 @@ namespace
     void PublishNmsVtable()
     {
         const uint32_t entries[kNmsVtableSlots] = {
-            reinterpret_cast<uint32_t>(&NmsCtorBody),           // [0]  0x10038640
-            reinterpret_cast<uint32_t>(&NmsRejectPtrBody),      // [1]  0x10038350
+            static_cast<uint32_t>(NmsCtorBodyAddress()),           // [0]  0x10038640
+            static_cast<uint32_t>(NmsRejectPtrBodyAddress()),      // [1]  0x10038350
             reinterpret_cast<uint32_t>(&NmsAllocateBody),       // [2]  0x10038360
             reinterpret_cast<uint32_t>(&NmsFreeBody),           // [3]  0x10038430
-            reinterpret_cast<uint32_t>(&NmsSelfBody),           // [4]  0x10038540
-            reinterpret_cast<uint32_t>(&NmsSelfBody),           // [5]  0x10038540
-            reinterpret_cast<uint32_t>(&NmsZeroBody),           // [6]  0x10001950
-            reinterpret_cast<uint32_t>(&NmsZeroBody),           // [7]  0x10001950
-            reinterpret_cast<uint32_t>(&NmsSyncBody),           // [8]  0x100057F0
-            reinterpret_cast<uint32_t>(&NmsSyncBody),           // [9]  0x100057F0
-            reinterpret_cast<uint32_t>(&RgscLoginRemovedBody),  // [10] 0x10038550
-            reinterpret_cast<uint32_t>(&NmsNoopRet0Body),       // [11] 0x10038560
-            reinterpret_cast<uint32_t>(&SavegameNullBody),      // [12] 0x10038570
-            reinterpret_cast<uint32_t>(&NmsNoopPairBody),       // [13] 0x10038580
-            reinterpret_cast<uint32_t>(&NmsNoopRet0Body),       // [14] 0x10038560
-            reinterpret_cast<uint32_t>(&NmsRejectBody),         // [15] 0x10038590
-            reinterpret_cast<uint32_t>(&NmsRejectBody),         // [16] 0x10038590
-            reinterpret_cast<uint32_t>(&NmsNoopRet0Body),       // [17] 0x10038560
+            static_cast<uint32_t>(NmsSelfBodyAddress()),           // [4]  0x10038540
+            static_cast<uint32_t>(NmsSelfBodyAddress()),           // [5]  0x10038540
+            static_cast<uint32_t>(NmsZeroBodyAddress()),           // [6]  0x10001950
+            static_cast<uint32_t>(NmsZeroBodyAddress()),           // [7]  0x10001950
+            static_cast<uint32_t>(NmsSyncBodyAddress()),           // [8]  0x100057F0
+            static_cast<uint32_t>(NmsSyncBodyAddress()),           // [9]  0x100057F0
+            static_cast<uint32_t>(RgscLoginRemovedBodyAddress()),  // [10] 0x10038550
+            static_cast<uint32_t>(NmsNoopRet0BodyAddress()),       // [11] 0x10038560
+            static_cast<uint32_t>(SavegameNullBodyAddress()),      // [12] 0x10038570
+            static_cast<uint32_t>(NmsNoopPairBodyAddress()),       // [13] 0x10038580
+            static_cast<uint32_t>(NmsNoopRet0BodyAddress()),       // [14] 0x10038560
+            static_cast<uint32_t>(NmsRejectBodyAddress()),         // [15] 0x10038590
+            static_cast<uint32_t>(NmsRejectBodyAddress()),         // [16] 0x10038590
+            static_cast<uint32_t>(NmsNoopRet0BodyAddress()),       // [17] 0x10038560
             reinterpret_cast<uint32_t>(&NmsContainsBody),       // [18] 0x100385A0
-            reinterpret_cast<uint32_t>(&NmsThunk18Body),        // [19] 0x10038620
-            reinterpret_cast<uint32_t>(&NmsSyncBody),           // [20] 0x100057F0
-            reinterpret_cast<uint32_t>(&NmsSyncBody),           // [21] 0x100057F0
-            reinterpret_cast<uint32_t>(&NmsNoopArgBody),        // [22] 0x10038630
-            reinterpret_cast<uint32_t>(&NmsRejectBody),         // [23] 0x10038590
+            static_cast<uint32_t>(NmsThunk18BodyAddress()),        // [19] 0x10038620
+            static_cast<uint32_t>(NmsSyncBodyAddress()),           // [20] 0x100057F0
+            static_cast<uint32_t>(NmsSyncBodyAddress()),           // [21] 0x100057F0
+            static_cast<uint32_t>(NmsNoopArgBodyAddress()),        // [22] 0x10038630
+            static_cast<uint32_t>(NmsRejectBodyAddress()),         // [23] 0x10038590
         };
         std::memcpy(zpatch_nms_vtable, entries, sizeof(entries));
-    }
-
-    void PublishNewMemorySystem()
-    {
-        if (!Loader::Enabled("NewMemorySystem"))
-            return;
-
-        // The allocator init's `mov esi, <singleton>`: the operand is the address
-        // the installer writes the vtable at.
-        auto pattern = find_pattern("6A 01 B9 00 00 40 06");
-        if (!pattern.empty())
-            zpatch_nms_object = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(
-                GamePointer<std::byte>(*pattern.get_first<uint32_t>(8))));
-
-        // The registry lock and the table are this module's own state: the game
-        // initialises them once, and the offline tools call the pipeline once per
-        // dump cell, so the one-time flag keeps a second initialisation off the
-        // section (nothing about the game's behaviour depends on it).
-        PrepareArenaRegistry();
-        static bool prepared = false;
-        if (!prepared)
-        {
-            prepared = true;
-            PublishNmsVtable();
-        }
-    }
-
-    void InstallNewMemorySystem()
-    {
-        if (!Loader::Enabled("NewMemorySystem"))
-            return;
-
-        auto pattern = find_pattern("3D 80 99 99 59 73 05");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            // -34 is the call the original retargets, -29 the five-slot clear's
-            // first store; the jump resumes four instructions later at -16.
-            injector::MakeCALL(match - 34, reinterpret_cast<void*>(&NmsApplyBody), true);
-            injector::MakeJMP(match - 29, reinterpret_cast<void*>(match - 16), true);
-        }
     }
 }
 
@@ -1204,6 +590,7 @@ namespace
 // installed, and the published table is untouched. The only module state it can
 // change is that lock's initialisation, which the game's own allocator-init performs
 // anyway; the shipped ASI never calls it.
+
 export namespace MemoryArena
 {
     // The ABIs are the originals', which is part of what the caller sees:
@@ -1230,21 +617,6 @@ MemoryArena::Methods MemoryArena::Get()
 {
     PrepareArenaRegistry();
     return { &NmsAllocateBody, &NmsFreeBody, &NmsContainsBody };
-}
-
-// ---------------------------------------------------------------------------
-// NewFilesCompatibility, as the original handler applies it: the two sides are the
-// script native it registers and the radio-HUD texture lookups. The two radio-HUD
-// update calls become this module's bodies and the registrar's own `ret` becomes a
-// jump to the registration body. Both arms are gated on the two modules the original
-// refuses to run beside. What the three radio-HUD pieces resolve to - the current
-// texture dictionary, pgDictionary::Lookup and CSprite2d::SetTexture - is recorded in
-// docs/rebuilt.md 2m, since none of them can be driven offline.
-extern "C"
-{
-    // dword_10159C08: the game's file-registration entry, published from the
-    // `call` operand the registrar site carries.
-    uint32_t zpatch_newfiles_register_slot = 0;
 }
 
 namespace
@@ -1336,20 +708,6 @@ namespace
     }
 }
 
-// sub_10051600, recovered VA 0x10051600 (4 instructions): the registrar's
-// replacement tail. The original runs the registration between pushad/popad so
-// the caller's registers survive, then returns to the registrar's caller.
-static __declspec(naked) void NewfilesRegisterBody()
-{
-    __asm
-    {
-        __emit 0x60  // pushad
-        call NewfilesRegister
-        __emit 0x61  // popad
-        ret
-    }
-}
-
 // sub_10051890, recovered VA 0x10051890: the first file type's update, called
 // with the object in ECX. Compiled in the original and rebuilt here: a name at
 // +0x10 means "new file"; resolve it through the container's registry and append
@@ -1379,91 +737,6 @@ static char __fastcall NewfilesUpdateBBody(void* self, int)
     if (NewfilesCallObject(object, ResolveFileName(reinterpret_cast<const char*>(base + 0x10F))))
         NewfilesCallAdd(base + 4, base + 0x10F);
     return 1;
-}
-
-namespace
-{
-    void PublishNewFilesCompatibility()
-    {
-        if (!Loader::Enabled("NewFilesCompatibility") || ConflictingFileModulePresent())
-            return;
-
-        // The registrar's `call <entry>`: the operand at +6 is the displacement the
-        // update bodies register their callback through.
-        auto pattern = find_pattern("68 64 28 C8 67 E8");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            int32_t displacement{};
-            std::memcpy(&displacement, match + 6, sizeof(displacement));
-            zpatch_newfiles_register_slot = static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(match) + 10 + displacement);
-        }
-    }
-
-    void InstallNewFilesCompatibility()
-    {
-        if (!Loader::Enabled("NewFilesCompatibility") || ConflictingFileModulePresent())
-            return;
-
-        auto pattern = find_pattern("E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 7B FF FF FF");
-        if (!pattern.empty())
-            injector::MakeCALL(pattern.get_first<std::byte>(0),
-                reinterpret_cast<void*>(&NewfilesUpdateABody), true);
-
-        pattern = find_pattern("E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 6C FF FF FF");
-        if (!pattern.empty())
-            injector::MakeCALL(pattern.get_first<std::byte>(0),
-                reinterpret_cast<void*>(&NewfilesUpdateBBody), true);
-
-        pattern = find_pattern("68 64 28 C8 67 E8");
-        if (!pattern.empty())
-            injector::MakeJMP(pattern.get_first<std::byte>(28),
-                reinterpret_cast<void*>(&NewfilesRegisterBody), true);
-    }
-}
-
-// ---------------------------------------------------------------------------
-// NewSavesCompatibility, as the original handler sub_10052200 applies it: the
-// savegame-load entry is jumped to a trampoline that runs the prepare step, then
-// replays the thirteen bytes the jump swallowed and resumes at the entry's +0xD.
-//
-// The two steps behind the trampoline are compiled C in the original and are
-// rebuilt here with the same call sequence, the same conditions and the same
-// writes:
-//
-//   * sub_10051FD0 (prepare) asks the game's own save-directory function for the
-//     directory, builds "<directory>\<name>" from the buffer the handler captured,
-//     and hands that path to the converter;
-//   * sub_10051B30 (converter) opens the file, checks the 0x110-byte header's
-//     "SAVE" magic at +0xC, walks the eighteen 9-byte chunk headers (allocating,
-//     reading and freeing each payload), keeps three chunk sizes, and then patches
-//     the three game sites whose reads depend on the save layout: the branch
-//     opcode at 0x872185, the read call + pushed read size + branch at 0x7D8C50,
-//     and the second LoadData call at 0x8DA090.
-//
-// The converter takes from the game exactly what the original takes: the
-// directory function (called, not imitated) and the save-name buffer named by the
-// handler's first anchor. Everything else is the save file itself, so the three
-// writes are a deterministic function of the file's chunk sizes and of signatures
-// that occur exactly once wherever they exist (checked against every image in
-// game_refs).
-//
-// The two hooks the converter installs are compiled C in the original as well:
-// sub_10051A90 reads the caller's bytes into its own 0xE78-byte scratch and keeps
-// only the return value, and sub_10051AD0 consumes the newer save's extra twelve
-// bytes on both sides of the original LoadData call. Both are rebuilt here with
-// the same stack buffers and the same return-value rules.
-extern "C"
-{
-    // The published state, by the names the original keeps in its own .bss.
-    uint32_t zpatch_new_saves_src = 0;          // dword_1015AD9C: the game's save-name buffer
-    uint32_t zpatch_new_saves_resume = 0;       // dword_1015AD88: the load entry's +0xD
-    uint32_t zpatch_new_saves_loaddata = 0;     // dword_1015AD94: the game's LoadData entry
-    uint32_t zpatch_new_saves_p3_original = 0;  // dword_1015AD8C: the second LoadData call
-    uint8_t zpatch_new_saves_force_read = 0;    // byte_1015AD98: chunk 9 has the newer size
-    uint8_t zpatch_new_saves_new_chunk16 = 0;   // byte_1015AD9A: chunk 16 has the newer size
-    uint8_t zpatch_new_saves_extra_block = 0;   // byte_1015AD99: chunk 13 has the newer size
 }
 
 namespace
@@ -1548,6 +821,7 @@ namespace
 // The faults are the original's, unchanged: a chunk size below nine underflows the
 // `operator new` operand and `std::bad_alloc` leaves through this call, and a file
 // shorter than its header leaves the magic test reading the stack buffer's tail.
+
 export namespace Loading
 {
     // One 9-byte chunk header: the five-byte tag (which the walk never tests) and the
@@ -1579,95 +853,6 @@ export namespace Loading
     };
 
     export SaveWalkDecision WalkSaveFile(const char* path);
-}
-
-// sub_10051A90, recovered VA 0x10051A90 (20 instructions): the read at game
-// 0x7D8C50. It reads into its own 0xE78-byte local - the caller's buffer,
-// `[ebp+8]`, is deliberately left untouched - and answers the read's value; an
-// unpublished read entry skips the call and leaves EAX at the zero the test just
-// saw, which is the value this returns. The /GS frame and the returned register are
-// the original's, so this replaces the C++ rebuild the tree carried (docs/rebuilt.md).
-//
-// Naked and internal: an external-linkage naked function is written to the module
-// and every importer fails (C2488).
-static __declspec(naked) void NewSavesReadHook()
-{
-    __asm
-    {
-        push ebp
-        mov ebp, esp
-        sub esp, 0E7Ch
-        mov eax, DWORD PTR [__security_cookie]
-        xor eax, ebp
-        mov DWORD PTR [ebp - 4], eax
-        mov eax, DWORD PTR [zpatch_new_saves_loaddata]
-        test eax, eax
-        je newsaves_read_skip
-        push DWORD PTR [ebp + 0Ch]
-        lea ecx, [ebp - 0E7Ch]
-        push ecx
-        call eax
-        add esp, 8
-    newsaves_read_skip:
-        mov ecx, DWORD PTR [ebp - 4]
-        xor ecx, ebp
-        call __security_check_cookie
-        mov esp, ebp
-        pop ebp
-        ret
-    }
-}
-
-// sub_10051AD0, recovered VA 0x10051AD0 (33 instructions): the second LoadData call
-// at game 0x8DA090. When the save has the newer chunk 13 it consumes a twelve-byte
-// block before and after the original call - both reads run through the same slot
-// and the second one's value is what the body leaves in EAX - and otherwise the
-// original call's value passes through. The original call itself is unconditional
-// (a call through an unpublished slot faults), and it is the site's own target the
-// installer republished. Transcribed, so the C++ rebuild is gone (docs/rebuilt.md).
-//
-// Naked and internal: an external-linkage naked function is written to the module
-// and every importer fails (C2488).
-static __declspec(naked) void NewSavesSecondLoadHook()
-{
-    __asm
-    {
-        push ebp
-        mov ebp, esp
-        sub esp, 10h
-        mov eax, DWORD PTR [__security_cookie]
-        xor eax, ebp
-        mov DWORD PTR [ebp - 4], eax
-        cmp BYTE PTR [zpatch_new_saves_extra_block], 0
-        je newsaves_second_before
-        mov eax, DWORD PTR [zpatch_new_saves_loaddata]
-        test eax, eax
-        je newsaves_second_before
-        lea ecx, [ebp - 10h]
-        push 0Ch
-        push ecx
-        call eax
-        add esp, 8
-    newsaves_second_before:
-        call DWORD PTR [zpatch_new_saves_p3_original]
-        cmp BYTE PTR [zpatch_new_saves_extra_block], 0
-        je newsaves_second_done
-        mov eax, DWORD PTR [zpatch_new_saves_loaddata]
-        test eax, eax
-        je newsaves_second_done
-        lea ecx, [ebp - 10h]
-        push 0Ch
-        push ecx
-        call eax
-        add esp, 8
-    newsaves_second_done:
-        mov ecx, DWORD PTR [ebp - 4]
-        xor ecx, ebp
-        call __security_check_cookie
-        mov esp, ebp
-        pop ebp
-        ret
-    }
 }
 
 namespace
@@ -1723,7 +908,7 @@ namespace
                                             static_cast<uint32_t>(displacement);
 
             injector::MakeCALL(reinterpret_cast<void*>(site + kNewSavesCallSite),
-                reinterpret_cast<void*>(&NewSavesReadHook), true);
+                reinterpret_cast<void*>(NewSavesReadHookAddress()), true);
             if (zpatch_new_saves_loaddata == 0)
                 zpatch_new_saves_loaddata = originalTarget;
 
@@ -1743,7 +928,7 @@ namespace
                                             static_cast<uint32_t>(displacement);
 
             injector::MakeCALL(reinterpret_cast<void*>(site + kNewSavesCallSite),
-                reinterpret_cast<void*>(&NewSavesSecondLoadHook), true);
+                reinterpret_cast<void*>(NewSavesSecondLoadHookAddress()), true);
             if (zpatch_new_saves_p3_original == 0)
                 zpatch_new_saves_p3_original = originalTarget;
 
@@ -1891,105 +1076,6 @@ Loading::SaveWalkDecision Loading::WalkSaveFile(const char* path)
     return decision;
 }
 
-// sub_100521E0, recovered VA 0x100521E0 (8 instructions): the savegame-load
-// trampoline. pusha/popa keep the caller's registers across the prepare step; the
-// four instructions after them are the one the five-byte jump overwrote
-// (`mov [esp+0x1E0],eax`) and the three that follow it, and the tail jumps to the
-// entry's +0xD. `pusha`/`popa` are emitted as bytes: the assembler renders both
-// with a 0x66 operand-size prefix, which the original does not have.
-static __declspec(naked) void NewSavesTrampoline()
-{
-    __asm
-    {
-        __emit 0x60  // pusha
-        call NewSavesPrepare
-        __emit 0x61  // popa
-        mov dword ptr [esp + 1E0h], eax
-        mov eax, dword ptr [ebp + 8]
-        push ebx
-        xor ebx, ebx
-        jmp dword ptr [zpatch_new_saves_resume]
-    }
-}
-
-namespace
-{
-    // NewSavesCompatibility's first anchor: the `push <save-name buffer>` site.
-    // Its operand (the anchor's +1) is the game's buffer address, which is what the
-    // prepare step appends to the save directory. The second anchor publishes the
-    // load entry's continuation, +0xD.
-    void PublishNewSavesCompatibility()
-    {
-        if (!Loader::Enabled("NewSavesCompatibility"))
-            return;
-
-        auto primary = find_pattern("68 ? ? ? ? E8 ? ? ? ? 8B 2D ? ? ? ? 83 C4 08");
-        if (primary.empty())
-            return;
-        zpatch_new_saves_src = *primary.get_first<uint32_t>(1);
-
-        auto pattern = find_pattern("89 84 24 E0 01 00 00 8B 45 08 53 33 DB");
-        if (!pattern.empty())
-            zpatch_new_saves_resume = static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(13)));
-    }
-
-    // The same load entry is the write. The original returns before this scan when
-    // the first pattern missed, so the write is gated on the first pattern as well:
-    // 1.0.0.4.0 carries the entry but not the name site, and the original writes
-    // nothing there.
-    void InstallNewSavesCompatibility()
-    {
-        if (!Loader::Enabled("NewSavesCompatibility"))
-            return;
-
-        auto primary = find_pattern("68 ? ? ? ? E8 ? ? ? ? 8B 2D ? ? ? ? 83 C4 08");
-        if (primary.empty())
-            return;
-
-        auto pattern = find_pattern("89 84 24 E0 01 00 00 8B 45 08 53 33 DB");
-        if (!pattern.empty())
-            injector::MakeJMP(pattern.get_first<std::byte>(0),
-                reinterpret_cast<void*>(&NewSavesTrampoline), true);
-    }
-}
-
-// ---------------------------------------------------------------------------
-// LoadDLCs, as the original handler sub_100234E0 applies it.
-//
-// The handler does not scan: per build it stores three game entry points and then
-// rewrites six sites, each at a fixed RVA, with the instruction it computes in
-// place (an optional jump/call to another fixed RVA, a jump/call to one of the two
-// bodies below, or a twelve-byte NOP fill). The rows were read from the handler
-// itself, which switches on the build id; 1.0.8.0 is the `cmp eax, 9` block and
-// its `lea`/`add` immediates are the RVAs recorded here. The sites were checked
-// against GTAIV_1060.exe, GTAIV_1070.exe and GTAIV.exe: each carries the shape the
-// row replaces (`E8` for a call site, `E8` for the two rewritten call sites, `B8`
-// for the struct-fixup site, and the register/callback body of the loader for the
-// tail NOPs).
-//
-// The two bodies: 0x10023480 replaces the loader callback the register function
-// calls (it reports success), and 0x10023490 replaces the DLC manager's
-// initialisation tail, clearing five request slots and - the first time - running
-// the discovery pass before marking the object loaded.
-extern "C"
-{
-    // dword_1015BDDC: the loader callback, an absolute address.
-    uint32_t zpatch_dlc_load_callback = 0;
-    // dword_1015804C / dword_101580D0: the register and apply entry points, which
-    // the original stores as RVAs and adds the image base to at the call.
-    uint32_t zpatch_dlc_register_rva = 0;
-    uint32_t zpatch_dlc_apply_rva = 0;
-    // dword_1015AD70: the image base the discovery adds those RVAs to.
-    uint32_t zpatch_dlc_game_base = 0;
-}
-
-// The bounded formatter's entry, published by source/stability.ixx (sub_10001280).
-extern "C"
-{
-    extern uint32_t zpatch_format_entry;
-}
-
 namespace
 {
     constexpr std::size_t kDlcTailNopLength = 12;
@@ -2053,32 +1139,7 @@ namespace
         { Build::v1070, 0x413480u, 0x413E20u, 0x414300u, kDlcWrites1070 },
         { Build::v1080, 0x48F440u, 0x48FE00u, 0x490460u, kDlcWrites1080 },
     };
-}
 
-// The discovery pass's data (original sub_10023150): the five imported entries it
-// calls through the original's own IAT slots, and the five literals it pushes. Each
-// IAT operand is an absolute address, so the transcription names these slots and the
-// instructions keep the original's `call ds:[...]` / `mov reg, ds:[...]` shapes.
-extern "C"
-{
-    uint32_t zpatch_dlc_get_module_file_name = 0;   // 0x10063004 GetModuleFileNameA
-    uint32_t zpatch_dlc_path_remove_file_spec = 0;  // 0x10063250 PathRemoveFileSpecA
-    uint32_t zpatch_dlc_path_file_exists = 0;       // 0x1006324C PathFileExistsA
-    uint32_t zpatch_dlc_strcpy_s = 0;               // 0x10063388 strcpy_s
-    uint32_t zpatch_dlc_strcat_s = 0;               // 0x100633A8 strcat_s
-
-    // The original's own text: the two "content" layouts at 0x1012BD08/0x1012BDB0,
-    // their legacy fallbacks at 0x1012BD60/0x1012BE08, and the episode format at
-    // 0x1012BE54.
-    const char zpatch_dlc_tlad_content[] = "\\dlc\\tlad\\content\\";
-    const char zpatch_dlc_tlad_legacy[] = "\\TLAD\\";
-    const char zpatch_dlc_tbogt_content[] = "\\dlc\\TBoGT\\content\\";
-    const char zpatch_dlc_tbogt_legacy[] = "\\TBoGT\\";
-    const char zpatch_dlc_episode_format[] = "\\Episode%d\\";
-}
-
-namespace
-{
     // The original's `call 0x100603F1` is the CRT's scalar `operator new`, called
     // unchecked and never freed. The inline assembler cannot name it in a `call`, so
     // the transcription calls this cdecl forwarder: one `E8`, the same argument and
@@ -2095,6 +1156,1160 @@ namespace
         std::memset(destination, value, count);
     }
 
+    const DlcBuild* DlcBuildFor(Build build)
+    {
+        for (const auto& row : kDlcBuilds)
+        {
+            if (row.build == build)
+                return &row;
+        }
+        return nullptr;
+    }
+
+    void CopyOverrideDatPath()
+    {
+        const std::string fallback("0");
+        const auto& value = Feather::Value(Config::Ini(), "Options", "OverrideGTADatPathTo", fallback);
+        if (value == "0")
+            return;
+
+        strcpy_s(zpatch_dat_path, sizeof(zpatch_dat_path), value.c_str());
+    }
+}
+
+namespace
+{
+    void PublishLocalSettingsPath()
+    {
+        if (!Loader::Enabled("LocalSettingsPath"))
+            return;
+
+        CaptureLocalSettings();
+
+        auto pattern = find_pattern("7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D6 5F 5E 5B C3");
+        if (!pattern.empty())
+        {
+            // The wide path initializer's epilogue: each operand pushes one game
+            // path buffer, or loads the episode counter.
+            zpatch_local_path_1c = GamePointer<wchar_t>(*pattern.get_first<uint32_t>(-178));
+            zpatch_local_path_10 = GamePointer<wchar_t>(*pattern.get_first<uint32_t>(-190));
+            zpatch_local_episode_ptr = GamePointer<const int>(*pattern.get_first<uint32_t>(-151));
+            zpatch_local_path_18 = GamePointer<char>(*pattern.get_first<uint32_t>(-444));
+            zpatch_local_path_08 = GamePointer<char>(*pattern.get_first<uint32_t>(-432));
+        }
+
+        pattern = find_pattern("7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D7 5F C3");
+        if (!pattern.empty())
+        {
+            // The alternate epilogue (absent on 1.0.8.0) stores the same two
+            // LocalAppdata buffers the wide pattern captures.
+            zpatch_local_path_18 = GamePointer<char>(*pattern.get_first<uint32_t>(-160));
+            zpatch_local_path_1c = GamePointer<wchar_t>(*pattern.get_first<uint32_t>(-55));
+        }
+    }
+
+    void PublishNewMemorySystem()
+    {
+        if (!Loader::Enabled("NewMemorySystem"))
+            return;
+
+        // The allocator init's `mov esi, <singleton>`: the operand is the address
+        // the installer writes the vtable at.
+        auto pattern = find_pattern("6A 01 B9 00 00 40 06");
+        if (!pattern.empty())
+            zpatch_nms_object = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(
+                GamePointer<std::byte>(*pattern.get_first<uint32_t>(8))));
+
+        // The registry lock and the table are this module's own state: the game
+        // initialises them once, and the offline tools call the pipeline once per
+        // dump cell, so the one-time flag keeps a second initialisation off the
+        // section (nothing about the game's behaviour depends on it).
+        PrepareArenaRegistry();
+        static bool prepared = false;
+        if (!prepared)
+        {
+            prepared = true;
+            PublishNmsVtable();
+        }
+    }
+
+    void PublishNewFilesCompatibility()
+    {
+        if (!Loader::Enabled("NewFilesCompatibility") || ConflictingFileModulePresent())
+            return;
+
+        // The registrar's `call <entry>`: the operand at +6 is the displacement the
+        // update bodies register their callback through.
+        auto pattern = find_pattern("68 64 28 C8 67 E8");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            int32_t displacement{};
+            std::memcpy(&displacement, match + 6, sizeof(displacement));
+            zpatch_newfiles_register_slot = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(match) + 10 + displacement);
+        }
+    }
+
+    // NewSavesCompatibility's first anchor: the `push <save-name buffer>` site.
+    // Its operand (the anchor's +1) is the game's buffer address, which is what the
+    // prepare step appends to the save directory. The second anchor publishes the
+    // load entry's continuation, +0xD.
+    void PublishNewSavesCompatibility()
+    {
+        if (!Loader::Enabled("NewSavesCompatibility"))
+            return;
+
+        auto primary = find_pattern("68 ? ? ? ? E8 ? ? ? ? 8B 2D ? ? ? ? 83 C4 08");
+        if (primary.empty())
+            return;
+        zpatch_new_saves_src = *primary.get_first<uint32_t>(1);
+
+        auto pattern = find_pattern("89 84 24 E0 01 00 00 8B 45 08 53 33 DB");
+        if (!pattern.empty())
+            zpatch_new_saves_resume = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(13)));
+    }
+
+    void PublishLoadDLCs()
+    {
+        if (!Loader::Enabled("LoadDLCs"))
+            return;
+
+        const DlcBuild* const row = DlcBuildFor(Loader::Current());
+        if (row == nullptr)
+            return;
+
+        const auto base = static_cast<uint32_t>(Game::Get().ImageBase());
+        zpatch_dlc_game_base = base;
+        zpatch_dlc_register_rva = row->register_rva;
+        zpatch_dlc_apply_rva = row->apply_rva;
+        zpatch_dlc_load_callback = base + row->load_callback_rva;
+    }
+}
+
+namespace
+{
+    // FastLoading: the ten-millisecond sleep the streaming code takes between
+    // batches. The arm zeroes the pushed `sleep(10)` argument; the original handler
+    // writes the one byte at the anchor's +1.
+    void InstallFastLoading()
+    {
+        if (!Loader::Enabled("FastLoading"))
+            return;
+
+        auto pattern = find_pattern("6A 0A E8 ? ? ? ? 83 C7 0A 83 C4 04 81 FF E8 03 00 00 75 02 33 FF");
+        if (!pattern.empty())
+            injector::WriteMemory<std::byte>(pattern.get_first<std::byte>(1), Bytes::Zero, true);
+    }
+
+    // NoLoadingSleep: the loading screen's five-second `Sleep(5000)` becomes
+    // `Sleep(0)`. The arm zeroes the pushed immediate at the anchor's +1.
+    void InstallNoLoadingSleep()
+    {
+        if (!Loader::Enabled("NoLoadingSleep"))
+            return;
+
+        auto pattern = find_pattern("68 88 13 00 00 FF 15");
+        if (!pattern.empty())
+            injector::WriteMemory<uint32_t>(pattern.get_first<uint32_t>(1), 0u, true);
+    }
+
+    // RemoveGFWLUpdatePopup: the anchor's first twelve bytes are the subtraction
+    // and its two stores; the stub replays them and resumes at match + 12.
+    void InstallRemoveGFWLUpdatePopup()
+    {
+        if (!Loader::Enabled("RemoveGFWLUpdatePopup"))
+            return;
+
+        // dword_10159C10: the xlive.dll module the original's loader captures.
+        zpatch_xlive_base =
+            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(GetModuleHandleA("xlive.dll")));
+
+        auto pattern = find_pattern("2B C1 1B D6 89 44 24 0C 89 54 24 10 DF 6C 24 0C D8 0D ? ? ? ? D9 5C 24 08");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            zpatch_gfwl_resume = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match) + 12);
+            injector::MakeJMP(match, reinterpret_cast<void*>(GfwlStubBodyAddress()), true);
+        }
+    }
+
+    // RemoveRGSCLoginRequirement: the login-required branch of the RGSC launch
+    // path. On 1.0.8.0 the original writes the same five-byte jump twice (the
+    // duplicate is kept); the second anchor never matches on that build but does
+    // on the ones the key was gated for.
+    void InstallRemoveRGSCLoginRequirement()
+    {
+        if (!Loader::Enabled("RemoveRGSCLoginRequirement"))
+            return;
+
+        auto pattern = find_pattern("8B 44 24 ? 85 C0 74 ? F3 0F 7E 05 ? ? ? ? 66 0F D6 00");
+        if (Loader::Current() == Build::v1080 && !pattern.empty())
+        {
+            auto* site = pattern.get_first<std::byte>(0);  // 0x498460
+            injector::MakeJMP(site, reinterpret_cast<void*>(RgscLoginRemovedBodyAddress()), true);
+            injector::MakeJMP(site, reinterpret_cast<void*>(RgscLoginRemovedBodyAddress()), true);
+        }
+
+        pattern = find_pattern("83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53 8B 5C 24 4C 56 68 ? ? ? ? E8 ? ? ? ? 83 C4");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(0),
+                reinterpret_cast<void*>(RgscLoginRemovedBodyAddress()), true);
+    }
+
+    void InstallStartupTimeFix()
+    {
+        if (!Loader::Enabled("StartupTimeFix"))
+            return;
+
+        // Three sites on 1.0.8.0: the scan hint has to ask for all of them (the
+        // scanner stops at the hint).
+        auto pattern = find_pattern<3>("68 00 C2 EC 80 68");
+        if (!pattern.empty())
+        {
+            for (size_t index = 0; index < pattern.size(); ++index)
+            {
+                injector::WriteMemory<uint32_t>(pattern.get(index).get<std::byte>(6),
+                    static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&zpatch_startup_time)), true);
+                Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(pattern.get(index).get<std::byte>(6)));
+            }
+        }
+    }
+
+    void InstallVSyncFix()
+    {
+        if (!Loader::Enabled("VSyncFix"))
+            return;
+
+        auto pattern = find_pattern("8B 08 8B 51 0C 6A 01 6A 00 6A 00 6A 00 6A 00 50 FF D2 8B F0 81 FE ? ? ? ? 74");
+        if (!pattern.empty())
+        {
+            injector::WriteMemory<uint32_t>(pattern.get_first<std::byte>(30),
+                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&zpatch_vsync_flag)), true);
+            Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(30)));
+        }
+
+        pattern = find_pattern("8B 10 50 8B 82 A8 00 00 00 FF D0 83");
+        if (!pattern.empty())
+        {
+            injector::WriteMemory<uint32_t>(pattern.get_first<std::byte>(13),
+                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&zpatch_vsync_flag)), true);
+            Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(13)));
+        }
+    }
+
+    // BenchmarkFix: two match sites eight bytes into the matched call sequence.
+    // The resume is the anchor's +13, read before the sites are overwritten; the
+    // key's build mask excludes 1.0.8.0, so this arm is inert on that image.
+    void InstallBenchmarkFix()
+    {
+        if (!Loader::Enabled("BenchmarkFix"))
+            return;
+
+        auto pattern = find_pattern<2>("E8 ? ? ? ? 83 C4 04 57 8B D8 FF D6 8B 77 20");
+        if (!pattern.empty())
+        {
+            const auto resume = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get(0).get<std::byte>(0)) + 13);
+            zpatch_benchmark_resume_a = resume;
+            zpatch_benchmark_resume_b = resume;
+
+            injector::MakeJMP(pattern.get(0).get<std::byte>(8), reinterpret_cast<void*>(BenchmarkBodyAAddress()), true);
+            if (pattern.size() > 1)
+                injector::MakeJMP(pattern.get(1).get<std::byte>(8), reinterpret_cast<void*>(BenchmarkBodyBAddress()), true);
+        }
+    }
+
+    // OverrideGTADatPath: the anchor is the gta.dat loader's `push <char*>`, and
+    // the original rewrites just that immediate (the anchor's +1).
+    void InstallOverrideGTADatPath()
+    {
+        if (!Loader::Enabled("OverrideGTADatPath"))
+            return;
+
+        auto pattern = find_pattern("68 ? ? ? ? E8 ? ? ? ? 83 C4 04 E8 ? ? ? ? E8 ? ? ? ? E8");
+        if (!pattern.empty())
+        {
+            injector::WriteMemory<uint32_t>(pattern.get_first<std::byte>(1),
+                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(zpatch_dat_path)), true);
+            Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(1)));
+        }
+    }
+
+    // SkipIntro: the anchor is the intro sequence's store; the arm jumps from the
+    // anchor's -6, and the body resumes at the anchor itself.
+    void InstallSkipIntro()
+    {
+        if (!Loader::Enabled("SkipIntro") || FusionFixGateClosed())
+            return;
+
+        auto pattern = find_pattern("89 91 ? ? ? ? 8D 44 24 ? 68 ? ? ? ? 50");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            zpatch_skip_intro_match = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match));
+            injector::MakeJMP(match - 6, reinterpret_cast<void*>(SkipIntroBodyAddress()), true);
+        }
+    }
+
+    // SkipMenu: each anchor's call is retargeted to the body, and the resume is
+    // the call's original target (the call's displacement is read before the
+    // site is overwritten).
+    void InstallSkipMenu()
+    {
+        if (!Loader::Enabled("SkipMenu") || FusionFixGateClosed())
+            return;
+
+        auto pattern = find_pattern("83 F8 03 75 ? A1 ? ? ? ? 80 88 ? ? ? ? ? 84 DB 74 0A 6A 00 E8 ? ? ? ? 83 C4 04 5F 5E");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            int32_t displacement{};
+            std::memcpy(&displacement, match + 24, sizeof(displacement));
+            zpatch_skip_menu_resume = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(match) + 28 + displacement);
+            injector::MakeCALL(match + 23, reinterpret_cast<void*>(SkipMenuBodyAddress()), true);
+        }
+
+        pattern = find_pattern("6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5D 5B 33 CC E8 ? ? ? ? 81 C4 ? ? ? ? C3");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            int32_t displacement{};
+            std::memcpy(&displacement, match + 3, sizeof(displacement));
+            zpatch_skip_menu_resume = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(match) + 7 + displacement);
+            injector::MakeCALL(match + 2, reinterpret_cast<void*>(SkipMenuBodyAddress()), true);
+        }
+
+        pattern = find_pattern("6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC E8 ? ? ? ? 8B E5 5D C3");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            int32_t displacement{};
+            std::memcpy(&displacement, match + 3, sizeof(displacement));
+            zpatch_skip_menu_resume = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(match) + 7 + displacement);
+            injector::MakeCALL(match + 2, reinterpret_cast<void*>(SkipMenuBodyAddress()), true);
+        }
+    }
+
+    // SavegameFix: two anchors, eleven call retargets and one two-byte NOP, in
+    // the original handler's write order. The call displacements are excluded
+    // from the parity comparison; the NOP is not.
+    void InstallSavegameFix()
+    {
+        if (!Loader::Enabled("SavegameFix"))
+            return;
+
+        auto pattern = find_pattern("75 ? 83 C1 01 83 C0 01 83 F9 04");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            injector::MakeCALL(match - 73, reinterpret_cast<void*>(SavegameCloseBodyAddress()), true);
+            injector::MakeCALL(match - 143, reinterpret_cast<void*>(SavegameCopyBodyAddress()), true);
+            injector::MakeCALL(match - 176, reinterpret_cast<void*>(SavegameCopyBodyAddress()), true);
+            injector::MakeCALL(match - 280, reinterpret_cast<void*>(SavegameMutexBodyAddress()), true);
+            injector::MakeCALL(match - 240, reinterpret_cast<void*>(SavegameNullBodyAddress()), true);
+            injector::MakeNOP(match, 2, true);
+        }
+
+        pattern = find_pattern("8D 4C 24 18 51 6A 00 6A 0C 57");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            injector::MakeCALL(match - 86, reinterpret_cast<void*>(SavegameMutexBodyAddress()), true);
+            injector::MakeCALL(match - 47, reinterpret_cast<void*>(SavegameNullBodyAddress()), true);
+            injector::MakeCALL(match + 10, reinterpret_cast<void*>(SavegameCopyBodyAddress()), true);
+            injector::MakeCALL(match + 90, reinterpret_cast<void*>(SavegameCopyBodyAddress()), true);
+            injector::MakeCALL(match + 128, reinterpret_cast<void*>(SavegameCloseBodyAddress()), true);
+        }
+    }
+
+    void InstallLocalSettingsPath()
+    {
+        if (!Loader::Enabled("LocalSettingsPath"))
+            return;
+
+        auto pattern = find_pattern("53 8B 5C 24 08 56 6A 00 6A 00");
+        if (!pattern.empty())
+        {
+            // +16 is the call's memory operand, +32 the pushed path-name operand.
+            // Both addresses point into this module; the write-set dump expresses
+            // them in the baseline's coordinates.
+            auto* match = pattern.get_first<std::byte>(0);
+            injector::WriteMemory<uint32_t>(match + 16,
+                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&zpatch_local_saves_slot)), true);
+            injector::WriteMemory<uint32_t>(match + 32,
+                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(zpatch_local_iv_suffix)), true);
+            Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(match + 16));
+            Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(match + 32));
+        }
+
+        pattern = find_pattern("7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D6 5F 5E 5B C3");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(14),
+                reinterpret_cast<void*>(LocalSettingsDetourBodyAddress()), true);
+
+        pattern = find_pattern("7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D7 5F C3");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(-13),
+                reinterpret_cast<void*>(LocalSettingsFallbackBodyAddress()), true);
+
+        // The detour body's inline `call` is invisible to C++; naming the helper
+        // here keeps its out-of-line definition in the image.
+        const auto step = reinterpret_cast<uintptr_t>(&LocalSettingsStep);
+        (void)step;
+    }
+
+    void InstallNewMemorySystem()
+    {
+        if (!Loader::Enabled("NewMemorySystem"))
+            return;
+
+        auto pattern = find_pattern("3D 80 99 99 59 73 05");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            // -34 is the call the original retargets, -29 the five-slot clear's
+            // first store; the jump resumes four instructions later at -16.
+            injector::MakeCALL(match - 34, reinterpret_cast<void*>(NmsApplyBodyAddress()), true);
+            injector::MakeJMP(match - 29, reinterpret_cast<void*>(match - 16), true);
+        }
+    }
+
+    void InstallNewFilesCompatibility()
+    {
+        if (!Loader::Enabled("NewFilesCompatibility") || ConflictingFileModulePresent())
+            return;
+
+        auto pattern = find_pattern("E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 7B FF FF FF");
+        if (!pattern.empty())
+            injector::MakeCALL(pattern.get_first<std::byte>(0),
+                reinterpret_cast<void*>(&NewfilesUpdateABody), true);
+
+        pattern = find_pattern("E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 6C FF FF FF");
+        if (!pattern.empty())
+            injector::MakeCALL(pattern.get_first<std::byte>(0),
+                reinterpret_cast<void*>(&NewfilesUpdateBBody), true);
+
+        pattern = find_pattern("68 64 28 C8 67 E8");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(28),
+                reinterpret_cast<void*>(NewfilesRegisterBodyAddress()), true);
+    }
+
+    // The same load entry is the write. The original returns before this scan when
+    // the first pattern missed, so the write is gated on the first pattern as well:
+    // 1.0.0.4.0 carries the entry but not the name site, and the original writes
+    // nothing there.
+    void InstallNewSavesCompatibility()
+    {
+        if (!Loader::Enabled("NewSavesCompatibility"))
+            return;
+
+        auto primary = find_pattern("68 ? ? ? ? E8 ? ? ? ? 8B 2D ? ? ? ? 83 C4 08");
+        if (primary.empty())
+            return;
+
+        auto pattern = find_pattern("89 84 24 E0 01 00 00 8B 45 08 53 33 DB");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(0),
+                reinterpret_cast<void*>(NewSavesTrampolineAddress()), true);
+    }
+
+    void InstallLoadDLCs()
+    {
+        if (!Loader::Enabled("LoadDLCs"))
+            return;
+
+        const DlcBuild* const row = DlcBuildFor(Loader::Current());
+        if (row == nullptr)
+            return;
+
+        auto* const base = reinterpret_cast<std::byte*>(Game::Get().ImageBase());
+        for (const auto& write : row->writes)
+        {
+            auto* site = base + write.site;
+            switch (write.kind)
+            {
+            case DlcWriteKind::jump_rva:
+                injector::MakeJMP(site, base + write.target, true);
+                break;
+            case DlcWriteKind::call_rva:
+                injector::MakeCALL(site, base + write.target, true);
+                break;
+            case DlcWriteKind::jump_body:
+                injector::MakeJMP(site, reinterpret_cast<void*>(DlcStructFixupBodyAddress()), true);
+                break;
+            case DlcWriteKind::call_body:
+                injector::MakeCALL(site, reinterpret_cast<void*>(DlcDummyBodyAddress()), true);
+                break;
+            case DlcWriteKind::nop_tail:
+                injector::MakeNOP(site, kDlcTailNopLength, true);
+                break;
+            }
+        }
+    }
+}
+
+// Registered like every other arm: the install tier owns the gate.
+export void RegisterLoading()
+{
+    // The discovery pass's five imported entries, filled before any tier runs. The
+    // original calls them through its own IAT slots; this module's are filled from
+    // its own imports so the transcription's operands are absolute on both sides.
+    zpatch_dlc_get_module_file_name = static_cast<uint32_t>(
+        reinterpret_cast<uintptr_t>(&GetModuleFileNameA));
+    zpatch_dlc_path_remove_file_spec = static_cast<uint32_t>(
+        reinterpret_cast<uintptr_t>(&PathRemoveFileSpecA));
+    zpatch_dlc_path_file_exists = static_cast<uint32_t>(
+        reinterpret_cast<uintptr_t>(&PathFileExistsA));
+    // `strcpy_s`/`strcat_s` are overloaded in C++ (the template form takes the
+    // destination by reference), so the address is the C three-argument entry.
+    using SafeCopyFn = int(__cdecl*)(char*, size_t, const char*);
+    zpatch_dlc_strcpy_s = static_cast<uint32_t>(
+        reinterpret_cast<uintptr_t>(static_cast<SafeCopyFn>(&strcpy_s)));
+    zpatch_dlc_strcat_s = static_cast<uint32_t>(
+        reinterpret_cast<uintptr_t>(static_cast<SafeCopyFn>(&strcat_s)));
+
+    Loader::PublishEvent() += []
+    {
+        PublishLocalSettingsPath();
+        CopyOverrideDatPath();
+        PublishNewMemorySystem();
+        PublishNewFilesCompatibility();
+        PublishNewSavesCompatibility();
+        PublishLoadDLCs();
+    };
+    Loader::InstallEvent() += []
+    {
+        InstallFastLoading();
+        InstallNoLoadingSleep();
+        InstallLocalSettingsPath();
+        InstallRemoveGFWLUpdatePopup();
+        InstallRemoveRGSCLoginRequirement();
+        InstallStartupTimeFix();
+        InstallVSyncFix();
+        InstallBenchmarkFix();
+        InstallOverrideGTADatPath();
+        InstallSkipIntro();
+        InstallSkipMenu();
+        InstallSavegameFix();
+        InstallNewMemorySystem();
+        InstallNewFilesCompatibility();
+        InstallNewSavesCompatibility();
+        InstallLoadDLCs();
+    };
+
+    // The hook bodies carry their recovered VAs so the dump can express every
+    // branch in the original's coordinates.
+    Bodies::Register(LocalSettingsDetourBodyAddress(), 0x100512F0u);
+    Bodies::Register(LocalSettingsFallbackBodyAddress(), 0x10051300u);
+    Bodies::Register(GfwlStubBodyAddress(), 0x100054E0u);
+    Bodies::Register(RgscLoginRemovedBodyAddress(), 0x10038550u);
+    Bodies::Register(BenchmarkBodyAAddress(), 0x10005650u);
+    Bodies::Register(BenchmarkBodyBAddress(), 0x10005670u);
+    Bodies::Register(SkipIntroBodyAddress(), 0x10045C30u);
+    Bodies::Register(SkipMenuBodyAddress(), 0x10046610u);
+    Bodies::Register(SavegameNullBodyAddress(), 0x10038570u);
+    Bodies::Register(SavegameCloseBodyAddress(), 0x10045580u);
+    Bodies::Register(SavegameCopyBodyAddress(), 0x100455A0u);
+    Bodies::Register(SavegameMutexBodyAddress(), 0x100455E0u);
+
+    // NewMemorySystem's ten transcribed methods and the three rebuilt arena
+    // methods of its vtable (0x100B5038).
+    Bodies::Register(NmsCtorBodyAddress(), 0x10038640u);
+    Bodies::Register(NmsRejectPtrBodyAddress(), 0x10038350u);
+    Bodies::Register(NmsSelfBodyAddress(), 0x10038540u);
+    Bodies::Register(NmsZeroBodyAddress(), 0x10001950u);
+    Bodies::Register(NmsNoopRet0BodyAddress(), 0x10038560u);
+    Bodies::Register(NmsNoopPairBodyAddress(), 0x10038580u);
+    Bodies::Register(NmsRejectBodyAddress(), 0x10038590u);
+    Bodies::Register(NmsSyncBodyAddress(), 0x100057F0u);
+    Bodies::Register(NmsThunk18BodyAddress(), 0x10038620u);
+    Bodies::Register(NmsNoopArgBodyAddress(), 0x10038630u);
+    Bodies::Register(NmsApplyBodyAddress(), 0x10038670u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsAllocateBody), 0x10038360u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsFreeBody), 0x10038430u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsContainsBody), 0x100385A0u);
+
+    // NewFilesCompatibility's registration tail (transcribed) and its two update
+    // bodies (rebuilt, so they carry no proof row).
+    Bodies::Register(NewfilesRegisterBodyAddress(), 0x10051600u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NewfilesUpdateABody), 0x10051890u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NewfilesUpdateBBody), 0x100518D0u);
+
+    // NewSavesCompatibility's trampoline (transcribed) and the four steps behind it
+    // (the original's compiled C, rebuilt, so they carry no proof row): the prepare
+    // step, the converter, and the two hooks it installs at conversion time.
+    Bodies::Register(NewSavesTrampolineAddress(), 0x100521E0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NewSavesPrepare), 0x10051FD0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NewSavesConvert), 0x10051B30u);
+    Bodies::Register(NewSavesReadHookAddress(), 0x10051A90u);
+    Bodies::Register(NewSavesSecondLoadHookAddress(), 0x10051AD0u);
+
+    // LoadDLCs' two bodies, and the discovery pass the fixup body calls (a rebuild,
+    // so it carries no proof row).
+    Bodies::Register(DlcDummyBodyAddress(), 0x10023480u);
+    Bodies::Register(DlcStructFixupBodyAddress(), 0x10023490u);
+    Bodies::Register(DlcDiscoveryAddress(), 0x10023150u);
+
+    // The registrar's inline-asm `call` and the callbacks it names are invisible
+    // to C++; naming them here keeps their out-of-line definitions in the image.
+    const auto newfilesRegister = reinterpret_cast<uintptr_t>(&NewfilesRegister);
+    const auto newfilesCallback = reinterpret_cast<uintptr_t>(&NewfilesCallback);
+    (void)newfilesRegister;
+    (void)newfilesCallback;
+
+    // The two imports the save bodies call: the original calls them through its
+    // own IAT slots, so the bodies call through these published addresses.
+    zpatch_savegame_close_handle = reinterpret_cast<uintptr_t>(&CloseHandle);
+    zpatch_savegame_create_mutex = reinterpret_cast<uintptr_t>(&CreateMutexA);
+
+    // The copy body's inline `call` is invisible to C++; naming the wrapper here
+    // keeps its out-of-line definition in the image.
+    const auto copyBlock = reinterpret_cast<uintptr_t>(&SavegameCopyBlock);
+    (void)copyBlock;
+}
+
+// ---------------------------------------------------------------------------
+// Transcribed bodies. Each is the original's instruction stream, kept as asm
+// because that is what it is; the code above is what installs it.
+// ---------------------------------------------------------------------------
+
+// sub_100054E0, recovered VA 0x100054E0 (8 instructions): the shared
+// Patch4RemoveModChecks / RemoveGFWLUpdatePopup stub. It runs the flag-gated
+// helper between pusha/popa, replays the 64-bit ECX:ESI subtraction from EDX:EAX
+// the site held (and the two stores of its result into the caller's argument
+// slots), then tail-jumps to the replayed site's continuation. `pusha`/`popa` are
+// emitted as bytes: the inline assembler renders both with a 0x66 operand-size
+// prefix, which the original does not have.
+static __declspec(naked) void GfwlStubBody()
+{
+    __asm
+    {
+        __emit 0x60  // pusha
+        call GfwlPatch
+        __emit 0x61  // popa
+        sub eax, ecx
+        sbb edx, esi
+        mov DWORD PTR [esp + 0Ch], eax
+        mov DWORD PTR [esp + 10h], edx
+        jmp DWORD PTR [zpatch_gfwl_resume]
+    }
+}
+
+// sub_10038550, recovered VA 0x10038550 (2 instructions): the RGSC login check's
+// replacement. It sets only AL, so the caller sees "already signed in" and the
+// upper 24 bits of EAX stay whatever the caller had, exactly as the original.
+static __declspec(naked) void RgscLoginRemovedBody()
+{
+    __asm
+    {
+        mov al, 1
+        ret
+    }
+}
+
+// sub_10005650, recovered VA 0x10005650: BenchmarkFix's first match-site shim. It
+// checks the benchmark object, runs the interposed callback (ESI with EDI), then
+// resumes, or unwinds through the enclosing function's tail when the object is
+// null.
+static __declspec(naked) void BenchmarkBodyA()
+{
+    __asm
+    {
+        test eax, eax
+        jz benchmark_a_zero
+        push edi
+        mov ebx, eax
+        call esi
+        jmp DWORD PTR [zpatch_benchmark_resume_a]
+    benchmark_a_zero:
+        xor al, al
+        pop esi
+        pop ebp
+        pop ebx
+        add esp, 10h
+        ret
+    }
+}
+
+// sub_10005670, recovered VA 0x10005670: BenchmarkFix's second match-site shim,
+// the same shape as the first with its own resume.
+static __declspec(naked) void BenchmarkBodyB()
+{
+    __asm
+    {
+        test eax, eax
+        jz benchmark_b_zero
+        push edi
+        mov ebx, eax
+        call esi
+        jmp DWORD PTR [zpatch_benchmark_resume_b]
+    benchmark_b_zero:
+        xor al, al
+        pop esi
+        pop ebp
+        pop ebx
+        add esp, 10h
+        ret
+    }
+}
+
+// sub_10045C30, recovered VA 0x10045C30 (6 instructions): the intro-screen
+// detour. Entered through a jump from the anchor's -6 with the site's ECX and
+// EDX; it scales ECX by 400 and zeroes EDX below the 8000 threshold, which is
+// what skips the intro outright, then resumes at the anchor.
+static __declspec(naked) void SkipIntroBody()
+{
+    __asm
+    {
+        imul ecx, ecx, 190h
+        cmp edx, 1F40h
+        jge skip_intro_ok
+        xor edx, edx
+    skip_intro_ok:
+        jmp DWORD PTR [zpatch_skip_intro_match]
+    }
+}
+
+// sub_10046610, recovered VA 0x10046610 (12 instructions): the menu detour. The
+// site's call is retargeted to this body, whose first call with a zero argument
+// switches the menu id to 6 (one-shot through the flag), then tail-jumps to the
+// original call's target; the call's own return address stays on the stack, so
+// the target returns to the game's next instruction.
+static __declspec(naked) void SkipMenuBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        cmp BYTE PTR [zpatch_skip_menu_flag], 0
+        mov eax, DWORD PTR [ebp + 8]
+        jne skip_menu_go
+        test eax, eax
+        jne skip_menu_go
+        mov eax, 6
+        mov BYTE PTR [zpatch_skip_menu_flag], 1
+    skip_menu_go:
+        mov DWORD PTR [ebp + 8], eax
+        pop ebp
+        jmp DWORD PTR [zpatch_skip_menu_resume]
+    }
+}
+
+// sub_10038570, recovered VA 0x10038570 (2 instructions): the "no savegame"
+// path returns 0.
+static __declspec(naked) void SavegameNullBody()
+{
+    __asm
+    {
+        xor eax, eax
+        ret 8
+    }
+}
+
+// sub_10045580, recovered VA 0x10045580 (7 instructions): close the save
+// handle and report success.
+static __declspec(naked) void SavegameCloseBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        push DWORD PTR [ebp + 8]
+        call DWORD PTR [zpatch_savegame_close_handle]
+        xor eax, eax
+        pop ebp
+        ret 4
+    }
+}
+
+// sub_100455E0, recovered VA 0x100455E0 (19 instructions): create the save
+// mutex into the caller's handle slot; a null slot reports 1.
+static __declspec(naked) void SavegameMutexBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        push esi
+        mov esi, DWORD PTR [ebp + 0Ch]
+        test esi, esi
+        jz savegame_mutex_null
+        push 0
+        push 0
+        push 0
+        call DWORD PTR [zpatch_savegame_create_mutex]
+        mov DWORD PTR [esi], eax
+        xor eax, eax
+        pop esi
+        pop ebp
+        ret 8
+    savegame_mutex_null:
+        mov eax, 1
+        pop esi
+        pop ebp
+        ret 8
+    }
+}
+
+// sub_100455A0, recovered VA 0x100455A0 (28 instructions): the read/copy path.
+// It refuses when the destination buffer is smaller than the requested size
+// (0x8007007A), otherwise copies through the CRT and records the size.
+static __declspec(naked) void SavegameCopyBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        push esi
+        mov esi, DWORD PTR [ebp + 0Ch]
+        push edi
+        mov edi, DWORD PTR [ebp + 14h]
+        cmp DWORD PTR [edi], esi
+        jnb savegame_copy_room
+        mov DWORD PTR [edi], esi
+        mov eax, 8007007Ah
+        pop edi
+        pop esi
+        pop ebp
+        ret 14h
+    savegame_copy_room:
+        mov eax, DWORD PTR [ebp + 10h]
+        test eax, eax
+        jz savegame_copy_skip
+        push esi
+        push DWORD PTR [ebp + 8]
+        push eax
+        call SavegameCopyBlock
+        add esp, 0Ch
+    savegame_copy_skip:
+        mov DWORD PTR [edi], esi
+        xor eax, eax
+        pop edi
+        pop esi
+        pop ebp
+        ret 14h
+    }
+}
+
+// sub_100512F0, recovered VA 0x100512F0 (7 instructions): the wide path
+// initializer's epilogue detour (game 0x856EE6). It runs the step helper between
+// pusha/popa and replays the three pops and the return the five-byte jump
+// swallowed. `pusha`/`popa` are emitted as bytes: the inline assembler renders
+// both mnemonics with a 0x66 operand-size prefix, which the original does not
+// have.
+static __declspec(naked) void LocalSettingsDetourBody()
+{
+    __asm
+    {
+        __emit 0x60  // pusha
+        call LocalSettingsStep
+        __emit 0x61  // popa
+        pop edi
+        pop esi
+        pop ebx
+        ret
+    }
+}
+
+// sub_10051300, recovered VA 0x10051300 (11 instructions): the fallback epilogue
+// detour (a site that does not exist on 1.0.8.0). It runs the same helper, then
+// re-issues the four-argument call the site held through ESI and replays the two
+// pops and the return. Register ESI is the call target on entry, so the body
+// saves it through pusha/popa and uses the live value.
+static __declspec(naked) void LocalSettingsFallbackBody()
+{
+    __asm
+    {
+        __emit 0x60  // pusha
+        call LocalSettingsStep
+        __emit 0x61  // popa
+        push 0
+        push 0
+        push 1Ch
+        push 0
+        call esi
+        pop esi
+        pop edi
+        ret
+    }
+}
+
+// sub_10038560, recovered VA 0x10038560 (1 instruction): the table's release
+// hook. It cleans no stack argument (`ret 0`), which is why it is written as an
+// immediate rather than a plain `ret` (that is `ret`, opcode C3).
+static __declspec(naked) void NmsNoopRet0Body()
+{
+    __asm
+    {
+        ret 0
+    }
+}
+
+// sub_10038640, recovered VA 0x10038640 (17 instructions): the CRageAllocator
+// constructor, __thiscall with one stack argument the callee pops. It installs
+// this module's vtable in the object and, for the `& 5 == 5` selector, runs the
+// release hook on a stack scratch slot.
+static __declspec(naked) void* NmsCtorBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        mov eax, DWORD PTR [ebp + 8]
+        push esi
+        mov esi, ecx
+        and eax, 5
+        mov DWORD PTR [esi], OFFSET zpatch_nms_vtable
+        cmp al, 5
+        jne nms_ctor_done
+        push 4
+        push esi
+        call NmsNoopRet0Body
+        add esp, 8
+    nms_ctor_done:
+        mov eax, esi
+        pop esi
+        pop ebp
+        ret 4
+    }
+}
+
+// sub_10038350, recovered VA 0x10038350 (2 instructions): reject a pointer.
+static __declspec(naked) void NmsRejectPtrBody()
+{
+    __asm
+    {
+        xor al, al
+        ret 4
+    }
+}
+
+// sub_10038540, recovered VA 0x10038540 (2 instructions): the "self" slot.
+static __declspec(naked) void* NmsSelfBody()
+{
+    __asm
+    {
+        mov eax, ecx
+        ret 4
+    }
+}
+
+// sub_10001950, recovered VA 0x10001950 (2 instructions): the null slot.
+static __declspec(naked) void* NmsZeroBody()
+{
+    __asm
+    {
+        xor eax, eax
+        ret 4
+    }
+}
+
+// sub_10038580, recovered VA 0x10038580 (1 instruction): paired no-op, two
+// stack arguments.
+static __declspec(naked) void NmsNoopPairBody()
+{
+    __asm
+    {
+        ret 8
+    }
+}
+
+// sub_10038590, recovered VA 0x10038590 (2 instructions): the reject slot. It
+// sets only AL, so the upper 24 bits of EAX stay whatever the caller had.
+static __declspec(naked) void NmsRejectBody()
+{
+    __asm
+    {
+        xor al, al
+        ret
+    }
+}
+
+// sub_100057F0, recovered VA 0x100057F0 (2 instructions): the MP-sync stub, which
+// the original's table shares with BetterMPSync. audio.ixx owns that body but
+// keeps it inside its own unit, so the table gets this copy of the same two
+// instructions.
+static __declspec(naked) void NmsSyncBody()
+{
+    __asm
+    {
+        xor eax, eax
+        ret
+    }
+}
+
+// sub_10038630, recovered VA 0x10038630 (1 instruction): no-op with one stack
+// argument.
+static __declspec(naked) void NmsNoopArgBody()
+{
+    __asm
+    {
+        ret 4
+    }
+}
+
+// sub_10038620, recovered VA 0x10038620 (5 instructions): forward through the
+// object's slot 18. The tail jump keeps the caller's return address and EBP.
+static __declspec(naked) void NmsThunk18Body()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        mov eax, DWORD PTR [ecx]
+        pop ebp
+        jmp DWORD PTR [eax + 18h]
+    }
+}
+
+// sub_10038670, recovered VA 0x10038670 (5 instructions): the installer. It
+// writes this module's vtable into the published singleton and returns without
+// cleaning a stack argument (the site's call is replaced wholesale).
+static __declspec(naked) void NmsApplyBody()
+{
+    __asm
+    {
+        mov eax, DWORD PTR [zpatch_nms_object]
+        test eax, eax
+        je nms_apply_done
+        mov DWORD PTR [eax], OFFSET zpatch_nms_vtable
+    nms_apply_done:
+        ret
+    }
+}
+
+// sub_10051600, recovered VA 0x10051600 (4 instructions): the registrar's
+// replacement tail. The original runs the registration between pushad/popad so
+// the caller's registers survive, then returns to the registrar's caller.
+static __declspec(naked) void NewfilesRegisterBody()
+{
+    __asm
+    {
+        __emit 0x60  // pushad
+        call NewfilesRegister
+        __emit 0x61  // popad
+        ret
+    }
+}
+
+// sub_10051A90, recovered VA 0x10051A90 (20 instructions): the read at game
+// 0x7D8C50. It reads into its own 0xE78-byte local - the caller's buffer,
+// `[ebp+8]`, is deliberately left untouched - and answers the read's value; an
+// unpublished read entry skips the call and leaves EAX at the zero the test just
+// saw, which is the value this returns. The /GS frame and the returned register are
+// the original's, so this replaces the C++ rebuild the tree carried (docs/rebuilt.md).
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void NewSavesReadHook()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        sub esp, 0E7Ch
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, ebp
+        mov DWORD PTR [ebp - 4], eax
+        mov eax, DWORD PTR [zpatch_new_saves_loaddata]
+        test eax, eax
+        je newsaves_read_skip
+        push DWORD PTR [ebp + 0Ch]
+        lea ecx, [ebp - 0E7Ch]
+        push ecx
+        call eax
+        add esp, 8
+    newsaves_read_skip:
+        mov ecx, DWORD PTR [ebp - 4]
+        xor ecx, ebp
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
+// sub_10051AD0, recovered VA 0x10051AD0 (33 instructions): the second LoadData call
+// at game 0x8DA090. When the save has the newer chunk 13 it consumes a twelve-byte
+// block before and after the original call - both reads run through the same slot
+// and the second one's value is what the body leaves in EAX - and otherwise the
+// original call's value passes through. The original call itself is unconditional
+// (a call through an unpublished slot faults), and it is the site's own target the
+// installer republished. Transcribed, so the C++ rebuild is gone (docs/rebuilt.md).
+//
+// Naked and internal: an external-linkage naked function is written to the module
+// and every importer fails (C2488).
+static __declspec(naked) void NewSavesSecondLoadHook()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        sub esp, 10h
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, ebp
+        mov DWORD PTR [ebp - 4], eax
+        cmp BYTE PTR [zpatch_new_saves_extra_block], 0
+        je newsaves_second_before
+        mov eax, DWORD PTR [zpatch_new_saves_loaddata]
+        test eax, eax
+        je newsaves_second_before
+        lea ecx, [ebp - 10h]
+        push 0Ch
+        push ecx
+        call eax
+        add esp, 8
+    newsaves_second_before:
+        call DWORD PTR [zpatch_new_saves_p3_original]
+        cmp BYTE PTR [zpatch_new_saves_extra_block], 0
+        je newsaves_second_done
+        mov eax, DWORD PTR [zpatch_new_saves_loaddata]
+        test eax, eax
+        je newsaves_second_done
+        lea ecx, [ebp - 10h]
+        push 0Ch
+        push ecx
+        call eax
+        add esp, 8
+    newsaves_second_done:
+        mov ecx, DWORD PTR [ebp - 4]
+        xor ecx, ebp
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
+// sub_100521E0, recovered VA 0x100521E0 (8 instructions): the savegame-load
+// trampoline. pusha/popa keep the caller's registers across the prepare step; the
+// four instructions after them are the one the five-byte jump overwrote
+// (`mov [esp+0x1E0],eax`) and the three that follow it, and the tail jumps to the
+// entry's +0xD. `pusha`/`popa` are emitted as bytes: the assembler renders both
+// with a 0x66 operand-size prefix, which the original does not have.
+static __declspec(naked) void NewSavesTrampoline()
+{
+    __asm
+    {
+        __emit 0x60  // pusha
+        call NewSavesPrepare
+        __emit 0x61  // popa
+        mov dword ptr [esp + 1E0h], eax
+        mov eax, dword ptr [ebp + 8]
+        push ebx
+        xor ebx, ebx
+        jmp dword ptr [zpatch_new_saves_resume]
+    }
+}
+
+namespace
+{
     // sub_10001280, transcribed in source/stability.ixx (docs/rebuilt.md). The
     // original's `call 0x10001280` is an immediate, so this six-byte forwarder keeps
     // that shape while a module interface cannot export the naked body itself.
@@ -2421,185 +2636,35 @@ static __declspec(naked) void DlcStructFixupBody()
     }
 }
 
-namespace
-{
-    const DlcBuild* DlcBuildFor(Build build)
-    {
-        for (const auto& row : kDlcBuilds)
-        {
-            if (row.build == build)
-                return &row;
-        }
-        return nullptr;
-    }
-
-    void PublishLoadDLCs()
-    {
-        if (!Loader::Enabled("LoadDLCs"))
-            return;
-
-        const DlcBuild* const row = DlcBuildFor(Loader::Current());
-        if (row == nullptr)
-            return;
-
-        const auto base = static_cast<uint32_t>(Game::Get().ImageBase());
-        zpatch_dlc_game_base = base;
-        zpatch_dlc_register_rva = row->register_rva;
-        zpatch_dlc_apply_rva = row->apply_rva;
-        zpatch_dlc_load_callback = base + row->load_callback_rva;
-    }
-
-    void InstallLoadDLCs()
-    {
-        if (!Loader::Enabled("LoadDLCs"))
-            return;
-
-        const DlcBuild* const row = DlcBuildFor(Loader::Current());
-        if (row == nullptr)
-            return;
-
-        auto* const base = reinterpret_cast<std::byte*>(Game::Get().ImageBase());
-        for (const auto& write : row->writes)
-        {
-            auto* site = base + write.site;
-            switch (write.kind)
-            {
-            case DlcWriteKind::jump_rva:
-                injector::MakeJMP(site, base + write.target, true);
-                break;
-            case DlcWriteKind::call_rva:
-                injector::MakeCALL(site, base + write.target, true);
-                break;
-            case DlcWriteKind::jump_body:
-                injector::MakeJMP(site, reinterpret_cast<void*>(&DlcStructFixupBody), true);
-                break;
-            case DlcWriteKind::call_body:
-                injector::MakeCALL(site, reinterpret_cast<void*>(&DlcDummyBody), true);
-                break;
-            case DlcWriteKind::nop_tail:
-                injector::MakeNOP(site, kDlcTailNopLength, true);
-                break;
-            }
-        }
-    }
-}
-
-// Registered like every other arm: the install tier owns the gate.
-export void RegisterLoading()
-{
-    // The discovery pass's five imported entries, filled before any tier runs. The
-    // original calls them through its own IAT slots; this module's are filled from
-    // its own imports so the transcription's operands are absolute on both sides.
-    zpatch_dlc_get_module_file_name = static_cast<uint32_t>(
-        reinterpret_cast<uintptr_t>(&GetModuleFileNameA));
-    zpatch_dlc_path_remove_file_spec = static_cast<uint32_t>(
-        reinterpret_cast<uintptr_t>(&PathRemoveFileSpecA));
-    zpatch_dlc_path_file_exists = static_cast<uint32_t>(
-        reinterpret_cast<uintptr_t>(&PathFileExistsA));
-    // `strcpy_s`/`strcat_s` are overloaded in C++ (the template form takes the
-    // destination by reference), so the address is the C three-argument entry.
-    using SafeCopyFn = int(__cdecl*)(char*, size_t, const char*);
-    zpatch_dlc_strcpy_s = static_cast<uint32_t>(
-        reinterpret_cast<uintptr_t>(static_cast<SafeCopyFn>(&strcpy_s)));
-    zpatch_dlc_strcat_s = static_cast<uint32_t>(
-        reinterpret_cast<uintptr_t>(static_cast<SafeCopyFn>(&strcat_s)));
-
-    Loader::PublishEvent() += []
-    {
-        PublishLocalSettingsPath();
-        CopyOverrideDatPath();
-        PublishNewMemorySystem();
-        PublishNewFilesCompatibility();
-        PublishNewSavesCompatibility();
-        PublishLoadDLCs();
-    };
-    Loader::InstallEvent() += []
-    {
-        InstallFastLoading();
-        InstallNoLoadingSleep();
-        InstallLocalSettingsPath();
-        InstallRemoveGFWLUpdatePopup();
-        InstallRemoveRGSCLoginRequirement();
-        InstallStartupTimeFix();
-        InstallVSyncFix();
-        InstallBenchmarkFix();
-        InstallOverrideGTADatPath();
-        InstallSkipIntro();
-        InstallSkipMenu();
-        InstallSavegameFix();
-        InstallNewMemorySystem();
-        InstallNewFilesCompatibility();
-        InstallNewSavesCompatibility();
-        InstallLoadDLCs();
-    };
-
-    // The hook bodies carry their recovered VAs so the dump can express every
-    // branch in the original's coordinates.
-    Bodies::Register(reinterpret_cast<uintptr_t>(&LocalSettingsDetourBody), 0x100512F0u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&LocalSettingsFallbackBody), 0x10051300u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&GfwlStubBody), 0x100054E0u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&RgscLoginRemovedBody), 0x10038550u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&BenchmarkBodyA), 0x10005650u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&BenchmarkBodyB), 0x10005670u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&SkipIntroBody), 0x10045C30u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&SkipMenuBody), 0x10046610u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&SavegameNullBody), 0x10038570u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&SavegameCloseBody), 0x10045580u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&SavegameCopyBody), 0x100455A0u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&SavegameMutexBody), 0x100455E0u);
-
-    // NewMemorySystem's ten transcribed methods and the three rebuilt arena
-    // methods of its vtable (0x100B5038).
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsCtorBody), 0x10038640u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsRejectPtrBody), 0x10038350u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsSelfBody), 0x10038540u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsZeroBody), 0x10001950u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsNoopRet0Body), 0x10038560u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsNoopPairBody), 0x10038580u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsRejectBody), 0x10038590u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsSyncBody), 0x100057F0u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsThunk18Body), 0x10038620u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsNoopArgBody), 0x10038630u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsApplyBody), 0x10038670u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsAllocateBody), 0x10038360u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsFreeBody), 0x10038430u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsContainsBody), 0x100385A0u);
-
-    // NewFilesCompatibility's registration tail (transcribed) and its two update
-    // bodies (rebuilt, so they carry no proof row).
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NewfilesRegisterBody), 0x10051600u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NewfilesUpdateABody), 0x10051890u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NewfilesUpdateBBody), 0x100518D0u);
-
-    // NewSavesCompatibility's trampoline (transcribed) and the four steps behind it
-    // (the original's compiled C, rebuilt, so they carry no proof row): the prepare
-    // step, the converter, and the two hooks it installs at conversion time.
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NewSavesTrampoline), 0x100521E0u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NewSavesPrepare), 0x10051FD0u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NewSavesConvert), 0x10051B30u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NewSavesReadHook), 0x10051A90u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NewSavesSecondLoadHook), 0x10051AD0u);
-
-    // LoadDLCs' two bodies, and the discovery pass the fixup body calls (a rebuild,
-    // so it carries no proof row).
-    Bodies::Register(reinterpret_cast<uintptr_t>(&DlcDummyBody), 0x10023480u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&DlcStructFixupBody), 0x10023490u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&DlcDiscovery), 0x10023150u);
-
-    // The registrar's inline-asm `call` and the callbacks it names are invisible
-    // to C++; naming them here keeps their out-of-line definitions in the image.
-    const auto newfilesRegister = reinterpret_cast<uintptr_t>(&NewfilesRegister);
-    const auto newfilesCallback = reinterpret_cast<uintptr_t>(&NewfilesCallback);
-    (void)newfilesRegister;
-    (void)newfilesCallback;
-
-    // The two imports the save bodies call: the original calls them through its
-    // own IAT slots, so the bodies call through these published addresses.
-    zpatch_savegame_close_handle = reinterpret_cast<uintptr_t>(&CloseHandle);
-    zpatch_savegame_create_mutex = reinterpret_cast<uintptr_t>(&CreateMutexA);
-
-    // The copy body's inline `call` is invisible to C++; naming the wrapper here
-    // keeps its out-of-line definition in the image.
-    const auto copyBlock = reinterpret_cast<uintptr_t>(&SavegameCopyBlock);
-    (void)copyBlock;
-}
+// The body accessors the readable code above uses: each body is defined above, so
+// its address can be taken here (a declaration cannot carry __declspec(naked)).
+static uintptr_t GfwlStubBodyAddress() { return reinterpret_cast<uintptr_t>(&GfwlStubBody); }
+static uintptr_t RgscLoginRemovedBodyAddress() { return reinterpret_cast<uintptr_t>(&RgscLoginRemovedBody); }
+static uintptr_t BenchmarkBodyAAddress() { return reinterpret_cast<uintptr_t>(&BenchmarkBodyA); }
+static uintptr_t BenchmarkBodyBAddress() { return reinterpret_cast<uintptr_t>(&BenchmarkBodyB); }
+static uintptr_t SkipIntroBodyAddress() { return reinterpret_cast<uintptr_t>(&SkipIntroBody); }
+static uintptr_t SkipMenuBodyAddress() { return reinterpret_cast<uintptr_t>(&SkipMenuBody); }
+static uintptr_t SavegameNullBodyAddress() { return reinterpret_cast<uintptr_t>(&SavegameNullBody); }
+static uintptr_t SavegameCloseBodyAddress() { return reinterpret_cast<uintptr_t>(&SavegameCloseBody); }
+static uintptr_t SavegameMutexBodyAddress() { return reinterpret_cast<uintptr_t>(&SavegameMutexBody); }
+static uintptr_t SavegameCopyBodyAddress() { return reinterpret_cast<uintptr_t>(&SavegameCopyBody); }
+static uintptr_t LocalSettingsDetourBodyAddress() { return reinterpret_cast<uintptr_t>(&LocalSettingsDetourBody); }
+static uintptr_t LocalSettingsFallbackBodyAddress() { return reinterpret_cast<uintptr_t>(&LocalSettingsFallbackBody); }
+static uintptr_t NmsNoopRet0BodyAddress() { return reinterpret_cast<uintptr_t>(&NmsNoopRet0Body); }
+static uintptr_t NmsCtorBodyAddress() { return reinterpret_cast<uintptr_t>(&NmsCtorBody); }
+static uintptr_t NmsRejectPtrBodyAddress() { return reinterpret_cast<uintptr_t>(&NmsRejectPtrBody); }
+static uintptr_t NmsSelfBodyAddress() { return reinterpret_cast<uintptr_t>(&NmsSelfBody); }
+static uintptr_t NmsZeroBodyAddress() { return reinterpret_cast<uintptr_t>(&NmsZeroBody); }
+static uintptr_t NmsNoopPairBodyAddress() { return reinterpret_cast<uintptr_t>(&NmsNoopPairBody); }
+static uintptr_t NmsRejectBodyAddress() { return reinterpret_cast<uintptr_t>(&NmsRejectBody); }
+static uintptr_t NmsSyncBodyAddress() { return reinterpret_cast<uintptr_t>(&NmsSyncBody); }
+static uintptr_t NmsNoopArgBodyAddress() { return reinterpret_cast<uintptr_t>(&NmsNoopArgBody); }
+static uintptr_t NmsThunk18BodyAddress() { return reinterpret_cast<uintptr_t>(&NmsThunk18Body); }
+static uintptr_t NmsApplyBodyAddress() { return reinterpret_cast<uintptr_t>(&NmsApplyBody); }
+static uintptr_t NewfilesRegisterBodyAddress() { return reinterpret_cast<uintptr_t>(&NewfilesRegisterBody); }
+static uintptr_t NewSavesReadHookAddress() { return reinterpret_cast<uintptr_t>(&NewSavesReadHook); }
+static uintptr_t NewSavesSecondLoadHookAddress() { return reinterpret_cast<uintptr_t>(&NewSavesSecondLoadHook); }
+static uintptr_t NewSavesTrampolineAddress() { return reinterpret_cast<uintptr_t>(&NewSavesTrampoline); }
+static uintptr_t DlcDiscoveryAddress() { return reinterpret_cast<uintptr_t>(&DlcDiscovery); }
+static uintptr_t DlcDummyBodyAddress() { return reinterpret_cast<uintptr_t>(&DlcDummyBody); }
+static uintptr_t DlcStructFixupBodyAddress() { return reinterpret_cast<uintptr_t>(&DlcStructFixupBody); }

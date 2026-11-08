@@ -273,6 +273,56 @@ extern "C"
     const char zpatch_spawns_fmt_used_nonped[] = "%s used a non-ped model (%s)";
 }
 
+// Forward declarations for the transcribed bodies at the bottom of this
+// file: the readable code above installs them (and a body may branch to
+// another), so every one is named here. MSVC rejects `__declspec(naked)`
+// on a declaration (C2488), so these carry the signature only; each
+// definition in the tail is naked.
+static void SpawnsNameEntry();
+static void SpawnsWhoEntry();
+static void SpawnsPrintEntry();
+static void SpawnsFormatEntry();
+static void SpawnsGuardBody();
+static void SpawnsCase0x24Body();
+static void SpawnsCase0x3DBody();
+static void SpawnsCase0x56Body();
+static void SpawnsCase0x6FBody();
+static void SpawnsCase0x88Body();
+static void SpawnsCase0x9EBody();
+static void SpawnsCase0xB4Body();
+static void SpawnsCase0xCABody();
+static void SpawnsCase0xE0Body();
+static void SpawnsCase0xF6Body();
+static void SpawnsProbeBody();
+static void CollisionDeadlockShim();
+static void CarPartsShadowShim();
+static void CarDynamicShadowShim();
+static void CarDynamicShadowShimB();
+static void FchsCheckBody();
+static void FchsShimBody();
+static void CarDecalsSelectorShim();
+static void BikePhysicsDetour();
+static void DualHeadlightsNewBody();
+static void DualHeadlightsOldBody();
+static void* __fastcall VehicleComponentBody(void*, const char*);
+static void SteerResolveEntry();
+static void SteerConsumerBody();
+static void NoliveryFormat();
+static void SteerDetourEaxBody();
+static void SteerDetourEdxBody();
+static void GarageColourBody();
+static void GarageLookupBody();
+static void GarageBodyA();
+static void GarageBodyB();
+static void NoliveryHashBody();
+static void NoliveryCountBody();
+static void NoliveryCopyBody();
+static void NoliveryBodyA();
+static void NoliveryBodyB();
+static void NoliveryBodyC();
+static void NoliveryBodyD();
+static void NoliveryBodyE();
+
 // The 38,455-entry name table the probe's name helper walks. This module needs its
 // own copy: source/stability.ixx owns the same recovered array for
 // BadPlayerModelCrashFix, and that arm registers it with the body registry only
@@ -360,6 +410,1303 @@ namespace
         SpawnsScriptCall(0x79023CFCu, 1, &argument);
     }
 }
+
+// sub_1001EF30, recovered VA 0x1001EF30: HighFPSBikePhysicsFix's clamp, the helper
+// the detour calls between pushad/popad. The original converts the float value to
+// double, compares it against the 8-byte constant 0.006666666665 and replaces it
+// with 0x3BDA740E when it is below. Written as the same comparison rather than as
+// the SSE sequence: the value and the outcome are what the detour's contract is.
+static void BikePhysicsClamp() noexcept
+{
+    // The float the original's 0x3BDA740E immediate denotes, stored when the value
+    // is below the threshold; 0.006666667f is the shortest decimal that is that
+    // float. The comparison's own 8-byte constant is 0.006666666665 (the qword at
+    // 0x10152308).
+    constexpr float kBikeSpeedThreshold = 0.006666667f;
+
+    const float value = zpatch_bike_value;
+    if (0.006666666665 > static_cast<double>(value))
+        zpatch_bike_value = kBikeSpeedThreshold;
+}
+
+// sub_100064D0, recovered VA 0x100064D0: the two light indices the dual-headlight
+// bodies push. The original's bodies call it inside pushad/popad, so the clobbering
+// is harmless there; the words hold the same values from load time on.
+static void DualHeadlightConstants() noexcept
+{
+    zpatch_dual_light_a = 1;
+    zpatch_dual_light_b = 2;
+}
+
+namespace
+{
+    // sub_10003E50 (source/shared.ixx), called as the original's direct `call`:
+    // this forwarder is what an inline-asm `call` can name (the resolver itself is a
+    // naked body in another unit, and a module interface cannot export it).
+    uint32_t __cdecl NoliveryResolve(const char* name)
+    {
+        return reinterpret_cast<uint32_t(__cdecl*)(const char*)>(Shared::ValueResolver())(name);
+    }
+}
+
+// Vehicle fixes. Every arm anchors to its own recovered signature; most writes are
+// in-place bytes, jump rewrites and NOP runs, and the four sites whose fix is a
+// rewritten instruction sequence jump to a transcribed body instead.
+//
+// The signatures are forged from the game database (IDA, 1.0.8.0) at each arm's
+// scan anchor and are unique in that image; the offsets are measured from the
+// anchor, which is why they did not change when the strings did.
+namespace
+{
+    // One recovered sub-gate: is the current build's id a bit of `mask`? The
+    // catalogue's own mask is the arm's gate; a few recovered rows carry a narrower
+    // one of their own, which is what this reads.
+    bool CurrentBuildInMask(uint32_t mask)
+    {
+        return (mask & (1u << static_cast<uint32_t>(Loader::Current()))) != 0;
+    }
+
+    // CarDynamicShadowFix@noE's own gate: the recovered table gives the row the
+    // mask 0x22 (build ids 1000 and 1040), the builds where the installer's pattern
+    // E is absent. 1.0.0.4 has pattern E, so it keeps the E path and is not in the
+    // mask even though pattern C matches there too.
+    constexpr uint32_t kCarDynamicShadowNoEBuilds = 0x22u;
+
+    // DualVehicleHeadlights' two recovered arm gates: the original's own table gives
+    // the old body 0x62 (build ids 1, 5 and 6 -- 1.0.0.0, 1.0.4.0, 1.0.0.4) and the
+    // new body 0x4BF80 (id 7 and every later build). The original's handler selects
+    // between the two by the build id it classified (`cmp [build], 1` .. `cmp
+    // [build], 6`, 0x100067F3), which is the same split. The union is every
+    // supported build.
+    constexpr uint32_t kDualHeadlightsOldBuilds = 0x62u;
+    constexpr uint32_t kDualHeadlightsNewBuilds = 0x4BF80u;
+
+    // A captured pattern operand is a 32-bit VA of the image *as loaded* (the same
+    // helper as misc.ixx's): the loader has already applied the image's relocations,
+    // so the dword is a live address and the cast is the whole conversion. The game
+    // runs relocated, so subtracting the preferred base here would add the run's
+    // whole relocation distance to the pointer; the offline dump relocates its copy
+    // of the image too. Only the arms that write *through* such an operand need it.
+    template <typename T>
+    T* GamePointer(uint32_t value)
+    {
+        return reinterpret_cast<T*>(static_cast<uintptr_t>(value));
+    }
+
+    // A rel32 target inside the match: the displacement dword at `displacement`,
+    // measured from the instruction's last byte at `next`.
+    uint32_t Rel32Target(std::byte* match, std::ptrdiff_t displacement, std::ptrdiff_t next)
+    {
+        const auto displacementValue = *reinterpret_cast<const int32_t*>(match + displacement);
+        return static_cast<uint32_t>(
+            reinterpret_cast<uintptr_t>(match + next) + static_cast<uint32_t>(displacementValue));
+    }
+
+    // EpisodicVehicleSupport's own episode word: the game's unk_10158128, an int
+    // holding 2, which every `cmp [episode], 2` below tests. The arm hands the game
+    // this module's word instead, so the four 1.0.7.0/1.0.8.0 sites read a value
+    // this module owns; the dump canonicalises the four published operands.
+    uint32_t zpatch_episode_flag = 2;
+    // The address of a body another module transcribed, by its recovered VA. The
+    // shared IDE parser hook lives in source/misc.ixx, and a module interface cannot
+    // export a naked function; the body registry is what makes it reachable (the same
+    // route the BPM arm uses for the native layer's pieces).
+    uintptr_t RegisteredBody(uint32_t reference)
+    {
+        for (const auto& entry : Bodies::All())
+        {
+            if (entry.reference == reference)
+                return entry.address;
+        }
+        return 0;
+    }
+
+    // The original loader preamble resolves these five entries unconditionally
+    // (sub_100523C0, 0x10052EE6..0x10052F50), before any handler runs: the model-info
+    // array (dword_1015AD78), the bone getter (dword_10159B88) and the two matrix
+    // setters (dword_1015D63C, dword_10159CDC). Each scan's hit is exactly what the
+    // preamble's own pattern takes -- the bone getter's signature has two hits and
+    // the preamble takes the first (`cmovnz ecx, eax` with the scan's front element),
+    // and a miss keeps the slot as it was, which for a first run is zero, so the
+    // consumer faults on the null it reads just as the original's does.
+    //
+    // The two CRT entries are the ones the livery helpers call through their IAT
+    // slots: `_stricmp` (the registry comparator) and `strcpy_s` (the 0x10-byte name
+    // copy). byte_10159B85 is the original DllMain's CitizenIV.exe probe
+    // (0x10055DFB..0x10055E17); it starts zero and is set once, here.
+    void ResolveSteerHelpers()
+    {
+        auto pattern = find_pattern("85 C0 C6 44 24 0C 00 C6 44 24 0D 00 75 07");
+        if (!pattern.empty())
+        {
+            const auto value = *pattern.get_first<uint32_t>(-4);
+            zpatch_steer_model_array = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(GamePointer<std::byte>(value)));
+        }
+
+        pattern = find_pattern("56 8B F1 8B 06 8B 90 A0 00 00 00 57 FF D2 85 C0 74 1C");
+        if (!pattern.empty())
+            zpatch_steer_bone = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)));
+
+        pattern = find_pattern("0F 10 5E 14 F3 0F 10 66 18 F3 0F 10 4C 24 0C F3");
+        if (!pattern.empty())
+            zpatch_steer_matrix_a = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(-0x30)));
+
+        pattern = find_pattern(
+            "0F 10 16 F3 0F 10 5E 04 F3 0F 10 4C 24 0C F3 0F 10 66 08 F2 0F 5A C0");
+        if (!pattern.empty())
+            zpatch_steer_matrix_b = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(-0x30)));
+
+        zpatch_steer_stricmp = reinterpret_cast<uintptr_t>(&_stricmp);
+        // `strcpy_s` is an overload set in the CRT headers (the array form is a
+        // template), so the slot takes the three-argument entry explicitly.
+        zpatch_nolivery_strcpy_s = reinterpret_cast<uintptr_t>(
+            static_cast<errno_t(__cdecl*)(char*, size_t, const char*)>(&strcpy_s));
+
+        zpatch_garage_citizen = GetModuleHandleA("CitizenIV.exe") != nullptr ? 1 : 0;
+    }
+
+    // CollisionDeadlockFix's published walk test: the site's own call target (the
+    // disp32 at match+91), read before the install overwrites the entry.
+    void PublishCollisionDeadlockFix()
+    {
+        if (!Loader::Enabled("CollisionDeadlockFix"))
+            return;
+
+        auto pattern = find_pattern("55 8B EC 83 E4 F8 51 8B 45 0C 0F B7 48 66");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get_first<std::byte>(0);
+        const auto displacement = *reinterpret_cast<const int32_t*>(match + 91);
+        zpatch_collision_should_walk =
+            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 95) + displacement);
+    }
+
+    // HighFPSBikePhysicsFix's resume: the site's own `call` at match+9, read before
+    // the install replaces the first five bytes with the jump. The body re-runs those
+    // five bytes' instructions and tail-jumps to the call, so the call and the rest of
+    // the function run unchanged.
+    void PublishHighFPSBikePhysicsFix()
+    {
+        if (!Loader::Enabled("HighFPSBikePhysicsFix"))
+            return;
+
+        auto pattern = find_pattern("D9 45 08 51 8B CE D9 1C 24 E8 ?? ?? ?? ?? 8A 86 90 14 00 00");
+        if (pattern.empty())
+            return;
+
+        zpatch_bike_resume =
+            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(9)));
+    }
+
+    // DualVehicleHeadlights' published operands, all read from the one match: the
+    // light-state global the site pushes at match+207, the ped getter's call target
+    // (the disp32 at match+140, next byte +144), the driver test's (+151/+155), the
+    // draw call's (+331/+335) and the resume (`pop edi`, match+338). The site's own
+    // instructions carry those operands, so the publish is a read, not a decode.
+    void PublishDualVehicleHeadlights()
+    {
+        // The catalogue's key mask cannot be the gate here: see the install arm.
+        if (Catalogue::Read("DualVehicleHeadlights") != 1)
+            return;
+
+        auto pattern = find_pattern("8B 17 8B 42 64 8B CF FF D0 8B 54");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get_first<std::byte>(0);
+        zpatch_dual_bcc = *pattern.get_first<uint32_t>(207);
+        zpatch_dual_bd0 = Rel32Target(match, 140, 144);
+        zpatch_dual_be4 = Rel32Target(match, 151, 155);
+        zpatch_dual_bd4 = Rel32Target(match, 331, 335);
+        zpatch_dual_be0 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 338));
+    }
+
+    // FreezeCarFix / DebugPrintSpawns: the original's handler 0x10037C70 scans the
+    // primary signature first and wraps every other scan in its `if (result)`, so a
+    // miss on 1.0.0.0 / 1.0.4.0 / 1.0.0.4 installs nothing at all. The arm keeps
+    // that shape: the DebugPrintSpawns flag and the probe's operands are read here,
+    // before the install tier writes any site, and every resume is the target of the
+    // `E8` the install is about to overwrite.
+    void PublishFreezeCarFix()
+    {
+        if (!Loader::Enabled("FreezeCarFix"))
+            return;
+
+        // The original reads DebugPrintSpawns only inside this gate and only raises
+        // the flag (`movzx ecx,[0x10159C15]; cmp esi,1; cmove ecx,1; mov [...],cl`),
+        // so a value other than 1 leaves it at the BSS zero.
+        zpatch_spawns_debug = Catalogue::Read("DebugPrintSpawns") == 1 ? 1 : 0;
+        zpatch_spawns_getmodulehandlew = static_cast<uint32_t>(
+            reinterpret_cast<uintptr_t>(&GetModuleHandleW));
+        zpatch_spawns_resolver = static_cast<uint32_t>(Shared::ValueResolver());
+
+        auto primary = find_pattern("32 DB 8B 54 24 24 52 E8 ? ? ? ? 8B F0");
+        if (primary.empty())
+            return;
+
+        auto* primaryMatch = primary.get_first<std::byte>(0);
+        zpatch_spawns_orig_a = Rel32Target(primaryMatch, 8, 12);
+
+        // dword_1015AD78, the ped-model object array, is the operand four bytes
+        // before the original's own anchor (the same recovered read the
+        // BadPlayerModelCrashFix arm makes). It is a live VA: the loader has already
+        // relocated the image, and the dump relocates its copy too.
+        auto pedArray = find_pattern("85 C0 C6 44 24 0C 00 C6 44 24 0D 00 75 07");
+        if (!pedArray.empty())
+            zpatch_spawns_ped_array = *pedArray.get_first<uint32_t>(-4);
+
+        auto guard = find_pattern(
+            "8B 4C 24 28 8B 54 24 24 50 51 52 E8 ? ? ? ? 5F 5E 5D 5B");
+        if (!guard.empty())
+            zpatch_spawns_orig_b = Rel32Target(guard.get_first<std::byte>(0), 12, 16);
+
+        // The probe's ten jump-table arms: each site's own `call` target is the
+        // resume the thunk tail-jumps to, in case order 0..9.
+        auto dispatch = find_pattern("E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00");
+        if (!dispatch.empty())
+        {
+            auto* match = dispatch.get_first<std::byte>(0);
+            zpatch_spawns_case0_resume = Rel32Target(match, 37, 41);
+            zpatch_spawns_case1_resume = Rel32Target(match, 62, 66);
+            zpatch_spawns_case2_resume = Rel32Target(match, 87, 91);
+            zpatch_spawns_case3_resume = Rel32Target(match, 112, 116);
+            zpatch_spawns_case4_resume = Rel32Target(match, 137, 141);
+            zpatch_spawns_case5_resume = Rel32Target(match, 159, 163);
+            zpatch_spawns_case6_resume = Rel32Target(match, 181, 185);
+            zpatch_spawns_case7_resume = Rel32Target(match, 203, 207);
+            zpatch_spawns_case8_resume = Rel32Target(match, 225, 229);
+            zpatch_spawns_case9_resume = Rel32Target(match, 247, 251);
+        }
+    }
+
+    // CarPartsShadowFix's published resumes: the site's own bytes -- the `jle` it
+    // would have run (match+2) and the loop exit that `jle` jumps to (match+0x45).
+    // The shared detour is installed under either key, so the publish uses the same
+    // combined gate.
+    void PublishCarPartsShadowFix()
+    {
+        if (!Loader::Enabled("CarPartsShadowFix") && !Loader::Enabled("CarDynamicShadowFix"))
+            return;
+
+        auto pattern = find_pattern("85 DB 7E 41 55 EB 0A");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get_first<std::byte>(0);
+        zpatch_carparts_resume_if = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 2));
+        zpatch_carparts_resume_else =
+            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 0x45));
+    }
+
+    // CarDynamicShadowFix's published call target and resume, from whichever body
+    // variant the build carries: pattern A's `call` sits at match+6, so its resume is
+    // match+0xB and the displacement is at match+7; pattern B's `call` sits at
+    // match+8, so its resume is match+0xD and the displacement is at match+9.
+    void PublishCarDynamicShadowFix()
+    {
+        if (!Loader::Enabled("CarDynamicShadowFix"))
+            return;
+
+        auto pattern = find_pattern("56 6A 02 53 53 57 E8 ? ? ? ? 56 6A 02 6A 04 6A 05 57 E8");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            const auto resume = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 11));
+            zpatch_carparts_shadow_fn = resume + *reinterpret_cast<const int32_t*>(match + 7);
+            zpatch_carparts_resume_2 = resume;
+            return;
+        }
+
+        pattern = find_pattern("56 6A 02 6A 00 6A 00 57 E8 ? ? ? ? 56 6A 02 6A 04 6A 05 57 E8");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            const auto resume = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 13));
+            zpatch_carparts_shadow_fn = resume + *reinterpret_cast<const int32_t*>(match + 9);
+            zpatch_carparts_resume_2 = resume;
+        }
+    }
+
+    // ForceCarHeadlightShadows' resume: the E9 replaces the shadow function's entry
+    // (game 0x8F7590), and the shim replays those twelve prologue bytes itself, so
+    // the continuation is the instruction after them (match+12, the `mov eax,
+    // [ebp+20h]`). Read before the site is written, as the original's handler does.
+    void PublishForceCarHeadlightShadows()
+    {
+        if (!Loader::Enabled("ForceCarHeadlightShadows"))
+            return;
+
+        auto pattern = find_pattern("55 8B EC 83 E4 F0 81 EC D4 00 00 00 8B 45 20 8B");
+        if (!pattern.empty())
+            zpatch_fchs_resume = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(12)));
+    }
+
+    // The three steer keys' shared slots, read before any of their sites is written:
+    // the detour's resume (match+16) and the part-drive function the site's own code
+    // calls, plus the shared IDE hook's resume (the parser anchor's -1, which the
+    // original's sub_10004110 publishes as `result - 1`). Only one of the two site
+    // variants exists per build, and each carries its own operand offsets (423/427 on
+    // the 1.0.6.0-and-later site, 140/144 on the older one).
+    void PublishSteerSites()
+    {
+        auto pattern = find_pattern("32 DB 8B 16 8B 82 28 01 00 00 8B CE FF D0");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            zpatch_steer_resume = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 16));
+            zpatch_steer_part_call = Rel32Target(match, 423, 427);
+        }
+
+        pattern = find_pattern("7C E0 8B 06 8B 90 28 01 00 00 8B CE FF D2");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            zpatch_steer_resume = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 16));
+            zpatch_steer_part_call = Rel32Target(match, 140, 144);
+        }
+
+        pattern = find_pattern("0C 83 88 94 00 00 00 04");
+        if (!pattern.empty())
+            zpatch_ide_hook_slot = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(-1)));
+    }
+
+    // MovingSteeringWheelSupport / ShakingEngineBlock / MovingPlaneParts: the
+    // original's handler sets its own switch byte and calls the shared installer
+    // (0x10054A7A, 0x10054B56, 0x10054AE8: `mov byte_1015AD4?, 1; call
+    // sub_10005210`). The switch bytes are module words, so two of the keys on runs
+    // both consumer blocks and one of them off leaves its block dormant -- exactly
+    // the original's per-key switches.
+    void PublishMovingSteeringWheelSupport()
+    {
+        if (!Loader::Enabled("MovingSteeringWheelSupport"))
+            return;
+        PublishSteerSites();
+    }
+
+    void PublishShakingEngineBlock()
+    {
+        if (!Loader::Enabled("ShakingEngineBlock"))
+            return;
+        PublishSteerSites();
+    }
+
+    void PublishMovingPlaneParts()
+    {
+        if (!Loader::Enabled("MovingPlaneParts"))
+            return;
+        PublishSteerSites();
+    }
+
+    // GarageModelFix's two resumes, read from the sites before they are overwritten:
+    // the `fstp [esi+4]` at the first site's +6 and the `call` at the second site's
+    // +5.
+    void PublishGarageModelFix()
+    {
+        if (!Loader::Enabled("GarageModelFix"))
+            return;
+
+        auto pattern = find_pattern("8B 57 20 D9 42 34 D9 5E 04 8B 47 20");
+        if (!pattern.empty())
+            zpatch_garage_resume_a = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(6)));
+
+        pattern = find_pattern("0F B7 0E 50 51 E8");
+        if (!pattern.empty())
+            zpatch_garage_resume_b = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(5)));
+    }
+
+    // NoLiveryLimit's published slots, in the original handler's (sub_1003D420)
+    // order and with its own either/or: the first site variant publishes the count
+    // loop's lookup (the call operand six bytes before the anchor) and the D/E resume
+    // (match+90); failing that, the older variant publishes its own pair (match-8 and
+    // match+84). The A/B/C resume comes from the livery anchor's +13 either way.
+    void PublishNoLiveryLimit()
+    {
+        if (!Loader::Enabled("NoLiveryLimit"))
+            return;
+
+        auto pattern = find_pattern("74 52 8D B5 3C 01 00 00 83 FB 04");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            zpatch_nolivery_fn = Rel32Target(match, -6, -2);
+            zpatch_nolivery_resume_d = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(match + 90));
+        }
+        else
+        {
+            pattern = find_pattern("8D AF 3C 01 00 00 8D 54 24 20");
+            if (!pattern.empty())
+            {
+                auto* match = pattern.get_first<std::byte>(0);
+                zpatch_nolivery_fn = Rel32Target(match, -8, -4);
+                zpatch_nolivery_resume_d = static_cast<uint32_t>(
+                    reinterpret_cast<uintptr_t>(match + 84));
+            }
+        }
+
+        pattern = find_pattern("8B 8C 83 3C 01 00 00 0F BF 53 48");
+        if (!pattern.empty())
+            zpatch_nolivery_resume = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(13)));
+    }
+
+    // CarDecalsFix: the decal selector's entry is replaced by its fixed twin, which
+    // drops the episodic-build test between the mask compare and the member read.
+    void InstallCarDecalsFix()
+    {
+        if (!Loader::Enabled("CarDecalsFix"))
+            return;
+
+        auto pattern = find_pattern("8B 44 24 08 8B 48 28 81 E1 C0 03 00 00 81 F9 80 00 00 00");
+        if (pattern.empty())
+            return;
+
+        Bodies::Register(reinterpret_cast<uintptr_t>(&CarDecalsSelectorShim), 0x1001B2E0u);
+        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(&CarDecalsSelectorShim), true);
+    }
+
+    // CollisionDeadlockFix: the node walk is replaced by its capped twin.
+    void InstallCollisionDeadlockFix()
+    {
+        if (!Loader::Enabled("CollisionDeadlockFix"))
+            return;
+
+        auto pattern = find_pattern("55 8B EC 83 E4 F8 51 8B 45 0C 0F B7 48 66");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get_first<std::byte>(0);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&CollisionDeadlockShim), 0x10005D80u);
+        injector::MakeJMP(match, reinterpret_cast<void*>(&CollisionDeadlockShim), true);
+    }
+
+    // HighFPSBikePhysicsFix: the bike's per-frame speed value passes through the
+    // clamp before the physics step consumes it.
+    void InstallHighFPSBikePhysicsFix()
+    {
+        if (!Loader::Enabled("HighFPSBikePhysicsFix"))
+            return;
+
+        auto pattern = find_pattern("D9 45 08 51 8B CE D9 1C 24 E8 ?? ?? ?? ?? 8A 86 90 14 00 00");
+        if (pattern.empty())
+            return;
+
+        Bodies::Register(reinterpret_cast<uintptr_t>(&BikePhysicsDetour), 0x1001EF60u);
+        injector::MakeJMP(pattern.get_first<std::byte>(0), reinterpret_cast<void*>(&BikePhysicsDetour), true);
+    }
+
+    // DualVehicleHeadlights: both recovered arms jump to their own body at the same
+    // site, and the original's handler picks the body from the build id it classified
+    // (`cmp [build], 1` .. `cmp [build], 6` at 0x100067F3): ids 1..6 get the old body,
+    // every later build the new one. That is the pair of recovered masks, so each
+    // build runs exactly one arm; the reference tree ran both unconditionally and the
+    // later write won, which lands on the same bytes everywhere the masks are
+    // disjoint (they are).
+    //
+    // The gate is the catalogue's INI read alone. This key's catalogue mask (0x20) is
+    // the feature document's build list, not the original's: the original's own two
+    // arm masks cover every supported build, so `Loader::Enabled` would never install
+    // this arm anywhere but 1.0.4.0. See docs/parity.md.
+    void InstallDualVehicleHeadlights()
+    {
+        if (Catalogue::Read("DualVehicleHeadlights") != 1)
+            return;
+
+        auto pattern = find_pattern("8B 17 8B 42 64 8B CF FF D0 8B 54");
+        if (pattern.empty())
+            return;
+
+        if (CurrentBuildInMask(kDualHeadlightsOldBuilds))
+        {
+            Bodies::Register(reinterpret_cast<uintptr_t>(&DualHeadlightsOldBody), 0x10006630u);
+            injector::MakeJMP(pattern.get_first<std::byte>(0),
+                reinterpret_cast<void*>(&DualHeadlightsOldBody), true);
+        }
+
+        if (CurrentBuildInMask(kDualHeadlightsNewBuilds))
+        {
+            Bodies::Register(reinterpret_cast<uintptr_t>(&DualHeadlightsNewBody), 0x100064F0u);
+            injector::MakeJMP(pattern.get_first<std::byte>(0),
+                reinterpret_cast<void*>(&DualHeadlightsNewBody), true);
+        }
+    }
+
+    void InstallFreezeCarFix()
+    {
+        if (!Loader::Enabled("FreezeCarFix"))
+            return;
+
+        auto primary = find_pattern("32 DB 8B 54 24 24 52 E8 ? ? ? ? 8B F0");
+        if (primary.empty())
+            return;
+
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsProbeBody), 0x10037510u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsGuardBody), 0x100372F0u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0x24Body), 0x10037330u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0x6FBody), 0x10037390u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0xE0Body), 0x100373C0u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0x3DBody), 0x100373F0u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0x56Body), 0x10037420u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0x88Body), 0x10037450u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0x9EBody), 0x10037480u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0xF6Body), 0x100374B0u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0xB4Body), 0x100374E0u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0xCABody), 0x10037360u);
+
+        injector::MakeCALL(primary.get_first<std::byte>(7),
+            reinterpret_cast<void*>(&SpawnsProbeBody), true);
+
+        auto guard = find_pattern(
+            "8B 4C 24 28 8B 54 24 24 50 51 52 E8 ? ? ? ? 5F 5E 5D 5B");
+        if (!guard.empty())
+        {
+            injector::MakeCALL(guard.get_first<std::byte>(11),
+                reinterpret_cast<void*>(&SpawnsGuardBody), true);
+        }
+
+        struct SpawnCase final
+        {
+            std::ptrdiff_t dispatchOffset;
+            void (*body)();
+        };
+        constexpr SpawnCase kSpawnCases[] = {
+            { 0x24, &SpawnsCase0x24Body },
+            { 0x3D, &SpawnsCase0x3DBody },
+            { 0x56, &SpawnsCase0x56Body },
+            { 0x6F, &SpawnsCase0x6FBody },
+            { 0x88, &SpawnsCase0x88Body },
+            { 0x9E, &SpawnsCase0x9EBody },
+            { 0xB4, &SpawnsCase0xB4Body },
+            { 0xCA, &SpawnsCase0xCABody },
+            { 0xE0, &SpawnsCase0xE0Body },
+            { 0xF6, &SpawnsCase0xF6Body },
+        };
+
+        auto dispatch = find_pattern("E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00");
+        if (!dispatch.empty())
+        {
+            auto* match = dispatch.get_first<std::byte>(0);
+            for (const SpawnCase& spawn : kSpawnCases)
+            {
+                injector::MakeCALL(match + spawn.dispatchOffset,
+                    reinterpret_cast<void*>(spawn.body), true);
+            }
+        }
+
+        auto probeA = find_pattern("88 87 40 01 00 00 E8");
+        if (!probeA.empty())
+        {
+            injector::MakeCALL(probeA.get_first<std::byte>(6),
+                reinterpret_cast<void*>(&SpawnsProbeBody), true);
+        }
+
+        auto probeB = find_pattern("88 5C 24 1F 8B 54 24 28 52 E8");
+        if (!probeB.empty())
+        {
+            injector::MakeCALL(probeB.get_first<std::byte>(9),
+                reinterpret_cast<void*>(&SpawnsProbeBody), true);
+            injector::MakeCALL(probeB.get_first<std::byte>(254),
+                reinterpret_cast<void*>(&SpawnsProbeBody), true);
+        }
+
+        auto probeC = find_pattern("38 98 8C 00 00 00 75 2D 57 E8");
+        if (!probeC.empty())
+        {
+            injector::MakeCALL(probeC.get_first<std::byte>(9),
+                reinterpret_cast<void*>(&SpawnsProbeBody), true);
+        }
+
+        // The second row of the original's own table: a shorter prefix of the
+        // primary, installed at the same +7 site, so the write is the duplicate the
+        // original makes (17 rows, 16 distinct sites).
+        auto shortPrimary = find_pattern("32 DB 8B 54 24 24 52 E8");
+        if (!shortPrimary.empty())
+        {
+            injector::MakeCALL(shortPrimary.get_first<std::byte>(7),
+                reinterpret_cast<void*>(&SpawnsProbeBody), true);
+        }
+    }
+
+    // CarPartsShadowFix shares the detour with CarDynamicShadowFix: the original
+    // gates the rewrite on either key and only the standalone forcing writes below
+    // are CarPartsShadowFix's own.
+    void InstallCarPartsShadowFix()
+    {
+        if (!Loader::Enabled("CarPartsShadowFix") && !Loader::Enabled("CarDynamicShadowFix"))
+            return;
+
+        auto pattern = find_pattern("85 DB 7E 41 55 EB 0A");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get_first<std::byte>(0);
+
+        Bodies::Register(reinterpret_cast<uintptr_t>(&CarPartsShadowShim), 0x10006880u);
+        injector::MakeJMP(match - 6, reinterpret_cast<void*>(&CarPartsShadowShim), true);
+
+        if (!Loader::Enabled("CarPartsShadowFix"))
+            return;
+
+        // The standalone arm forces the shadow path on its own: the `jnz` that would
+        // skip it becomes a short jump. The recovered standalone handler scans two
+        // variants: the `83 F8 04` site (1.0.6.0 and later) and the `83 FA 04 75 0C`
+        // site (the older builds). Each scan is a clean skip on the builds that do
+        // not carry it.
+        pattern = find_pattern("83 F8 04 C6 44 24 0E 00 75 0F");
+        if (!pattern.empty())
+            injector::WriteMemory<std::byte>(pattern.get_first(8), Bytes::ShortJmp, true);
+
+        pattern = find_pattern("83 FA 04 75 0C");
+        if (!pattern.empty())
+            injector::WriteMemory<std::byte>(pattern.get_first(3), Bytes::ShortJmp, true);
+    }
+
+    // CarDynamicShadowFix: the shadow call site is detached so the shadow is drawn
+    // twice with the remaining arguments. Two recovered body variants exist: pattern
+    // A (1.0.6.0 and later) and pattern B (the older builds); the key's own build
+    // mask covers both, and the signatures are the gate. The same installer's C and
+    // E branches are the old builds' two extra writes: a range check rewritten as an
+    // unconditional jump, and the six-byte NOP fill where pattern E is absent.
+    void InstallCarDynamicShadowFix()
+    {
+        if (!Loader::Enabled("CarDynamicShadowFix"))
+            return;
+
+        auto pattern = find_pattern("56 6A 02 53 53 57 E8 ? ? ? ? 56 6A 02 6A 04 6A 05 57 E8");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            Bodies::Register(reinterpret_cast<uintptr_t>(&CarDynamicShadowShim), 0x100068A0u);
+            injector::MakeJMP(match, reinterpret_cast<void*>(&CarDynamicShadowShim), true);
+        }
+
+        // Pattern B is the old-build variant of the same call site.
+        pattern = find_pattern("56 6A 02 6A 00 6A 00 57 E8 ? ? ? ? 56 6A 02 6A 04 6A 05 57 E8");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            Bodies::Register(reinterpret_cast<uintptr_t>(&CarDynamicShadowShimB), 0x100068D0u);
+            injector::MakeJMP(match, reinterpret_cast<void*>(&CarDynamicShadowShimB), true);
+        }
+
+        // Pattern C: the double range check (`>= 0x14` / `>= 6`) is skipped by
+        // turning the second test's `jnz` into a jump over it. The row exists only on
+        // the older builds, which is also where the @noE fill below belongs.
+        pattern = find_pattern("83 F8 14 7D 05 83 F8 06 7D 14");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            injector::MakeJMP(match + 3, match + 0x1E, true);
+
+            // CarDynamicShadowFix@noE: with pattern E absent (the recovered gate is
+            // build ids 1000 and 1040) the installer NOP-fills six bytes after the C
+            // anchor. 1.0.0.4 has pattern E, so it is not in the mask.
+            if (CurrentBuildInMask(kCarDynamicShadowNoEBuilds))
+                injector::MakeNOP(match + 62, 6, true);
+        }
+
+        // The shadow's record size is forced to 0x100 from 0x104, and the branch that
+        // would skip the shadow becomes unconditional.
+        pattern = find_pattern("50 68 04 01 00 00 6A 02 6A 00 E8");
+        if (!pattern.empty())
+            injector::WriteMemory<std::byte>(pattern.get_first(2), Bytes::Zero, true);
+
+        pattern = find_pattern("83 E0 0F 83 F8 03 75 17 F6 86 6C 02 00 00 04");
+        if (!pattern.empty())
+            injector::WriteMemory<std::byte>(pattern.get_first(6), Bytes::ShortJmp, true);
+
+        // With ForceCarHeadlightShadows off the original also re-encodes the `jz`
+        // that skips the shadow as a five-byte `jmp` to the same target, and forces
+        // the pushed shadow size from 0x504 to 0x100.
+        if (Loader::Enabled("ForceCarHeadlightShadows"))
+            return;
+
+        pattern = find_pattern("0F 84 9E 00 00 00 80 7D 28");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            const auto displacement = *reinterpret_cast<const int32_t*>(match + 2);
+            injector::MakeJMP(match, match + 6 + displacement, true);
+        }
+
+        pattern = find_pattern("51 68 04 05 00 00 6A 02 6A 00 E8");
+        if (!pattern.empty())
+            injector::WriteMemory<uint32_t>(pattern.get_first(2), 0x100u, true);
+    }
+
+    // ForceCarHeadlightShadows: the shadow function hooks to the shim, the three
+    // branches that decide whether the headlight cone draws its shadow are forced so
+    // the shadow always runs, and the offset float is retargeted at this module's
+    // word instead of the game's 0.0f at 0xD95B68. The writes, in the original
+    // handler's order:
+    //   * `EB` at the anchor's +6 (the `jne +79h` of `cmp al,1` / `test bl,bl`),
+    //     `E9` at +95 to match+476 (the second `jne +177h`, one byte shorter than the
+    //     six-byte `0F 85` it replaces, which is why the write starts on the opcode
+    //     and its sixth byte becomes the unreachable remainder), `EB` at +379 (the
+    //     `jne +5Fh` on the same target) and the `movss` operand at +211;
+    //   * the E9 at the shadow function's entry;
+    //   * the handler tail's restore of the two shadow-buffer pushes (0x504 / 0x104)
+    //     and of the `je +9Eh` at 0x8F719F. On a pristine image every one of those is
+    //     a no-op; they are the original's `sub_1000E870` writes, which undo exactly
+    //     the CarDynamicShadowFix rewrites that arm skips while this key is on, so
+    //     the two keys interact the way they do in the original.
+    void InstallForceCarHeadlightShadows()
+    {
+        if (!Loader::Enabled("ForceCarHeadlightShadows"))
+            return;
+
+        auto pattern = find_pattern("3C 01 75 50 84 DB 75 79");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            injector::WriteMemory<std::byte>(match + 6, Bytes::ShortJmp, true);
+            injector::MakeJMP(match + 95, match + 476, true);
+            injector::WriteMemory<std::byte>(match + 379, Bytes::ShortJmp, true);
+
+            // The `movss xmm2, [0xD95B68]` operand becomes this module's float. The
+            // original writes its own image's dword_101580C0 here (0x101580C0); the
+            // stored baseline records the reference dump's 0xD0000000 placeholder for
+            // the word, so the slot is registered for the dump's canonicalisation.
+            injector::WriteMemory<uint32_t>(match + 211,
+                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&zpatch_fchs_offset)), true);
+            Bodies::RegisterPublishedImage(reinterpret_cast<uintptr_t>(match + 211));
+        }
+
+        pattern = find_pattern("55 8B EC 83 E4 F0 81 EC D4 00 00 00 8B 45 20 8B");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(0),
+                reinterpret_cast<void*>(&FchsShimBody), true);
+
+        // `push 0x504` (the first shadow buffer) and `push 0x104` (the second) are
+        // written back as dwords; both immediates are unchanged on a pristine image.
+        pattern = find_pattern("8D 4C 24 50 51 68 04 05 00 00");
+        if (!pattern.empty())
+            injector::WriteMemory<uint32_t>(pattern.get_first<std::byte>(6), 0x00000504u, true);
+
+        pattern = find_pattern("8D 44 24 50 50 68 04 01 00 00");
+        if (!pattern.empty())
+            injector::WriteMemory<uint32_t>(pattern.get_first<std::byte>(6), 0x00000104u, true);
+
+        // `0F 84 9E 00 00 00` (the `je` that skips the shadow) is rewritten with its
+        // own six bytes, the last one left as it was.
+        pattern = find_pattern("F3 0F 11 44 24 1C 0F 84 9E 00 00 00");
+        if (!pattern.empty())
+        {
+            auto* site = pattern.get_first<std::byte>(6);
+            injector::WriteMemory<std::byte>(site, std::byte{ 0x0F }, true);
+            injector::WriteMemory<std::byte>(site + 1, std::byte{ 0x84 }, true);
+            injector::WriteMemory<uint16_t>(site + 2, 0x009Eu, true);
+            injector::WriteMemory<std::byte>(site + 4, Bytes::Zero, true);
+        }
+    }
+
+    // InfiniteCarBottomDistance: the `ja` of the bottom-distance clamp becomes an
+    // unconditional jump over it (`EB 2A`, written as its two bytes -- there is no
+    // short-jump API).
+    void InstallInfiniteCarBottomDistance()
+    {
+        if (!Loader::Enabled("InfiniteCarBottomDistance"))
+            return;
+
+        auto pattern = find_pattern("0F 2F D0 76 25 0F 28 C2");
+        if (pattern.empty())
+            return;
+
+        auto* site = pattern.get_first<std::byte>(3);
+        injector::WriteMemory<std::byte>(site, Bytes::ShortJmp, true);
+        injector::WriteMemory<std::byte>(site + 1, Bytes::JumpOverClamp, true);
+    }
+
+    // ReversingLightFix: the slot displacement of `mov eax,[edx+64h]` becomes 0x60,
+    // so the reversing-light path reads the neighbouring member.
+    void InstallReversingLightFix()
+    {
+        if (!Loader::Enabled("ReversingLightFix"))
+            return;
+
+        auto pattern = find_pattern("11 01 00 00 8B 16 8B 42 64 8B CE FF D0 F3 0F 10");
+        if (!pattern.empty())
+            injector::WriteMemory<std::byte>(pattern.get_first(8), Bytes::Slot60, true);
+    }
+
+    // BikeFeetFix: the 12-byte rider-foot block is deleted, so the chopper foot
+    // position is left to the game's own (correct) path.
+    void InstallBikeFeetFix()
+    {
+        if (!Loader::Enabled("BikeFeetFix"))
+            return;
+
+        auto pattern = find_pattern("39 82 54 13 00 00 0F 85 94 04 00 00");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(12), 12, true);
+    }
+
+    // BikePhoneAnimsFix: the six-byte phone-animation branch is deleted.
+    void InstallBikePhoneAnimsFix()
+    {
+        if (!Loader::Enabled("BikePhoneAnimsFix"))
+            return;
+
+        auto pattern = find_pattern("80 BE 18 02 00 00 00 0F 85 36 01 00 00 80 BE");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(33), 6, true);
+    }
+
+    // PipeBombDropIconSupport: the nine-byte check before the anchor is deleted, so
+    // the pipe-bomb drop icon is accepted on the episodic builds.
+    void InstallPipeBombDropIconSupport()
+    {
+        if (!Loader::Enabled("PipeBombDropIconSupport"))
+            return;
+
+        auto pattern = find_pattern("83 7D 18 1C 75 14");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(-9), 9, true);
+    }
+
+    // EpisodicVehicleSupport: the episode test at each site is deleted, so every
+    // vehicle check that is gated on "not episodic" runs on the episodic builds.
+    //
+    // Two parts, because the original's handler has two:
+    //   * 1.0.7.0 and 1.0.8.0 each retarget the absolute operand of two
+    //     `cmp dword ptr [episode], 2` sites (the first also a `jnz`, the second a
+    //     `jne rel32`) at this module's episode word. The original's recovered table
+    //     does that as four *RVA installs* -- a rebased pointer store at a fixed RVA
+    //     (build 8: 0x21500 and 0x7D91AE; build 9: 0x95040 and 0x684ABE), not a
+    //     pattern hit. The store value proves it: it is this module's own pointer,
+    //     which a signature could not name. Spelling the game's absolute operand out
+    //     in a signature would also bake in the preferred-base VA, which the loader
+    //     rewrites on every run (the executable carries DYNAMIC_BASE), so such an
+    //     arm could never match the live image and would never fire in the game;
+    //   * every gated build then gets the 23 signature-driven NOP rows, in the
+    //     original's row order. The first two rows write every hit of a multi-hit
+    //     scan (two each on this image) and two rows carry a second window.
+    void InstallEpisodicVehicleSupport()
+    {
+        if (!Loader::Enabled("EpisodicVehicleSupport"))
+            return;
+
+        const auto flag = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&zpatch_episode_flag));
+        struct FlagStore final
+        {
+            Build build;
+            uint32_t rva;
+        };
+        static constexpr FlagStore kEpisodeFlagStores[] = {
+            { Build::v1070, 0x021500u },
+            { Build::v1070, 0x7D91AEu },
+            { Build::v1080, 0x095040u },
+            { Build::v1080, 0x684ABEu },
+        };
+        for (const auto& store : kEpisodeFlagStores)
+        {
+            if (Loader::Current() != store.build)
+                continue;
+
+            auto* const site =
+                reinterpret_cast<std::byte*>(Game::Get().ImageBase() + store.rva);
+            injector::WriteMemory<uint32_t>(site, flag, true);
+            Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(site));
+        }
+
+        // Row 1: the `jl` of a loop that only runs on the episodic builds. Two
+        // sites, both rewritten (the original writes hits[0] and hits[1]).
+        auto pattern = find_pattern<2>("7C 18 0F BF 4E 2E");
+        for (size_t hit = 0; hit < pattern.size(); ++hit)
+            injector::MakeNOP(pattern.get(hit).get<std::byte>(-6), 8, true);
+
+        // Row 2: the same `cmp [episode], 2` shape twice in two functions.
+        pattern = find_pattern<2>("83 3D ?? ?? ?? ?? 02 75 17 F3 0F 10 44 24 08");
+        for (size_t hit = 0; hit < pattern.size(); ++hit)
+            injector::MakeNOP(pattern.get(hit).get<std::byte>(0), 9, true);
+
+        // Rows 3-20: one window each.
+        pattern = find_pattern("39 35 ?? ?? ?? ?? 75 0E 80 3D");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(6), 2, true);
+
+        pattern = find_pattern("74 17 83 3D ?? ?? ?? ?? 02 75 0E F3 0F 10 05");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(2), 9, true);
+
+        pattern = find_pattern("7C 22 83 F8 28 75 1D");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(0), 2, true);
+
+        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 0F 8C 0E 05 00 00");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(0), 13, true);
+
+        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 75 08 3B 05");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(0), 9, true);
+
+        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 75 17 F3 0F 10 44 24 0C");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(0), 9, true);
+
+        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 75 1F 8B 44 24 04");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(0), 9, true);
+
+        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 75 21 8B 96 20 08 00 00");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(0), 9, true);
+
+        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 75 24 F6 87 6C 02 00 00 04");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(0), 9, true);
+
+        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 75 35 0F BF 46 2E");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(0), 9, true);
+
+        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 75 38 8B 16");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(0), 9, true);
+
+        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 7C 11 8B 4E");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(7), 2, true);
+
+        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 7C 1F 8B");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(7), 2, true);
+
+        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 7C 26 8B 85 40 0B 00 00");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(0), 9, true);
+
+        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 7C 35 0F BF 43 2E");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(0), 9, true);
+
+        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 7C 43");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(7), 2, true);
+
+        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 7C 4A 0F BF 46 2E");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(0), 13, true);
+
+        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 89 44 24 38");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(11), 6, true);
+
+        // Row 21: the branch and the byte it would skip to (a second window at +17).
+        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 8A 0D");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            injector::MakeNOP(match, 7, true);
+            injector::MakeNOP(match + 17, 2, true);
+        }
+
+        // Row 22: the float load's branch.
+        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 F3 0F 10 05 ?? ?? ?? ?? F3 0F 11 44 24 20 75 4C");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(21), 2, true);
+
+        // Row 23: the loop head and its `jl` (a second window at +10).
+        pattern = find_pattern("8B 56 04 8B 4A 0C 89 4C 24 1C 7C 18");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            injector::MakeNOP(match - 15, 7, true);
+            injector::MakeNOP(match + 10, 2, true);
+        }
+    }
+
+    // TeleportProtection: the entry becomes `ret 8`. The original writes exactly three
+    // bytes -- C2 08 over the opcode and 00 over the byte after the immediate -- and
+    // injector::MakeRET is not equivalent: it stores the opcode through a 4-byte int,
+    // which would also zero match+3.
+    void InstallTeleportProtection()
+    {
+        if (!Loader::Enabled("TeleportProtection"))
+            return;
+
+        auto pattern = find_pattern("55 8B EC 83 E4 F8 51 53 8B 5D 08 56 57 6A 08 8D 44 24 10 8B F1 8D 7B 04 50 8B CF C7 44 24 14 00");
+        if (pattern.empty())
+            return;
+
+        auto* match = pattern.get_first<std::byte>(0);
+        injector::WriteMemory<std::byte>(match, Bytes::RetImm16, true);
+        injector::WriteMemory<std::byte>(match + 1, Bytes::RetImm16High, true);
+        injector::WriteMemory<std::byte>(match + 2, Bytes::Zero, true);
+    }
+
+    // IncreaseVehicleStructLimit: the struct count the allocator is asked for becomes
+    // 100 instead of the original 50: the signature's +6 byte is the immediate of the
+    // `push 32` that follows the pushed structure-name address. The pattern is the
+    // original's own (`68 ? ? ? ? 6A 32 8B C8`, recovered from the ASI's signature
+    // table, handler 0x10023020): the pushed address is a relocated operand, so it
+    // must stay a wildcard. Baking the recovered 1.0.8.0 VA in (`68 34 EE DA 00`)
+    // makes the arm miss the moment the loader relocates the image -- which it does
+    // on every run, because the executable carries DYNAMIC_BASE -- and would also
+    // miss in the offline dump once that copy is relocated.
+    void InstallIncreaseVehicleStructLimit()
+    {
+        if (!Loader::Enabled("IncreaseVehicleStructLimit"))
+            return;
+
+        auto pattern = find_pattern("68 ? ? ? ? 6A 32 8B C8");
+        if (!pattern.empty())
+            injector::WriteMemory<std::byte>(pattern.get_first(6), std::byte{ 100 }, true);
+    }
+
+    // IncreaseVehicleModelLimit: the vehicle-model cap the loop bound is compared
+    // against becomes 1024. The site is the `mov ecx, 0xF3E8E8` at match+77: the
+    // arm reads that operand, which is the address of the model-limit object the
+    // allocator is constructed with, and writes the new cap through it. The write
+    // is a game-data dword, not a published pointer, so there is no slot to
+    // register with the dump.
+    void InstallIncreaseVehicleModelLimit()
+    {
+        if (!Loader::Enabled("IncreaseVehicleModelLimit"))
+            return;
+
+        auto pattern = find_pattern("83 C7 01 81 FF 18 79 00 00 7C D2");
+        if (pattern.empty())
+            return;
+
+        constexpr uint32_t kVehicleModelLimit = 0x400u;
+        injector::WriteMemory<uint32_t>(
+            GamePointer<uint32_t>(*pattern.get_first<uint32_t>(77)), kVehicleModelLimit, true);
+    }
+
+    // The steer keys' shared write set, exactly the original's sub_10005210 plus its
+    // sub_10004110: the vtable-call site the build carries becomes a jump to that
+    // build's detour body, and the shared IDE parser hook is installed so the
+    // wheelangle table the consumer reads is filled. The three keys call this from
+    // their own arms after setting their switch byte, so enabling two of them writes
+    // the same bytes twice, as the original's two handler calls do.
+    void InstallSteerSites()
+    {
+        auto pattern = find_pattern("32 DB 8B 16 8B 82 28 01 00 00 8B CE FF D0");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(2),
+                reinterpret_cast<void*>(&SteerDetourEaxBody), true);
+
+        pattern = find_pattern("7C E0 8B 06 8B 90 28 01 00 00 8B CE FF D2");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(2),
+                reinterpret_cast<void*>(&SteerDetourEdxBody), true);
+
+        pattern = find_pattern("0C 83 88 94 00 00 00 04");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(-10),
+                reinterpret_cast<void*>(RegisteredBody(0x100040E0u)), true);
+    }
+
+    void InstallMovingSteeringWheelSupport()
+    {
+        if (!Loader::Enabled("MovingSteeringWheelSupport"))
+            return;
+        zpatch_steer_enabled = 1;
+        InstallSteerSites();
+    }
+
+    void InstallShakingEngineBlock()
+    {
+        if (!Loader::Enabled("ShakingEngineBlock"))
+            return;
+        zpatch_engine_enabled = 1;
+        InstallSteerSites();
+    }
+
+    void InstallMovingPlaneParts()
+    {
+        if (!Loader::Enabled("MovingPlaneParts"))
+            return;
+        zpatch_plane_enabled = 1;
+        InstallSteerSites();
+    }
+
+    // GarageModelFix: both sites jump to their own body. The first carries the colour
+    // copy, the second rewrites the model index the garage object hands on.
+    void InstallGarageModelFix()
+    {
+        if (!Loader::Enabled("GarageModelFix"))
+            return;
+
+        auto pattern = find_pattern("8B 57 20 D9 42 34 D9 5E 04 8B 47 20");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(0),
+                reinterpret_cast<void*>(&GarageBodyA), true);
+
+        pattern = find_pattern("0F B7 0E 50 51 E8");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first<std::byte>(0),
+                reinterpret_cast<void*>(&GarageBodyB), true);
+    }
+
+    // NoLiveryLimit: the collector site (or the older variant of it), then the three
+    // livery sites at the anchor, -199 and -237, each jumping to its own body. The
+    // order is the original's: the collector first, then the anchor, then -199, then
+    // -237.
+    void InstallNoLiveryLimit()
+    {
+        if (!Loader::Enabled("NoLiveryLimit"))
+            return;
+
+        auto pattern = find_pattern("74 52 8D B5 3C 01 00 00 83 FB 04");
+        if (!pattern.empty())
+        {
+            injector::MakeJMP(pattern.get_first<std::byte>(2),
+                reinterpret_cast<void*>(&NoliveryBodyD), true);
+        }
+        else
+        {
+            pattern = find_pattern("8D AF 3C 01 00 00 8D 54 24 20");
+            if (!pattern.empty())
+                injector::MakeJMP(pattern.get_first<std::byte>(0),
+                    reinterpret_cast<void*>(&NoliveryBodyE), true);
+        }
+
+        pattern = find_pattern("8B 8C 83 3C 01 00 00 0F BF 53 48");
+        if (!pattern.empty())
+        {
+            auto* match = pattern.get_first<std::byte>(0);
+            injector::MakeJMP(match, reinterpret_cast<void*>(&NoliveryBodyA), true);
+            injector::MakeJMP(match - 199, reinterpret_cast<void*>(&NoliveryBodyC), true);
+            injector::MakeJMP(match - 237, reinterpret_cast<void*>(&NoliveryBodyB), true);
+        }
+    }
+}
+
+// Registered like every other arm: the publish tier reads every site the install
+// tier is about to overwrite, and the install tier owns the gate and the writes.
+export void RegisterVehicles()
+{
+    // The original's loader preamble fills both per-model light tables before it
+    // reads a single option (`sub_100523C0`'s first two blocks). This is the first
+    // registration after Shared::Register() has made `sub_10003E50` callable, and
+    // nothing before it reads an option or writes an image byte, so the tables are
+    // complete -- and a malformed row throws -- exactly where the original's
+    // preamble does it. Both sections are read here because the original reads them
+    // in one place, [PopupLightAngles] first.
+    Config::ReadModelTables(Config::Ini(),
+        reinterpret_cast<Config::NameResolver>(Shared::ValueResolver()));
+
+    // The original's loader preamble resolves the steer consumer's five game entries
+    // and the two CRT slots before any handler runs, and its DllMain probes for
+    // CitizenIV.exe at the same point; none of it writes an image byte.
+    ResolveSteerHelpers();
+
+    Loader::PublishEvent() += []
+    {
+        PublishCollisionDeadlockFix();
+        PublishCarPartsShadowFix();
+        PublishCarDynamicShadowFix();
+        PublishForceCarHeadlightShadows();
+        PublishHighFPSBikePhysicsFix();
+        PublishDualVehicleHeadlights();
+        PublishMovingSteeringWheelSupport();
+        PublishShakingEngineBlock();
+        PublishMovingPlaneParts();
+        PublishGarageModelFix();
+        PublishNoLiveryLimit();
+        PublishFreezeCarFix();
+    };
+    Loader::InstallEvent() += []
+    {
+        InstallCarDecalsFix();
+        InstallCollisionDeadlockFix();
+        InstallCarPartsShadowFix();
+        InstallCarDynamicShadowFix();
+        // After the shadow arm: the original's ForceCarHeadlightShadows handler runs
+        // after the CarDynamicShadowFix block, and its tail restores what that block
+        // rewrites -- so with both keys on, the restore is what the game sees.
+        InstallForceCarHeadlightShadows();
+        InstallInfiniteCarBottomDistance();
+        InstallReversingLightFix();
+        InstallBikeFeetFix();
+        InstallBikePhoneAnimsFix();
+        InstallEpisodicVehicleSupport();
+        InstallHighFPSBikePhysicsFix();
+        InstallPipeBombDropIconSupport();
+        InstallTeleportProtection();
+        InstallDualVehicleHeadlights();
+        InstallIncreaseVehicleModelLimit();
+        InstallIncreaseVehicleStructLimit();
+        InstallMovingSteeringWheelSupport();
+        InstallShakingEngineBlock();
+        InstallMovingPlaneParts();
+        InstallGarageModelFix();
+        InstallNoLiveryLimit();
+        InstallFreezeCarFix();
+    };
+
+    // The bodies' recovered VAs, so the dump expresses each arm's branch in the
+    // original's coordinates. The three steer keys all jump to the same two detour
+    // bodies, so those are registered once here rather than in the shared installer.
+    Bodies::Register(reinterpret_cast<uintptr_t>(&VehicleComponentBody), 0x10003F40u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&FchsShimBody), 0x1001ADB0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&SteerDetourEaxBody), 0x100051B0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&SteerDetourEdxBody), 0x100051E0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&GarageColourBody), 0x10046B90u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&GarageLookupBody), 0x10046BD0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&GarageBodyA), 0x10046C80u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&GarageBodyB), 0x10046CA0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryHashBody), 0x1003D220u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryCountBody), 0x1003D270u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryCopyBody), 0x1003D2F0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryBodyA), 0x1003D310u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryBodyB), 0x1003D340u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryBodyC), 0x1003D370u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryBodyD), 0x1003D3A0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryBodyE), 0x1003D3E0u);
+
+    // The steer consumer's two 512-slot wheelangle tables. The transcription reads
+    // them through indexed absolute operands (`[esi*4 + zpatch_wheelangle_models]`),
+    // which cannot name the original's VA, so each registration pairs this module's
+    // copy with the address the original keeps it at and the length there: 512
+    // dwords. The registration is mirrored by a `table` row in tests/bodies.tsv, the
+    // offline projection the proof resolves (docs/rebuilt.md). The arrays belong to
+    // source/misc.ixx because the transcribed IDE parser hook is what fills them;
+    // both are all-zero at load, as the original's are.
+    Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_wheelangle_models),
+        0x1015A538u, sizeof(zpatch_wheelangle_models));   // 512 * 4 = 2048
+    Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_wheelangle_angles),
+        0x10159D38u, sizeof(zpatch_wheelangle_angles));   // 512 * 4 = 2048
+
+    // ForceCarHeadlightShadows' two [HeadlightConeOffsets] arrays: dword_1015ADB8 (the
+    // hashes) and dword_1015B5C0 (the offsets). The hash registration is the original's
+    // **extended** 2,052-byte range -- 512 words plus the one word the walk reads past
+    // slot 511 (dword_1015B5B8) -- so the proof compares that read too. The word is not
+    // a copy: it is CarDynamicShadowFix's published shadow-function slot, defined
+    // immediately after the array in source/config.ixx so the layout matches the
+    // original's .data (docs/rebuilt.md §2g). The offsets array is registered at its
+    // own base, which the original places 2,056 bytes into the block.
+    Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_headlight_cone_hashes),
+        0x1015ADB8u, sizeof(zpatch_headlight_cone_hashes) + sizeof(uint32_t));  // 2052
+    Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_headlight_cone_values),
+        0x1015B5C0u, sizeof(zpatch_headlight_cone_values));   // 512 * 4 = 2048
+
+    // Each stub's inline `call` is invisible to C++; naming the forwarders here keeps
+    // their out-of-line definitions in the image.
+    [[maybe_unused]] const uintptr_t helpers[] = {
+        reinterpret_cast<uintptr_t>(&NoliveryFormat),
+        reinterpret_cast<uintptr_t>(&NoliveryResolve),
+        reinterpret_cast<uintptr_t>(&SteerConsumerBody),
+        reinterpret_cast<uintptr_t>(&FchsCheckBody),
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Transcribed bodies. Each is the original's instruction stream, kept as asm
+// because that is what it is; the code above is what installs it.
+// ---------------------------------------------------------------------------
 
 // The probe's four helper entries. The original calls the compiler-generated
 // helpers directly (sub_10003F00 / sub_1005B290 / sub_1005B530 / sub_10001280); a
@@ -456,14 +1803,23 @@ static __declspec(naked) void SpawnsGuardBody()
     }
 
 ZP_SPAWNS_CASE(SpawnsCase0x24Body, 5, zpatch_spawns_case0_resume)
+
 ZP_SPAWNS_CASE(SpawnsCase0x3DBody, 3, zpatch_spawns_case1_resume)
+
 ZP_SPAWNS_CASE(SpawnsCase0x56Body, 3, zpatch_spawns_case2_resume)
+
 ZP_SPAWNS_CASE(SpawnsCase0x6FBody, 0, zpatch_spawns_case3_resume)
+
 ZP_SPAWNS_CASE(SpawnsCase0x88Body, 4, zpatch_spawns_case4_resume)
+
 ZP_SPAWNS_CASE(SpawnsCase0x9EBody, 6, zpatch_spawns_case5_resume)
+
 ZP_SPAWNS_CASE(SpawnsCase0xB4Body, 7, zpatch_spawns_case6_resume)
+
 ZP_SPAWNS_CASE(SpawnsCase0xCABody, 1, zpatch_spawns_case7_resume)
+
 ZP_SPAWNS_CASE(SpawnsCase0xE0Body, 2, zpatch_spawns_case8_resume)
+
 ZP_SPAWNS_CASE(SpawnsCase0xF6Body, 8, zpatch_spawns_case9_resume)
 
 #undef ZP_SPAWNS_CASE
@@ -1216,24 +2572,6 @@ static __declspec(naked) void CarDecalsSelectorShim()
     }
 }
 
-// sub_1001EF30, recovered VA 0x1001EF30: HighFPSBikePhysicsFix's clamp, the helper
-// the detour calls between pushad/popad. The original converts the float value to
-// double, compares it against the 8-byte constant 0.006666666665 and replaces it
-// with 0x3BDA740E when it is below. Written as the same comparison rather than as
-// the SSE sequence: the value and the outcome are what the detour's contract is.
-static void BikePhysicsClamp() noexcept
-{
-    // The float the original's 0x3BDA740E immediate denotes, stored when the value
-    // is below the threshold; 0.006666667f is the shortest decimal that is that
-    // float. The comparison's own 8-byte constant is 0.006666666665 (the qword at
-    // 0x10152308).
-    constexpr float kBikeSpeedThreshold = 0.006666667f;
-
-    const float value = zpatch_bike_value;
-    if (0.006666666665 > static_cast<double>(value))
-        zpatch_bike_value = kBikeSpeedThreshold;
-}
-
 // sub_1001EF60, recovered VA 0x1001EF60: the bike-physics detour. It saves the
 // incoming bike value, clamps it through the helper, writes the clamped value back
 // into the caller's argument slot, leaves EAX as the caller had it, then re-runs the
@@ -1262,15 +2600,6 @@ static __declspec(naked) void BikePhysicsDetour()
         fstp DWORD PTR [esp]
         jmp DWORD PTR [zpatch_bike_resume]
     }
-}
-
-// sub_100064D0, recovered VA 0x100064D0: the two light indices the dual-headlight
-// bodies push. The original's bodies call it inside pushad/popad, so the clobbering
-// is harmless there; the words hold the same values from load time on.
-static void DualHeadlightConstants() noexcept
-{
-    zpatch_dual_light_a = 1;
-    zpatch_dual_light_b = 2;
 }
 
 // sub_100064F0, recovered VA 0x100064F0: DualVehicleHeadlights' new-build body. It
@@ -1926,30 +3255,18 @@ static __declspec(naked) void SteerConsumerBody()
     }
 }
 
-namespace
+// sub_10001280, recovered VA 0x10001280: the bounded formatter, transcribed once
+// in source/stability.ixx and proved there instruction for instruction
+// (docs/rebuilt.md). A module interface cannot export a naked function, so this
+// six-byte forwarder is what the livery helpers' `call` names: the original's
+// call is an immediate too, and the forwarder enters the body with the stack and
+// the registers untouched.
+static __declspec(naked) void NoliveryFormat()
 {
-    // sub_10001280, recovered VA 0x10001280: the bounded formatter, transcribed once
-    // in source/stability.ixx and proved there instruction for instruction
-    // (docs/rebuilt.md). A module interface cannot export a naked function, so this
-    // six-byte forwarder is what the livery helpers' `call` names: the original's
-    // call is an immediate too, and the forwarder enters the body with the stack and
-    // the registers untouched.
-    static __declspec(naked) void NoliveryFormat()
+    __asm
     {
-        __asm
-        {
-            jmp DWORD PTR [zpatch_format_entry]
-        }
+        jmp DWORD PTR [zpatch_format_entry]
     }
-
-    // sub_10003E50 (source/shared.ixx), called as the original's direct `call`:
-    // this forwarder is what an inline-asm `call` can name (the resolver itself is a
-    // naked body in another unit, and a module interface cannot export it).
-    uint32_t __cdecl NoliveryResolve(const char* name)
-    {
-        return reinterpret_cast<uint32_t(__cdecl*)(const char*)>(Shared::ValueResolver())(name);
-    }
-
 }
 
 // sub_100051B0, recovered VA 0x100051B0 (10 instructions): the steer detour. It
@@ -2357,1258 +3674,4 @@ static __declspec(naked) void NoliveryBodyE()
         pop ebx
         jmp DWORD PTR [zpatch_nolivery_resume_d]
     }
-}
-
-// Vehicle fixes. Every arm anchors to its own recovered signature; most writes are
-// in-place bytes, jump rewrites and NOP runs, and the four sites whose fix is a
-// rewritten instruction sequence jump to a transcribed body instead.
-//
-// The signatures are forged from the game database (IDA, 1.0.8.0) at each arm's
-// scan anchor and are unique in that image; the offsets are measured from the
-// anchor, which is why they did not change when the strings did.
-namespace
-{
-    // One recovered sub-gate: is the current build's id a bit of `mask`? The
-    // catalogue's own mask is the arm's gate; a few recovered rows carry a narrower
-    // one of their own, which is what this reads.
-    bool CurrentBuildInMask(uint32_t mask)
-    {
-        return (mask & (1u << static_cast<uint32_t>(Loader::Current()))) != 0;
-    }
-
-    // CarDynamicShadowFix@noE's own gate: the recovered table gives the row the
-    // mask 0x22 (build ids 1000 and 1040), the builds where the installer's pattern
-    // E is absent. 1.0.0.4 has pattern E, so it keeps the E path and is not in the
-    // mask even though pattern C matches there too.
-    constexpr uint32_t kCarDynamicShadowNoEBuilds = 0x22u;
-
-    // DualVehicleHeadlights' two recovered arm gates: the original's own table gives
-    // the old body 0x62 (build ids 1, 5 and 6 -- 1.0.0.0, 1.0.4.0, 1.0.0.4) and the
-    // new body 0x4BF80 (id 7 and every later build). The original's handler selects
-    // between the two by the build id it classified (`cmp [build], 1` .. `cmp
-    // [build], 6`, 0x100067F3), which is the same split. The union is every
-    // supported build.
-    constexpr uint32_t kDualHeadlightsOldBuilds = 0x62u;
-    constexpr uint32_t kDualHeadlightsNewBuilds = 0x4BF80u;
-
-    // A captured pattern operand is a 32-bit VA of the image *as loaded* (the same
-    // helper as misc.ixx's): the loader has already applied the image's relocations,
-    // so the dword is a live address and the cast is the whole conversion. The game
-    // runs relocated, so subtracting the preferred base here would add the run's
-    // whole relocation distance to the pointer; the offline dump relocates its copy
-    // of the image too. Only the arms that write *through* such an operand need it.
-    template <typename T>
-    T* GamePointer(uint32_t value)
-    {
-        return reinterpret_cast<T*>(static_cast<uintptr_t>(value));
-    }
-
-    // A rel32 target inside the match: the displacement dword at `displacement`,
-    // measured from the instruction's last byte at `next`.
-    uint32_t Rel32Target(std::byte* match, std::ptrdiff_t displacement, std::ptrdiff_t next)
-    {
-        const auto displacementValue = *reinterpret_cast<const int32_t*>(match + displacement);
-        return static_cast<uint32_t>(
-            reinterpret_cast<uintptr_t>(match + next) + static_cast<uint32_t>(displacementValue));
-    }
-
-    // CarDecalsFix: the decal selector's entry is replaced by its fixed twin, which
-    // drops the episodic-build test between the mask compare and the member read.
-    void InstallCarDecalsFix()
-    {
-        if (!Loader::Enabled("CarDecalsFix"))
-            return;
-
-        auto pattern = find_pattern("8B 44 24 08 8B 48 28 81 E1 C0 03 00 00 81 F9 80 00 00 00");
-        if (pattern.empty())
-            return;
-
-        Bodies::Register(reinterpret_cast<uintptr_t>(&CarDecalsSelectorShim), 0x1001B2E0u);
-        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(&CarDecalsSelectorShim), true);
-    }
-
-    // CollisionDeadlockFix's published walk test: the site's own call target (the
-    // disp32 at match+91), read before the install overwrites the entry.
-    void PublishCollisionDeadlockFix()
-    {
-        if (!Loader::Enabled("CollisionDeadlockFix"))
-            return;
-
-        auto pattern = find_pattern("55 8B EC 83 E4 F8 51 8B 45 0C 0F B7 48 66");
-        if (pattern.empty())
-            return;
-
-        auto* match = pattern.get_first<std::byte>(0);
-        const auto displacement = *reinterpret_cast<const int32_t*>(match + 91);
-        zpatch_collision_should_walk =
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 95) + displacement);
-    }
-
-    // CollisionDeadlockFix: the node walk is replaced by its capped twin.
-    void InstallCollisionDeadlockFix()
-    {
-        if (!Loader::Enabled("CollisionDeadlockFix"))
-            return;
-
-        auto pattern = find_pattern("55 8B EC 83 E4 F8 51 8B 45 0C 0F B7 48 66");
-        if (pattern.empty())
-            return;
-
-        auto* match = pattern.get_first<std::byte>(0);
-        Bodies::Register(reinterpret_cast<uintptr_t>(&CollisionDeadlockShim), 0x10005D80u);
-        injector::MakeJMP(match, reinterpret_cast<void*>(&CollisionDeadlockShim), true);
-    }
-
-    // HighFPSBikePhysicsFix's resume: the site's own `call` at match+9, read before
-    // the install replaces the first five bytes with the jump. The body re-runs those
-    // five bytes' instructions and tail-jumps to the call, so the call and the rest of
-    // the function run unchanged.
-    void PublishHighFPSBikePhysicsFix()
-    {
-        if (!Loader::Enabled("HighFPSBikePhysicsFix"))
-            return;
-
-        auto pattern = find_pattern("D9 45 08 51 8B CE D9 1C 24 E8 ?? ?? ?? ?? 8A 86 90 14 00 00");
-        if (pattern.empty())
-            return;
-
-        zpatch_bike_resume =
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(9)));
-    }
-
-    // HighFPSBikePhysicsFix: the bike's per-frame speed value passes through the
-    // clamp before the physics step consumes it.
-    void InstallHighFPSBikePhysicsFix()
-    {
-        if (!Loader::Enabled("HighFPSBikePhysicsFix"))
-            return;
-
-        auto pattern = find_pattern("D9 45 08 51 8B CE D9 1C 24 E8 ?? ?? ?? ?? 8A 86 90 14 00 00");
-        if (pattern.empty())
-            return;
-
-        Bodies::Register(reinterpret_cast<uintptr_t>(&BikePhysicsDetour), 0x1001EF60u);
-        injector::MakeJMP(pattern.get_first<std::byte>(0), reinterpret_cast<void*>(&BikePhysicsDetour), true);
-    }
-
-    // DualVehicleHeadlights' published operands, all read from the one match: the
-    // light-state global the site pushes at match+207, the ped getter's call target
-    // (the disp32 at match+140, next byte +144), the driver test's (+151/+155), the
-    // draw call's (+331/+335) and the resume (`pop edi`, match+338). The site's own
-    // instructions carry those operands, so the publish is a read, not a decode.
-    void PublishDualVehicleHeadlights()
-    {
-        // The catalogue's key mask cannot be the gate here: see the install arm.
-        if (Catalogue::Read("DualVehicleHeadlights") != 1)
-            return;
-
-        auto pattern = find_pattern("8B 17 8B 42 64 8B CF FF D0 8B 54");
-        if (pattern.empty())
-            return;
-
-        auto* match = pattern.get_first<std::byte>(0);
-        zpatch_dual_bcc = *pattern.get_first<uint32_t>(207);
-        zpatch_dual_bd0 = Rel32Target(match, 140, 144);
-        zpatch_dual_be4 = Rel32Target(match, 151, 155);
-        zpatch_dual_bd4 = Rel32Target(match, 331, 335);
-        zpatch_dual_be0 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 338));
-    }
-
-    // DualVehicleHeadlights: both recovered arms jump to their own body at the same
-    // site, and the original's handler picks the body from the build id it classified
-    // (`cmp [build], 1` .. `cmp [build], 6` at 0x100067F3): ids 1..6 get the old body,
-    // every later build the new one. That is the pair of recovered masks, so each
-    // build runs exactly one arm; the reference tree ran both unconditionally and the
-    // later write won, which lands on the same bytes everywhere the masks are
-    // disjoint (they are).
-    //
-    // The gate is the catalogue's INI read alone. This key's catalogue mask (0x20) is
-    // the feature document's build list, not the original's: the original's own two
-    // arm masks cover every supported build, so `Loader::Enabled` would never install
-    // this arm anywhere but 1.0.4.0. See docs/parity.md.
-    void InstallDualVehicleHeadlights()
-    {
-        if (Catalogue::Read("DualVehicleHeadlights") != 1)
-            return;
-
-        auto pattern = find_pattern("8B 17 8B 42 64 8B CF FF D0 8B 54");
-        if (pattern.empty())
-            return;
-
-        if (CurrentBuildInMask(kDualHeadlightsOldBuilds))
-        {
-            Bodies::Register(reinterpret_cast<uintptr_t>(&DualHeadlightsOldBody), 0x10006630u);
-            injector::MakeJMP(pattern.get_first<std::byte>(0),
-                reinterpret_cast<void*>(&DualHeadlightsOldBody), true);
-        }
-
-        if (CurrentBuildInMask(kDualHeadlightsNewBuilds))
-        {
-            Bodies::Register(reinterpret_cast<uintptr_t>(&DualHeadlightsNewBody), 0x100064F0u);
-            injector::MakeJMP(pattern.get_first<std::byte>(0),
-                reinterpret_cast<void*>(&DualHeadlightsNewBody), true);
-        }
-    }
-
-    // FreezeCarFix / DebugPrintSpawns: the original's handler 0x10037C70 scans the
-    // primary signature first and wraps every other scan in its `if (result)`, so a
-    // miss on 1.0.0.0 / 1.0.4.0 / 1.0.0.4 installs nothing at all. The arm keeps
-    // that shape: the DebugPrintSpawns flag and the probe's operands are read here,
-    // before the install tier writes any site, and every resume is the target of the
-    // `E8` the install is about to overwrite.
-    void PublishFreezeCarFix()
-    {
-        if (!Loader::Enabled("FreezeCarFix"))
-            return;
-
-        // The original reads DebugPrintSpawns only inside this gate and only raises
-        // the flag (`movzx ecx,[0x10159C15]; cmp esi,1; cmove ecx,1; mov [...],cl`),
-        // so a value other than 1 leaves it at the BSS zero.
-        zpatch_spawns_debug = Catalogue::Read("DebugPrintSpawns") == 1 ? 1 : 0;
-        zpatch_spawns_getmodulehandlew = static_cast<uint32_t>(
-            reinterpret_cast<uintptr_t>(&GetModuleHandleW));
-        zpatch_spawns_resolver = static_cast<uint32_t>(Shared::ValueResolver());
-
-        auto primary = find_pattern("32 DB 8B 54 24 24 52 E8 ? ? ? ? 8B F0");
-        if (primary.empty())
-            return;
-
-        auto* primaryMatch = primary.get_first<std::byte>(0);
-        zpatch_spawns_orig_a = Rel32Target(primaryMatch, 8, 12);
-
-        // dword_1015AD78, the ped-model object array, is the operand four bytes
-        // before the original's own anchor (the same recovered read the
-        // BadPlayerModelCrashFix arm makes). It is a live VA: the loader has already
-        // relocated the image, and the dump relocates its copy too.
-        auto pedArray = find_pattern("85 C0 C6 44 24 0C 00 C6 44 24 0D 00 75 07");
-        if (!pedArray.empty())
-            zpatch_spawns_ped_array = *pedArray.get_first<uint32_t>(-4);
-
-        auto guard = find_pattern(
-            "8B 4C 24 28 8B 54 24 24 50 51 52 E8 ? ? ? ? 5F 5E 5D 5B");
-        if (!guard.empty())
-            zpatch_spawns_orig_b = Rel32Target(guard.get_first<std::byte>(0), 12, 16);
-
-        // The probe's ten jump-table arms: each site's own `call` target is the
-        // resume the thunk tail-jumps to, in case order 0..9.
-        auto dispatch = find_pattern("E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00");
-        if (!dispatch.empty())
-        {
-            auto* match = dispatch.get_first<std::byte>(0);
-            zpatch_spawns_case0_resume = Rel32Target(match, 37, 41);
-            zpatch_spawns_case1_resume = Rel32Target(match, 62, 66);
-            zpatch_spawns_case2_resume = Rel32Target(match, 87, 91);
-            zpatch_spawns_case3_resume = Rel32Target(match, 112, 116);
-            zpatch_spawns_case4_resume = Rel32Target(match, 137, 141);
-            zpatch_spawns_case5_resume = Rel32Target(match, 159, 163);
-            zpatch_spawns_case6_resume = Rel32Target(match, 181, 185);
-            zpatch_spawns_case7_resume = Rel32Target(match, 203, 207);
-            zpatch_spawns_case8_resume = Rel32Target(match, 225, 229);
-            zpatch_spawns_case9_resume = Rel32Target(match, 247, 251);
-        }
-    }
-
-    void InstallFreezeCarFix()
-    {
-        if (!Loader::Enabled("FreezeCarFix"))
-            return;
-
-        auto primary = find_pattern("32 DB 8B 54 24 24 52 E8 ? ? ? ? 8B F0");
-        if (primary.empty())
-            return;
-
-        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsProbeBody), 0x10037510u);
-        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsGuardBody), 0x100372F0u);
-        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0x24Body), 0x10037330u);
-        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0x6FBody), 0x10037390u);
-        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0xE0Body), 0x100373C0u);
-        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0x3DBody), 0x100373F0u);
-        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0x56Body), 0x10037420u);
-        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0x88Body), 0x10037450u);
-        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0x9EBody), 0x10037480u);
-        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0xF6Body), 0x100374B0u);
-        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0xB4Body), 0x100374E0u);
-        Bodies::Register(reinterpret_cast<uintptr_t>(&SpawnsCase0xCABody), 0x10037360u);
-
-        injector::MakeCALL(primary.get_first<std::byte>(7),
-            reinterpret_cast<void*>(&SpawnsProbeBody), true);
-
-        auto guard = find_pattern(
-            "8B 4C 24 28 8B 54 24 24 50 51 52 E8 ? ? ? ? 5F 5E 5D 5B");
-        if (!guard.empty())
-        {
-            injector::MakeCALL(guard.get_first<std::byte>(11),
-                reinterpret_cast<void*>(&SpawnsGuardBody), true);
-        }
-
-        struct SpawnCase final
-        {
-            std::ptrdiff_t dispatchOffset;
-            void (*body)();
-        };
-        constexpr SpawnCase kSpawnCases[] = {
-            { 0x24, &SpawnsCase0x24Body },
-            { 0x3D, &SpawnsCase0x3DBody },
-            { 0x56, &SpawnsCase0x56Body },
-            { 0x6F, &SpawnsCase0x6FBody },
-            { 0x88, &SpawnsCase0x88Body },
-            { 0x9E, &SpawnsCase0x9EBody },
-            { 0xB4, &SpawnsCase0xB4Body },
-            { 0xCA, &SpawnsCase0xCABody },
-            { 0xE0, &SpawnsCase0xE0Body },
-            { 0xF6, &SpawnsCase0xF6Body },
-        };
-
-        auto dispatch = find_pattern("E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00");
-        if (!dispatch.empty())
-        {
-            auto* match = dispatch.get_first<std::byte>(0);
-            for (const SpawnCase& spawn : kSpawnCases)
-            {
-                injector::MakeCALL(match + spawn.dispatchOffset,
-                    reinterpret_cast<void*>(spawn.body), true);
-            }
-        }
-
-        auto probeA = find_pattern("88 87 40 01 00 00 E8");
-        if (!probeA.empty())
-        {
-            injector::MakeCALL(probeA.get_first<std::byte>(6),
-                reinterpret_cast<void*>(&SpawnsProbeBody), true);
-        }
-
-        auto probeB = find_pattern("88 5C 24 1F 8B 54 24 28 52 E8");
-        if (!probeB.empty())
-        {
-            injector::MakeCALL(probeB.get_first<std::byte>(9),
-                reinterpret_cast<void*>(&SpawnsProbeBody), true);
-            injector::MakeCALL(probeB.get_first<std::byte>(254),
-                reinterpret_cast<void*>(&SpawnsProbeBody), true);
-        }
-
-        auto probeC = find_pattern("38 98 8C 00 00 00 75 2D 57 E8");
-        if (!probeC.empty())
-        {
-            injector::MakeCALL(probeC.get_first<std::byte>(9),
-                reinterpret_cast<void*>(&SpawnsProbeBody), true);
-        }
-
-        // The second row of the original's own table: a shorter prefix of the
-        // primary, installed at the same +7 site, so the write is the duplicate the
-        // original makes (17 rows, 16 distinct sites).
-        auto shortPrimary = find_pattern("32 DB 8B 54 24 24 52 E8");
-        if (!shortPrimary.empty())
-        {
-            injector::MakeCALL(shortPrimary.get_first<std::byte>(7),
-                reinterpret_cast<void*>(&SpawnsProbeBody), true);
-        }
-    }
-
-    // CarPartsShadowFix's published resumes: the site's own bytes -- the `jle` it
-    // would have run (match+2) and the loop exit that `jle` jumps to (match+0x45).
-    // The shared detour is installed under either key, so the publish uses the same
-    // combined gate.
-    void PublishCarPartsShadowFix()
-    {
-        if (!Loader::Enabled("CarPartsShadowFix") && !Loader::Enabled("CarDynamicShadowFix"))
-            return;
-
-        auto pattern = find_pattern("85 DB 7E 41 55 EB 0A");
-        if (pattern.empty())
-            return;
-
-        auto* match = pattern.get_first<std::byte>(0);
-        zpatch_carparts_resume_if = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 2));
-        zpatch_carparts_resume_else =
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 0x45));
-    }
-
-    // CarPartsShadowFix shares the detour with CarDynamicShadowFix: the original
-    // gates the rewrite on either key and only the standalone forcing writes below
-    // are CarPartsShadowFix's own.
-    void InstallCarPartsShadowFix()
-    {
-        if (!Loader::Enabled("CarPartsShadowFix") && !Loader::Enabled("CarDynamicShadowFix"))
-            return;
-
-        auto pattern = find_pattern("85 DB 7E 41 55 EB 0A");
-        if (pattern.empty())
-            return;
-
-        auto* match = pattern.get_first<std::byte>(0);
-
-        Bodies::Register(reinterpret_cast<uintptr_t>(&CarPartsShadowShim), 0x10006880u);
-        injector::MakeJMP(match - 6, reinterpret_cast<void*>(&CarPartsShadowShim), true);
-
-        if (!Loader::Enabled("CarPartsShadowFix"))
-            return;
-
-        // The standalone arm forces the shadow path on its own: the `jnz` that would
-        // skip it becomes a short jump. The recovered standalone handler scans two
-        // variants: the `83 F8 04` site (1.0.6.0 and later) and the `83 FA 04 75 0C`
-        // site (the older builds). Each scan is a clean skip on the builds that do
-        // not carry it.
-        pattern = find_pattern("83 F8 04 C6 44 24 0E 00 75 0F");
-        if (!pattern.empty())
-            injector::WriteMemory<std::byte>(pattern.get_first(8), Bytes::ShortJmp, true);
-
-        pattern = find_pattern("83 FA 04 75 0C");
-        if (!pattern.empty())
-            injector::WriteMemory<std::byte>(pattern.get_first(3), Bytes::ShortJmp, true);
-    }
-
-    // CarDynamicShadowFix's published call target and resume, from whichever body
-    // variant the build carries: pattern A's `call` sits at match+6, so its resume is
-    // match+0xB and the displacement is at match+7; pattern B's `call` sits at
-    // match+8, so its resume is match+0xD and the displacement is at match+9.
-    void PublishCarDynamicShadowFix()
-    {
-        if (!Loader::Enabled("CarDynamicShadowFix"))
-            return;
-
-        auto pattern = find_pattern("56 6A 02 53 53 57 E8 ? ? ? ? 56 6A 02 6A 04 6A 05 57 E8");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            const auto resume = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 11));
-            zpatch_carparts_shadow_fn = resume + *reinterpret_cast<const int32_t*>(match + 7);
-            zpatch_carparts_resume_2 = resume;
-            return;
-        }
-
-        pattern = find_pattern("56 6A 02 6A 00 6A 00 57 E8 ? ? ? ? 56 6A 02 6A 04 6A 05 57 E8");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            const auto resume = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 13));
-            zpatch_carparts_shadow_fn = resume + *reinterpret_cast<const int32_t*>(match + 9);
-            zpatch_carparts_resume_2 = resume;
-        }
-    }
-
-    // CarDynamicShadowFix: the shadow call site is detached so the shadow is drawn
-    // twice with the remaining arguments. Two recovered body variants exist: pattern
-    // A (1.0.6.0 and later) and pattern B (the older builds); the key's own build
-    // mask covers both, and the signatures are the gate. The same installer's C and
-    // E branches are the old builds' two extra writes: a range check rewritten as an
-    // unconditional jump, and the six-byte NOP fill where pattern E is absent.
-    void InstallCarDynamicShadowFix()
-    {
-        if (!Loader::Enabled("CarDynamicShadowFix"))
-            return;
-
-        auto pattern = find_pattern("56 6A 02 53 53 57 E8 ? ? ? ? 56 6A 02 6A 04 6A 05 57 E8");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            Bodies::Register(reinterpret_cast<uintptr_t>(&CarDynamicShadowShim), 0x100068A0u);
-            injector::MakeJMP(match, reinterpret_cast<void*>(&CarDynamicShadowShim), true);
-        }
-
-        // Pattern B is the old-build variant of the same call site.
-        pattern = find_pattern("56 6A 02 6A 00 6A 00 57 E8 ? ? ? ? 56 6A 02 6A 04 6A 05 57 E8");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            Bodies::Register(reinterpret_cast<uintptr_t>(&CarDynamicShadowShimB), 0x100068D0u);
-            injector::MakeJMP(match, reinterpret_cast<void*>(&CarDynamicShadowShimB), true);
-        }
-
-        // Pattern C: the double range check (`>= 0x14` / `>= 6`) is skipped by
-        // turning the second test's `jnz` into a jump over it. The row exists only on
-        // the older builds, which is also where the @noE fill below belongs.
-        pattern = find_pattern("83 F8 14 7D 05 83 F8 06 7D 14");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            injector::MakeJMP(match + 3, match + 0x1E, true);
-
-            // CarDynamicShadowFix@noE: with pattern E absent (the recovered gate is
-            // build ids 1000 and 1040) the installer NOP-fills six bytes after the C
-            // anchor. 1.0.0.4 has pattern E, so it is not in the mask.
-            if (CurrentBuildInMask(kCarDynamicShadowNoEBuilds))
-                injector::MakeNOP(match + 62, 6, true);
-        }
-
-        // The shadow's record size is forced to 0x100 from 0x104, and the branch that
-        // would skip the shadow becomes unconditional.
-        pattern = find_pattern("50 68 04 01 00 00 6A 02 6A 00 E8");
-        if (!pattern.empty())
-            injector::WriteMemory<std::byte>(pattern.get_first(2), Bytes::Zero, true);
-
-        pattern = find_pattern("83 E0 0F 83 F8 03 75 17 F6 86 6C 02 00 00 04");
-        if (!pattern.empty())
-            injector::WriteMemory<std::byte>(pattern.get_first(6), Bytes::ShortJmp, true);
-
-        // With ForceCarHeadlightShadows off the original also re-encodes the `jz`
-        // that skips the shadow as a five-byte `jmp` to the same target, and forces
-        // the pushed shadow size from 0x504 to 0x100.
-        if (Loader::Enabled("ForceCarHeadlightShadows"))
-            return;
-
-        pattern = find_pattern("0F 84 9E 00 00 00 80 7D 28");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            const auto displacement = *reinterpret_cast<const int32_t*>(match + 2);
-            injector::MakeJMP(match, match + 6 + displacement, true);
-        }
-
-        pattern = find_pattern("51 68 04 05 00 00 6A 02 6A 00 E8");
-        if (!pattern.empty())
-            injector::WriteMemory<uint32_t>(pattern.get_first(2), 0x100u, true);
-    }
-
-    // ForceCarHeadlightShadows' resume: the E9 replaces the shadow function's entry
-    // (game 0x8F7590), and the shim replays those twelve prologue bytes itself, so
-    // the continuation is the instruction after them (match+12, the `mov eax,
-    // [ebp+20h]`). Read before the site is written, as the original's handler does.
-    void PublishForceCarHeadlightShadows()
-    {
-        if (!Loader::Enabled("ForceCarHeadlightShadows"))
-            return;
-
-        auto pattern = find_pattern("55 8B EC 83 E4 F0 81 EC D4 00 00 00 8B 45 20 8B");
-        if (!pattern.empty())
-            zpatch_fchs_resume = static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(12)));
-    }
-
-    // ForceCarHeadlightShadows: the shadow function hooks to the shim, the three
-    // branches that decide whether the headlight cone draws its shadow are forced so
-    // the shadow always runs, and the offset float is retargeted at this module's
-    // word instead of the game's 0.0f at 0xD95B68. The writes, in the original
-    // handler's order:
-    //   * `EB` at the anchor's +6 (the `jne +79h` of `cmp al,1` / `test bl,bl`),
-    //     `E9` at +95 to match+476 (the second `jne +177h`, one byte shorter than the
-    //     six-byte `0F 85` it replaces, which is why the write starts on the opcode
-    //     and its sixth byte becomes the unreachable remainder), `EB` at +379 (the
-    //     `jne +5Fh` on the same target) and the `movss` operand at +211;
-    //   * the E9 at the shadow function's entry;
-    //   * the handler tail's restore of the two shadow-buffer pushes (0x504 / 0x104)
-    //     and of the `je +9Eh` at 0x8F719F. On a pristine image every one of those is
-    //     a no-op; they are the original's `sub_1000E870` writes, which undo exactly
-    //     the CarDynamicShadowFix rewrites that arm skips while this key is on, so
-    //     the two keys interact the way they do in the original.
-    void InstallForceCarHeadlightShadows()
-    {
-        if (!Loader::Enabled("ForceCarHeadlightShadows"))
-            return;
-
-        auto pattern = find_pattern("3C 01 75 50 84 DB 75 79");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            injector::WriteMemory<std::byte>(match + 6, Bytes::ShortJmp, true);
-            injector::MakeJMP(match + 95, match + 476, true);
-            injector::WriteMemory<std::byte>(match + 379, Bytes::ShortJmp, true);
-
-            // The `movss xmm2, [0xD95B68]` operand becomes this module's float. The
-            // original writes its own image's dword_101580C0 here (0x101580C0); the
-            // stored baseline records the reference dump's 0xD0000000 placeholder for
-            // the word, so the slot is registered for the dump's canonicalisation.
-            injector::WriteMemory<uint32_t>(match + 211,
-                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&zpatch_fchs_offset)), true);
-            Bodies::RegisterPublishedImage(reinterpret_cast<uintptr_t>(match + 211));
-        }
-
-        pattern = find_pattern("55 8B EC 83 E4 F0 81 EC D4 00 00 00 8B 45 20 8B");
-        if (!pattern.empty())
-            injector::MakeJMP(pattern.get_first<std::byte>(0),
-                reinterpret_cast<void*>(&FchsShimBody), true);
-
-        // `push 0x504` (the first shadow buffer) and `push 0x104` (the second) are
-        // written back as dwords; both immediates are unchanged on a pristine image.
-        pattern = find_pattern("8D 4C 24 50 51 68 04 05 00 00");
-        if (!pattern.empty())
-            injector::WriteMemory<uint32_t>(pattern.get_first<std::byte>(6), 0x00000504u, true);
-
-        pattern = find_pattern("8D 44 24 50 50 68 04 01 00 00");
-        if (!pattern.empty())
-            injector::WriteMemory<uint32_t>(pattern.get_first<std::byte>(6), 0x00000104u, true);
-
-        // `0F 84 9E 00 00 00` (the `je` that skips the shadow) is rewritten with its
-        // own six bytes, the last one left as it was.
-        pattern = find_pattern("F3 0F 11 44 24 1C 0F 84 9E 00 00 00");
-        if (!pattern.empty())
-        {
-            auto* site = pattern.get_first<std::byte>(6);
-            injector::WriteMemory<std::byte>(site, std::byte{ 0x0F }, true);
-            injector::WriteMemory<std::byte>(site + 1, std::byte{ 0x84 }, true);
-            injector::WriteMemory<uint16_t>(site + 2, 0x009Eu, true);
-            injector::WriteMemory<std::byte>(site + 4, Bytes::Zero, true);
-        }
-    }
-
-    // InfiniteCarBottomDistance: the `ja` of the bottom-distance clamp becomes an
-    // unconditional jump over it (`EB 2A`, written as its two bytes -- there is no
-    // short-jump API).
-    void InstallInfiniteCarBottomDistance()
-    {
-        if (!Loader::Enabled("InfiniteCarBottomDistance"))
-            return;
-
-        auto pattern = find_pattern("0F 2F D0 76 25 0F 28 C2");
-        if (pattern.empty())
-            return;
-
-        auto* site = pattern.get_first<std::byte>(3);
-        injector::WriteMemory<std::byte>(site, Bytes::ShortJmp, true);
-        injector::WriteMemory<std::byte>(site + 1, Bytes::JumpOverClamp, true);
-    }
-
-    // ReversingLightFix: the slot displacement of `mov eax,[edx+64h]` becomes 0x60,
-    // so the reversing-light path reads the neighbouring member.
-    void InstallReversingLightFix()
-    {
-        if (!Loader::Enabled("ReversingLightFix"))
-            return;
-
-        auto pattern = find_pattern("11 01 00 00 8B 16 8B 42 64 8B CE FF D0 F3 0F 10");
-        if (!pattern.empty())
-            injector::WriteMemory<std::byte>(pattern.get_first(8), Bytes::Slot60, true);
-    }
-
-    // BikeFeetFix: the 12-byte rider-foot block is deleted, so the chopper foot
-    // position is left to the game's own (correct) path.
-    void InstallBikeFeetFix()
-    {
-        if (!Loader::Enabled("BikeFeetFix"))
-            return;
-
-        auto pattern = find_pattern("39 82 54 13 00 00 0F 85 94 04 00 00");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(12), 12, true);
-    }
-
-    // BikePhoneAnimsFix: the six-byte phone-animation branch is deleted.
-    void InstallBikePhoneAnimsFix()
-    {
-        if (!Loader::Enabled("BikePhoneAnimsFix"))
-            return;
-
-        auto pattern = find_pattern("80 BE 18 02 00 00 00 0F 85 36 01 00 00 80 BE");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(33), 6, true);
-    }
-
-    // PipeBombDropIconSupport: the nine-byte check before the anchor is deleted, so
-    // the pipe-bomb drop icon is accepted on the episodic builds.
-    void InstallPipeBombDropIconSupport()
-    {
-        if (!Loader::Enabled("PipeBombDropIconSupport"))
-            return;
-
-        auto pattern = find_pattern("83 7D 18 1C 75 14");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(-9), 9, true);
-    }
-
-    // EpisodicVehicleSupport's own episode word: the game's unk_10158128, an int
-    // holding 2, which every `cmp [episode], 2` below tests. The arm hands the game
-    // this module's word instead, so the four 1.0.7.0/1.0.8.0 sites read a value
-    // this module owns; the dump canonicalises the four published operands.
-    uint32_t zpatch_episode_flag = 2;
-
-    // EpisodicVehicleSupport: the episode test at each site is deleted, so every
-    // vehicle check that is gated on "not episodic" runs on the episodic builds.
-    //
-    // Two parts, because the original's handler has two:
-    //   * 1.0.7.0 and 1.0.8.0 each retarget the absolute operand of two
-    //     `cmp dword ptr [episode], 2` sites (the first also a `jnz`, the second a
-    //     `jne rel32`) at this module's episode word. The original's recovered table
-    //     does that as four *RVA installs* -- a rebased pointer store at a fixed RVA
-    //     (build 8: 0x21500 and 0x7D91AE; build 9: 0x95040 and 0x684ABE), not a
-    //     pattern hit. The store value proves it: it is this module's own pointer,
-    //     which a signature could not name. Spelling the game's absolute operand out
-    //     in a signature would also bake in the preferred-base VA, which the loader
-    //     rewrites on every run (the executable carries DYNAMIC_BASE), so such an
-    //     arm could never match the live image and would never fire in the game;
-    //   * every gated build then gets the 23 signature-driven NOP rows, in the
-    //     original's row order. The first two rows write every hit of a multi-hit
-    //     scan (two each on this image) and two rows carry a second window.
-    void InstallEpisodicVehicleSupport()
-    {
-        if (!Loader::Enabled("EpisodicVehicleSupport"))
-            return;
-
-        const auto flag = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&zpatch_episode_flag));
-        struct FlagStore final
-        {
-            Build build;
-            uint32_t rva;
-        };
-        static constexpr FlagStore kEpisodeFlagStores[] = {
-            { Build::v1070, 0x021500u },
-            { Build::v1070, 0x7D91AEu },
-            { Build::v1080, 0x095040u },
-            { Build::v1080, 0x684ABEu },
-        };
-        for (const auto& store : kEpisodeFlagStores)
-        {
-            if (Loader::Current() != store.build)
-                continue;
-
-            auto* const site =
-                reinterpret_cast<std::byte*>(Game::Get().ImageBase() + store.rva);
-            injector::WriteMemory<uint32_t>(site, flag, true);
-            Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(site));
-        }
-
-        // Row 1: the `jl` of a loop that only runs on the episodic builds. Two
-        // sites, both rewritten (the original writes hits[0] and hits[1]).
-        auto pattern = find_pattern<2>("7C 18 0F BF 4E 2E");
-        for (size_t hit = 0; hit < pattern.size(); ++hit)
-            injector::MakeNOP(pattern.get(hit).get<std::byte>(-6), 8, true);
-
-        // Row 2: the same `cmp [episode], 2` shape twice in two functions.
-        pattern = find_pattern<2>("83 3D ?? ?? ?? ?? 02 75 17 F3 0F 10 44 24 08");
-        for (size_t hit = 0; hit < pattern.size(); ++hit)
-            injector::MakeNOP(pattern.get(hit).get<std::byte>(0), 9, true);
-
-        // Rows 3-20: one window each.
-        pattern = find_pattern("39 35 ?? ?? ?? ?? 75 0E 80 3D");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(6), 2, true);
-
-        pattern = find_pattern("74 17 83 3D ?? ?? ?? ?? 02 75 0E F3 0F 10 05");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(2), 9, true);
-
-        pattern = find_pattern("7C 22 83 F8 28 75 1D");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(0), 2, true);
-
-        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 0F 8C 0E 05 00 00");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(0), 13, true);
-
-        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 75 08 3B 05");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(0), 9, true);
-
-        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 75 17 F3 0F 10 44 24 0C");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(0), 9, true);
-
-        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 75 1F 8B 44 24 04");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(0), 9, true);
-
-        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 75 21 8B 96 20 08 00 00");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(0), 9, true);
-
-        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 75 24 F6 87 6C 02 00 00 04");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(0), 9, true);
-
-        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 75 35 0F BF 46 2E");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(0), 9, true);
-
-        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 75 38 8B 16");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(0), 9, true);
-
-        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 7C 11 8B 4E");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(7), 2, true);
-
-        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 7C 1F 8B");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(7), 2, true);
-
-        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 7C 26 8B 85 40 0B 00 00");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(0), 9, true);
-
-        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 7C 35 0F BF 43 2E");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(0), 9, true);
-
-        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 7C 43");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(7), 2, true);
-
-        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 7C 4A 0F BF 46 2E");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(0), 13, true);
-
-        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 89 44 24 38");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(11), 6, true);
-
-        // Row 21: the branch and the byte it would skip to (a second window at +17).
-        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 8A 0D");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            injector::MakeNOP(match, 7, true);
-            injector::MakeNOP(match + 17, 2, true);
-        }
-
-        // Row 22: the float load's branch.
-        pattern = find_pattern("83 3D ?? ?? ?? ?? 02 F3 0F 10 05 ?? ?? ?? ?? F3 0F 11 44 24 20 75 4C");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(21), 2, true);
-
-        // Row 23: the loop head and its `jl` (a second window at +10).
-        pattern = find_pattern("8B 56 04 8B 4A 0C 89 4C 24 1C 7C 18");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            injector::MakeNOP(match - 15, 7, true);
-            injector::MakeNOP(match + 10, 2, true);
-        }
-    }
-
-    // TeleportProtection: the entry becomes `ret 8`. The original writes exactly three
-    // bytes -- C2 08 over the opcode and 00 over the byte after the immediate -- and
-    // injector::MakeRET is not equivalent: it stores the opcode through a 4-byte int,
-    // which would also zero match+3.
-    void InstallTeleportProtection()
-    {
-        if (!Loader::Enabled("TeleportProtection"))
-            return;
-
-        auto pattern = find_pattern("55 8B EC 83 E4 F8 51 53 8B 5D 08 56 57 6A 08 8D 44 24 10 8B F1 8D 7B 04 50 8B CF C7 44 24 14 00");
-        if (pattern.empty())
-            return;
-
-        auto* match = pattern.get_first<std::byte>(0);
-        injector::WriteMemory<std::byte>(match, Bytes::RetImm16, true);
-        injector::WriteMemory<std::byte>(match + 1, Bytes::RetImm16High, true);
-        injector::WriteMemory<std::byte>(match + 2, Bytes::Zero, true);
-    }
-
-    // IncreaseVehicleStructLimit: the struct count the allocator is asked for becomes
-    // 100 instead of the original 50: the signature's +6 byte is the immediate of the
-    // `push 32` that follows the pushed structure-name address. The pattern is the
-    // original's own (`68 ? ? ? ? 6A 32 8B C8`, recovered from the ASI's signature
-    // table, handler 0x10023020): the pushed address is a relocated operand, so it
-    // must stay a wildcard. Baking the recovered 1.0.8.0 VA in (`68 34 EE DA 00`)
-    // makes the arm miss the moment the loader relocates the image -- which it does
-    // on every run, because the executable carries DYNAMIC_BASE -- and would also
-    // miss in the offline dump once that copy is relocated.
-    void InstallIncreaseVehicleStructLimit()
-    {
-        if (!Loader::Enabled("IncreaseVehicleStructLimit"))
-            return;
-
-        auto pattern = find_pattern("68 ? ? ? ? 6A 32 8B C8");
-        if (!pattern.empty())
-            injector::WriteMemory<std::byte>(pattern.get_first(6), std::byte{ 100 }, true);
-    }
-
-    // IncreaseVehicleModelLimit: the vehicle-model cap the loop bound is compared
-    // against becomes 1024. The site is the `mov ecx, 0xF3E8E8` at match+77: the
-    // arm reads that operand, which is the address of the model-limit object the
-    // allocator is constructed with, and writes the new cap through it. The write
-    // is a game-data dword, not a published pointer, so there is no slot to
-    // register with the dump.
-    void InstallIncreaseVehicleModelLimit()
-    {
-        if (!Loader::Enabled("IncreaseVehicleModelLimit"))
-            return;
-
-        auto pattern = find_pattern("83 C7 01 81 FF 18 79 00 00 7C D2");
-        if (pattern.empty())
-            return;
-
-        constexpr uint32_t kVehicleModelLimit = 0x400u;
-        injector::WriteMemory<uint32_t>(
-            GamePointer<uint32_t>(*pattern.get_first<uint32_t>(77)), kVehicleModelLimit, true);
-    }
-    // The address of a body another module transcribed, by its recovered VA. The
-    // shared IDE parser hook lives in source/misc.ixx, and a module interface cannot
-    // export a naked function; the body registry is what makes it reachable (the same
-    // route the BPM arm uses for the native layer's pieces).
-    uintptr_t RegisteredBody(uint32_t reference)
-    {
-        for (const auto& entry : Bodies::All())
-        {
-            if (entry.reference == reference)
-                return entry.address;
-        }
-        return 0;
-    }
-
-    // The original loader preamble resolves these five entries unconditionally
-    // (sub_100523C0, 0x10052EE6..0x10052F50), before any handler runs: the model-info
-    // array (dword_1015AD78), the bone getter (dword_10159B88) and the two matrix
-    // setters (dword_1015D63C, dword_10159CDC). Each scan's hit is exactly what the
-    // preamble's own pattern takes -- the bone getter's signature has two hits and
-    // the preamble takes the first (`cmovnz ecx, eax` with the scan's front element),
-    // and a miss keeps the slot as it was, which for a first run is zero, so the
-    // consumer faults on the null it reads just as the original's does.
-    //
-    // The two CRT entries are the ones the livery helpers call through their IAT
-    // slots: `_stricmp` (the registry comparator) and `strcpy_s` (the 0x10-byte name
-    // copy). byte_10159B85 is the original DllMain's CitizenIV.exe probe
-    // (0x10055DFB..0x10055E17); it starts zero and is set once, here.
-    void ResolveSteerHelpers()
-    {
-        auto pattern = find_pattern("85 C0 C6 44 24 0C 00 C6 44 24 0D 00 75 07");
-        if (!pattern.empty())
-        {
-            const auto value = *pattern.get_first<uint32_t>(-4);
-            zpatch_steer_model_array = static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(GamePointer<std::byte>(value)));
-        }
-
-        pattern = find_pattern("56 8B F1 8B 06 8B 90 A0 00 00 00 57 FF D2 85 C0 74 1C");
-        if (!pattern.empty())
-            zpatch_steer_bone = static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)));
-
-        pattern = find_pattern("0F 10 5E 14 F3 0F 10 66 18 F3 0F 10 4C 24 0C F3");
-        if (!pattern.empty())
-            zpatch_steer_matrix_a = static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(-0x30)));
-
-        pattern = find_pattern(
-            "0F 10 16 F3 0F 10 5E 04 F3 0F 10 4C 24 0C F3 0F 10 66 08 F2 0F 5A C0");
-        if (!pattern.empty())
-            zpatch_steer_matrix_b = static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(-0x30)));
-
-        zpatch_steer_stricmp = reinterpret_cast<uintptr_t>(&_stricmp);
-        // `strcpy_s` is an overload set in the CRT headers (the array form is a
-        // template), so the slot takes the three-argument entry explicitly.
-        zpatch_nolivery_strcpy_s = reinterpret_cast<uintptr_t>(
-            static_cast<errno_t(__cdecl*)(char*, size_t, const char*)>(&strcpy_s));
-
-        zpatch_garage_citizen = GetModuleHandleA("CitizenIV.exe") != nullptr ? 1 : 0;
-    }
-
-    // The three steer keys' shared slots, read before any of their sites is written:
-    // the detour's resume (match+16) and the part-drive function the site's own code
-    // calls, plus the shared IDE hook's resume (the parser anchor's -1, which the
-    // original's sub_10004110 publishes as `result - 1`). Only one of the two site
-    // variants exists per build, and each carries its own operand offsets (423/427 on
-    // the 1.0.6.0-and-later site, 140/144 on the older one).
-    void PublishSteerSites()
-    {
-        auto pattern = find_pattern("32 DB 8B 16 8B 82 28 01 00 00 8B CE FF D0");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            zpatch_steer_resume = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 16));
-            zpatch_steer_part_call = Rel32Target(match, 423, 427);
-        }
-
-        pattern = find_pattern("7C E0 8B 06 8B 90 28 01 00 00 8B CE FF D2");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            zpatch_steer_resume = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + 16));
-            zpatch_steer_part_call = Rel32Target(match, 140, 144);
-        }
-
-        pattern = find_pattern("0C 83 88 94 00 00 00 04");
-        if (!pattern.empty())
-            zpatch_ide_hook_slot = static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(-1)));
-    }
-
-    // The steer keys' shared write set, exactly the original's sub_10005210 plus its
-    // sub_10004110: the vtable-call site the build carries becomes a jump to that
-    // build's detour body, and the shared IDE parser hook is installed so the
-    // wheelangle table the consumer reads is filled. The three keys call this from
-    // their own arms after setting their switch byte, so enabling two of them writes
-    // the same bytes twice, as the original's two handler calls do.
-    void InstallSteerSites()
-    {
-        auto pattern = find_pattern("32 DB 8B 16 8B 82 28 01 00 00 8B CE FF D0");
-        if (!pattern.empty())
-            injector::MakeJMP(pattern.get_first<std::byte>(2),
-                reinterpret_cast<void*>(&SteerDetourEaxBody), true);
-
-        pattern = find_pattern("7C E0 8B 06 8B 90 28 01 00 00 8B CE FF D2");
-        if (!pattern.empty())
-            injector::MakeJMP(pattern.get_first<std::byte>(2),
-                reinterpret_cast<void*>(&SteerDetourEdxBody), true);
-
-        pattern = find_pattern("0C 83 88 94 00 00 00 04");
-        if (!pattern.empty())
-            injector::MakeJMP(pattern.get_first<std::byte>(-10),
-                reinterpret_cast<void*>(RegisteredBody(0x100040E0u)), true);
-    }
-
-    // MovingSteeringWheelSupport / ShakingEngineBlock / MovingPlaneParts: the
-    // original's handler sets its own switch byte and calls the shared installer
-    // (0x10054A7A, 0x10054B56, 0x10054AE8: `mov byte_1015AD4?, 1; call
-    // sub_10005210`). The switch bytes are module words, so two of the keys on runs
-    // both consumer blocks and one of them off leaves its block dormant -- exactly
-    // the original's per-key switches.
-    void PublishMovingSteeringWheelSupport()
-    {
-        if (!Loader::Enabled("MovingSteeringWheelSupport"))
-            return;
-        PublishSteerSites();
-    }
-
-    void InstallMovingSteeringWheelSupport()
-    {
-        if (!Loader::Enabled("MovingSteeringWheelSupport"))
-            return;
-        zpatch_steer_enabled = 1;
-        InstallSteerSites();
-    }
-
-    void PublishShakingEngineBlock()
-    {
-        if (!Loader::Enabled("ShakingEngineBlock"))
-            return;
-        PublishSteerSites();
-    }
-
-    void InstallShakingEngineBlock()
-    {
-        if (!Loader::Enabled("ShakingEngineBlock"))
-            return;
-        zpatch_engine_enabled = 1;
-        InstallSteerSites();
-    }
-
-    void PublishMovingPlaneParts()
-    {
-        if (!Loader::Enabled("MovingPlaneParts"))
-            return;
-        PublishSteerSites();
-    }
-
-    void InstallMovingPlaneParts()
-    {
-        if (!Loader::Enabled("MovingPlaneParts"))
-            return;
-        zpatch_plane_enabled = 1;
-        InstallSteerSites();
-    }
-
-    // GarageModelFix's two resumes, read from the sites before they are overwritten:
-    // the `fstp [esi+4]` at the first site's +6 and the `call` at the second site's
-    // +5.
-    void PublishGarageModelFix()
-    {
-        if (!Loader::Enabled("GarageModelFix"))
-            return;
-
-        auto pattern = find_pattern("8B 57 20 D9 42 34 D9 5E 04 8B 47 20");
-        if (!pattern.empty())
-            zpatch_garage_resume_a = static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(6)));
-
-        pattern = find_pattern("0F B7 0E 50 51 E8");
-        if (!pattern.empty())
-            zpatch_garage_resume_b = static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(5)));
-    }
-
-    // GarageModelFix: both sites jump to their own body. The first carries the colour
-    // copy, the second rewrites the model index the garage object hands on.
-    void InstallGarageModelFix()
-    {
-        if (!Loader::Enabled("GarageModelFix"))
-            return;
-
-        auto pattern = find_pattern("8B 57 20 D9 42 34 D9 5E 04 8B 47 20");
-        if (!pattern.empty())
-            injector::MakeJMP(pattern.get_first<std::byte>(0),
-                reinterpret_cast<void*>(&GarageBodyA), true);
-
-        pattern = find_pattern("0F B7 0E 50 51 E8");
-        if (!pattern.empty())
-            injector::MakeJMP(pattern.get_first<std::byte>(0),
-                reinterpret_cast<void*>(&GarageBodyB), true);
-    }
-
-    // NoLiveryLimit's published slots, in the original handler's (sub_1003D420)
-    // order and with its own either/or: the first site variant publishes the count
-    // loop's lookup (the call operand six bytes before the anchor) and the D/E resume
-    // (match+90); failing that, the older variant publishes its own pair (match-8 and
-    // match+84). The A/B/C resume comes from the livery anchor's +13 either way.
-    void PublishNoLiveryLimit()
-    {
-        if (!Loader::Enabled("NoLiveryLimit"))
-            return;
-
-        auto pattern = find_pattern("74 52 8D B5 3C 01 00 00 83 FB 04");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            zpatch_nolivery_fn = Rel32Target(match, -6, -2);
-            zpatch_nolivery_resume_d = static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(match + 90));
-        }
-        else
-        {
-            pattern = find_pattern("8D AF 3C 01 00 00 8D 54 24 20");
-            if (!pattern.empty())
-            {
-                auto* match = pattern.get_first<std::byte>(0);
-                zpatch_nolivery_fn = Rel32Target(match, -8, -4);
-                zpatch_nolivery_resume_d = static_cast<uint32_t>(
-                    reinterpret_cast<uintptr_t>(match + 84));
-            }
-        }
-
-        pattern = find_pattern("8B 8C 83 3C 01 00 00 0F BF 53 48");
-        if (!pattern.empty())
-            zpatch_nolivery_resume = static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(13)));
-    }
-
-    // NoLiveryLimit: the collector site (or the older variant of it), then the three
-    // livery sites at the anchor, -199 and -237, each jumping to its own body. The
-    // order is the original's: the collector first, then the anchor, then -199, then
-    // -237.
-    void InstallNoLiveryLimit()
-    {
-        if (!Loader::Enabled("NoLiveryLimit"))
-            return;
-
-        auto pattern = find_pattern("74 52 8D B5 3C 01 00 00 83 FB 04");
-        if (!pattern.empty())
-        {
-            injector::MakeJMP(pattern.get_first<std::byte>(2),
-                reinterpret_cast<void*>(&NoliveryBodyD), true);
-        }
-        else
-        {
-            pattern = find_pattern("8D AF 3C 01 00 00 8D 54 24 20");
-            if (!pattern.empty())
-                injector::MakeJMP(pattern.get_first<std::byte>(0),
-                    reinterpret_cast<void*>(&NoliveryBodyE), true);
-        }
-
-        pattern = find_pattern("8B 8C 83 3C 01 00 00 0F BF 53 48");
-        if (!pattern.empty())
-        {
-            auto* match = pattern.get_first<std::byte>(0);
-            injector::MakeJMP(match, reinterpret_cast<void*>(&NoliveryBodyA), true);
-            injector::MakeJMP(match - 199, reinterpret_cast<void*>(&NoliveryBodyC), true);
-            injector::MakeJMP(match - 237, reinterpret_cast<void*>(&NoliveryBodyB), true);
-        }
-    }
-}
-
-// Registered like every other arm: the publish tier reads every site the install
-// tier is about to overwrite, and the install tier owns the gate and the writes.
-export void RegisterVehicles()
-{
-    // The original's loader preamble fills both per-model light tables before it
-    // reads a single option (`sub_100523C0`'s first two blocks). This is the first
-    // registration after Shared::Register() has made `sub_10003E50` callable, and
-    // nothing before it reads an option or writes an image byte, so the tables are
-    // complete -- and a malformed row throws -- exactly where the original's
-    // preamble does it. Both sections are read here because the original reads them
-    // in one place, [PopupLightAngles] first.
-    Config::ReadModelTables(Config::Ini(),
-        reinterpret_cast<Config::NameResolver>(Shared::ValueResolver()));
-
-    // The original's loader preamble resolves the steer consumer's five game entries
-    // and the two CRT slots before any handler runs, and its DllMain probes for
-    // CitizenIV.exe at the same point; none of it writes an image byte.
-    ResolveSteerHelpers();
-
-    Loader::PublishEvent() += []
-    {
-        PublishCollisionDeadlockFix();
-        PublishCarPartsShadowFix();
-        PublishCarDynamicShadowFix();
-        PublishForceCarHeadlightShadows();
-        PublishHighFPSBikePhysicsFix();
-        PublishDualVehicleHeadlights();
-        PublishMovingSteeringWheelSupport();
-        PublishShakingEngineBlock();
-        PublishMovingPlaneParts();
-        PublishGarageModelFix();
-        PublishNoLiveryLimit();
-        PublishFreezeCarFix();
-    };
-    Loader::InstallEvent() += []
-    {
-        InstallCarDecalsFix();
-        InstallCollisionDeadlockFix();
-        InstallCarPartsShadowFix();
-        InstallCarDynamicShadowFix();
-        // After the shadow arm: the original's ForceCarHeadlightShadows handler runs
-        // after the CarDynamicShadowFix block, and its tail restores what that block
-        // rewrites -- so with both keys on, the restore is what the game sees.
-        InstallForceCarHeadlightShadows();
-        InstallInfiniteCarBottomDistance();
-        InstallReversingLightFix();
-        InstallBikeFeetFix();
-        InstallBikePhoneAnimsFix();
-        InstallEpisodicVehicleSupport();
-        InstallHighFPSBikePhysicsFix();
-        InstallPipeBombDropIconSupport();
-        InstallTeleportProtection();
-        InstallDualVehicleHeadlights();
-        InstallIncreaseVehicleModelLimit();
-        InstallIncreaseVehicleStructLimit();
-        InstallMovingSteeringWheelSupport();
-        InstallShakingEngineBlock();
-        InstallMovingPlaneParts();
-        InstallGarageModelFix();
-        InstallNoLiveryLimit();
-        InstallFreezeCarFix();
-    };
-
-    // The bodies' recovered VAs, so the dump expresses each arm's branch in the
-    // original's coordinates. The three steer keys all jump to the same two detour
-    // bodies, so those are registered once here rather than in the shared installer.
-    Bodies::Register(reinterpret_cast<uintptr_t>(&VehicleComponentBody), 0x10003F40u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&FchsShimBody), 0x1001ADB0u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&SteerDetourEaxBody), 0x100051B0u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&SteerDetourEdxBody), 0x100051E0u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&GarageColourBody), 0x10046B90u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&GarageLookupBody), 0x10046BD0u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&GarageBodyA), 0x10046C80u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&GarageBodyB), 0x10046CA0u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryHashBody), 0x1003D220u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryCountBody), 0x1003D270u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryCopyBody), 0x1003D2F0u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryBodyA), 0x1003D310u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryBodyB), 0x1003D340u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryBodyC), 0x1003D370u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryBodyD), 0x1003D3A0u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&NoliveryBodyE), 0x1003D3E0u);
-
-    // The steer consumer's two 512-slot wheelangle tables. The transcription reads
-    // them through indexed absolute operands (`[esi*4 + zpatch_wheelangle_models]`),
-    // which cannot name the original's VA, so each registration pairs this module's
-    // copy with the address the original keeps it at and the length there: 512
-    // dwords. The registration is mirrored by a `table` row in tests/bodies.tsv, the
-    // offline projection the proof resolves (docs/rebuilt.md). The arrays belong to
-    // source/misc.ixx because the transcribed IDE parser hook is what fills them;
-    // both are all-zero at load, as the original's are.
-    Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_wheelangle_models),
-        0x1015A538u, sizeof(zpatch_wheelangle_models));   // 512 * 4 = 2048
-    Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_wheelangle_angles),
-        0x10159D38u, sizeof(zpatch_wheelangle_angles));   // 512 * 4 = 2048
-
-    // ForceCarHeadlightShadows' two [HeadlightConeOffsets] arrays: dword_1015ADB8 (the
-    // hashes) and dword_1015B5C0 (the offsets). The hash registration is the original's
-    // **extended** 2,052-byte range -- 512 words plus the one word the walk reads past
-    // slot 511 (dword_1015B5B8) -- so the proof compares that read too. The word is not
-    // a copy: it is CarDynamicShadowFix's published shadow-function slot, defined
-    // immediately after the array in source/config.ixx so the layout matches the
-    // original's .data (docs/rebuilt.md §2g). The offsets array is registered at its
-    // own base, which the original places 2,056 bytes into the block.
-    Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_headlight_cone_hashes),
-        0x1015ADB8u, sizeof(zpatch_headlight_cone_hashes) + sizeof(uint32_t));  // 2052
-    Bodies::RegisterTable(reinterpret_cast<uintptr_t>(zpatch_headlight_cone_values),
-        0x1015B5C0u, sizeof(zpatch_headlight_cone_values));   // 512 * 4 = 2048
-
-    // Each stub's inline `call` is invisible to C++; naming the forwarders here keeps
-    // their out-of-line definitions in the image.
-    [[maybe_unused]] const uintptr_t helpers[] = {
-        reinterpret_cast<uintptr_t>(&NoliveryFormat),
-        reinterpret_cast<uintptr_t>(&NoliveryResolve),
-        reinterpret_cast<uintptr_t>(&SteerConsumerBody),
-        reinterpret_cast<uintptr_t>(&FchsCheckBody),
-    };
 }

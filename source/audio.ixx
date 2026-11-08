@@ -143,6 +143,552 @@ extern "C"
     alignas(16) uint64_t zpatch_mf_double_sign[2] = { 0x8000000000000000ull, 0x8000000000000000ull };
 }
 
+// Forward declarations for the transcribed bodies at the bottom of this
+// file: the readable code above installs them (and a body may branch to
+// another), so every one is named here. MSVC rejects `__declspec(naked)`
+// on a declaration (C2488), so these carry the signature only; each
+// definition in the tail is naked.
+static void CombinedRadioFreezeFixBody();
+static void BetterMPSyncBody();
+static void ValueResolverThunk();
+static void PedModelsInCutscenesCheckBody();
+static void AudioContextInitEntry();
+static void AudioInvokeEntry();
+static void AudioCleanupDwordEntry();
+static void AudioCleanupBoolEntry();
+static void AudioCallHashEntry();
+static unsigned int __fastcall AudioCallTwoBody(unsigned int, unsigned int);
+static unsigned int __fastcall AudioCallZeroBoolBody(unsigned int);
+static unsigned int __fastcall AudioCallByteBody(unsigned int, unsigned int);
+static bool DeathMusicGateBody();
+static void MfAxisFloatBody();
+static void MfAxisNegBody();
+static void MfAxisIntBody();
+static void MfAxisFlagBody();
+static void MfAngleStepBody();
+static void MfAngleBody();
+static void MfAdvanceWindowsBody();
+static void MfAdvanceBody();
+
+// The CRT `memset` the three wrappers open with. The original calls the CRT's own
+// thunk (0x10060D6E) with the same argument order; the inline assembler rejects a
+// direct call to the intrinsic's name (C2420), so the call names this cdecl
+// forwarder, which is still one `E8`. Same shape as native.ixx's NativeZeroBlock.
+static void __cdecl AudioZeroBlock(void* destination, int value, unsigned int count)
+{
+    std::memset(destination, value, count);
+}
+
+// sub_10050AD0, recovered VA 0x10050AD0 (75 instructions to its `ret`): the
+// death-music track install. Called through the game's track-select function
+// entry, it asks the gate body first, resolves the `6A 06 68 ? ? ? ? 8D 8C` site
+// once, and writes a random track number 1..5 into the push immediate at site+1.
+//
+// Rebuilt rather than transcribed, so it has no proof row: the original is
+// compiler output for a C function with an EH4 frame (prologue 0x10050AD3 ..
+// 0x10050AF4, handler 0x100619C1 with its scope table at 0x10154384, epilogue
+// 0x10050BAE .. 0x10050BC8), and its clock/seed block calls the static CRT's own
+// helpers (0x1005FFC3 and 0x1005FF77), which reach the CRT's per-thread state
+// through `fs:[2Ch]` and the TLS index dword_10159328 -- image-internal addresses
+// a rebuilt module cannot name (docs/parity.md). The state word it keeps is
+// published above, the gate call is the transcribed body, and the write it makes
+// is the original's: `rand() % 5 + 1` at site+1.
+static char DeathMusicInstallBody()
+{
+    if (!DeathMusicGateBody())
+        return 0;
+
+    if (zpatch_audio_death_music_site == 0)
+    {
+        auto pattern = find_pattern("6A 06 68 ? ? ? ? 8D 8C");
+        if (!pattern.empty())
+        {
+            zpatch_audio_death_music_site = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)));
+        }
+    }
+
+    if (zpatch_audio_death_music_site != 0)
+    {
+        // The site is `push 6`; the second byte is the immediate the track number
+        // replaces. The original writes it unguarded, and so does this.
+        auto* site = reinterpret_cast<std::byte*>(
+            static_cast<uintptr_t>(zpatch_audio_death_music_site) + 1);
+        injector::WriteMemory<std::byte>(site,
+            static_cast<std::byte>(std::rand() % 5 + 1), true);
+    }
+    return 1;
+}
+
+namespace
+{
+    // The address of a body another module transcribed, by its recovered VA. The
+    // native layer publishes only its C entries -- a module interface cannot
+    // export a naked function -- so the body registry is what makes its pieces
+    // reachable from here (the same helper stability.ixx uses).
+    uint32_t RegisteredBody(uint32_t reference)
+    {
+        for (const auto& entry : Bodies::All())
+        {
+            if (entry.reference == reference)
+                return static_cast<uint32_t>(entry.address);
+        }
+        return 0;
+    }
+
+    // The game waits ten ticks when the window is minimized; the original writes
+    // six, so the arm does too.
+    constexpr std::byte kMinimizePauseTick{ 0x06 };
+
+    // One site of the episode gate: the recovered signature, the offset from its
+    // anchor the NOP starts at, and how many bytes it covers. A row NOPs either
+    // the comparison itself or the branch after the six-byte `cmp [episode],2`.
+    struct EpisodeGateSite final
+    {
+        std::string_view signature;
+        ptrdiff_t offset;
+        size_t length;
+    };
+
+    // EpisodicWeaponSupport: the eight episode gates in front of the episodic
+    // weapons. The key's build mask is the original's ten-build set (options.inc),
+    // so the arm needs no gate of its own.
+    constexpr EpisodeGateSite kEpisodicWeaponSites[] = {
+        { "75 5B 83 3D ? ? ? ? 00 75", 0, 2 },
+        { "83 3D ? ? ? ? 02 0F 85 8C 01 00 00", 7, 6 },
+        { "83 3D ? ? ? ? 02 0F 8C D5 00", 0, 13 },
+        { "83 3D ? ? ? ? 02 75 20 8B CD E8", 7, 2 },
+        { "83 3D ? ? ? ? 02 75 50", 7, 2 },
+        { "83 3D ? ? ? ? 02 7C 21 8B 44 24 0C", 7, 2 },
+        { "83 3D ? ? ? ? 02 7C 32 8B 41", 7, 2 },
+        { "83 3D ? ? ? ? 02 7C 7D 8B 4C 24 0C", 7, 2 },
+    };
+
+    // The two movd replacements: `cvtsi2ss xmmN, eax` becomes `movd xmmN, eax`,
+    // which moves the stored int bit-for-bit. Four bytes each; the bytes around
+    // them are untouched.
+    constexpr std::array<uint8_t, 4> kMovdXmm0Eax{ 0x66, 0x0F, 0x6E, 0xC0 };
+    constexpr std::array<uint8_t, 4> kMovdXmm1Eax{ 0x66, 0x0F, 0x6E, 0xC8 };
+
+    // RestoreDeathMusic's option word. The original's loader preamble stores it
+    // from the INI before any body runs and the gate body tests it at run time;
+    // ours is set in the publish tier, once the key is known to be on.
+    void PublishRestoreDeathMusic()
+    {
+        if (!Loader::Enabled("RestoreDeathMusic"))
+            return;
+
+        zpatch_audio_death_music_flag = 1;
+    }
+
+    // MouseFix's published words, read before the sites are written: the two axis
+    // pointers, the invert byte, the game's frame clock and the two resumes. The
+    // first three are absolute operands of the sites the install tier overwrites,
+    // which is why the publish tier owns them. Each operand is a live VA (the
+    // loader has already applied the image's relocations; the offline dump
+    // relocates its copy), so the captured dword is the address and is stored as
+    // read.
+    void PublishMouseFix()
+    {
+        if (!Loader::Enabled("MouseFix"))
+            return;
+
+        auto pattern = find_pattern("51 8B 44 24 0C 85 C0 0F 57 D2 56 8B 35 ? ? ? ? 57 8B 3D ? ? ? ? F3 0F 11 54 24 08 75 0C");
+        if (!pattern.empty())
+        {
+            zpatch_mf_x = *pattern.get_first<uint32_t>(13);
+            zpatch_mf_y = *pattern.get_first<uint32_t>(20);
+        }
+
+        pattern = find_pattern("8B 44 24 08 8B 4C 24 04 50 51 E8 ? ? ? ? 83 C4 08 83 3D");
+        if (!pattern.empty())
+            zpatch_mf_flag = *pattern.get_first<uint32_t>(20);
+
+        pattern = find_pattern("83 EC 08 DB 05 ? ? ? ? 68");
+        if (!pattern.empty())
+        {
+            zpatch_mf_time =
+                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0));
+        }
+
+        pattern = find_pattern("53 56 8B F1 57 8B BE 40 01 00 00 85 FF F3 0F 11 46");
+        if (!pattern.empty())
+        {
+            const auto match = reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0));
+            zpatch_mf_resume_a = static_cast<uint32_t>(match);
+            zpatch_mf_resume_b = static_cast<uint32_t>(match + 1878);
+        }
+
+        // The game's VirtualProtect, which the advance helper calls through its
+        // IAT slot in the original (`FF 15`), so it stays an indirect call here.
+        zpatch_mf_virtual_protect = reinterpret_cast<uintptr_t>(&VirtualProtect);
+    }
+    // AllowHashesForIDE: the game's model-name hash function becomes the shared
+    // resolver (sub_10003E50), so an IDE entry may name a model by `hash:NNNN`.
+    // The game calls the hash function with two arguments; the resolver is
+    // __cdecl and reads only the first, so its plain `ret` leaves the second for
+    // the caller to pop, exactly as the original's body does.
+    void InstallAllowHashesForIDE()
+    {
+        if (!Loader::Enabled("AllowHashesForIDE"))
+            return;
+
+        auto pattern = find_pattern("8B 4C 24 08 56 8B 74 24 08 80 3E 22");
+        if (!pattern.empty())
+            injector::MakeJMP(pattern.get_first(0),
+                reinterpret_cast<void*>(Shared::ValueResolver()), true);
+    }
+
+    // CombinedRadioFreezeFix: the call at the anchor is the radio update; it
+    // becomes a call into the body, which returns the freeze value instead of
+    // running the update.
+    void InstallCombinedRadioFreezeFix()
+    {
+        if (!Loader::Enabled("CombinedRadioFreezeFix"))
+            return;
+
+        auto pattern = find_pattern("E8 ? ? ? ? 8B 35 ? ? ? ? 3B F0");
+        if (!pattern.empty())
+        {
+            Bodies::Register(reinterpret_cast<uintptr_t>(&CombinedRadioFreezeFixBody), 0x10005ED0u);
+            injector::MakeCALL(pattern.get_first(0),
+                reinterpret_cast<void*>(&CombinedRadioFreezeFixBody), true);
+        }
+    }
+
+    // BetterMPSync: the sync path's virtual call is the five bytes at the anchor's
+    // +6 (`push ebp; mov ecx,esi; call edx`); the call is replaced by a call into
+    // the body, which answers 0 and leaves the stack balanced (the argument push
+    // and the callee's own pop are both gone).
+    void InstallBetterMPSync()
+    {
+        if (!Loader::Enabled("BetterMPSync"))
+            return;
+
+        auto pattern = find_pattern("8B 90 E8 00 00 00 55 8B CE FF");
+        if (!pattern.empty())
+        {
+            Bodies::Register(reinterpret_cast<uintptr_t>(&BetterMPSyncBody), 0x100057F0u);
+            injector::MakeCALL(pattern.get_first(6),
+                reinterpret_cast<void*>(&BetterMPSyncBody), true);
+        }
+    }
+
+    // IncreasePtrNodes: the three atPool sizes the pointer-node lists allocate.
+    // Each site is `push <flags>; push <name>; push <count>`, so the arm rewrites
+    // the count at the anchor's +8: 80,000 -> 320,000 for the single-node pool and
+    // 16,000 -> 64,000 for the two double-node pools.
+    void InstallIncreasePtrNodes()
+    {
+        if (!Loader::Enabled("IncreasePtrNodes"))
+            return;
+
+        auto pattern = find_pattern("6A 08 ? ? ? ? ? 68 80 38 01 00");
+        if (!pattern.empty())
+            injector::WriteMemory<uint32_t>(pattern.get_first(8), 320'000u, true);
+
+        pattern = find_pattern("6A 10 ? ? ? ? ? 68 80 3E 00 00");
+        if (!pattern.empty())
+            injector::WriteMemory<uint32_t>(pattern.get_first(8), 64'000u, true);
+
+        pattern = find_pattern("6A 14 ? ? ? ? ? 68 80 3E 00 00");
+        if (!pattern.empty())
+            injector::WriteMemory<uint32_t>(pattern.get_first(8), 64'000u, true);
+    }
+
+    // NoPhysicsSleep: the physics sleep threshold is the float the anchor's -38
+    // operand names (0.005f at game 0x1090B18, RVA 0xC90B18), so the arm writes a
+    // zero there. The operand is a live VA -- the loader has already relocated the
+    // image, and the offline dump relocates its copy -- so it is used as it was
+    // captured; rebasing it through the preferred base would move the write by the
+    // run's whole relocation distance.
+    void InstallNoPhysicsSleep()
+    {
+        if (!Loader::Enabled("NoPhysicsSleep"))
+            return;
+
+        auto pattern = find_pattern("0F 00 00 00 C7 41 14 14 00 00 00 C7 41 1C 00 00");
+        if (pattern.empty())
+            return;
+
+        injector::WriteMemory<uint32_t>(*pattern.get_first<uint32_t>(-38), 0u, true);
+    }
+
+    // DoNotPauseOnMinimize: the wait's tick count drops to six, and the branch
+    // that pauses the game when the window loses focus is NOPed.
+    void InstallDoNotPauseOnMinimize()
+    {
+        if (!Loader::Enabled("DoNotPauseOnMinimize"))
+            return;
+
+        auto pattern = find_pattern("6A 0A 56 50 FF D2 A1");
+        if (!pattern.empty())
+            injector::WriteMemory<std::byte>(pattern.get_first(1), kMinimizePauseTick, true);
+
+        pattern = find_pattern("75 ? 8B 0D ? ? ? ? 51 FF 15 ? ? ? ? 85 C0 75 ? 8B 15");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(0), 2, true);
+    }
+
+    void InstallEpisodicWeaponSupport()
+    {
+        if (!Loader::Enabled("EpisodicWeaponSupport"))
+            return;
+
+        for (const auto& site : kEpisodicWeaponSites)
+        {
+            auto pattern = find_pattern(site.signature);
+            if (!pattern.empty())
+                injector::MakeNOP(pattern.get_first(site.offset), site.length, true);
+        }
+    }
+
+    // PoliceEpisodicWeaponSupport: the police-vehicle episode gate; the two-byte
+    // branch after the `cmp [episode],2` at the anchor is NOPed.
+    void InstallPoliceEpisodicWeaponSupport()
+    {
+        if (!Loader::Enabled("PoliceEpisodicWeaponSupport"))
+            return;
+
+        auto pattern = find_pattern("39 2D ? ? ? ? 75 3E");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(6), 2, true);
+    }
+
+    // TBoGTHeliHeightLimit: the helicopter ceiling's episode gate -- the branch
+    // after the `cmp [episode],2` at the anchor is NOPed, so the ceiling applies
+    // on every episode.
+    void InstallTBoGTHeliHeightLimit()
+    {
+        if (!Loader::Enabled("TBoGTHeliHeightLimit"))
+            return;
+
+        auto pattern = find_pattern("83 3D ? ? ? ? 02 7C 0A F3 0F");
+        if (!pattern.empty())
+            injector::MakeNOP(pattern.get_first(7), 2, true);
+    }
+
+    // PedModelsInCutscenesFix: the cutscene code's player-model check becomes the
+    // body, which re-derives the player model's index through the shared resolver
+    // and the game lookup and compares that with the object's model word.
+    void InstallPedModelsInCutscenesFix()
+    {
+        if (!Loader::Enabled("PedModelsInCutscenesFix"))
+            return;
+
+        auto pattern = find_pattern("56 8B F1 E8 ? ? ? ? 85 C0 74 0E 66 8B 40 2E");
+        if (!pattern.empty())
+        {
+            Bodies::Register(reinterpret_cast<uintptr_t>(&PedModelsInCutscenesCheckBody),
+                0x10050870u);
+            injector::MakeJMP(pattern.get_first(0),
+                reinterpret_cast<void*>(&PedModelsInCutscenesCheckBody), true);
+        }
+    }
+
+    // RestoreDeathMusic: the game's track-select function entry and its two
+    // callers become calls into the install body and the gate body. All three
+    // sites are already `E8` calls in the image, so only the displacement moves.
+    void InstallRestoreDeathMusic()
+    {
+        if (!Loader::Enabled("RestoreDeathMusic"))
+            return;
+
+        auto pattern = find_pattern("0F 57 C0 F3 0F 11 86 20 02 00 00");
+        if (!pattern.empty())
+        {
+            Bodies::Register(reinterpret_cast<uintptr_t>(&DeathMusicInstallBody), 0x10050AD0u);
+            injector::MakeCALL(pattern.get_first(-13),
+                reinterpret_cast<void*>(&DeathMusicInstallBody), true);
+        }
+
+        pattern = find_pattern("C7 86 04 02 00 00 04 00 00 00 E9");
+        if (!pattern.empty())
+        {
+            Bodies::Register(reinterpret_cast<uintptr_t>(&DeathMusicGateBody), 0x10050A50u);
+            injector::MakeCALL(pattern.get_first(-13),
+                reinterpret_cast<void*>(&DeathMusicGateBody), true);
+        }
+
+        pattern = find_pattern("E8 ? ? ? ? 84 C0 74 C6 8B BE");
+        if (!pattern.empty())
+        {
+            injector::MakeCALL(pattern.get_first(0),
+                reinterpret_cast<void*>(&DeathMusicGateBody), true);
+        }
+    }
+
+    // MouseFix: the pair of axis readers, the three `cvtsi2ss` sites and the two
+    // angle sites. Every write is the original handler's: an `E9` at the two axis
+    // readers and the flagged reader, the movd pair at +5/+33 with the two-byte
+    // nops at +3/+31, the movd single at +5 with its two-byte nop at +3, the two
+    // `E8`s at +51/+90 of the int-axis site, and the two `E9`s at the angle site's
+    // -15 and +1862.
+    void InstallMouseFix()
+    {
+        if (!Loader::Enabled("MouseFix"))
+            return;
+
+        auto pattern = find_pattern("51 8B 44 24 0C 85 C0 0F 57 D2 56 8B 35 ? ? ? ? 57 8B 3D ? ? ? ? F3 0F 11 54 24 08 75 0C");
+        if (!pattern.empty())
+        {
+            Bodies::Register(reinterpret_cast<uintptr_t>(&MfAxisFloatBody), 0x10024060u);
+            injector::MakeJMP(pattern.get_first(0),
+                reinterpret_cast<void*>(&MfAxisFloatBody), true);
+        }
+
+        // The negated-axis reader's anchor differs from the flagged one only in
+        // the instruction after the call, so it is its own signature.
+        pattern = find_pattern("8B 44 24 08 8B 4C 24 04 50 51 E8 ? ? ? ? D8");
+        if (!pattern.empty())
+        {
+            Bodies::Register(reinterpret_cast<uintptr_t>(&MfAxisNegBody), 0x100240C0u);
+            injector::MakeJMP(pattern.get_first(0),
+                reinterpret_cast<void*>(&MfAxisNegBody), true);
+        }
+
+        constexpr std::string_view kMovdSites[] = {
+            "83 C4 08 F7 D8 F3 0F 2A C0 6A 00 8B CE F3 0F 11 07",
+            "83 C4 08 F7 D8 F3 0F 2A C0 6A 01 8B CB F3 0F 11 07",
+        };
+        for (const auto site : kMovdSites)
+        {
+            pattern = find_pattern(site);
+            if (pattern.empty())
+                continue;
+
+            injector::WriteMemoryRaw(pattern.get_first(5),
+                const_cast<uint8_t*>(kMovdXmm0Eax.data()), kMovdXmm0Eax.size(), true);
+            injector::WriteMemoryRaw(pattern.get_first(33),
+                const_cast<uint8_t*>(kMovdXmm0Eax.data()), kMovdXmm0Eax.size(), true);
+            injector::MakeNOP(pattern.get_first(3), 2, true);
+            injector::MakeNOP(pattern.get_first(31), 2, true);
+        }
+
+        pattern = find_pattern("83 C4 08 F7 D8 F3 0F 2A C8 F3 0F 10 46");
+        if (!pattern.empty())
+        {
+            injector::WriteMemoryRaw(pattern.get_first(5),
+                const_cast<uint8_t*>(kMovdXmm1Eax.data()), kMovdXmm1Eax.size(), true);
+            injector::MakeNOP(pattern.get_first(3), 2, true);
+        }
+
+        pattern = find_pattern("8B 44 24 08 8B 4C 24 04 50 51 E8 ? ? ? ? 83 C4 08 83 3D");
+        if (!pattern.empty())
+        {
+            Bodies::Register(reinterpret_cast<uintptr_t>(&MfAxisFlagBody), 0x10024170u);
+            injector::MakeJMP(pattern.get_first(0),
+                reinterpret_cast<void*>(&MfAxisFlagBody), true);
+        }
+
+        // The int-axis helper is called from two places of one function (the
+        // anchor's +51 and +90), so both calls are retargeted from the one scan.
+        pattern = find_pattern("56 8B 74 24 08 57 8B 7C 24 10 C7 06 00 00 00 00");
+        if (!pattern.empty())
+        {
+            Bodies::Register(reinterpret_cast<uintptr_t>(&MfAxisIntBody), 0x10024120u);
+            injector::MakeCALL(pattern.get_first(51),
+                reinterpret_cast<void*>(&MfAxisIntBody), true);
+            injector::MakeCALL(pattern.get_first(90),
+                reinterpret_cast<void*>(&MfAxisIntBody), true);
+        }
+
+        // The two site bodies: the angle hook 15 bytes before the anchor and the
+        // advance hook 1862 bytes after it.
+        pattern = find_pattern("53 56 8B F1 57 8B BE 40 01 00 00 85 FF F3 0F 11 46");
+        if (!pattern.empty())
+        {
+            Bodies::Register(reinterpret_cast<uintptr_t>(&MfAngleBody), 0x10024560u);
+            Bodies::Register(reinterpret_cast<uintptr_t>(&MfAdvanceBody), 0x100243A0u);
+            Bodies::Register(reinterpret_cast<uintptr_t>(&MfAdvanceWindowsBody), 0x100241E0u);
+            injector::MakeJMP(pattern.get_first(-15),
+                reinterpret_cast<void*>(&MfAngleBody), true);
+            injector::MakeJMP(pattern.get_first(1862),
+                reinterpret_cast<void*>(&MfAdvanceBody), true);
+        }
+    }
+}
+
+// One of this module's keys is deliberately not installed:
+//
+//   * OutOfCommissionFix: the key's payload is the original's embedded, compressed
+//     finale2.sco (163,796 bytes at 0x100B6798 in .rdata), decoded into a
+//     179,536-byte table by sub_1004B570 and then registered and mounted by
+//     sub_1004B750 / sub_1004C3F0 (16,311 bytes of C++ with EH4 frames). Its
+//     7-instruction branch body and its 29-instruction wrapper are implementable,
+//     but the branch only accepts the archive magic the missing table produces, so
+//     installing it would widen a check nothing fills. docs/parity.md records what
+//     is missing.
+//
+// It stays open rather than being stubbed.
+
+// Registered like every other arm: the publish tier reads the sites the install
+// tier overwrites, and the install tier owns the gate and the writes.
+export void RegisterAudio()
+{
+    // The thunk's slot: published once, before any arm can install the body.
+    zpatch_audio_value_resolver = Shared::ValueResolver();
+
+    // The five preamble salts the death-music bodies read, taken from the layer's
+    // resolved words rather than written as literals: a hit build keeps the
+    // shipped values and 1.0.0.0/1.0.4.0 get the fallback set (source/native.ixx).
+    zpatch_audio_salt_10158054 = Native::Salt(0x10158054u);
+    zpatch_audio_salt_10158050 = Native::Salt(0x10158050u);
+    zpatch_audio_salt_101580A8 = Native::Salt(0x101580A8u);
+    zpatch_audio_salt_1015805C = Native::Salt(0x1015805Cu);
+    zpatch_audio_salt_10158028 = Native::Salt(0x10158028u);
+
+    // The native-layer pieces the wrappers call, by their recovered VAs. Only one
+    // body can carry a recovered VA, so these are the layer's transcriptions
+    // reached through audio's forwarders.
+    zpatch_audio_context_init = RegisteredBody(0x100038C0u);
+    zpatch_audio_invoke_entry = RegisteredBody(0x100038E0u);
+    zpatch_audio_cleanup_dword = RegisteredBody(0x1005DE40u);
+    zpatch_audio_cleanup_bool = RegisteredBody(0x1005DE80u);
+    zpatch_audio_call_hash = RegisteredBody(0x1005B150u);
+
+    Loader::PublishEvent() += []
+    {
+        PublishRestoreDeathMusic();
+        PublishMouseFix();
+    };
+
+    Loader::InstallEvent() += []
+    {
+        InstallAllowHashesForIDE();
+        InstallCombinedRadioFreezeFix();
+        InstallBetterMPSync();
+        InstallIncreasePtrNodes();
+        InstallNoPhysicsSleep();
+        InstallDoNotPauseOnMinimize();
+        InstallEpisodicWeaponSupport();
+        InstallPoliceEpisodicWeaponSupport();
+        InstallTBoGTHeliHeightLimit();
+        InstallPedModelsInCutscenesFix();
+        InstallRestoreDeathMusic();
+        InstallMouseFix();
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Transcribed bodies. Each is the original's instruction stream, kept as asm
+// because that is what it is; the code above is what installs it.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// RestoreDeathMusic
+//
+// The key has three sites: the game's death-music track select function entry and
+// its two callers. The entry becomes a call to the install body (sub_10050AD0),
+// which asks the gate body (sub_10050A50) whether death music should play and, if
+// so, writes a random track number into the game's own `push imm8`. The gate body
+// answers through three hash salts and four native-script calls, so the pieces it
+// needs from the native layer are transcribed here as well: the two-argument
+// wrapper (sub_1005B1E0, salt dword_10158054), the byte wrapper (sub_1005B490,
+// salt dword_10158028) and the zero-argument bool wrapper (sub_1005B360, hash in
+// ECX), plus the layer's own sub_1005B150/sub_100038C0/sub_100038E0/sub_1005DE40/
+// sub_1005DE80 reached through forwarders.
+// ---------------------------------------------------------------------------
 
 // sub_10005ED0, recovered VA 0x10005ED0 (6 bytes, 2 instructions): the radio
 // freeze value. The site is a call into the game's radio update; the body returns
@@ -221,30 +767,6 @@ static __declspec(naked) void PedModelsInCutscenesCheckBody()
         pop ebp
         ret
     }
-}
-
-// ---------------------------------------------------------------------------
-// RestoreDeathMusic
-//
-// The key has three sites: the game's death-music track select function entry and
-// its two callers. The entry becomes a call to the install body (sub_10050AD0),
-// which asks the gate body (sub_10050A50) whether death music should play and, if
-// so, writes a random track number into the game's own `push imm8`. The gate body
-// answers through three hash salts and four native-script calls, so the pieces it
-// needs from the native layer are transcribed here as well: the two-argument
-// wrapper (sub_1005B1E0, salt dword_10158054), the byte wrapper (sub_1005B490,
-// salt dword_10158028) and the zero-argument bool wrapper (sub_1005B360, hash in
-// ECX), plus the layer's own sub_1005B150/sub_100038C0/sub_100038E0/sub_1005DE40/
-// sub_1005DE80 reached through forwarders.
-// ---------------------------------------------------------------------------
-
-// The CRT `memset` the three wrappers open with. The original calls the CRT's own
-// thunk (0x10060D6E) with the same argument order; the inline assembler rejects a
-// direct call to the intrinsic's name (C2420), so the call names this cdecl
-// forwarder, which is still one `E8`. Same shape as native.ixx's NativeZeroBlock.
-static void __cdecl AudioZeroBlock(void* destination, int value, unsigned int count)
-{
-    std::memset(destination, value, count);
 }
 
 // The forwarders into the native layer's transcribed pieces. Each is one `jmp`
@@ -514,47 +1036,6 @@ static __declspec(naked) bool DeathMusicGateBody()
         pop ebp
         ret
     }
-}
-
-// sub_10050AD0, recovered VA 0x10050AD0 (75 instructions to its `ret`): the
-// death-music track install. Called through the game's track-select function
-// entry, it asks the gate body first, resolves the `6A 06 68 ? ? ? ? 8D 8C` site
-// once, and writes a random track number 1..5 into the push immediate at site+1.
-//
-// Rebuilt rather than transcribed, so it has no proof row: the original is
-// compiler output for a C function with an EH4 frame (prologue 0x10050AD3 ..
-// 0x10050AF4, handler 0x100619C1 with its scope table at 0x10154384, epilogue
-// 0x10050BAE .. 0x10050BC8), and its clock/seed block calls the static CRT's own
-// helpers (0x1005FFC3 and 0x1005FF77), which reach the CRT's per-thread state
-// through `fs:[2Ch]` and the TLS index dword_10159328 -- image-internal addresses
-// a rebuilt module cannot name (docs/parity.md). The state word it keeps is
-// published above, the gate call is the transcribed body, and the write it makes
-// is the original's: `rand() % 5 + 1` at site+1.
-static char DeathMusicInstallBody()
-{
-    if (!DeathMusicGateBody())
-        return 0;
-
-    if (zpatch_audio_death_music_site == 0)
-    {
-        auto pattern = find_pattern("6A 06 68 ? ? ? ? 8D 8C");
-        if (!pattern.empty())
-        {
-            zpatch_audio_death_music_site = static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)));
-        }
-    }
-
-    if (zpatch_audio_death_music_site != 0)
-    {
-        // The site is `push 6`; the second byte is the immediate the track number
-        // replaces. The original writes it unguarded, and so does this.
-        auto* site = reinterpret_cast<std::byte*>(
-            static_cast<uintptr_t>(zpatch_audio_death_music_site) + 1);
-        injector::WriteMemory<std::byte>(site,
-            static_cast<std::byte>(std::rand() % 5 + 1), true);
-    }
-    return 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -1029,455 +1510,4 @@ static __declspec(naked) void MfAdvanceBody()
         movss xmm3, DWORD PTR [esi + 150h]
         jmp DWORD PTR [zpatch_mf_resume_b]
     }
-}
-
-namespace
-{
-    // AllowHashesForIDE: the game's model-name hash function becomes the shared
-    // resolver (sub_10003E50), so an IDE entry may name a model by `hash:NNNN`.
-    // The game calls the hash function with two arguments; the resolver is
-    // __cdecl and reads only the first, so its plain `ret` leaves the second for
-    // the caller to pop, exactly as the original's body does.
-    void InstallAllowHashesForIDE()
-    {
-        if (!Loader::Enabled("AllowHashesForIDE"))
-            return;
-
-        auto pattern = find_pattern("8B 4C 24 08 56 8B 74 24 08 80 3E 22");
-        if (!pattern.empty())
-            injector::MakeJMP(pattern.get_first(0),
-                reinterpret_cast<void*>(Shared::ValueResolver()), true);
-    }
-
-    // CombinedRadioFreezeFix: the call at the anchor is the radio update; it
-    // becomes a call into the body, which returns the freeze value instead of
-    // running the update.
-    void InstallCombinedRadioFreezeFix()
-    {
-        if (!Loader::Enabled("CombinedRadioFreezeFix"))
-            return;
-
-        auto pattern = find_pattern("E8 ? ? ? ? 8B 35 ? ? ? ? 3B F0");
-        if (!pattern.empty())
-        {
-            Bodies::Register(reinterpret_cast<uintptr_t>(&CombinedRadioFreezeFixBody), 0x10005ED0u);
-            injector::MakeCALL(pattern.get_first(0),
-                reinterpret_cast<void*>(&CombinedRadioFreezeFixBody), true);
-        }
-    }
-
-    // BetterMPSync: the sync path's virtual call is the five bytes at the anchor's
-    // +6 (`push ebp; mov ecx,esi; call edx`); the call is replaced by a call into
-    // the body, which answers 0 and leaves the stack balanced (the argument push
-    // and the callee's own pop are both gone).
-    void InstallBetterMPSync()
-    {
-        if (!Loader::Enabled("BetterMPSync"))
-            return;
-
-        auto pattern = find_pattern("8B 90 E8 00 00 00 55 8B CE FF");
-        if (!pattern.empty())
-        {
-            Bodies::Register(reinterpret_cast<uintptr_t>(&BetterMPSyncBody), 0x100057F0u);
-            injector::MakeCALL(pattern.get_first(6),
-                reinterpret_cast<void*>(&BetterMPSyncBody), true);
-        }
-    }
-
-    // IncreasePtrNodes: the three atPool sizes the pointer-node lists allocate.
-    // Each site is `push <flags>; push <name>; push <count>`, so the arm rewrites
-    // the count at the anchor's +8: 80,000 -> 320,000 for the single-node pool and
-    // 16,000 -> 64,000 for the two double-node pools.
-    void InstallIncreasePtrNodes()
-    {
-        if (!Loader::Enabled("IncreasePtrNodes"))
-            return;
-
-        auto pattern = find_pattern("6A 08 ? ? ? ? ? 68 80 38 01 00");
-        if (!pattern.empty())
-            injector::WriteMemory<uint32_t>(pattern.get_first(8), 320'000u, true);
-
-        pattern = find_pattern("6A 10 ? ? ? ? ? 68 80 3E 00 00");
-        if (!pattern.empty())
-            injector::WriteMemory<uint32_t>(pattern.get_first(8), 64'000u, true);
-
-        pattern = find_pattern("6A 14 ? ? ? ? ? 68 80 3E 00 00");
-        if (!pattern.empty())
-            injector::WriteMemory<uint32_t>(pattern.get_first(8), 64'000u, true);
-    }
-
-    // NoPhysicsSleep: the physics sleep threshold is the float the anchor's -38
-    // operand names (0.005f at game 0x1090B18, RVA 0xC90B18), so the arm writes a
-    // zero there. The operand is a live VA -- the loader has already relocated the
-    // image, and the offline dump relocates its copy -- so it is used as it was
-    // captured; rebasing it through the preferred base would move the write by the
-    // run's whole relocation distance.
-    void InstallNoPhysicsSleep()
-    {
-        if (!Loader::Enabled("NoPhysicsSleep"))
-            return;
-
-        auto pattern = find_pattern("0F 00 00 00 C7 41 14 14 00 00 00 C7 41 1C 00 00");
-        if (pattern.empty())
-            return;
-
-        injector::WriteMemory<uint32_t>(*pattern.get_first<uint32_t>(-38), 0u, true);
-    }
-
-    // The game waits ten ticks when the window is minimized; the original writes
-    // six, so the arm does too.
-    constexpr std::byte kMinimizePauseTick{ 0x06 };
-
-    // DoNotPauseOnMinimize: the wait's tick count drops to six, and the branch
-    // that pauses the game when the window loses focus is NOPed.
-    void InstallDoNotPauseOnMinimize()
-    {
-        if (!Loader::Enabled("DoNotPauseOnMinimize"))
-            return;
-
-        auto pattern = find_pattern("6A 0A 56 50 FF D2 A1");
-        if (!pattern.empty())
-            injector::WriteMemory<std::byte>(pattern.get_first(1), kMinimizePauseTick, true);
-
-        pattern = find_pattern("75 ? 8B 0D ? ? ? ? 51 FF 15 ? ? ? ? 85 C0 75 ? 8B 15");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(0), 2, true);
-    }
-
-    // One site of the episode gate: the recovered signature, the offset from its
-    // anchor the NOP starts at, and how many bytes it covers. A row NOPs either
-    // the comparison itself or the branch after the six-byte `cmp [episode],2`.
-    struct EpisodeGateSite final
-    {
-        std::string_view signature;
-        ptrdiff_t offset;
-        size_t length;
-    };
-
-    // EpisodicWeaponSupport: the eight episode gates in front of the episodic
-    // weapons. The key's build mask is the original's ten-build set (options.inc),
-    // so the arm needs no gate of its own.
-    constexpr EpisodeGateSite kEpisodicWeaponSites[] = {
-        { "75 5B 83 3D ? ? ? ? 00 75", 0, 2 },
-        { "83 3D ? ? ? ? 02 0F 85 8C 01 00 00", 7, 6 },
-        { "83 3D ? ? ? ? 02 0F 8C D5 00", 0, 13 },
-        { "83 3D ? ? ? ? 02 75 20 8B CD E8", 7, 2 },
-        { "83 3D ? ? ? ? 02 75 50", 7, 2 },
-        { "83 3D ? ? ? ? 02 7C 21 8B 44 24 0C", 7, 2 },
-        { "83 3D ? ? ? ? 02 7C 32 8B 41", 7, 2 },
-        { "83 3D ? ? ? ? 02 7C 7D 8B 4C 24 0C", 7, 2 },
-    };
-
-    void InstallEpisodicWeaponSupport()
-    {
-        if (!Loader::Enabled("EpisodicWeaponSupport"))
-            return;
-
-        for (const auto& site : kEpisodicWeaponSites)
-        {
-            auto pattern = find_pattern(site.signature);
-            if (!pattern.empty())
-                injector::MakeNOP(pattern.get_first(site.offset), site.length, true);
-        }
-    }
-
-    // PoliceEpisodicWeaponSupport: the police-vehicle episode gate; the two-byte
-    // branch after the `cmp [episode],2` at the anchor is NOPed.
-    void InstallPoliceEpisodicWeaponSupport()
-    {
-        if (!Loader::Enabled("PoliceEpisodicWeaponSupport"))
-            return;
-
-        auto pattern = find_pattern("39 2D ? ? ? ? 75 3E");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(6), 2, true);
-    }
-
-    // TBoGTHeliHeightLimit: the helicopter ceiling's episode gate -- the branch
-    // after the `cmp [episode],2` at the anchor is NOPed, so the ceiling applies
-    // on every episode.
-    void InstallTBoGTHeliHeightLimit()
-    {
-        if (!Loader::Enabled("TBoGTHeliHeightLimit"))
-            return;
-
-        auto pattern = find_pattern("83 3D ? ? ? ? 02 7C 0A F3 0F");
-        if (!pattern.empty())
-            injector::MakeNOP(pattern.get_first(7), 2, true);
-    }
-
-    // PedModelsInCutscenesFix: the cutscene code's player-model check becomes the
-    // body, which re-derives the player model's index through the shared resolver
-    // and the game lookup and compares that with the object's model word.
-    void InstallPedModelsInCutscenesFix()
-    {
-        if (!Loader::Enabled("PedModelsInCutscenesFix"))
-            return;
-
-        auto pattern = find_pattern("56 8B F1 E8 ? ? ? ? 85 C0 74 0E 66 8B 40 2E");
-        if (!pattern.empty())
-        {
-            Bodies::Register(reinterpret_cast<uintptr_t>(&PedModelsInCutscenesCheckBody),
-                0x10050870u);
-            injector::MakeJMP(pattern.get_first(0),
-                reinterpret_cast<void*>(&PedModelsInCutscenesCheckBody), true);
-        }
-    }
-
-    // The address of a body another module transcribed, by its recovered VA. The
-    // native layer publishes only its C entries -- a module interface cannot
-    // export a naked function -- so the body registry is what makes its pieces
-    // reachable from here (the same helper stability.ixx uses).
-    uint32_t RegisteredBody(uint32_t reference)
-    {
-        for (const auto& entry : Bodies::All())
-        {
-            if (entry.reference == reference)
-                return static_cast<uint32_t>(entry.address);
-        }
-        return 0;
-    }
-
-    // RestoreDeathMusic's option word. The original's loader preamble stores it
-    // from the INI before any body runs and the gate body tests it at run time;
-    // ours is set in the publish tier, once the key is known to be on.
-    void PublishRestoreDeathMusic()
-    {
-        if (!Loader::Enabled("RestoreDeathMusic"))
-            return;
-
-        zpatch_audio_death_music_flag = 1;
-    }
-
-    // RestoreDeathMusic: the game's track-select function entry and its two
-    // callers become calls into the install body and the gate body. All three
-    // sites are already `E8` calls in the image, so only the displacement moves.
-    void InstallRestoreDeathMusic()
-    {
-        if (!Loader::Enabled("RestoreDeathMusic"))
-            return;
-
-        auto pattern = find_pattern("0F 57 C0 F3 0F 11 86 20 02 00 00");
-        if (!pattern.empty())
-        {
-            Bodies::Register(reinterpret_cast<uintptr_t>(&DeathMusicInstallBody), 0x10050AD0u);
-            injector::MakeCALL(pattern.get_first(-13),
-                reinterpret_cast<void*>(&DeathMusicInstallBody), true);
-        }
-
-        pattern = find_pattern("C7 86 04 02 00 00 04 00 00 00 E9");
-        if (!pattern.empty())
-        {
-            Bodies::Register(reinterpret_cast<uintptr_t>(&DeathMusicGateBody), 0x10050A50u);
-            injector::MakeCALL(pattern.get_first(-13),
-                reinterpret_cast<void*>(&DeathMusicGateBody), true);
-        }
-
-        pattern = find_pattern("E8 ? ? ? ? 84 C0 74 C6 8B BE");
-        if (!pattern.empty())
-        {
-            injector::MakeCALL(pattern.get_first(0),
-                reinterpret_cast<void*>(&DeathMusicGateBody), true);
-        }
-    }
-
-    // MouseFix's published words, read before the sites are written: the two axis
-    // pointers, the invert byte, the game's frame clock and the two resumes. The
-    // first three are absolute operands of the sites the install tier overwrites,
-    // which is why the publish tier owns them. Each operand is a live VA (the
-    // loader has already applied the image's relocations; the offline dump
-    // relocates its copy), so the captured dword is the address and is stored as
-    // read.
-    void PublishMouseFix()
-    {
-        if (!Loader::Enabled("MouseFix"))
-            return;
-
-        auto pattern = find_pattern("51 8B 44 24 0C 85 C0 0F 57 D2 56 8B 35 ? ? ? ? 57 8B 3D ? ? ? ? F3 0F 11 54 24 08 75 0C");
-        if (!pattern.empty())
-        {
-            zpatch_mf_x = *pattern.get_first<uint32_t>(13);
-            zpatch_mf_y = *pattern.get_first<uint32_t>(20);
-        }
-
-        pattern = find_pattern("8B 44 24 08 8B 4C 24 04 50 51 E8 ? ? ? ? 83 C4 08 83 3D");
-        if (!pattern.empty())
-            zpatch_mf_flag = *pattern.get_first<uint32_t>(20);
-
-        pattern = find_pattern("83 EC 08 DB 05 ? ? ? ? 68");
-        if (!pattern.empty())
-        {
-            zpatch_mf_time =
-                reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0));
-        }
-
-        pattern = find_pattern("53 56 8B F1 57 8B BE 40 01 00 00 85 FF F3 0F 11 46");
-        if (!pattern.empty())
-        {
-            const auto match = reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0));
-            zpatch_mf_resume_a = static_cast<uint32_t>(match);
-            zpatch_mf_resume_b = static_cast<uint32_t>(match + 1878);
-        }
-
-        // The game's VirtualProtect, which the advance helper calls through its
-        // IAT slot in the original (`FF 15`), so it stays an indirect call here.
-        zpatch_mf_virtual_protect = reinterpret_cast<uintptr_t>(&VirtualProtect);
-    }
-
-    // The two movd replacements: `cvtsi2ss xmmN, eax` becomes `movd xmmN, eax`,
-    // which moves the stored int bit-for-bit. Four bytes each; the bytes around
-    // them are untouched.
-    constexpr std::array<uint8_t, 4> kMovdXmm0Eax{ 0x66, 0x0F, 0x6E, 0xC0 };
-    constexpr std::array<uint8_t, 4> kMovdXmm1Eax{ 0x66, 0x0F, 0x6E, 0xC8 };
-
-    // MouseFix: the pair of axis readers, the three `cvtsi2ss` sites and the two
-    // angle sites. Every write is the original handler's: an `E9` at the two axis
-    // readers and the flagged reader, the movd pair at +5/+33 with the two-byte
-    // nops at +3/+31, the movd single at +5 with its two-byte nop at +3, the two
-    // `E8`s at +51/+90 of the int-axis site, and the two `E9`s at the angle site's
-    // -15 and +1862.
-    void InstallMouseFix()
-    {
-        if (!Loader::Enabled("MouseFix"))
-            return;
-
-        auto pattern = find_pattern("51 8B 44 24 0C 85 C0 0F 57 D2 56 8B 35 ? ? ? ? 57 8B 3D ? ? ? ? F3 0F 11 54 24 08 75 0C");
-        if (!pattern.empty())
-        {
-            Bodies::Register(reinterpret_cast<uintptr_t>(&MfAxisFloatBody), 0x10024060u);
-            injector::MakeJMP(pattern.get_first(0),
-                reinterpret_cast<void*>(&MfAxisFloatBody), true);
-        }
-
-        // The negated-axis reader's anchor differs from the flagged one only in
-        // the instruction after the call, so it is its own signature.
-        pattern = find_pattern("8B 44 24 08 8B 4C 24 04 50 51 E8 ? ? ? ? D8");
-        if (!pattern.empty())
-        {
-            Bodies::Register(reinterpret_cast<uintptr_t>(&MfAxisNegBody), 0x100240C0u);
-            injector::MakeJMP(pattern.get_first(0),
-                reinterpret_cast<void*>(&MfAxisNegBody), true);
-        }
-
-        constexpr std::string_view kMovdSites[] = {
-            "83 C4 08 F7 D8 F3 0F 2A C0 6A 00 8B CE F3 0F 11 07",
-            "83 C4 08 F7 D8 F3 0F 2A C0 6A 01 8B CB F3 0F 11 07",
-        };
-        for (const auto site : kMovdSites)
-        {
-            pattern = find_pattern(site);
-            if (pattern.empty())
-                continue;
-
-            injector::WriteMemoryRaw(pattern.get_first(5),
-                const_cast<uint8_t*>(kMovdXmm0Eax.data()), kMovdXmm0Eax.size(), true);
-            injector::WriteMemoryRaw(pattern.get_first(33),
-                const_cast<uint8_t*>(kMovdXmm0Eax.data()), kMovdXmm0Eax.size(), true);
-            injector::MakeNOP(pattern.get_first(3), 2, true);
-            injector::MakeNOP(pattern.get_first(31), 2, true);
-        }
-
-        pattern = find_pattern("83 C4 08 F7 D8 F3 0F 2A C8 F3 0F 10 46");
-        if (!pattern.empty())
-        {
-            injector::WriteMemoryRaw(pattern.get_first(5),
-                const_cast<uint8_t*>(kMovdXmm1Eax.data()), kMovdXmm1Eax.size(), true);
-            injector::MakeNOP(pattern.get_first(3), 2, true);
-        }
-
-        pattern = find_pattern("8B 44 24 08 8B 4C 24 04 50 51 E8 ? ? ? ? 83 C4 08 83 3D");
-        if (!pattern.empty())
-        {
-            Bodies::Register(reinterpret_cast<uintptr_t>(&MfAxisFlagBody), 0x10024170u);
-            injector::MakeJMP(pattern.get_first(0),
-                reinterpret_cast<void*>(&MfAxisFlagBody), true);
-        }
-
-        // The int-axis helper is called from two places of one function (the
-        // anchor's +51 and +90), so both calls are retargeted from the one scan.
-        pattern = find_pattern("56 8B 74 24 08 57 8B 7C 24 10 C7 06 00 00 00 00");
-        if (!pattern.empty())
-        {
-            Bodies::Register(reinterpret_cast<uintptr_t>(&MfAxisIntBody), 0x10024120u);
-            injector::MakeCALL(pattern.get_first(51),
-                reinterpret_cast<void*>(&MfAxisIntBody), true);
-            injector::MakeCALL(pattern.get_first(90),
-                reinterpret_cast<void*>(&MfAxisIntBody), true);
-        }
-
-        // The two site bodies: the angle hook 15 bytes before the anchor and the
-        // advance hook 1862 bytes after it.
-        pattern = find_pattern("53 56 8B F1 57 8B BE 40 01 00 00 85 FF F3 0F 11 46");
-        if (!pattern.empty())
-        {
-            Bodies::Register(reinterpret_cast<uintptr_t>(&MfAngleBody), 0x10024560u);
-            Bodies::Register(reinterpret_cast<uintptr_t>(&MfAdvanceBody), 0x100243A0u);
-            Bodies::Register(reinterpret_cast<uintptr_t>(&MfAdvanceWindowsBody), 0x100241E0u);
-            injector::MakeJMP(pattern.get_first(-15),
-                reinterpret_cast<void*>(&MfAngleBody), true);
-            injector::MakeJMP(pattern.get_first(1862),
-                reinterpret_cast<void*>(&MfAdvanceBody), true);
-        }
-    }
-}
-
-// One of this module's keys is deliberately not installed:
-//
-//   * OutOfCommissionFix: the key's payload is the original's embedded, compressed
-//     finale2.sco (163,796 bytes at 0x100B6798 in .rdata), decoded into a
-//     179,536-byte table by sub_1004B570 and then registered and mounted by
-//     sub_1004B750 / sub_1004C3F0 (16,311 bytes of C++ with EH4 frames). Its
-//     7-instruction branch body and its 29-instruction wrapper are implementable,
-//     but the branch only accepts the archive magic the missing table produces, so
-//     installing it would widen a check nothing fills. docs/parity.md records what
-//     is missing.
-//
-// It stays open rather than being stubbed.
-
-// Registered like every other arm: the publish tier reads the sites the install
-// tier overwrites, and the install tier owns the gate and the writes.
-export void RegisterAudio()
-{
-    // The thunk's slot: published once, before any arm can install the body.
-    zpatch_audio_value_resolver = Shared::ValueResolver();
-
-    // The five preamble salts the death-music bodies read, taken from the layer's
-    // resolved words rather than written as literals: a hit build keeps the
-    // shipped values and 1.0.0.0/1.0.4.0 get the fallback set (source/native.ixx).
-    zpatch_audio_salt_10158054 = Native::Salt(0x10158054u);
-    zpatch_audio_salt_10158050 = Native::Salt(0x10158050u);
-    zpatch_audio_salt_101580A8 = Native::Salt(0x101580A8u);
-    zpatch_audio_salt_1015805C = Native::Salt(0x1015805Cu);
-    zpatch_audio_salt_10158028 = Native::Salt(0x10158028u);
-
-    // The native-layer pieces the wrappers call, by their recovered VAs. Only one
-    // body can carry a recovered VA, so these are the layer's transcriptions
-    // reached through audio's forwarders.
-    zpatch_audio_context_init = RegisteredBody(0x100038C0u);
-    zpatch_audio_invoke_entry = RegisteredBody(0x100038E0u);
-    zpatch_audio_cleanup_dword = RegisteredBody(0x1005DE40u);
-    zpatch_audio_cleanup_bool = RegisteredBody(0x1005DE80u);
-    zpatch_audio_call_hash = RegisteredBody(0x1005B150u);
-
-    Loader::PublishEvent() += []
-    {
-        PublishRestoreDeathMusic();
-        PublishMouseFix();
-    };
-
-    Loader::InstallEvent() += []
-    {
-        InstallAllowHashesForIDE();
-        InstallCombinedRadioFreezeFix();
-        InstallBetterMPSync();
-        InstallIncreasePtrNodes();
-        InstallNoPhysicsSleep();
-        InstallDoNotPauseOnMinimize();
-        InstallEpisodicWeaponSupport();
-        InstallPoliceEpisodicWeaponSupport();
-        InstallTBoGTHeliHeightLimit();
-        InstallPedModelsInCutscenesFix();
-        InstallRestoreDeathMusic();
-        InstallMouseFix();
-    };
 }

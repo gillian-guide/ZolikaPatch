@@ -13,47 +13,33 @@ import game;
 import loader;
 import patch;
 
-// LaunchWithPlayGTAIV: the two launch slots carry `LaunchGTAIV.exe\0`; the mod
-// rewrites both to `PlayGTAIV.exe\0e\0` so the game relaunches through the DRM
-// bypass. The scan is wildcard-free and hits exactly the two slots on the five
-// builds the original gated, and unrelated slots on the builds it excluded - so
-// the gate is load-bearing, not decoration.
-namespace
+// The four transcribed file-API forwarders' operands. Each `call ds:[…]` in the
+// original is the kernel32 import through its own IAT; the module has no IAT (static
+// CRT), so the slot holds the same function. The create-file body also reads the
+// address the DFA capture recorded (the original's dword_10159D30), which the
+// capture writes before the install tier runs. All four are filled by
+// PublishDfaForwarders() from RegisterLauncher(), before any tier.
+extern "C"
 {
-    inline constexpr std::array<std::byte, 16> kLauncherName = {
-        std::byte{ 'P' }, std::byte{ 'l' }, std::byte{ 'a' }, std::byte{ 'y' },
-        std::byte{ 'G' }, std::byte{ 'T' }, std::byte{ 'A' }, std::byte{ 'I' },
-        std::byte{ 'V' }, std::byte{ '.' }, std::byte{ 'e' }, std::byte{ 'x' },
-        std::byte{ 'e' }, Bytes::Zero, std::byte{ 'e' }, Bytes::Zero,
-    };
-
-    // "LaunchGTAIV.exe\0", the text both slots currently hold.
-    inline constexpr std::string_view kLauncherSlot = "4C 61 75 6E 63 68 47 54 41 49 56 2E 65 78 65 00";
-
-    void InstallLaunchWithPlayGTAIV()
-    {
-        if (!Loader::Enabled("LaunchWithPlayGTAIV"))
-            return;
-
-        // The launch slots exist in the game process, which is where this arm
-        // belongs: the offline dump has no module context, and the original only
-        // rewrites the slots when PlayGTAIV.exe is the launcher.
-        if (Game::Get().Module() == nullptr)
-            return;
-
-        if (!BuildIs(Loader::Current(),
-                { Build::v1000, Build::v1040, Build::v1060, Build::v1070, Build::v1080 }))
-            return;
-
-        auto pattern = find_pattern(kLauncherSlot);
-        for (size_t index = 0; index < pattern.size(); ++index)
-        {
-            auto* slot = pattern.get(index).get<std::byte>();
-            injector::WriteMemoryRaw(reinterpret_cast<uintptr_t>(slot),
-                const_cast<std::byte*>(kLauncherName.data()), kLauncherName.size(), true);
-        }
-    }
+    uint32_t zpatch_dfa_create_file = 0;          // the original's IAT slot 0x10063048
+    uint32_t zpatch_dfa_create_file_slot = 0;     // dword_10159D30, the captured slot
+    uint32_t zpatch_dfa_set_file_pointer = 0;     // the original's IAT slot 0x10063030
+    uint32_t zpatch_dfa_get_file_size_ex = 0;     // 0x10063008
+    uint32_t zpatch_dfa_read_file = 0;            // 0x10063000
 }
+
+// Forward declarations for the transcribed bodies at the bottom of this
+// file: the readable code above installs them (and a body may branch to
+// another), so every one is named here. MSVC rejects `__declspec(naked)`
+// on a declaration (C2488), so these carry the signature only; each
+// definition in the tail is naked.
+static void DfaInitBody();
+static void DfaCreateFileBody();
+static void RomResetBody();
+static void DfaSetFilePointerBody();
+static void DfaGetFileSizeExBody();
+static void DfaReadFileBody();
+static void RomSetBody();
 
 // ---------------------------------------------------------------------------
 // SkipLauncher
@@ -480,23 +466,353 @@ namespace
             return TRUE;
         }
     }
-
 }
 
-// The four transcribed file-API forwarders' operands. Each `call ds:[…]` in the
-// original is the kernel32 import through its own IAT; the module has no IAT (static
-// CRT), so the slot holds the same function. The create-file body also reads the
-// address the DFA capture recorded (the original's dword_10159D30), which the
-// capture writes before the install tier runs. All four are filled by
-// PublishDfaForwarders() from RegisterLauncher(), before any tier.
-extern "C"
+// LaunchWithPlayGTAIV: the two launch slots carry `LaunchGTAIV.exe\0`; the mod
+// rewrites both to `PlayGTAIV.exe\0e\0` so the game relaunches through the DRM
+// bypass. The scan is wildcard-free and hits exactly the two slots on the five
+// builds the original gated, and unrelated slots on the builds it excluded - so
+// the gate is load-bearing, not decoration.
+namespace
 {
-    uint32_t zpatch_dfa_create_file = 0;          // the original's IAT slot 0x10063048
-    uint32_t zpatch_dfa_create_file_slot = 0;     // dword_10159D30, the captured slot
-    uint32_t zpatch_dfa_set_file_pointer = 0;     // the original's IAT slot 0x10063030
-    uint32_t zpatch_dfa_get_file_size_ex = 0;     // 0x10063008
-    uint32_t zpatch_dfa_read_file = 0;            // 0x10063000
+    inline constexpr std::array<std::byte, 16> kLauncherName = {
+        std::byte{ 'P' }, std::byte{ 'l' }, std::byte{ 'a' }, std::byte{ 'y' },
+        std::byte{ 'G' }, std::byte{ 'T' }, std::byte{ 'A' }, std::byte{ 'I' },
+        std::byte{ 'V' }, std::byte{ '.' }, std::byte{ 'e' }, std::byte{ 'x' },
+        std::byte{ 'e' }, Bytes::Zero, std::byte{ 'e' }, Bytes::Zero,
+    };
+
+    // "LaunchGTAIV.exe\0", the text both slots currently hold.
+    inline constexpr std::string_view kLauncherSlot = "4C 61 75 6E 63 68 47 54 41 49 56 2E 65 78 65 00";
+
+    void InstallLaunchWithPlayGTAIV()
+    {
+        if (!Loader::Enabled("LaunchWithPlayGTAIV"))
+            return;
+
+        // The launch slots exist in the game process, which is where this arm
+        // belongs: the offline dump has no module context, and the original only
+        // rewrites the slots when PlayGTAIV.exe is the launcher.
+        if (Game::Get().Module() == nullptr)
+            return;
+
+        if (!BuildIs(Loader::Current(),
+                { Build::v1000, Build::v1040, Build::v1060, Build::v1070, Build::v1080 }))
+            return;
+
+        auto pattern = find_pattern(kLauncherSlot);
+        for (size_t index = 0; index < pattern.size(); ++index)
+        {
+            auto* slot = pattern.get(index).get<std::byte>();
+            injector::WriteMemoryRaw(reinterpret_cast<uintptr_t>(slot),
+                const_cast<std::byte*>(kLauncherName.data()), kLauncherName.size(), true);
+        }
+    }
 }
+
+namespace
+{
+    uintptr_t BodyAddress(SkipHook hook)
+    {
+        switch (hook)
+        {
+        case SkipHook::dfa_init: return reinterpret_cast<uintptr_t>(&DfaInitBody);
+        case SkipHook::create_file: return reinterpret_cast<uintptr_t>(&DfaCreateFileBody);
+        case SkipHook::close_handle: return reinterpret_cast<uintptr_t>(&CloseHandleBody);
+        case SkipHook::set_file_pointer: return reinterpret_cast<uintptr_t>(&DfaSetFilePointerBody);
+        case SkipHook::get_file_size_ex: return reinterpret_cast<uintptr_t>(&DfaGetFileSizeExBody);
+        case SkipHook::read_file: return reinterpret_cast<uintptr_t>(&DfaReadFileBody);
+        case SkipHook::rom_reset: return reinterpret_cast<uintptr_t>(&RomResetBody);
+        case SkipHook::rom_set: return reinterpret_cast<uintptr_t>(&RomSetBody);
+        }
+        return 0;
+    }
+
+    // The DFA installer's guards (0x1000487B..0x100048D5): the XLivelessAddon
+    // companion suppresses the stage, a loaded GTAC.dll suppresses it, and the four
+    // EFLC builds are excluded. The caller adds the installer's own one-shot.
+    bool DfaSelected()
+    {
+        if (GetModuleHandleA("XLivelessAddon.asi") != nullptr)
+            return false;
+        if (GetModuleHandleA("GTAC.dll") != nullptr)
+            return false;
+        return !BuildIs(Loader::Current(),
+            { Build::v1100, Build::v1110, Build::v1120, Build::v1130 });
+    }
+
+    // One E8/E9 per install row; a missing signature is the original's clean skip.
+    void InstallBranches(std::span<const LauncherInstall> installs)
+    {
+        for (const auto& install : installs)
+        {
+            auto pattern = find_pattern(install.signature);
+            if (pattern.empty())
+                continue;
+
+            auto* site = pattern.get_first<std::byte>(install.offset);
+            injector::WriteMemory<std::byte>(site, install.opcode, true);
+            const auto displacement = static_cast<int32_t>(
+                BodyAddress(install.body) - (reinterpret_cast<uintptr_t>(site) + 5));
+            injector::WriteMemory<int32_t>(site + 1, displacement, true);
+        }
+    }
+
+    // The IAT capture: read before the create_file hook is written, which is the
+    // order the original keeps (capture at 0x100048EE, first install at 0x10004901).
+    void PublishDfaCapture()
+    {
+        if (!Loader::Enabled("SkipLauncher") || !DfaSelected())
+            return;
+
+        auto pattern = find_pattern(kDfaCapture);
+        if (pattern.empty())
+            return;
+        zpatch_dfa_create_file_slot = *pattern.get_first<uint32_t>(kDfaCaptureOffset);
+    }
+
+    // The five DFA bodies' operands: the four `call ds:[…]` slots hold the same
+    // kernel32 functions the original imported (the static CRT has no IAT), and
+    // the create body's capture slot stays zero until the publish tier records the
+    // game's own IAT address. One function, so the shipped publish step and the
+    // test seam cannot drift: the bodies are reached only from the game's calls,
+    // but the DFA stage installs them from the install tier and nothing may read an
+    // empty slot.
+    void PublishDfaForwarders()
+    {
+        zpatch_dfa_create_file = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&CreateFileA));
+        zpatch_dfa_set_file_pointer =
+            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&SetFilePointer));
+        zpatch_dfa_get_file_size_ex =
+            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&GetFileSizeEx));
+        zpatch_dfa_read_file = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&ReadFile));
+    }
+
+    // ---- the stages --------------------------------------------------------
+
+    // The main table. One entry can install a jump to another entry's match, so
+    // every match is kept while the table runs; the original skips such an entry
+    // whole when its target was absent, because the xor and the jump share one
+    // guard.
+    void ApplyMainTable()
+    {
+        std::array<const std::byte*, std::size(kEntries)> matches{};
+        for (size_t index = 0; index < std::size(kEntries); ++index)
+        {
+            const auto& entry = kEntries[index];
+            auto pattern = find_pattern(entry.signature);
+            if (pattern.empty())
+                continue;
+
+            auto* match = pattern.get_first<std::byte>(0);
+            matches[index] = match;
+
+            bool targetAbsent = false;
+            for (const auto& patch : entry.patches)
+            {
+                if (patch.kind != LauncherPatch::Kind::target)
+                    continue;
+                if (patch.targetEntry >= matches.size() || matches[patch.targetEntry] == nullptr)
+                    targetAbsent = true;
+            }
+            if (targetAbsent)
+                continue;
+
+            for (const auto& patch : entry.patches)
+            {
+                auto* site = match + patch.offset;
+                switch (patch.kind)
+                {
+                case LauncherPatch::Kind::store:
+                    injector::WriteMemoryRaw(reinterpret_cast<uintptr_t>(site),
+                        const_cast<std::byte*>(patch.bytes.data()), patch.bytes.size(), true);
+                    break;
+                case LauncherPatch::Kind::fill:
+                    injector::MakeNOP(site, patch.count, true);
+                    break;
+                case LauncherPatch::Kind::target:
+                {
+                    // The E9 opcode sits one byte before the recorded site, so the
+                    // displacement is measured from the end of that 5-byte branch.
+                    auto* target = const_cast<std::byte*>(matches[patch.targetEntry]);
+                    const auto displacement = static_cast<int32_t>(
+                        reinterpret_cast<uintptr_t>(target) - (reinterpret_cast<uintptr_t>(site) + 4));
+                    injector::WriteMemory<int32_t>(site, displacement, true);
+                    break;
+                }
+                }
+            }
+        }
+    }
+
+    // The two collectors: the first two matches of the first pattern, the last
+    // two of the second, each with the `mov al,1; ret; nop` stub. The recovered
+    // code tests only that the pattern matched at all and then indexes the pair,
+    // so the arm keeps that shape; a pattern that matches has at least two hits on
+    // every supported image (measured in docs/parity.md).
+    void ApplyCollectors()
+    {
+        for (const auto& collector : kCollectors)
+        {
+            auto pattern = find_pattern<0xFFFFFFFFu>(collector.signature);
+            const size_t hits = pattern.size();
+            if (hits == 0)
+                continue;
+
+            const size_t first = collector.firstTwo ? 0 : hits - 2;
+            const size_t last = collector.firstTwo ? 1 : hits - 1;
+            for (size_t hit = first; hit <= last; ++hit)
+                injector::WriteMemoryRaw(
+                    reinterpret_cast<uintptr_t>(pattern.get(hit).get<std::byte>()),
+                    const_cast<std::byte*>(collector.stub.data()), collector.stub.size(), true);
+        }
+    }
+
+    // The DFA stage: six installs and the two collected jumps to other patterns'
+    // matches. The original's one-shot byte is set before the first scan, so a
+    // second call (MiscFixes' 0x10024018) does nothing even if a scan failed.
+    void InstallDfa()
+    {
+        static bool done = false;
+        if (!DfaSelected() || done)
+            return;
+        done = true;
+
+        InstallBranches(kDfaInstalls);
+
+        auto collected = find_pattern<0xFFFFFFFFu>(kDfaCollector);
+        if (collected.empty())
+            return;
+
+        for (size_t target = 0; target < std::size(kDfaCollectedTargets); ++target)
+        {
+            // The original indexes the collector's first two matches after a
+            // non-empty check only; both are present on every image where the
+            // collector matches at all.
+            auto* site = collected.get(target).get<std::byte>();
+            auto destination = find_pattern(kDfaCollectedTargets[target]);
+            if (destination.empty())
+                continue;
+
+            injector::WriteMemory<std::byte>(site, LongJmp, true);
+            const auto displacement = static_cast<int32_t>(
+                reinterpret_cast<uintptr_t>(destination.get_first<std::byte>(0)) -
+                (reinterpret_cast<uintptr_t>(site) + 5));
+            injector::WriteMemory<int32_t>(site + 1, displacement, true);
+        }
+    }
+
+    // The ROM stage: two installs, once. It runs even when the main table is
+    // skipped (the original's handler jumps straight to this call).
+    void InstallRom()
+    {
+        static bool done = false;
+        if (done)
+            return;
+        done = true;
+
+        InstallBranches(kRomInstalls);
+    }
+
+    // The original's one handler: the main table and the DFA stage are skipped
+    // when the XLivelessAddon companion is loaded; the ROM stage always runs.
+    void InstallSkipLauncher()
+    {
+        if (!Loader::Enabled("SkipLauncher"))
+            return;
+
+        if (GetModuleHandleA("XLivelessAddon.asi") == nullptr)
+        {
+            ApplyMainTable();
+            ApplyCollectors();
+            InstallDfa();
+        }
+        InstallRom();
+    }
+}
+
+// Registered like every other arm: the install tier owns the gate.
+export void RegisterLauncher()
+{
+    // The transcribed forwarders' targets, filled before any tier runs. The capture
+    // slot (zpatch_dfa_create_file_slot) is the publish tier's, not this one's.
+    PublishDfaForwarders();
+
+    Loader::PublishEvent() += [] { PublishDfaCapture(); };
+    Loader::InstallEvent() += []
+    {
+        InstallLaunchWithPlayGTAIV();
+        InstallSkipLauncher();
+    };
+
+    // The hook bodies carry their recovered VAs so the dump can express every
+    // branch in the original's coordinates.
+    Bodies::Register(reinterpret_cast<uintptr_t>(&DfaInitBody), 0x10004780u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&DfaCreateFileBody), 0x10004820u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&CloseHandleBody), 0x10004790u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&DfaSetFilePointerBody), 0x10004760u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&DfaGetFileSizeExBody), 0x10004720u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&DfaReadFileBody), 0x10004740u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&RomResetBody), 0x10004570u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&RomSetBody), 0x10004610u);
+}
+
+// ---------------------------------------------------------------------------
+// The test-only seam over the five DFA file-API bodies (tests/dfa_close.cpp,
+// ctest `zp_dfa_close`). The four transcribed forwarders and the rebuilt
+// close-handle body are the callable part of the launcher stage: the game reaches
+// them only through the `E9` installs 0x10004850 writes at its own call sites, so
+// nothing offline can make them run. The seam hands a test exactly those five
+// addresses and the ABIs the originals have; it changes no body and adds no
+// behaviour. It publishes the four forwarder slots because the bodies read them
+// (the create body's fallback would otherwise `call` through zero), which is the
+// same store `RegisterLauncher` makes before any tier.
+//
+// Nothing here reaches the shipped image: the entries have no caller inside the ASI
+// and no PE export, so `/OPT:REF` drops them and the linker map gains no symbol,
+// while the test links the same object file and calls them.
+export namespace Launcher
+{
+    // The five entries, in the originals' ABIs (all `__cdecl`, the caller cleans):
+    //   create_file       0x10004820  7 arguments, CreateFileA's
+    //   read_file         0x10004740  5 arguments, ReadFile's
+    //   set_file_pointer  0x10004760  4 arguments, SetFilePointer's
+    //   get_file_size_ex  0x10004720  2 arguments, GetFileSizeEx's
+    //   close_handle      0x10004790  1 argument, the rebuilt CloseHandle behind EH4
+    struct DfaBodies
+    {
+        HANDLE(__cdecl* create_file)(LPCSTR file_name, DWORD access, DWORD share,
+            LPSECURITY_ATTRIBUTES security, DWORD disposition, DWORD flags, HANDLE template_file);
+        BOOL(__cdecl* read_file)(HANDLE file, LPVOID buffer, DWORD count, LPDWORD read,
+            LPOVERLAPPED overlapped);
+        DWORD(__cdecl* set_file_pointer)(HANDLE file, LONG distance, LONG* distance_high,
+            DWORD method);
+        BOOL(__cdecl* get_file_size_ex)(HANDLE file, LARGE_INTEGER* size);
+        BOOL(__cdecl* close_handle)(HANDLE handle);
+    };
+
+    // The five bodies, with the four forwarder slots published.
+    DfaBodies DfaBodiesForTest();
+}
+
+Launcher::DfaBodies Launcher::DfaBodiesForTest()
+{
+    PublishDfaForwarders();
+    return {
+        reinterpret_cast<HANDLE(__cdecl*)(LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD,
+            DWORD, HANDLE)>(&DfaCreateFileBody),
+        reinterpret_cast<BOOL(__cdecl*)(HANDLE, LPVOID, DWORD, LPDWORD, LPOVERLAPPED)>(
+            &DfaReadFileBody),
+        reinterpret_cast<DWORD(__cdecl*)(HANDLE, LONG, LONG*, DWORD)>(&DfaSetFilePointerBody),
+        reinterpret_cast<BOOL(__cdecl*)(HANDLE, LARGE_INTEGER*)>(&DfaGetFileSizeExBody),
+        reinterpret_cast<BOOL(__cdecl*)(HANDLE)>(&CloseHandleBody),
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Transcribed bodies. Each is the original's instruction stream, kept as asm
+// because that is what it is; the code above is what installs it.
+// ---------------------------------------------------------------------------
 
 // The transcribed bodies are naked assembly, so they live at module scope: MSVC
 // writes them to the BMI from anywhere, but only a module-scope `static` keeps the
@@ -652,303 +968,4 @@ static __declspec(naked) void RomSetBody()
         mov al, 1
         ret 8
     }
-}
-
-namespace
-{
-    uintptr_t BodyAddress(SkipHook hook)
-    {
-        switch (hook)
-        {
-        case SkipHook::dfa_init: return reinterpret_cast<uintptr_t>(&DfaInitBody);
-        case SkipHook::create_file: return reinterpret_cast<uintptr_t>(&DfaCreateFileBody);
-        case SkipHook::close_handle: return reinterpret_cast<uintptr_t>(&CloseHandleBody);
-        case SkipHook::set_file_pointer: return reinterpret_cast<uintptr_t>(&DfaSetFilePointerBody);
-        case SkipHook::get_file_size_ex: return reinterpret_cast<uintptr_t>(&DfaGetFileSizeExBody);
-        case SkipHook::read_file: return reinterpret_cast<uintptr_t>(&DfaReadFileBody);
-        case SkipHook::rom_reset: return reinterpret_cast<uintptr_t>(&RomResetBody);
-        case SkipHook::rom_set: return reinterpret_cast<uintptr_t>(&RomSetBody);
-        }
-        return 0;
-    }
-
-    // ---- the stages --------------------------------------------------------
-
-    // The main table. One entry can install a jump to another entry's match, so
-    // every match is kept while the table runs; the original skips such an entry
-    // whole when its target was absent, because the xor and the jump share one
-    // guard.
-    void ApplyMainTable()
-    {
-        std::array<const std::byte*, std::size(kEntries)> matches{};
-        for (size_t index = 0; index < std::size(kEntries); ++index)
-        {
-            const auto& entry = kEntries[index];
-            auto pattern = find_pattern(entry.signature);
-            if (pattern.empty())
-                continue;
-
-            auto* match = pattern.get_first<std::byte>(0);
-            matches[index] = match;
-
-            bool targetAbsent = false;
-            for (const auto& patch : entry.patches)
-            {
-                if (patch.kind != LauncherPatch::Kind::target)
-                    continue;
-                if (patch.targetEntry >= matches.size() || matches[patch.targetEntry] == nullptr)
-                    targetAbsent = true;
-            }
-            if (targetAbsent)
-                continue;
-
-            for (const auto& patch : entry.patches)
-            {
-                auto* site = match + patch.offset;
-                switch (patch.kind)
-                {
-                case LauncherPatch::Kind::store:
-                    injector::WriteMemoryRaw(reinterpret_cast<uintptr_t>(site),
-                        const_cast<std::byte*>(patch.bytes.data()), patch.bytes.size(), true);
-                    break;
-                case LauncherPatch::Kind::fill:
-                    injector::MakeNOP(site, patch.count, true);
-                    break;
-                case LauncherPatch::Kind::target:
-                {
-                    // The E9 opcode sits one byte before the recorded site, so the
-                    // displacement is measured from the end of that 5-byte branch.
-                    auto* target = const_cast<std::byte*>(matches[patch.targetEntry]);
-                    const auto displacement = static_cast<int32_t>(
-                        reinterpret_cast<uintptr_t>(target) - (reinterpret_cast<uintptr_t>(site) + 4));
-                    injector::WriteMemory<int32_t>(site, displacement, true);
-                    break;
-                }
-                }
-            }
-        }
-    }
-
-    // The two collectors: the first two matches of the first pattern, the last
-    // two of the second, each with the `mov al,1; ret; nop` stub. The recovered
-    // code tests only that the pattern matched at all and then indexes the pair,
-    // so the arm keeps that shape; a pattern that matches has at least two hits on
-    // every supported image (measured in docs/parity.md).
-    void ApplyCollectors()
-    {
-        for (const auto& collector : kCollectors)
-        {
-            auto pattern = find_pattern<0xFFFFFFFFu>(collector.signature);
-            const size_t hits = pattern.size();
-            if (hits == 0)
-                continue;
-
-            const size_t first = collector.firstTwo ? 0 : hits - 2;
-            const size_t last = collector.firstTwo ? 1 : hits - 1;
-            for (size_t hit = first; hit <= last; ++hit)
-                injector::WriteMemoryRaw(
-                    reinterpret_cast<uintptr_t>(pattern.get(hit).get<std::byte>()),
-                    const_cast<std::byte*>(collector.stub.data()), collector.stub.size(), true);
-        }
-    }
-
-    // The DFA installer's guards (0x1000487B..0x100048D5): the XLivelessAddon
-    // companion suppresses the stage, a loaded GTAC.dll suppresses it, and the four
-    // EFLC builds are excluded. The caller adds the installer's own one-shot.
-    bool DfaSelected()
-    {
-        if (GetModuleHandleA("XLivelessAddon.asi") != nullptr)
-            return false;
-        if (GetModuleHandleA("GTAC.dll") != nullptr)
-            return false;
-        return !BuildIs(Loader::Current(),
-            { Build::v1100, Build::v1110, Build::v1120, Build::v1130 });
-    }
-
-    // The IAT capture: read before the create_file hook is written, which is the
-    // order the original keeps (capture at 0x100048EE, first install at 0x10004901).
-    void PublishDfaCapture()
-    {
-        if (!Loader::Enabled("SkipLauncher") || !DfaSelected())
-            return;
-
-        auto pattern = find_pattern(kDfaCapture);
-        if (pattern.empty())
-            return;
-        zpatch_dfa_create_file_slot = *pattern.get_first<uint32_t>(kDfaCaptureOffset);
-    }
-
-    // One E8/E9 per install row; a missing signature is the original's clean skip.
-    void InstallBranches(std::span<const LauncherInstall> installs)
-    {
-        for (const auto& install : installs)
-        {
-            auto pattern = find_pattern(install.signature);
-            if (pattern.empty())
-                continue;
-
-            auto* site = pattern.get_first<std::byte>(install.offset);
-            injector::WriteMemory<std::byte>(site, install.opcode, true);
-            const auto displacement = static_cast<int32_t>(
-                BodyAddress(install.body) - (reinterpret_cast<uintptr_t>(site) + 5));
-            injector::WriteMemory<int32_t>(site + 1, displacement, true);
-        }
-    }
-
-    // The DFA stage: six installs and the two collected jumps to other patterns'
-    // matches. The original's one-shot byte is set before the first scan, so a
-    // second call (MiscFixes' 0x10024018) does nothing even if a scan failed.
-    void InstallDfa()
-    {
-        static bool done = false;
-        if (!DfaSelected() || done)
-            return;
-        done = true;
-
-        InstallBranches(kDfaInstalls);
-
-        auto collected = find_pattern<0xFFFFFFFFu>(kDfaCollector);
-        if (collected.empty())
-            return;
-
-        for (size_t target = 0; target < std::size(kDfaCollectedTargets); ++target)
-        {
-            // The original indexes the collector's first two matches after a
-            // non-empty check only; both are present on every image where the
-            // collector matches at all.
-            auto* site = collected.get(target).get<std::byte>();
-            auto destination = find_pattern(kDfaCollectedTargets[target]);
-            if (destination.empty())
-                continue;
-
-            injector::WriteMemory<std::byte>(site, LongJmp, true);
-            const auto displacement = static_cast<int32_t>(
-                reinterpret_cast<uintptr_t>(destination.get_first<std::byte>(0)) -
-                (reinterpret_cast<uintptr_t>(site) + 5));
-            injector::WriteMemory<int32_t>(site + 1, displacement, true);
-        }
-    }
-
-    // The ROM stage: two installs, once. It runs even when the main table is
-    // skipped (the original's handler jumps straight to this call).
-    void InstallRom()
-    {
-        static bool done = false;
-        if (done)
-            return;
-        done = true;
-
-        InstallBranches(kRomInstalls);
-    }
-
-    // The five DFA bodies' operands: the four `call ds:[…]` slots hold the same
-    // kernel32 functions the original imported (the static CRT has no IAT), and
-    // the create body's capture slot stays zero until the publish tier records the
-    // game's own IAT address. One function, so the shipped publish step and the
-    // test seam cannot drift: the bodies are reached only from the game's calls,
-    // but the DFA stage installs them from the install tier and nothing may read an
-    // empty slot.
-    void PublishDfaForwarders()
-    {
-        zpatch_dfa_create_file = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&CreateFileA));
-        zpatch_dfa_set_file_pointer =
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&SetFilePointer));
-        zpatch_dfa_get_file_size_ex =
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&GetFileSizeEx));
-        zpatch_dfa_read_file = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&ReadFile));
-    }
-
-    // The original's one handler: the main table and the DFA stage are skipped
-    // when the XLivelessAddon companion is loaded; the ROM stage always runs.
-    void InstallSkipLauncher()
-    {
-        if (!Loader::Enabled("SkipLauncher"))
-            return;
-
-        if (GetModuleHandleA("XLivelessAddon.asi") == nullptr)
-        {
-            ApplyMainTable();
-            ApplyCollectors();
-            InstallDfa();
-        }
-        InstallRom();
-    }
-}
-
-// Registered like every other arm: the install tier owns the gate.
-export void RegisterLauncher()
-{
-    // The transcribed forwarders' targets, filled before any tier runs. The capture
-    // slot (zpatch_dfa_create_file_slot) is the publish tier's, not this one's.
-    PublishDfaForwarders();
-
-    Loader::PublishEvent() += [] { PublishDfaCapture(); };
-    Loader::InstallEvent() += []
-    {
-        InstallLaunchWithPlayGTAIV();
-        InstallSkipLauncher();
-    };
-
-    // The hook bodies carry their recovered VAs so the dump can express every
-    // branch in the original's coordinates.
-    Bodies::Register(reinterpret_cast<uintptr_t>(&DfaInitBody), 0x10004780u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&DfaCreateFileBody), 0x10004820u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&CloseHandleBody), 0x10004790u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&DfaSetFilePointerBody), 0x10004760u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&DfaGetFileSizeExBody), 0x10004720u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&DfaReadFileBody), 0x10004740u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&RomResetBody), 0x10004570u);
-    Bodies::Register(reinterpret_cast<uintptr_t>(&RomSetBody), 0x10004610u);
-}
-
-// ---------------------------------------------------------------------------
-// The test-only seam over the five DFA file-API bodies (tests/dfa_close.cpp,
-// ctest `zp_dfa_close`). The four transcribed forwarders and the rebuilt
-// close-handle body are the callable part of the launcher stage: the game reaches
-// them only through the `E9` installs 0x10004850 writes at its own call sites, so
-// nothing offline can make them run. The seam hands a test exactly those five
-// addresses and the ABIs the originals have; it changes no body and adds no
-// behaviour. It publishes the four forwarder slots because the bodies read them
-// (the create body's fallback would otherwise `call` through zero), which is the
-// same store `RegisterLauncher` makes before any tier.
-//
-// Nothing here reaches the shipped image: the entries have no caller inside the ASI
-// and no PE export, so `/OPT:REF` drops them and the linker map gains no symbol,
-// while the test links the same object file and calls them.
-export namespace Launcher
-{
-    // The five entries, in the originals' ABIs (all `__cdecl`, the caller cleans):
-    //   create_file       0x10004820  7 arguments, CreateFileA's
-    //   read_file         0x10004740  5 arguments, ReadFile's
-    //   set_file_pointer  0x10004760  4 arguments, SetFilePointer's
-    //   get_file_size_ex  0x10004720  2 arguments, GetFileSizeEx's
-    //   close_handle      0x10004790  1 argument, the rebuilt CloseHandle behind EH4
-    struct DfaBodies
-    {
-        HANDLE(__cdecl* create_file)(LPCSTR file_name, DWORD access, DWORD share,
-            LPSECURITY_ATTRIBUTES security, DWORD disposition, DWORD flags, HANDLE template_file);
-        BOOL(__cdecl* read_file)(HANDLE file, LPVOID buffer, DWORD count, LPDWORD read,
-            LPOVERLAPPED overlapped);
-        DWORD(__cdecl* set_file_pointer)(HANDLE file, LONG distance, LONG* distance_high,
-            DWORD method);
-        BOOL(__cdecl* get_file_size_ex)(HANDLE file, LARGE_INTEGER* size);
-        BOOL(__cdecl* close_handle)(HANDLE handle);
-    };
-
-    // The five bodies, with the four forwarder slots published.
-    DfaBodies DfaBodiesForTest();
-}
-
-Launcher::DfaBodies Launcher::DfaBodiesForTest()
-{
-    PublishDfaForwarders();
-    return {
-        reinterpret_cast<HANDLE(__cdecl*)(LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD,
-            DWORD, HANDLE)>(&DfaCreateFileBody),
-        reinterpret_cast<BOOL(__cdecl*)(HANDLE, LPVOID, DWORD, LPDWORD, LPOVERLAPPED)>(
-            &DfaReadFileBody),
-        reinterpret_cast<DWORD(__cdecl*)(HANDLE, LONG, LONG*, DWORD)>(&DfaSetFilePointerBody),
-        reinterpret_cast<BOOL(__cdecl*)(HANDLE, LARGE_INTEGER*)>(&DfaGetFileSizeExBody),
-        reinterpret_cast<BOOL(__cdecl*)(HANDLE)>(&CloseHandleBody),
-    };
 }
