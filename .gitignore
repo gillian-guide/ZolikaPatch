@@ -14,3 +14,5 @@ fault_parity_long_child.report
 dfa_close_child.report
 dfa_close_child.probe
 dfa_close_roundtrip.bin
+out.before
+out.after
