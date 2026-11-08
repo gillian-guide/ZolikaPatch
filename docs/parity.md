@@ -361,11 +361,16 @@ place; the offline dump cannot see it, because nothing dereferences the slot the
 
 - `IncreaseVehicleModelLimit` (anchor `0x8DD143`): writes the dword `0x400` through
   the operand of the `mov ecx, 0xF3E8E8` at match+77, which is the model-limit
-  object the allocator is constructed with. The write target is a *game* address, so
-  this arm rebases it through the image's preferred base (`GamePointer`): the
-  identity in the game, and what makes the offline dump write the same two bytes.
+  object the allocator is constructed with. The operand is a *live address*: the
+  loader has already applied the image's relocations when the arm runs, so the cast
+  is the whole conversion (`GamePointer`, now identity). `docs/parity.md`'s
+  "captured operands are live addresses" section records the measurement and why the
+  old preferred-base rebase was wrong in the game.
 - `EpisodicVehicleSupport`: on 1.0.7.0 and 1.0.8.0 it retargets two absolute
-  episode-flag operands to this module's own word (initial 2, the game's value);
+  episode-flag operands to this module's own word (initial 2, the game's value) as
+  the original's four fixed-RVA installs -- build 8: `0x21500` and `0x7D91AE`;
+  build 9: `0x95040` and `0x684ABE` -- never as a pattern hit, because the operand
+  those words hold is a relocated address;
   every gated build then gets the 23 signature-driven NOP rows, in the original's
   row order (two all-hits rows, two rows with a second window).
 - `HighFPSBikePhysicsFix` (anchor `0xB9C05B`): jumps to the clamp detour at
@@ -945,8 +950,9 @@ excludes by design).
 - The published words are the sites' own operands, read in the publish tier: the
   two axis pointers (`0x17945D0`, `0x17945C0`), the invert byte `0x10FC0D0`, the
   game's frame clock `0xB4D3A0` and the two resumes (`0xA81B1F` and `+1878`). Each
-  is rebased through the image's preferred base, so the offline dump reads the
-  same words at a heap base that the game reads at `0x400000`.
+  is a live address when the arm runs -- the loader has already relocated the image,
+  and the offline dump relocates its copy the same way -- so it is stored as read
+  ("captured operands are live addresses", above).
 - The literals the bodies read are the original's `.data`, declared with the type the
   instruction reads and initialised with the number it is, never with a bit pattern:
   `0.0078125`, `255.0`, `0.075000003` (`0.075f` printed to 9 significant digits and read
@@ -1095,7 +1101,8 @@ call at `0x107A` is retargeted to the vtable installer and a jump at `0x107F` sk
 the five-slot clear it replaces, resuming at `0x108C` (anchor
 `3D 80 99 99 59 73 05`, RVA `0x109C`). The singleton the installer writes into comes
 from the `6A 01 B9 00 00 40 06` anchor's `mov esi, <address>` operand at `+8`
-(`0x19CF9F0`), rebased through `GamePointer` like every other captured game pointer.
+(`0x19CF9F0`), a live address read as captured like every other captured game
+pointer ("captured operands are live addresses", above).
 The table is the original's 24-slot vtable at `0x100B5038`, read entry by entry:
 slots 10 and 12 point at the RGSC-login stub and the savegame null path, which this
 unit already owns, and slots 8/9/20/21 at the two-instruction MP-sync stub — the
@@ -1514,6 +1521,83 @@ prepare step's path building still need an in-game save load.
 
 - `FreezeCarFix` needs its 1,421-byte probe and the spawn path around it; the steer
   consumer `sub_10004C70` it also touched is now in place (see the section above).
+
+### Captured operands are live addresses
+
+A captured pattern operand -- a dword read out of a `mov`/`cmp`/`push` operand and
+cast to a pointer -- is an address of the image **as the loader mapped it**, not of
+the file. `GTAIV.exe` carries `DYNAMIC_BASE` (`DllCharacteristics` `0x140`), so the
+loader relocates the executable on essentially every run; `ZolikaPatch.writes.log`
+shows live bases `0x4B0000` and `0xA60000`, and the crash dumps' `in GTAIV.exe
+(+offset)` pairs imply `0x420000`, `0x4D0000`, `0x8B0000`, `0xCC0000`, `0xDE0000`,
+`0xFC0000`. By the time any arm runs, every `.reloc` entry has been applied, so the
+dword in the instruction already names the live object.
+
+The tree used to convert such an operand again, `hostBase + (value -
+OptionalHeader.ImageBase)`, on the premise that the game sits at its preferred base
+(it does not). In a relocated game that moves every pointer by the run's whole
+relocation distance: `SpeedupBugFix` wrote eight dwords through mis-based pointers,
+`IncreaseVehicleModelLimit` wrote `0x400` through one, `BadPlayerModelCrashFix` read
+its ped array through one, and `MouseFix` read three axis words through them. The
+offline dump was *correct* under that formula, which is why no check caught it.
+
+Two halves fix it, and they must stay together:
+
+- **The arms treat the operand as the address it is.** `GamePointer` /
+  `GameImagePointer` are identity casts (`loading.ixx`, `vehicles.ixx`, `misc.ixx`);
+  the two inline rebases (`InstallNoPhysicsSleep`'s threshold, `CrashMsgFix`'s thunk)
+  and `WritableImageWord`'s range test use the live address too, and the two
+  `GameAddress` helpers were deleted where a plain read reads better
+  (`stability.ixx`'s ped array, `audio.ixx`'s three MouseFix words). This is the
+  behaviour the original has and `readable/` uses; the arm-written bytes are
+  unchanged in the dump.
+- **The dump relocates its copy.** `tests/dump_main.cpp` maps the image into a
+  64 KiB-aligned `VirtualAlloc` allocation (so its delta is a loader delta, a
+  multiple of the allocation granularity) and applies every HIGHLOW entry with
+  `delta = hostBase - OptionalHeader.ImageBase`. It refuses a file with no `.reloc`,
+  a `.reloc` that runs past the buffer, a fixup outside the buffer, a malformed
+  block and a non-HIGHLOW entry type -- loudly, with the RVA -- instead of skipping
+  them. Every dump run then asserts the property that was violated: at
+  `IncreaseVehicleModelLimit`'s anchor, the unrelocated `mov ecx, imm32` operand must
+  become `hostBase + RVA`, the pointee must be a writable dword of the buffer, and a
+  byte-equal result fails the run (revert the pass and it prints
+  `FAILED: ... the .reloc pass did not run` and exits 1).
+
+The dump's rows still speak the baselines' coordinate system: `0xD0000000` for a
+substituted published pointer, and the *original* image's bytes for every byte a
+mod wrote, so a relocated dword the loader moved is not reported as a write set.
+Building 9's per-key file is byte-identical before and after the change (12,834
+lines, 0 differing lines), and `tools/parity_report.py 9` still reports 98 closed /
+0 open / 1 oracle-verified.
+
+**A signature may not spell out a relocated dword.** The same class of bug sits
+above the arms: a recovered signature that bakes in an absolute address matches the
+file image and never the running game, so the arm silently never fires. Two were
+found and fixed against the oracle's own strings:
+
+- `IncreaseVehicleStructLimit` scanned `68 34 EE DA 00` (the narrowed 1.0.8.0 push
+  operand). The original's own pattern is `68 ? ? ? ? 6A 32 8B C8` (in the ASI at
+  file offset `0x12AF74`, handler `0x10023020`), with the pushed name wildcarded and
+  the write at `+6` (the `push 32` count). Its one occurrence on each of the nine
+  images means the arm now writes the row every baseline already records:
+  `0x64` at `0x6C79C1` / `0x6717A1` / `0x5BD661` / `0x7EA641` / `0x7EA871` /
+  `0x64A2B1` / `0x754131` / `0x753B91` / `0x614C71` (builds 1, 5, 6, 7, 8, 9, 11,
+  12, 13; build 9 was already closed, the other eight close with this) -- exactly
+  the row the oracle's own install writes there.
+- `EpisodicVehicleSupport`'s two flag stores scanned `54 D7 12 01 02 ...`, the game's
+  absolute `dword_1012D754`. The original does them as four fixed-RVA installs
+  (build 8: `0x21500`, `0x7D91AE`; build 9: `0x95040`, `0x684ABE`), so the arm now
+  writes `ImageBase() + RVA` exactly as the recovered table says. This is also what
+  restores the eight placeholder bytes the build-9 cell had lost.
+
+`tools/check_relocated_literals.py` (ctest `zp_relocated_literals`) is the general
+guard: for every literal `find_pattern` in `source/*.ixx` it finds the hits in each
+of the nine images, then fails if a *concrete* byte of the hit lies in the high half
+of a HIGHLOW dword (the half a 64 KiB-aligned delta moves) -- i.e. the pattern spells
+out an address. It reports the file, line, arm and the offending pattern; with
+`68 34 EE DA 00` restored it fails on `vehicles.ixx:2343
+(InstallIncreaseVehicleStructLimit)` and names the dword, and it currently passes
+over 1,704 pattern hits.
 
 ## Transcribing a body
 

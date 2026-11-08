@@ -467,12 +467,20 @@ namespace Native
 
     void* Resolve(uint32_t hash)
     {
-        return GuardedResolve(hash);
+        const auto handler = GuardedResolve(hash);
+        // A resolve that answers null is the interesting case in play: the caller
+        // usually dereferences the result, so the log records which hash failed.
+        Log::Print("native resolve hash {:08X} -> {:08X}", hash,
+                   reinterpret_cast<uintptr_t>(handler));
+        return handler;
     }
 
     bool Invoke(uint32_t hash, void* block)
     {
-        return GuardedInvoke(hash, block) != 0;
+        const bool answered = GuardedInvoke(hash, block) != 0;
+        Log::Print("native invoke hash {:08X} block {:08X} -> {}", hash,
+                   reinterpret_cast<uintptr_t>(block), answered ? 1 : 0);
+        return answered;
     }
 
     uintptr_t Resolver()

@@ -504,16 +504,18 @@ static void* __fastcall SpeedupBugFixBody(void* self, int)
 
 namespace
 {
-    // A captured pattern operand is an address in the image's own coordinate
-    // system. The dump places that image at a heap address, so the operand is
-    // rebased through the image's preferred base; in the game the two are equal.
+    // A captured pattern operand is a 32-bit VA of the image *as the loader mapped
+    // it*: the image's `.reloc` entries were applied before any arm ran, so the
+    // dword in the instruction already names the live object. The game is relocated
+    // on every run (GTAIV.exe carries DYNAMIC_BASE, and the observed bases include
+    // 0x4B0000 and 0xA60000), so converting the operand through the preferred base
+    // again would move every pointer by the run's whole relocation distance. The
+    // offline dump applies the same fixups to its own copy of the image
+    // (tests/dump_main.cpp), which is what makes this identity cast right there too.
     template <typename T>
     T* GameImagePointer(uint32_t value)
     {
-        const auto host = Game::Get().ImageBase();
-        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(host);
-        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(host + dos->e_lfanew);
-        return reinterpret_cast<T*>(host + (value - static_cast<uint32_t>(nt->OptionalHeader.ImageBase)));
+        return reinterpret_cast<T*>(static_cast<uintptr_t>(value));
     }
 
     // SpeedupBugFix: the handler's eight operands, in its read order
@@ -548,18 +550,20 @@ namespace
     // The body writes through all eight pointers, so every one of them has to be a
     // writable word of the image in use before any of them is published: a
     // signature that matched a different function would otherwise hand the body a
-    // code address or a constant to store floats into.
+    // code address or a constant to store floats into. The operand is a live
+    // address, so the *live* base is what says where it sits; the PE header still
+    // records the preferred base and is not the image this runs in.
     bool WritableImageWord(uint32_t value)
     {
-        const auto host = Game::Get().ImageBase();
-        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(host);
-        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(host + dos->e_lfanew);
-        const auto preferred = static_cast<uint32_t>(nt->OptionalHeader.ImageBase);
-        if (value < preferred ||
-            value - preferred > nt->OptionalHeader.SizeOfImage - sizeof(uint32_t))
+        const auto& game = Game::Get();
+        const auto host = static_cast<uint32_t>(game.ImageBase());
+        if (value < host ||
+            value - host > game.ImageSize() - sizeof(uint32_t))
             return false;
 
-        const auto rva = value - preferred;
+        const auto rva = value - host;
+        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(game.ImageBase());
+        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(game.ImageBase() + dos->e_lfanew);
         const auto* section = IMAGE_FIRST_SECTION(nt);
         for (WORD index = 0; index < nt->FileHeader.NumberOfSections; ++index, ++section)
         {

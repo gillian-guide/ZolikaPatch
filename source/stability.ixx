@@ -1152,21 +1152,20 @@ namespace
         injector::MakeJMP(pattern.get_first(81), reinterpret_cast<void*>(&BlackscreenShim), true);
     }
 
-    // The thunk the CrashMsgFix anchor's -4 points at, rebased onto the image in
-    // use: the pointer the anchor carries is an image VA, and the offline dump
-    // loads the image at another base.
+    // The thunk the CrashMsgFix anchor's -4 points at. The operand is a 32-bit VA of
+    // the image *as loaded*: the loader has already applied the image's relocations
+    // before this runs, so it is a live address and the cast is the whole
+    // conversion. The offline dump relocates its own copy (tests/dump_main.cpp), so
+    // the same identity holds there; rebasing through the preferred base would move
+    // the thunk by the run's whole relocation distance.
     std::byte* CrashMsgSite()
     {
         auto pattern = find_pattern("68 6A 10 4E 31");
         if (pattern.empty())
             return nullptr;
 
-        const auto& game = Game::Get();
-        const auto* headers = reinterpret_cast<const IMAGE_NT_HEADERS*>(
-            game.ImageBase() + reinterpret_cast<const IMAGE_DOS_HEADER*>(game.ImageBase())->e_lfanew);
-        const auto stored = *pattern.get_first<uint32_t>(-4);
         return reinterpret_cast<std::byte*>(
-            game.ImageBase() + (stored - headers->OptionalHeader.ImageBase));
+            static_cast<uintptr_t>(*pattern.get_first<uint32_t>(-4)));
     }
 
     // CrashMsgFix's published getter: the target of the branch at the thunk's entry,
@@ -1476,18 +1475,6 @@ namespace
         }
     }
 
-    // A captured pattern operand is an address in the image's own coordinate
-    // system. The dump places that image at a heap address, so the operand is
-    // rebased through the image's preferred base; in the game the two are equal.
-    uint32_t GameAddress(uint32_t value)
-    {
-        const auto host = Game::Get().ImageBase();
-        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(host);
-        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(host + dos->e_lfanew);
-        return static_cast<uint32_t>(
-            host + (value - static_cast<uint32_t>(nt->OptionalHeader.ImageBase)));
-    }
-
     // The address of a body another module transcribed, by its recovered VA. The
     // native-call layer publishes only its C entries, and a module interface cannot
     // export a naked function, so the body registry is what makes its pieces
@@ -1521,10 +1508,12 @@ namespace
             reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0)) + 10);
 
         // dword_1015AD78: the ped-model object array, the absolute operand four
-        // bytes before the original's own anchor (game 0x49EC0F).
+        // bytes before the original's own anchor (game 0x49EC0F). The operand is a
+        // live VA -- the loader has already relocated the image, and the offline
+        // dump relocates its copy too -- so the captured dword is the address.
         pattern = find_pattern("85 C0 C6 44 24 0C 00 C6 44 24 0D 00 75 07");
         if (!pattern.empty())
-            zpatch_bpm_ped_array = GameAddress(*pattern.get_first<uint32_t>(-4));
+            zpatch_bpm_ped_array = *pattern.get_first<uint32_t>(-4);
 
         // dword_10159C74: the model-class lookup the fallback calls, the
         // original's anchor - 42 (game 0xB191D0).

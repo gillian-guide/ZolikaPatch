@@ -299,6 +299,15 @@ if(Python3_Interpreter_FOUND)
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_oracle_verified.py)
   add_test(NAME zp_fault_dialogs
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_fault_dialogs.py)
+  # A recovered signature that spells out a .reloc-covered dword can never match
+  # the running game (the loader rewrites those bytes on every run), so the arm
+  # silently never fires. This is the lint for that class: `68 34 EE DA 00` and
+  # two EpisodicVehicleSupport patterns were exactly it.
+  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/GTAIV.exe)
+    add_test(NAME zp_relocated_literals
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_relocated_literals.py
+              --game ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs)
+  endif()
 endif()
 if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/EFLC_1110.exe)
   add_test(NAME zp_launcher_slots

@@ -1689,17 +1689,16 @@ namespace
     constexpr uint32_t kDualHeadlightsOldBuilds = 0x62u;
     constexpr uint32_t kDualHeadlightsNewBuilds = 0x4BF80u;
 
-    // A captured pattern operand is an address in the image's own coordinate
-    // system. The dump places that image at a heap address, so the operand is
-    // rebased through the image's preferred base; in the game the two are equal.
-    // Only the arms that write *through* such an operand need it.
+    // A captured pattern operand is a 32-bit VA of the image *as loaded* (the same
+    // helper as misc.ixx's): the loader has already applied the image's relocations,
+    // so the dword is a live address and the cast is the whole conversion. The game
+    // runs relocated, so subtracting the preferred base here would add the run's
+    // whole relocation distance to the pointer; the offline dump relocates its copy
+    // of the image too. Only the arms that write *through* such an operand need it.
     template <typename T>
     T* GamePointer(uint32_t value)
     {
-        const auto host = Game::Get().ImageBase();
-        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(host);
-        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(host + dos->e_lfanew);
-        return reinterpret_cast<T*>(host + (value - static_cast<uint32_t>(nt->OptionalHeader.ImageBase)));
+        return reinterpret_cast<T*>(static_cast<uintptr_t>(value));
     }
 
     // A rel32 target inside the match: the displacement dword at `displacement`,
@@ -2161,9 +2160,14 @@ namespace
     // Two parts, because the original's handler has two:
     //   * 1.0.7.0 and 1.0.8.0 each retarget the absolute operand of two
     //     `cmp dword ptr [episode], 2` sites (the first also a `jnz`, the second a
-    //     `jne rel32`) at this module's episode word. The recovered signatures keep
-    //     the build's own operand bytes, so each build has its own pair -- and the
-    //     operand itself is the match, which is why the write lands at +0;
+    //     `jne rel32`) at this module's episode word. The original's recovered table
+    //     does that as four *RVA installs* -- a rebased pointer store at a fixed RVA
+    //     (build 8: 0x21500 and 0x7D91AE; build 9: 0x95040 and 0x684ABE), not a
+    //     pattern hit. The store value proves it: it is this module's own pointer,
+    //     which a signature could not name. Spelling the game's absolute operand out
+    //     in a signature would also bake in the preferred-base VA, which the loader
+    //     rewrites on every run (the executable carries DYNAMIC_BASE), so such an
+    //     arm could never match the live image and would never fire in the game;
     //   * every gated build then gets the 23 signature-driven NOP rows, in the
     //     original's row order. The first two rows write every hit of a multi-hit
     //     scan (two each on this image) and two rows carry a second window.
@@ -2173,42 +2177,26 @@ namespace
             return;
 
         const auto flag = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&zpatch_episode_flag));
-        if (Loader::Current() == Build::v1070)
+        struct FlagStore final
         {
-            auto pattern = find_pattern("44 80 0F ?? 02 75 ?? E8 ?? ?? ?? ?? 3B C3 74 ?? 8D");
-            if (!pattern.empty())
-            {
-                auto* site = pattern.get_first<std::byte>(0);
-                injector::WriteMemory<uint32_t>(site, flag, true);
-                Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(site));
-            }
-
-            pattern = find_pattern("44 80 0F ?? 02 0F 85 94 00 ?? ?? ?? ?? 24 ?? 85 D2 0F 84 ?? ?? ?? ?? 8B");
-            if (!pattern.empty())
-            {
-                auto* site = pattern.get_first<std::byte>(0);
-                injector::WriteMemory<uint32_t>(site, flag, true);
-                Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(site));
-            }
-        }
-
-        if (Loader::Current() == Build::v1080)
+            Build build;
+            uint32_t rva;
+        };
+        static constexpr FlagStore kEpisodeFlagStores[] = {
+            { Build::v1070, 0x021500u },
+            { Build::v1070, 0x7D91AEu },
+            { Build::v1080, 0x095040u },
+            { Build::v1080, 0x684ABEu },
+        };
+        for (const auto& store : kEpisodeFlagStores)
         {
-            auto pattern = find_pattern("54 D7 12 01 02 75 ?? E8 ?? ?? ?? ?? 3B C3 74 ?? 8D");
-            if (!pattern.empty())
-            {
-                auto* site = pattern.get_first<std::byte>(0);
-                injector::WriteMemory<uint32_t>(site, flag, true);
-                Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(site));
-            }
+            if (Loader::Current() != store.build)
+                continue;
 
-            pattern = find_pattern("54 D7 12 01 02 0F 85 94 00 ?? ?? ?? ?? 24 ?? 85 D2 0F 84 ?? ?? ?? ?? 8B");
-            if (!pattern.empty())
-            {
-                auto* site = pattern.get_first<std::byte>(0);
-                injector::WriteMemory<uint32_t>(site, flag, true);
-                Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(site));
-            }
+            auto* const site =
+                reinterpret_cast<std::byte*>(Game::Get().ImageBase() + store.rva);
+            injector::WriteMemory<uint32_t>(site, flag, true);
+            Bodies::RegisterPublished(reinterpret_cast<uintptr_t>(site));
         }
 
         // Row 1: the `jl` of a loop that only runs on the episodic builds. Two
@@ -2339,14 +2327,20 @@ namespace
     }
 
     // IncreaseVehicleStructLimit: the struct count the allocator is asked for becomes
-    // 100 instead of the original constant. The signature keeps the absolute address
-    // of the structure name, so it is specific to 1.0.8.0.
+    // 100 instead of the original 50: the signature's +6 byte is the immediate of the
+    // `push 32` that follows the pushed structure-name address. The pattern is the
+    // original's own (`68 ? ? ? ? 6A 32 8B C8`, recovered from the ASI's signature
+    // table, handler 0x10023020): the pushed address is a relocated operand, so it
+    // must stay a wildcard. Baking the recovered 1.0.8.0 VA in (`68 34 EE DA 00`)
+    // makes the arm miss the moment the loader relocates the image -- which it does
+    // on every run, because the executable carries DYNAMIC_BASE -- and would also
+    // miss in the offline dump once that copy is relocated.
     void InstallIncreaseVehicleStructLimit()
     {
         if (!Loader::Enabled("IncreaseVehicleStructLimit"))
             return;
 
-        auto pattern = find_pattern("68 34 EE DA 00");
+        auto pattern = find_pattern("68 ? ? ? ? 6A 32 8B C8");
         if (!pattern.empty())
             injector::WriteMemory<std::byte>(pattern.get_first(6), std::byte{ 100 }, true);
     }

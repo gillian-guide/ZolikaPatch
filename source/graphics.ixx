@@ -1359,6 +1359,9 @@ namespace
                 static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + displacement));
             zpatch_cutscene_poke =
                 static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match + displacement + 0x4F));
+            Log::Print("cutscene: match {:08X} disp {:08X} target {:08X} poke {:08X}",
+                       reinterpret_cast<uintptr_t>(match), displacement,
+                       zpatch_cutscene_target, zpatch_cutscene_poke);
         }
 
         // The body's VirtualProtect call goes through a slot because the original
@@ -1404,6 +1407,10 @@ namespace
             pattern = find_pattern("74 0B 83 7C 24 2C 03");
         if (!pattern.empty())
             injector::WriteMemory<std::byte>(pattern.get_first(0), Bytes::ShortJmp, true);
+
+        Log::Print("cutscene: resolved={} target={:08X} poke={:08X} resolveEntry={:08X}",
+                   zpatch_cutscene_target != 0 ? 1 : 0, zpatch_cutscene_target,
+                   zpatch_cutscene_poke, zpatch_native_resolve_entry);
     }
 }
 

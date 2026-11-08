@@ -630,16 +630,15 @@ namespace
     char* zpatch_local_path_18 = nullptr;          // szPathLocalAppdata_EP
     wchar_t* zpatch_local_path_1c = nullptr;       // wszPathLocalAppdataW
 
-    // A captured pattern operand is an address in the image's own coordinate
-    // system. The dump places that image at a heap address, so the operand is
-    // rebased through the image's preferred base; in the game the two are equal.
+    // A captured pattern operand is a 32-bit VA of the image *as loaded* (the same
+    // helper as misc.ixx's): the loader has already applied the image's relocations,
+    // so the dword is a live address and the cast is the whole conversion. The game
+    // runs relocated, so subtracting the preferred base here would add the run's
+    // whole relocation distance; the offline dump relocates its copy too.
     template <typename T>
     T* GamePointer(uint32_t value)
     {
-        const auto host = Game::Get().ImageBase();
-        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(host);
-        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(host + dos->e_lfanew);
-        return reinterpret_cast<T*>(host + (value - static_cast<uint32_t>(nt->OptionalHeader.ImageBase)));
+        return reinterpret_cast<T*>(static_cast<uintptr_t>(value));
     }
 
     // The path text the step helper stores: "\saves\<name>\".

@@ -49,6 +49,14 @@ namespace
             game.FileVersionString(), game.ImageBase(), game.ImageSize());
         Log::Print("ini: {} ({})", std::string(Config::FileName), read ? "read" : "absent");
         Log::Print("build: {} ({})", BuildName(build), CompactVersion(game.FileVersion()));
+
+        // Which keys the arms will actually act on. A crash report is only useful
+        // alongside the configuration that produced it.
+        std::string enabled;
+        for (const auto& option : Catalogue::All)
+            if (Catalogue::Read(option.key) != 0)
+                enabled += std::string(option.key) + " ";
+        Log::Line("enabled: " + enabled);
 #endif
 
         FusionFix::onInitEvent().executeAll();

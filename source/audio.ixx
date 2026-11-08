@@ -1108,9 +1108,10 @@ namespace
 
     // NoPhysicsSleep: the physics sleep threshold is the float the anchor's -38
     // operand names (0.005f at game 0x1090B18, RVA 0xC90B18), so the arm writes a
-    // zero there. The operand is an absolute game VA and the image may be mapped
-    // elsewhere (the offline dump is), so it is rebased onto the image in use
-    // first.
+    // zero there. The operand is a live VA -- the loader has already relocated the
+    // image, and the offline dump relocates its copy -- so it is used as it was
+    // captured; rebasing it through the preferred base would move the write by the
+    // run's whole relocation distance.
     void InstallNoPhysicsSleep()
     {
         if (!Loader::Enabled("NoPhysicsSleep"))
@@ -1120,13 +1121,7 @@ namespace
         if (pattern.empty())
             return;
 
-        const auto& game = Game::Get();
-        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(game.ImageBase());
-        const auto* headers =
-            reinterpret_cast<const IMAGE_NT_HEADERS*>(game.ImageBase() + dos->e_lfanew);
-        const auto threshold = *pattern.get_first<uint32_t>(-38);
-        injector::WriteMemory<uint32_t>(
-            game.ImageBase() + (threshold - headers->OptionalHeader.ImageBase), 0u, true);
+        injector::WriteMemory<uint32_t>(*pattern.get_first<uint32_t>(-38), 0u, true);
     }
 
     // The game waits ten ticks when the window is minimized; the original writes
@@ -1243,18 +1238,6 @@ namespace
         return 0;
     }
 
-    // A captured pattern operand is an address in the image's own coordinate
-    // system. The dump places that image at a heap address, so the operand is
-    // rebased through the image's preferred base; in the game the two are equal.
-    uint32_t GameAddress(uint32_t value)
-    {
-        const auto host = Game::Get().ImageBase();
-        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(host);
-        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(host + dos->e_lfanew);
-        return static_cast<uint32_t>(
-            host + (value - static_cast<uint32_t>(nt->OptionalHeader.ImageBase)));
-    }
-
     // RestoreDeathMusic's option word. The original's loader preamble stores it
     // from the INI before any body runs and the gate body tests it at run time;
     // ours is set in the publish tier, once the key is known to be on.
@@ -1301,7 +1284,10 @@ namespace
     // MouseFix's published words, read before the sites are written: the two axis
     // pointers, the invert byte, the game's frame clock and the two resumes. The
     // first three are absolute operands of the sites the install tier overwrites,
-    // which is why the publish tier owns them.
+    // which is why the publish tier owns them. Each operand is a live VA (the
+    // loader has already applied the image's relocations; the offline dump
+    // relocates its copy), so the captured dword is the address and is stored as
+    // read.
     void PublishMouseFix()
     {
         if (!Loader::Enabled("MouseFix"))
@@ -1310,13 +1296,13 @@ namespace
         auto pattern = find_pattern("51 8B 44 24 0C 85 C0 0F 57 D2 56 8B 35 ? ? ? ? 57 8B 3D ? ? ? ? F3 0F 11 54 24 08 75 0C");
         if (!pattern.empty())
         {
-            zpatch_mf_x = GameAddress(*pattern.get_first<uint32_t>(13));
-            zpatch_mf_y = GameAddress(*pattern.get_first<uint32_t>(20));
+            zpatch_mf_x = *pattern.get_first<uint32_t>(13);
+            zpatch_mf_y = *pattern.get_first<uint32_t>(20);
         }
 
         pattern = find_pattern("8B 44 24 08 8B 4C 24 04 50 51 E8 ? ? ? ? 83 C4 08 83 3D");
         if (!pattern.empty())
-            zpatch_mf_flag = GameAddress(*pattern.get_first<uint32_t>(20));
+            zpatch_mf_flag = *pattern.get_first<uint32_t>(20);
 
         pattern = find_pattern("83 EC 08 DB 05 ? ? ? ? 68");
         if (!pattern.empty())
