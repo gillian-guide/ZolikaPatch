@@ -65,3 +65,20 @@ The artifact is `build/win-x86/Release/ZolikaPatch.asi`; copy it next to `GTAIV.
 
 Licensed under the GPL-3.0; see `LICENSE` and `NOTICE`. The vendored libraries keep their own licences.
 
+## Licence and attribution
+
+This tree is licensed under the **GNU General Public License v3.0** (see LICENSE), because
+its architecture is GTAIV.EFLC.FusionFix's and that project is GPL-3.0:
+
+- GTAIV.EFLC.FusionFix (https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix) — the module
+  layout, the Event<Args...> tiers, the Game install context, the plain-translation-unit
+  startup driver and the ind_pattern house idiom are its design, adapted here. Where a file
+  is a direct adaptation rather than an independent implementation it says so in its header.
+- injector (https://github.com/thelink2012/injector), Hooking.Patterns
+  (https://github.com/Hooking-Patterns/Hooking.Patterns) and IniReader
+  (https://github.com/Rookfighter/inifile-cpp) are vendored under external/ at the pinned
+  commits recorded there, each under its own licence.
+- ZolikaPatch itself (Zolika1351) is the specification this reimplements; no source was
+  copied from it, and the recovered addresses, signatures, defaults and behaviour are
+  documented with provenance throughout docs/.
+
