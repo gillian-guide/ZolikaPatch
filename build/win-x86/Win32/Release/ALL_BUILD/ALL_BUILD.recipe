@@ -1,0 +1,53 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <ProjectOutputs>
+    <ProjectOutput>
+      <FullPath>D:\GitHub\OpenZDecomp\decomp\readable-fusion\build\win-x86\Release\ZERO_CHECK</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\GitHub\OpenZDecomp\decomp\readable-fusion\build\win-x86\Release\ZolikaPatch.asi</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\GitHub\OpenZDecomp\decomp\readable-fusion\build\win-x86\Release\zp_dfa_close.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\GitHub\OpenZDecomp\decomp\readable-fusion\build\win-x86\Release\zp_dump.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\GitHub\OpenZDecomp\decomp\readable-fusion\build\win-x86\Release\zp_fault_parity.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\GitHub\OpenZDecomp\decomp\readable-fusion\build\win-x86\Release\zp_model_tables.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\GitHub\OpenZDecomp\decomp\readable-fusion\build\win-x86\Release\zp_native_guard.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\GitHub\OpenZDecomp\decomp\readable-fusion\build\win-x86\Release\zp_nms_arena.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\GitHub\OpenZDecomp\decomp\readable-fusion\build\win-x86\Release\zp_ooc_init.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\GitHub\OpenZDecomp\decomp\readable-fusion\build\win-x86\Release\zp_pe_check.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\GitHub\OpenZDecomp\decomp\readable-fusion\build\win-x86\Release\zp_salt_check.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\GitHub\OpenZDecomp\decomp\readable-fusion\build\win-x86\Release\zp_save_walk.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\GitHub\OpenZDecomp\decomp\readable-fusion\build\win-x86\Release\zp_speedup_clock.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\GitHub\OpenZDecomp\decomp\readable-fusion\build\win-x86\Release\zp_tests.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\GitHub\OpenZDecomp\decomp\readable-fusion\build\win-x86\Release\ALL_BUILD</FullPath>
+    </ProjectOutput>
+  </ProjectOutputs>
+  <ContentFiles />
+  <SatelliteDlls />
+  <NonRecipeFileRefs />
+</Project>

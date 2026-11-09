@@ -1,0 +1,25 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_modules.dir\\Release\\game.obj",
+            "outputs": [
+                "zp_modules.dir\\Release\\",
+                "zp_modules.dir\\Release\\game.ifc"
+            ],
+            "provides": [
+                {
+                    "logical-name": "game",
+                    "source-path": "d:\\github\\openzdecomp\\decomp\\readable-fusion\\source\\game.ixx",
+                    "is-interface": true
+                }
+            ],
+            "requires": [
+                {
+                    "logical-name": "common"
+                }
+            ]
+        }
+    ]
+}

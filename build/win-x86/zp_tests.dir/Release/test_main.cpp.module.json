@@ -1,0 +1,35 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_tests.dir\\Release\\test_main.obj",
+            "outputs": [
+                "zp_tests.dir\\Release\\"
+            ],
+            "requires": [
+                {
+                    "logical-name": "bodies"
+                },
+                {
+                    "logical-name": "common"
+                },
+                {
+                    "logical-name": "config"
+                },
+                {
+                    "logical-name": "game"
+                },
+                {
+                    "logical-name": "loader"
+                },
+                {
+                    "logical-name": "options"
+                },
+                {
+                    "logical-name": "patch"
+                }
+            ]
+        }
+    ]
+}

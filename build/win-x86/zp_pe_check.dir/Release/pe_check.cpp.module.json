@@ -1,0 +1,13 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_pe_check.dir\\Release\\pe_check.obj",
+            "outputs": [
+                "zp_pe_check.dir\\Release\\"
+            ],
+            "requires": []
+        }
+    ]
+}

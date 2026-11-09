@@ -1,0 +1,17 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_save_walk.dir\\Release\\save_walk.obj",
+            "outputs": [
+                "zp_save_walk.dir\\Release\\"
+            ],
+            "requires": [
+                {
+                    "logical-name": "loading"
+                }
+            ]
+        }
+    ]
+}

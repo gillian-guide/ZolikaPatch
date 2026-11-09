@@ -1,0 +1,17 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_native_guard.dir\\Release\\native_guard.obj",
+            "outputs": [
+                "zp_native_guard.dir\\Release\\"
+            ],
+            "requires": [
+                {
+                    "logical-name": "native"
+                }
+            ]
+        }
+    ]
+}

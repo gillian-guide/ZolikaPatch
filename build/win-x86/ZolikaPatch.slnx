@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Solution>
+	<Configurations>
+		<BuildType Name="Debug"/>
+		<BuildType Name="Release"/>
+		<BuildType Name="Trace"/>
+		<Platform Name="Win32"/>
+	</Configurations>
+	<Project Path="ZolikaPatch.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="31027dd6-344f-3657-a08e-3531da2900ed">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="zp_modules.vcxproj"/>
+	</Project>
+	<Project Path="zp_dfa_close.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="720d1b1a-0ea1-3603-b352-78b16d28f94b">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="zp_modules.vcxproj"/>
+	</Project>
+	<Project Path="zp_dump.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="f1e4d66b-db55-3ebf-aca5-141dd065d371">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="ZolikaPatch.vcxproj"/>
+		<BuildDependency Project="zp_modules.vcxproj"/>
+	</Project>
+	<Project Path="zp_fault_parity.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="199bf90a-f4dd-333d-b6d8-d0103f091b80">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="zp_modules.vcxproj"/>
+	</Project>
+	<Project Path="zp_model_tables.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="0f14ae52-9ac0-38ec-ae4d-4d5ada587885">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="zp_modules.vcxproj"/>
+	</Project>
+	<Project Path="zp_modules.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="5d2ea48d-ec66-3dbb-bcc5-37f9f29f17a6">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="zp_native_guard.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="76a0cb38-8acb-3d4e-8d72-369f3aaf4d7c">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="zp_modules.vcxproj"/>
+	</Project>
+	<Project Path="zp_nms_arena.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="8dfee388-d5b7-335a-8caf-ef243b71fe0c">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="zp_modules.vcxproj"/>
+	</Project>
+	<Project Path="zp_ooc_init.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="27e2fa81-09f7-363a-b988-3daf419883e0">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="zp_modules.vcxproj"/>
+	</Project>
+	<Project Path="zp_pe_check.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="f7f03cb1-af99-3129-a3a6-e8ae98302789">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="ZolikaPatch.vcxproj"/>
+	</Project>
+	<Project Path="zp_salt_check.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="82f14ba3-8195-3324-833a-e435cf2f8309">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="ZolikaPatch.vcxproj"/>
+		<BuildDependency Project="zp_modules.vcxproj"/>
+	</Project>
+	<Project Path="zp_save_walk.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="ffc58208-e8c5-34b5-b5fc-98ce7d61875d">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="zp_modules.vcxproj"/>
+	</Project>
+	<Project Path="zp_speedup_clock.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="ea1f629d-d4f4-3fe0-b315-91918e3ec617">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="zp_modules.vcxproj"/>
+	</Project>
+	<Project Path="zp_tests.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="bbf3ffbc-eb95-3025-a6a5-236f0089bbb1">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="ZolikaPatch.vcxproj"/>
+		<BuildDependency Project="zp_modules.vcxproj"/>
+	</Project>
+	<Folder Name="/CMakePredefinedTargets/">
+		<Project Path="ALL_BUILD.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="3b356ddd-e752-3184-922c-a278045fd3bf" DefaultStartup="true">
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+			<BuildDependency Project="ZolikaPatch.vcxproj"/>
+			<BuildDependency Project="zp_dfa_close.vcxproj"/>
+			<BuildDependency Project="zp_dump.vcxproj"/>
+			<BuildDependency Project="zp_fault_parity.vcxproj"/>
+			<BuildDependency Project="zp_model_tables.vcxproj"/>
+			<BuildDependency Project="zp_modules.vcxproj"/>
+			<BuildDependency Project="zp_native_guard.vcxproj"/>
+			<BuildDependency Project="zp_nms_arena.vcxproj"/>
+			<BuildDependency Project="zp_ooc_init.vcxproj"/>
+			<BuildDependency Project="zp_pe_check.vcxproj"/>
+			<BuildDependency Project="zp_salt_check.vcxproj"/>
+			<BuildDependency Project="zp_save_walk.vcxproj"/>
+			<BuildDependency Project="zp_speedup_clock.vcxproj"/>
+			<BuildDependency Project="zp_tests.vcxproj"/>
+			<Build Solution="Debug|*" Project="false"/>
+			<Build Solution="Release|*" Project="false"/>
+			<Build Solution="Trace|*" Project="false"/>
+		</Project>
+		<Project Path="RUN_TESTS.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="1376f2bc-d244-32e4-8dc9-25a4d0ec9d64">
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+			<Build Solution="Debug|*" Project="false"/>
+			<Build Solution="Release|*" Project="false"/>
+			<Build Solution="Trace|*" Project="false"/>
+		</Project>
+		<Project Path="ZERO_CHECK.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="99a3b0c4-6a28-3970-ba23-eb5756a586da"/>
+	</Folder>
+</Solution>

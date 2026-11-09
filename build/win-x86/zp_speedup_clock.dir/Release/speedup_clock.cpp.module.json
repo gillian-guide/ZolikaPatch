@@ -1,0 +1,17 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_speedup_clock.dir\\Release\\speedup_clock.obj",
+            "outputs": [
+                "zp_speedup_clock.dir\\Release\\"
+            ],
+            "requires": [
+                {
+                    "logical-name": "misc"
+                }
+            ]
+        }
+    ]
+}

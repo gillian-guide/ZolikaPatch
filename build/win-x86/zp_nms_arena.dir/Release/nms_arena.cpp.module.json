@@ -1,0 +1,17 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_nms_arena.dir\\Release\\nms_arena.obj",
+            "outputs": [
+                "zp_nms_arena.dir\\Release\\"
+            ],
+            "requires": [
+                {
+                    "logical-name": "loading"
+                }
+            ]
+        }
+    ]
+}

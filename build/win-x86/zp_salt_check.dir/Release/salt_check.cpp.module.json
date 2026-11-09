@@ -1,0 +1,26 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_salt_check.dir\\Release\\salt_check.obj",
+            "outputs": [
+                "zp_salt_check.dir\\Release\\"
+            ],
+            "requires": [
+                {
+                    "logical-name": "common"
+                },
+                {
+                    "logical-name": "game"
+                },
+                {
+                    "logical-name": "native"
+                },
+                {
+                    "logical-name": "patch"
+                }
+            ]
+        }
+    ]
+}

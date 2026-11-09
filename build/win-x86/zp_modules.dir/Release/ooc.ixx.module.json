@@ -1,0 +1,34 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_modules.dir\\Release\\ooc.obj",
+            "outputs": [
+                "zp_modules.dir\\Release\\",
+                "zp_modules.dir\\Release\\ooc.ifc"
+            ],
+            "provides": [
+                {
+                    "logical-name": "ooc",
+                    "source-path": "d:\\github\\openzdecomp\\decomp\\readable-fusion\\source\\ooc.ixx",
+                    "is-interface": true
+                }
+            ],
+            "requires": [
+                {
+                    "logical-name": "bodies"
+                },
+                {
+                    "logical-name": "common"
+                },
+                {
+                    "logical-name": "loader"
+                },
+                {
+                    "logical-name": "patch"
+                }
+            ]
+        }
+    ]
+}

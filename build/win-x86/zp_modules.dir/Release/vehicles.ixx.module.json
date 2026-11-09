@@ -1,0 +1,49 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_modules.dir\\Release\\vehicles.obj",
+            "outputs": [
+                "zp_modules.dir\\Release\\",
+                "zp_modules.dir\\Release\\vehicles.ifc"
+            ],
+            "provides": [
+                {
+                    "logical-name": "vehicles",
+                    "source-path": "d:\\github\\openzdecomp\\decomp\\readable-fusion\\source\\vehicles.ixx",
+                    "is-interface": true
+                }
+            ],
+            "requires": [
+                {
+                    "logical-name": "bodies"
+                },
+                {
+                    "logical-name": "bytes"
+                },
+                {
+                    "logical-name": "common"
+                },
+                {
+                    "logical-name": "config"
+                },
+                {
+                    "logical-name": "loader"
+                },
+                {
+                    "logical-name": "native"
+                },
+                {
+                    "logical-name": "options"
+                },
+                {
+                    "logical-name": "patch"
+                },
+                {
+                    "logical-name": "shared"
+                }
+            ]
+        }
+    ]
+}

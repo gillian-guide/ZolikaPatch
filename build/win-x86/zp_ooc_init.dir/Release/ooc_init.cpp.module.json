@@ -1,0 +1,17 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_ooc_init.dir\\Release\\ooc_init.obj",
+            "outputs": [
+                "zp_ooc_init.dir\\Release\\"
+            ],
+            "requires": [
+                {
+                    "logical-name": "ooc"
+                }
+            ]
+        }
+    ]
+}

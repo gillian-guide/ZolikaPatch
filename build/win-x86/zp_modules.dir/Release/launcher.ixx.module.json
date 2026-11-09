@@ -1,0 +1,40 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_modules.dir\\Release\\launcher.obj",
+            "outputs": [
+                "zp_modules.dir\\Release\\",
+                "zp_modules.dir\\Release\\launcher.ifc"
+            ],
+            "provides": [
+                {
+                    "logical-name": "launcher",
+                    "source-path": "d:\\github\\openzdecomp\\decomp\\readable-fusion\\source\\launcher.ixx",
+                    "is-interface": true
+                }
+            ],
+            "requires": [
+                {
+                    "logical-name": "bodies"
+                },
+                {
+                    "logical-name": "bytes"
+                },
+                {
+                    "logical-name": "common"
+                },
+                {
+                    "logical-name": "game"
+                },
+                {
+                    "logical-name": "loader"
+                },
+                {
+                    "logical-name": "patch"
+                }
+            ]
+        }
+    ]
+}

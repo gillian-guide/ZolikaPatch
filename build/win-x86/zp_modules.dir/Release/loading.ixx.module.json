@@ -1,0 +1,46 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_modules.dir\\Release\\loading.obj",
+            "outputs": [
+                "zp_modules.dir\\Release\\",
+                "zp_modules.dir\\Release\\loading.ifc"
+            ],
+            "provides": [
+                {
+                    "logical-name": "loading",
+                    "source-path": "d:\\github\\openzdecomp\\decomp\\readable-fusion\\source\\loading.ixx",
+                    "is-interface": true
+                }
+            ],
+            "requires": [
+                {
+                    "logical-name": "bodies"
+                },
+                {
+                    "logical-name": "bytes"
+                },
+                {
+                    "logical-name": "common"
+                },
+                {
+                    "logical-name": "config"
+                },
+                {
+                    "logical-name": "game"
+                },
+                {
+                    "logical-name": "loader"
+                },
+                {
+                    "logical-name": "patch"
+                },
+                {
+                    "logical-name": "shared"
+                }
+            ]
+        }
+    ]
+}

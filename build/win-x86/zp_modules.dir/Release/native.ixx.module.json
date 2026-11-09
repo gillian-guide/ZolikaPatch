@@ -1,0 +1,31 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_modules.dir\\Release\\native.obj",
+            "outputs": [
+                "zp_modules.dir\\Release\\",
+                "zp_modules.dir\\Release\\native.ifc"
+            ],
+            "provides": [
+                {
+                    "logical-name": "native",
+                    "source-path": "d:\\github\\openzdecomp\\decomp\\readable-fusion\\source\\native.ixx",
+                    "is-interface": true
+                }
+            ],
+            "requires": [
+                {
+                    "logical-name": "bodies"
+                },
+                {
+                    "logical-name": "common"
+                },
+                {
+                    "logical-name": "patch"
+                }
+            ]
+        }
+    ]
+}

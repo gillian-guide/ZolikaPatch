@@ -1,0 +1,17 @@
+D:/GitHub/OpenZDecomp/decomp/readable-fusion/build/win-x86/CMakeFiles/zp_modules.dir
+D:/GitHub/OpenZDecomp/decomp/readable-fusion/build/win-x86/CMakeFiles/ZolikaPatch.dir
+D:/GitHub/OpenZDecomp/decomp/readable-fusion/build/win-x86/CMakeFiles/zp_tests.dir
+D:/GitHub/OpenZDecomp/decomp/readable-fusion/build/win-x86/CMakeFiles/zp_model_tables.dir
+D:/GitHub/OpenZDecomp/decomp/readable-fusion/build/win-x86/CMakeFiles/zp_save_walk.dir
+D:/GitHub/OpenZDecomp/decomp/readable-fusion/build/win-x86/CMakeFiles/zp_native_guard.dir
+D:/GitHub/OpenZDecomp/decomp/readable-fusion/build/win-x86/CMakeFiles/zp_nms_arena.dir
+D:/GitHub/OpenZDecomp/decomp/readable-fusion/build/win-x86/CMakeFiles/zp_dfa_close.dir
+D:/GitHub/OpenZDecomp/decomp/readable-fusion/build/win-x86/CMakeFiles/zp_speedup_clock.dir
+D:/GitHub/OpenZDecomp/decomp/readable-fusion/build/win-x86/CMakeFiles/zp_ooc_init.dir
+D:/GitHub/OpenZDecomp/decomp/readable-fusion/build/win-x86/CMakeFiles/zp_fault_parity.dir
+D:/GitHub/OpenZDecomp/decomp/readable-fusion/build/win-x86/CMakeFiles/zp_dump.dir
+D:/GitHub/OpenZDecomp/decomp/readable-fusion/build/win-x86/CMakeFiles/zp_salt_check.dir
+D:/GitHub/OpenZDecomp/decomp/readable-fusion/build/win-x86/CMakeFiles/zp_pe_check.dir
+D:/GitHub/OpenZDecomp/decomp/readable-fusion/build/win-x86/CMakeFiles/RUN_TESTS.dir
+D:/GitHub/OpenZDecomp/decomp/readable-fusion/build/win-x86/CMakeFiles/ALL_BUILD.dir
+D:/GitHub/OpenZDecomp/decomp/readable-fusion/build/win-x86/CMakeFiles/ZERO_CHECK.dir

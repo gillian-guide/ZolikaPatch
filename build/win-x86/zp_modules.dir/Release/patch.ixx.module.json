@@ -1,0 +1,28 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_modules.dir\\Release\\patch.obj",
+            "outputs": [
+                "zp_modules.dir\\Release\\",
+                "zp_modules.dir\\Release\\patch.ifc"
+            ],
+            "provides": [
+                {
+                    "logical-name": "patch",
+                    "source-path": "d:\\github\\openzdecomp\\decomp\\readable-fusion\\source\\patch.ixx",
+                    "is-interface": true
+                }
+            ],
+            "requires": [
+                {
+                    "logical-name": "common"
+                },
+                {
+                    "logical-name": "game"
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="D:\GitHub\OpenZDecomp\decomp\readable-fusion\build\win-x86\CMakeFiles\4449d65d72926210708125244baed46f\RUN_TESTS_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{5D5CD370-BE29-36C5-9C7E-A69E7450F513}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

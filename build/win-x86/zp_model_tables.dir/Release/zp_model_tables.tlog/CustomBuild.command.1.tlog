@@ -1,0 +1,10 @@
+^D:\GITHUB\OPENZDECOMP\DECOMP\READABLE-FUSION\CMAKELISTS.TXT
+setlocal
+C:\Users\Gillian\scoop\apps\cmake\current\bin\cmake.exe -SD:/GitHub/OpenZDecomp/decomp/readable-fusion -BD:/GitHub/OpenZDecomp/decomp/readable-fusion/build/win-x86 --check-stamp-file D:/GitHub/OpenZDecomp/decomp/readable-fusion/build/win-x86/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

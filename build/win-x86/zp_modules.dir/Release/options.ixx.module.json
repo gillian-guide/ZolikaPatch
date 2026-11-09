@@ -1,0 +1,31 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_modules.dir\\Release\\options.obj",
+            "outputs": [
+                "zp_modules.dir\\Release\\",
+                "zp_modules.dir\\Release\\options.ifc"
+            ],
+            "provides": [
+                {
+                    "logical-name": "options",
+                    "source-path": "d:\\github\\openzdecomp\\decomp\\readable-fusion\\source\\options.ixx",
+                    "is-interface": true
+                }
+            ],
+            "requires": [
+                {
+                    "logical-name": "common"
+                },
+                {
+                    "logical-name": "config"
+                },
+                {
+                    "logical-name": "game"
+                }
+            ]
+        }
+    ]
+}

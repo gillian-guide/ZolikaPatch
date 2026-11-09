@@ -1,0 +1,65 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "ZolikaPatch.dir\\Release\\dllmain.obj",
+            "outputs": [
+                "ZolikaPatch.dir\\Release\\"
+            ],
+            "requires": [
+                {
+                    "logical-name": "common"
+                },
+                {
+                    "logical-name": "config"
+                },
+                {
+                    "logical-name": "game"
+                },
+                {
+                    "logical-name": "loader"
+                },
+                {
+                    "logical-name": "options"
+                },
+                {
+                    "logical-name": "shared"
+                },
+                {
+                    "logical-name": "native"
+                },
+                {
+                    "logical-name": "stability"
+                },
+                {
+                    "logical-name": "vehicles"
+                },
+                {
+                    "logical-name": "useless_checks"
+                },
+                {
+                    "logical-name": "graphics"
+                },
+                {
+                    "logical-name": "launcher"
+                },
+                {
+                    "logical-name": "loading"
+                },
+                {
+                    "logical-name": "audio"
+                },
+                {
+                    "logical-name": "misc"
+                },
+                {
+                    "logical-name": "menu"
+                },
+                {
+                    "logical-name": "ooc"
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,40 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_modules.dir\\Release\\menu.obj",
+            "outputs": [
+                "zp_modules.dir\\Release\\",
+                "zp_modules.dir\\Release\\menu.ifc"
+            ],
+            "provides": [
+                {
+                    "logical-name": "menu",
+                    "source-path": "d:\\github\\openzdecomp\\decomp\\readable-fusion\\source\\menu.ixx",
+                    "is-interface": true
+                }
+            ],
+            "requires": [
+                {
+                    "logical-name": "bodies"
+                },
+                {
+                    "logical-name": "common"
+                },
+                {
+                    "logical-name": "game"
+                },
+                {
+                    "logical-name": "loader"
+                },
+                {
+                    "logical-name": "native"
+                },
+                {
+                    "logical-name": "patch"
+                }
+            ]
+        }
+    ]
+}

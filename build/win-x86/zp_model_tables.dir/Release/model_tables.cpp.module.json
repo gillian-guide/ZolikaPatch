@@ -1,0 +1,26 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_model_tables.dir\\Release\\model_tables.obj",
+            "outputs": [
+                "zp_model_tables.dir\\Release\\"
+            ],
+            "requires": [
+                {
+                    "logical-name": "common"
+                },
+                {
+                    "logical-name": "config"
+                },
+                {
+                    "logical-name": "game"
+                },
+                {
+                    "logical-name": "shared"
+                }
+            ]
+        }
+    ]
+}

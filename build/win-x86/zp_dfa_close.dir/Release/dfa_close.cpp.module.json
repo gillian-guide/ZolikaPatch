@@ -1,0 +1,17 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_dfa_close.dir\\Release\\dfa_close.obj",
+            "outputs": [
+                "zp_dfa_close.dir\\Release\\"
+            ],
+            "requires": [
+                {
+                    "logical-name": "launcher"
+                }
+            ]
+        }
+    ]
+}

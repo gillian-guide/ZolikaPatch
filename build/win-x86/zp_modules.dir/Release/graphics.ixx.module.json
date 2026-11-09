@@ -1,0 +1,40 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_modules.dir\\Release\\graphics.obj",
+            "outputs": [
+                "zp_modules.dir\\Release\\",
+                "zp_modules.dir\\Release\\graphics.ifc"
+            ],
+            "provides": [
+                {
+                    "logical-name": "graphics",
+                    "source-path": "d:\\github\\openzdecomp\\decomp\\readable-fusion\\source\\graphics.ixx",
+                    "is-interface": true
+                }
+            ],
+            "requires": [
+                {
+                    "logical-name": "bodies"
+                },
+                {
+                    "logical-name": "bytes"
+                },
+                {
+                    "logical-name": "common"
+                },
+                {
+                    "logical-name": "game"
+                },
+                {
+                    "logical-name": "loader"
+                },
+                {
+                    "logical-name": "patch"
+                }
+            ]
+        }
+    ]
+}

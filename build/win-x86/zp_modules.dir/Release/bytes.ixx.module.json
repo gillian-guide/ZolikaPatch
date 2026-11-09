@@ -1,0 +1,25 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "zp_modules.dir\\Release\\bytes.obj",
+            "outputs": [
+                "zp_modules.dir\\Release\\",
+                "zp_modules.dir\\Release\\bytes.ifc"
+            ],
+            "provides": [
+                {
+                    "logical-name": "bytes",
+                    "source-path": "d:\\github\\openzdecomp\\decomp\\readable-fusion\\source\\bytes.ixx",
+                    "is-interface": true
+                }
+            ],
+            "requires": [
+                {
+                    "logical-name": "common"
+                }
+            ]
+        }
+    ]
+}
