@@ -79,6 +79,7 @@ target_sources(zp_modules PUBLIC
     source/loading.ixx
     source/audio.ixx
     source/misc.ixx
+    source/menu.ixx
     source/ooc.ixx)
 target_include_directories(zp_modules PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/source

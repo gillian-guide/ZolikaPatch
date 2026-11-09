@@ -113,8 +113,12 @@ only. `NewSavesCompatibility`, the last substantial
 feature key, is closed by the converter recorded in its own section below;
 `HighQualityReflections` closed with the site-arithmetic resolution recorded below.
 
-- **98 of 99 option keys closed**;
-- **164 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+- **98 of 99 option keys closed**; the two former no-handler keys
+  (`AddOptionsInMenu`, `FixPCIDKickbug`) are now implemented too, so the scoreboard's
+  count is backed by arms rather than by two empty cells (their effects are
+  conditional on the companion library and on the live registry, so the cells stay
+  empty and the count does not move);
+- **174 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe, and the compiled bodies listed in
   [`rebuilt.md`](rebuilt.md) are rebuilt in C++ instead, with no proof row. That file
@@ -2271,9 +2275,9 @@ handler's own strings and per-build site VAs are now pinned in
 | `VSyncFix` | `0x100503B0` | gate `build not in {1,2,3,4,5,9,13}`; two patterns; a 4-byte module pointer `&unk_10159BC0` at `match+13` and at `match+30` | `InstallVSyncFix` writes `&zpatch_vsync_flag` at the same two offsets; the catalogue mask is the same gate | agrees |
 | `Patch6and7RemoveModChecks` | `0x10044710` | gate `build == 7 || build == 8`; 16 fixed-RVA bytes on 1.0.6.0 and 21 on 1.0.7.0 (rows below) | per-build signature rows resolve to exactly those RVAs and bytes | agrees |
 | `Patch7RemoveModChecks` | **none of its own** | it is the OR alternative in `0x100523C0`, feeding the same `0x10044710`: with only `Patch7RemoveModChecks=1` the original writes the full 16/21 bytes | gated only on `Patch6and7RemoveModChecks`, so it wrote nothing | fixed, baseline short |
-| `AddOptionsInMenu` | none of its own | no dedicated install handler, but **not write-free**: sets `byte_10158038`; `sub_10052380` then loads `IVMenuAPI.asi`, and only when that load succeeds does the caller run `sub_1001EDE0` (scan `6A 0A 56 50 FF D2 A1`, `mov byte ptr [match+1], 6`) plus `sub_10050BD0` and the two `0x10050A30`/`0x10050A40` callback registrations | no arm at all | no handler; integration unimplemented |
+| `AddOptionsInMenu` | none of its own | no dedicated install handler, but **not write-free**: sets `byte_10158038`; `sub_10052380` then loads `IVMenuAPI.asi`, and only when that load succeeds does the caller run `sub_1001EDE0` (scan `6A 0A 56 50 FF D2 A1`, `mov byte ptr [match+1], 6`) plus `sub_10050BD0` and the two `0x10050A30`/`0x10050A40` callback registrations | `source/menu.ixx`: the probe, the writer, the three death-music installs (the second half of the original's OR), both registrations and all four callbacks | implemented (see the section above) |
 | `DebugPrintSpawns` | none | no image write: read **only** inside the `FreezeCarFix` gate, raises `byte_10159C15`, which the spawn probe `0x10037510` reads | read inside the same gate (`zpatch_spawns_debug`) | agrees (no handler) |
-| `FixPCIDKickbug` | none | no image write: `SHDeleteValueW(HKEY_CURRENT_USER, L"Software\\Classes\\Software\\Microsoft\\XLive", L"PCID")` | no arm at all | no handler, unimplemented |
+| `FixPCIDKickbug` | none | no image write: `SHDeleteValueW(HKEY_CURRENT_USER, L"Software\\Classes\\Software\\Microsoft\\XLive", L"PCID")` | `source/misc.ixx`: the same call behind the same `== 1` gate plus the launch arm's module guard (the registry value is the user's, not the image's) | implemented (see the section above) |
 | `LaunchWithPlayGTAIV` | `0x100441B0` | gate `sub_10003A10` (a live `PlayGTAIV.exe` process) plus a switch with cases 1/5/7/8/9; 16 bytes `"PlayGTAIV.exe\0e\0"` at two fixed RVAs per case | same sites, payload, build list; the gate was `Game::Module()==nullptr`, not the process check | fixed |
 
 ### `BenchmarkFix`: the second resume was the first match's
@@ -2368,42 +2372,341 @@ the module guard as the offline-dump guard, so the game behaviour is the
 handler's and the pinned-base dump stays inert on all nine builds (0 rows: the
 dump attaches an image, not a loaded module, so the whole arm is outside it).
 
-### The four keys with no install handler
+### `OverrideGTADatPathTo` and `DebugPrintSpawns`: no handler, no write
 
 `OverrideGTADatPathTo` and `DebugPrintSpawns` are implemented and their empty
 baseline cells are correct: the first only copies into a plugin global, the
 second only sets a flag that is read inside `FreezeCarFix`'s gate. Neither writes
 an image byte on any build, so no cell can or should show one.
 
-`AddOptionsInMenu` and `FixPCIDKickbug` are **unimplemented in this tree**, and one
-of them is not write-free:
+### The two former unimplemented keys: `AddOptionsInMenu` and `FixPCIDKickbug`
 
-* `AddOptionsInMenu` sets `byte_10158038` (the IDB's static initial value is 1, the
-  same as the handler's absent default). `sub_10052380` then does
-  `GetModuleHandleA("IVMenuAPI.asi")` / `LoadLibraryA("IVMenuAPI.asi")` and returns
-  1 only when the library is (now) loaded; the caller then runs three integration
-  steps: `sub_1001EDE0`, `sub_10050BD0` and the two callback registrations at
-  `0x10055BEF` (`push offset sub_10050A40; push offset sub_10050A30`).
-  `sub_1001EDE0` is an image writer: it calls `sub_1001ECB0` (scan
-  `75 ? 8B 0D ? ? ? ? 51 FF 15 ? ? ? ? 85 C0 75 ? 8B 15`, write `9090` only when
-  `DoNotPauseOnMinimize` set `byte_1015AD43`, otherwise the original word back),
-  then scans `6A 0A 56 50 FF D2 A1` and does `mov byte ptr [v2], 6` at the match's
-  `+1` (`0x1001EE23`). The tree has no IVMenuAPI integration, so the key does
-  nothing here -- and, because that write is conditional on the library loading,
-  the baseline produced without `IVMenuAPI.asi` correctly has an empty cell. The
-  one byte it would add is the same site and value `DoNotPauseOnMinimize` writes
-  (`source/audio.ixx`, `6A 0A 56 50 FF D2 A1`), so the shared write is covered;
-  the load and the three registrations are not. Implementing the key means
-  porting that integration, not adding a one-line install.
-* `FixPCIDKickbug` calls `SHDeleteValueW(HKEY_CURRENT_USER,
-  L"Software\\Classes\\Software\\Microsoft\\XLive", L"PCID")`. Implementing it
-  is a small registry arm, but it must be kept out of the offline dump (whose
-  per-option cell would otherwise delete the value on every run), so it belongs
-  beside the launch arm's module guard, not in a bare installer.
+Both keys had no arm in the tree before this pass, and one of them is not
+write-free. Both are now implemented. The build-9 per-option dump is byte-identical
+before and after (SHA-256 `E20AF4EA…2845327`), because both arms' effects are
+conditional on state the offline harness does not have: `AddOptionsInMenu` needs
+`IVMenuAPI.asi` to load, and `FixPCIDKickbug` is a live-only registry delete.
 
-Neither key writes an image byte, so the baseline's empty cells are truthful; the
-gap is a behaviour gap, recorded here rather than papered over with a scoreboard
-movement.
+#### `AddOptionsInMenu` (`source/menu.ixx`)
+
+The key is read into `byte_10158038` (`strtol(ini.get(key,"1")) != 0`; the IDB's
+static initial value is 1, the same as the absent default). Its consumer
+`sub_10052380` is the companion-library probe, quoted in full:
+
+```
+10052380  cmp byte_10158038, 0
+10052387  jz  short loc_100523BA
+10052389  push offset "IVMenuAPI.asi"; call ds:GetModuleHandleA
+10052394  test eax, eax
+10052396  jz  short loc_1005239B
+10052398  mov al, 1
+1005239A  retn
+1005239B  cmp byte_101A843C, 0
+100523A2  jnz short loc_100523B3
+100523A4  push offset "IVMenuAPI.asi"; call ds:LoadLibraryA
+100523AF  test eax, eax
+100523B1  jnz short loc_10052398
+100523B3  mov byte_101A843C, 1
+100523BA  xor al, al
+100523BC  retn
+```
+
+Only when it answers 1 does the config walker run the three integration steps. Loading
+a DLL from `DllMain` runs under the loader lock, exactly as the original's config
+function did; the arm does not defer the load to a thread or to an `InitializeASI`-only
+path, and that is the original's behaviour preserved, not an oversight. The walker's
+call sites are:
+
+```
+100557d2  cmp esi, 1                       ; DoNotPauseOnMinimize
+100557d5  jnz short loc_100557E0
+100557d7  mov byte_1015AD43, 1
+100557de  jmp short loc_100557E9
+100557e0  call sub_10052380
+100557e5  test al, al
+100557e7  jz  short loc_100557EE
+100557e9  call sub_1001EDE0
+...
+10055b81  cmp esi, 1                       ; RestoreDeathMusic
+10055b84  jnz short loc_10055B8F
+10055b86  mov byte_10159B86, 1
+10055b8d  jmp short loc_10055B98
+10055b8f  call sub_10052380
+10055b94  test al, al
+10055b96  jz  short loc_10055B9D
+10055b98  call sub_10050BD0
+...
+10055be6  call sub_10052380
+10055beb  test al, al
+10055bed  jz  short loc_10055C39
+10055bef  push offset sub_10050A40
+10055bf4  push offset sub_10050A30
+10055bf9  sub esp, 8
+10055bfc  mov edx, offset aDeathMusic        ; L"Death Music"
+10055c01  push offset aPrefMusicVolum        ; "PREF_MUSIC_VOLUME"
+10055c06  push ecx                          ; a3: a leftover ECX, never read
+10055c07  mov ecx, offset aPrefDeathmusic    ; "PREF_DEATHMUSIC"
+10055c0c  call sub_100522B0
+10055c14  mov edx, offset aPauseGameOnFoc    ; L"Pause Game On Focus Loss"
+10055c19  push offset sub_1001EDC0
+10055c1e  push offset sub_1001EDB0
+10055c23  sub esp, 8
+10055c26  push offset aPrefVsync             ; "PREF_VSYNC"
+10055c2b  push ecx                          ; a3: a leftover ECX, never read
+10055c2c  mov ecx, offset aPrefFocusloss     ; "PREF_FOCUSLOSS"
+10055c31  call sub_100522B0
+```
+
+The first step is the writer `sub_1001EDE0`, transcribed whole (36 instructions):
+
+```
+1001ede0  push ebp
+1001ede1  mov ebp, esp
+1001ede3  sub esp, 0Ch
+1001ede6  mov eax, ___security_cookie
+1001edeb  xor eax, ebp
+1001eded  mov [ebp-4], eax
+1001edf0  push edi
+1001edf1  call sub_1001ECB0
+1001edf6  push 0
+1001edf8  call ds:GetModuleHandleA
+1001edfe  mov edx, eax
+1001ee00  mov ecx, offset "6A 0A 56 50 FF D2 A1"
+1001ee05  call sub_10003830
+1001ee0a  test eax, eax
+1001ee0c  jz  short loc_1001EE33
+1001ee0e  lea edi, [eax+1]
+1001ee11  lea eax, [ebp-8]
+1001ee14  push eax
+1001ee15  push 40h
+1001ee17  push 1
+1001ee19  push edi
+1001ee1a  call ds:VirtualProtect
+1001ee20  lea eax, [ebp-8]
+1001ee23  mov byte ptr [edi], 6
+1001ee26  push eax
+1001ee27  push [ebp-8]
+1001ee2a  push 1
+1001ee2c  push edi
+1001ee2d  call ds:VirtualProtect
+1001ee33  mov ecx, [ebp-4]
+1001ee36  xor ecx, ebp
+1001ee38  pop edi
+1001ee39  call @__security_check_cookie@4
+1001ee3e  mov esp, ebp
+1001ee40  pop ebp
+1001ee41  retn
+```
+
+The `sub_1001ECB0` call is a C++ rebuild, not a transcription: the original is
+compiler output for a function with an EH4 frame and a TLS static-init guard, and
+those are the blocking instructions:
+
+```
+1001ecb3  push 0FFFFFFFFh
+1001ecb5  push offset SEH_1001ECB0
+1001ecba  mov eax, large fs:0
+1001ecd1  lea eax, [ebp-0Ch]
+1001ecd4  mov large fs:0, eax              ; the EH4 frame
+1001ece6  mov ecx, [eax+ecx*4]
+1001ecfb  call __Init_thread_header       ; the one-time-scan TLS guard
+```
+
+The rebuild reproduces its observable rule: one scan of
+`75 ? 8B 0D ? ? ? ? 51 FF 15 ? ? ? ? 85 C0 75 ? 8B 15`, the pre-write word cached
+at `word_1015AD48`, then `9090` when `byte_1015AD43` is set and the cached word back
+when it is clear, written through the original's `VirtualProtect` pair. Because the
+DoNotPauseOnMinimize arm writes the same two bytes earlier in this tree, the scan and
+the pre-write word are resolved in the publish tier (the original's first call sees
+the pristine bytes because it is the one that writes them).
+
+The second step is the death-music installer `sub_10050BD0`, transcribed whole (133
+instructions). It makes three scans and three `E8` installs; the first block is:
+
+```
+10050bd0  push ebp
+10050bd1  mov ebp, esp
+10050bd3  sub esp, 0Ch
+10050bd6  mov eax, ___security_cookie
+10050bdb  xor eax, ebp
+10050bdd  mov [ebp-4], eax
+10050be0  push ebx
+10050be1  push esi
+10050be2  push edi
+10050be3  push 0
+10050be5  call ds:GetModuleHandleA
+10050beb  mov edx, eax
+10050bed  mov ecx, offset "0F 57 C0 F3 0F 11 86 20 02 00 00"
+10050bf2  call sub_10003830
+10050bf7  mov ebx, ds:VirtualProtect
+10050bfd  test eax, eax
+10050bff  jz  short loc_10050C44
+10050c01  lea edi, [eax-0Dh]
+10050c04  lea eax, [ebp-8]
+10050c07  push eax
+10050c08  push 40h
+10050c0a  push 1
+10050c0c  push edi
+10050c0d  call ebx
+10050c0f  lea eax, [ebp-8]
+10050c12  mov byte ptr [edi], 0E8h
+10050c15  push eax
+10050c16  push [ebp-8]
+10050c19  push 1
+10050c1b  push edi
+10050c1c  call ebx
+10050c1e  lea eax, [ebp-8]
+10050c21  push eax
+10050c22  push 40h
+10050c24  push 4
+10050c26  lea esi, [edi+1]
+10050c29  push esi
+10050c2a  call ebx
+10050c2c  mov eax, offset sub_10050AD0
+10050c31  sub eax, edi
+10050c33  sub eax, 5
+10050c36  mov [esi], eax
+10050c38  lea eax, [ebp-8]
+10050c3b  push eax
+10050c3c  push [ebp-8]
+10050c3f  push 4
+10050c41  push esi
+10050c42  call ebx
+```
+
+The second block is the same sequence with the pattern
+`C7 86 04 02 00 00 04 00 00 00 E9`, `lea edi, [eax-0Dh]` and
+`mov eax, offset sub_10050A50`; the third scans
+`E8 ? ? ? ? 84 C0 74 C6 8B BE`, takes the match itself (`mov edi, eax`) and also
+targets `sub_10050A50`. The epilogue is the /GS frame's:
+
+```
+10050cf9  mov ecx, [ebp-4]
+10050cfc  pop edi
+10050cfd  pop esi
+10050cfe  xor ecx, ebp
+10050d00  pop ebx
+10050d01  call @__security_check_cookie@4
+10050d06  mov esp, ebp
+10050d08  pop ebp
+10050d09  retn
+```
+
+The third step is the two `AddIVMenuOption` registrations. `sub_100522B0` is a C++
+rebuild (a plain handler: `GetModuleHandleA("IVMenuAPI.asi")`, then
+`GetProcAddress(..., "AddIVMenuOption")`, then the call). Its arguments are the
+family, the wide title, the fixed `"MENU_DISPLAY_ON_OFF"` type, the preference name,
+`1`, `0`, and the getter/setter pair. The original's third stack argument (the
+`push ecx` above) is never read by `sub_100522B0`, so the rebuild does not carry it;
+the fourth argument, the preference name, is what the export receives.
+
+The death-music install body `sub_10050AD0` is a C++ rebuild too: the same EH4 frame
+and TLS guard (`10050af1 lea eax,[ebp-0Ch]` / `10050af4 mov large fs:0,eax`;
+`10050b13 mov ecx,[eax+ecx*4]` / `10050b28 call __Init_thread_header`) plus the CRT's
+own thread-state helpers. It reproduces the original's observable rule: ask the gate,
+scan `6A 06 68 ? ? ? ? 8D 8C` once, write `rand() % 5 + 1` at site+1, answer 1.
+
+The pieces, and how each is carried:
+
+| piece | recovered VA | instructions | how |
+|---|---:|---:|---|
+| writer `sub_1001EDE0` | `0x1001EDE0` | 36 | transcribed, `ivmenu_writer` |
+| death-music installer `sub_10050BD0` | `0x10050BD0` | 133 | transcribed, `ivmenu_installer` |
+| death-music gate `sub_10050A50` | `0x10050A50` | 41 | transcribed, `ivmenu_death_gate` |
+| two-argument wrapper `sub_1005B1E0` | `0x1005B1E0` | 48 | transcribed, `ivmenu_call_two` |
+| zero-argument bool wrapper `sub_1005B360` | `0x1005B360` | 44 | transcribed, `ivmenu_call_zero_bool` |
+| byte wrapper `sub_1005B490` | `0x1005B490` | 46 | transcribed, `ivmenu_call_byte` |
+| Death Music getter `sub_10050A30` | `0x10050A30` | 2 | transcribed, `ivmenu_death_get` |
+| Death Music setter `sub_10050A40` | `0x10050A40` | 6 | transcribed, `ivmenu_death_set` |
+| focus-loss getter `sub_1001EDB0` | `0x1001EDB0` | 4 | transcribed, `ivmenu_focus_get` |
+| focus-loss setter `sub_1001EDC0` | `0x1001EDC0` | 6 | transcribed, `ivmenu_focus_set` |
+| focus-site writer `sub_1001ECB0` | `0x1001ECB0` | — | C++ rebuild (EH4 + TLS guard) |
+| death-music install body `sub_10050AD0` | `0x10050AD0` | — | C++ rebuild (EH4 + TLS guard) |
+| library probe `sub_10052380` | `0x10052380` | — | C++ rebuild (plain handler) |
+| `AddIVMenuOption` wrapper `sub_100522B0` | `0x100522B0` | — | C++ rebuild (plain handler) |
+
+The four callbacks are the original's streams, not approximations:
+
+```
+10050a30  movzx eax, byte_10159B86          ; Death Music getter
+10050a37  retn
+
+10050a40  push ebp                          ; Death Music setter
+10050a41  mov ebp, esp
+10050a43  cmp [ebp+arg_4], 0
+10050a47  setnz byte_10159B86
+10050a4e  pop ebp
+10050a4f  retn
+
+1001edb0  xor eax, eax                      ; focus-loss getter
+1001edb2  cmp byte_1015AD43, al
+1001edb8  setz al
+1001edbb  retn
+
+1001edc0  push ebp                          ; focus-loss setter
+1001edc1  mov ebp, esp
+1001edc3  cmp [ebp+arg_4], 0
+1001edc7  setz byte_1015AD43
+1001edce  pop ebp
+1001edcf  jmp sub_1001ECB0
+```
+
+The gate and its three wrappers are the same recovered pieces `source/audio.ixx`
+carries for `RestoreDeathMusic`; that module keeps them internal, and this arm needs
+them under its own key, so `source/menu.ixx` carries and proves its own copies. Only
+one copy is live in any configuration: audio's when `RestoreDeathMusic` is on (this
+arm then skips `sub_10050BD0`, because the original's OR calls it once), and the
+menu's when `RestoreDeathMusic` is off and the library loaded. The shared
+`byte_10159B86` is audio's `zpatch_audio_death_music_flag`, so the menu's getter and
+setter drive the same byte whichever gate is installed.
+
+**What is covered and what remains.** The load, the one-byte write, the three
+death-music installs, both registrations and all four callbacks are reproduced. What
+is not:
+
+- the **`ZMenuIV.asi` `GetZMenuVersion` guard** (`sub_10052300`, called
+  unconditionally at `0x1005527B`, not from the `AddOptionsInMenu` chain). It is the
+  other companion-library entry point the original calls; this tree does not
+  implement it, and it is a separate key's gap (the version check at
+  `cmp [ebp-8], 35DD1h`, then `MessageBoxA` + `TerminateProcess`). It is named here
+  so the omission is recorded, not hidden;
+- the **`IVMenuAPI.asi` library itself**: only its `AddIVMenuOption` export is
+  called, and that call is the library's code, not a body to transcribe. No other
+  `IVMenuAPI.asi` entry point is referenced anywhere in the ASI (the only two
+  `GetProcAddress` callers are `sub_100522B0` and `sub_10052300`);
+- the **`push ecx` third argument** of `sub_100522B0` is an undefined leftover
+  register; `sub_100522B0` never reads it, so the rebuild's omission is not
+  observable;
+- no in-game run: whether the menu renders the two options and the callbacks fire is
+  a runtime property.
+
+The harness is inert by construction: `zp_dump` has no `IVMenuAPI.asi` next to it,
+`LoadLibraryA` fails, and the probe's answer is the original's clean skip. The proof
+is the per-option dump: build 9's file is byte-identical before and after this pass
+(SHA-256 `E20AF4EA…2845327`, 384,422 bytes, 12,898 lines).
+
+#### `FixPCIDKickbug` (`source/misc.ixx`)
+
+The whole effect is one call, whose result the original ignores:
+
+```
+100523C0: v332 = sub_1005C160(v469, "FixPCIDKickbug", "1");
+          ...
+          if ( v334 == 1 )
+            SHDeleteValueW(HKEY_CURRENT_USER,
+                           L"Software\\Classes\\Software\\Microsoft\\XLive",
+                           L"PCID");
+```
+
+No image byte is written and there is no build gate; the absent default is `"1"` and
+the shipped INI carries `0`. The arm is `Loader::Enabled("FixPCIDKickbug")`, the same
+`std::stoi(...) == 1` gate, with the launch arm's module guard in front of it: the
+offline dump attaches an image, not a loaded module, and the registry value is the
+user's, not the image's. Measured on this machine: the value
+`HKCU\Software\Classes\Software\Microsoft\XLive\PCID` was
+`11327764130696386362` before and after a full per-option dump (the `FixPCIDKickbug`
+cell sets the key to 1), so the guard is what keeps the harness from deleting it.
+
 
 ### Measured
 
@@ -2422,6 +2725,27 @@ and an independent image scan of each handler's own pattern (never reading the
 baseline) agrees with our cell on every image, for every one of the ten keys; the
 scan tool and the per-build table are in
 `.agents/rewrite/09-baseline-only-keys.md`.
+
+The two former unimplemented keys leave every scoreboard line unchanged, and that is
+the expected result, not a missing measurement: their cells are empty on both sides
+because the harness has no `IVMenuAPI.asi` and no live registry. The gates for the
+implemented arms are:
+
+```
+cmake --build --preset release                          clean
+ctest --preset release                                  22/22 pass (182.6 s)
+python tools/parity_report.py 9                         98 closed, 0 open, 1 oracle
+build 9 per-option dump, before == after                SHA-256 E20AF4EA…2845327,
+                                                        384,422 bytes, 12,898 lines
+python tools/verify_bodies.py …                         174 body(ies), 0 failure(s)
+python tools/check_signature_parity.py --game ../game_refs
+                                                        132 signature(s) on 9 images:
+                                                        0 mismatch(es), 0 loosening(s)
+python tools/check_oracle_verified.py                   3 oracle-verified row(s), 0 failure(s)
+python tools/check_fault_dialogs.py                     12 test source(s), 0 failure(s)
+zp_dump --ooc-selftest                                  ooc selftest: PASS
+python tools/gen_body_targets.py --check                body_targets.tsv up to date (100 rows)
+```
 
 ## The oracle-verified class: baselines that are incomplete
 

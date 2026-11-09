@@ -357,3 +357,23 @@ spawns_probe 10037510 ?SpawnsProbeBody@@YAXXZ 394
 # output and rebuilt in C++. docs/parity.md.
 vram_fix_shim 1004AAB0 ?VramFixShimBody@@YAXXZ 13
 
+
+# AddOptionsInMenu / IVMenuAPI (source/menu.ixx): the writer 0x1001EDE0 and the
+# death-music installer 0x10050BD0 are the two handlers the original's config
+# walker calls once the companion library is loaded; both are transcribed. The
+# death-music gate and its three native-script wrappers are the same recovered
+# pieces source/audio.ixx carries for RestoreDeathMusic (its copies have internal
+# linkage, so this module carries its own; only one copy is live per
+# configuration). The four callbacks are the function pointers the two
+# AddIVMenuOption registrations pass. sub_1001ECB0 and sub_10050AD0 are compiler
+# output (EH4 frame + TLS static-init guard) and rebuilt in C++; no rows.
+ivmenu_writer 1001EDE0 ?MenuWriterBody@@YAXXZ 36
+ivmenu_installer 10050BD0 ?MenuInstallerBody@@YAXXZ 133
+ivmenu_death_gate 10050A50 ?MenuDeathGateBody@@YA_NXZ 41
+ivmenu_call_two 1005B1E0 ?MenuCallTwoBody@@YIIII@Z 48
+ivmenu_call_zero_bool 1005B360 ?MenuCallZeroBoolBody@@YIII@Z 44
+ivmenu_call_byte 1005B490 ?MenuCallByteBody@@YIIII@Z 46
+ivmenu_death_get 10050A30 ?MenuDeathGetBody@@YAXXZ 2
+ivmenu_death_set 10050A40 ?MenuDeathSetBody@@YAXII@Z 6
+ivmenu_focus_get 1001EDB0 ?MenuFocusGetBody@@YAXXZ 4
+ivmenu_focus_set 1001EDC0 ?MenuFocusSetBody@@YAXII@Z 6

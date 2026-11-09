@@ -20,6 +20,7 @@ import launcher;
 import loading;
 import audio;
 import misc;
+import menu;
 import ooc;
 
 // The write-set dump: load a copy of a game image into this process, apply the
@@ -584,6 +585,7 @@ int main(int argc, char** argv)
     RegisterLoading();
     RegisterAudio();
     RegisterMisc();
+    RegisterMenu();
     RegisterOoc();
 
     if (perOption)

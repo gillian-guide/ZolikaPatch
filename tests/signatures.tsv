@@ -428,3 +428,17 @@ LaunchWithPlayGTAIV.1070.b	0xE9E118	4C 61 75 6E 63 68 47 54 41 49 56 2E 65 78 65
 LaunchWithPlayGTAIV.1080.a	0xE508F8	4C 61 75 6E 63 68 47 54 41 49 56 2E 65 78 65 00	16
 LaunchWithPlayGTAIV.1080.b	0xE5A5E4	4C 61 75 6E 63 68 47 54 41 49 56 2E 65 78 65 00	16
 
+# AddOptionsInMenu (source/menu.ixx): the key has no handler of its own, but its
+# chain runs the same recovered scans the two audio arms use: the writer's
+# `6A 0A 56 50 FF D2 A1` (DoNotPauseOnMinimize's site, 0x5B68A6), the focus site
+# `75 ? 8B 0D ...` (DoNotPauseOnMinimize's second site, 0x40338A) and the three
+# death-music anchors (RestoreDeathMusic.a/.b/.c). The rows are recorded under this
+# key too because the menu arm owns the second half of the original's
+# `RestoreDeathMusic == 1 || sub_10052380()` OR and the whole writer.
+AddOptionsInMenu	0x5B68A6	6A 0A 56 50 FF D2 A1	7
+AddOptionsInMenu	0x40338A	75 ? 8B 0D ? ? ? ? 51 FF 15 ? ? ? ? 85 C0 75 ? 8B 15	21
+AddOptionsInMenu.a	0x81E3C5	0F 57 C0 F3 0F 11 86 20 02 00 00	11
+AddOptionsInMenu.b	0x81E509	C7 86 04 02 00 00 04 00 00 00 E9	12
+AddOptionsInMenu.c	0x81E53A	E8 ? ? ? ? 84 C0 74 C6 8B BE	10
+# FixPCIDKickbug (source/misc.ixx) has no scan and no image site: its whole
+# effect is the SHDeleteValueW call, so it records no row here.

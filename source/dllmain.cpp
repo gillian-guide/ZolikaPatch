@@ -15,6 +15,7 @@ import launcher;
 import loading;
 import audio;
 import misc;
+import menu;
 import ooc;
 
 extern "C" __declspec(dllexport) void InitializeASI();
@@ -72,6 +73,10 @@ namespace
         RegisterLoading();
         RegisterAudio();
         RegisterMisc();
+        // The IVMenuAPI integration runs after the audio arm: AddOptionsInMenu's
+        // death-music installs are the second half of the original's
+        // `RestoreDeathMusic == 1 || sub_10052380()` OR.
+        RegisterMenu();
         RegisterOoc();
         Loader::Run();
 
