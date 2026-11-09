@@ -25,8 +25,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: ZolikaPatch-old-source
+          name: ZolikaPatch
           path: |
             **/ZolikaPatch.asi
-            **/Release/*.asi
+            ZolikaPatch.ini
           if-no-files-found: error
