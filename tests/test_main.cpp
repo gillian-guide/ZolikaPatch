@@ -2106,6 +2106,10 @@ int main(int argc, char** argv) {
         CHECK(smpa60_tail_shim(object, resume) == 1);
         CHECK(linked[4] == 0x1234);
       }
+      // The write above only happens when pointers are 32 bits; reset the arena so
+      // the two guard cases below assert that nothing was written, rather than
+      // inheriting the value from the case that did write.
+      linked[4] = 0;
       object[5] = 0;
       object[4] = 0x5678;
       CHECK(smpa60_tail_shim(object, resume) == 1);
