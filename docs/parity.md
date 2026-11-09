@@ -45,6 +45,7 @@ fix.
 | a double free is unguarded | the same pointer handed to the arena's free twice | `sub_10038430` has no membership check in front of the free: `0x10038449` tests the incoming pointer for null and nothing else, `0x10038457` recovers the base from `[pointer-4]`, and `0x10038474` calls `HeapFree` on it unconditionally. The rebuild keeps the same order (free, then erase) and the same missing guard. The second free therefore reads `[pointer-4]` from a block the heap owns again and hands `HeapFree` a base derived from the heap's own links rather than from the original's arithmetic; whether that is a no-op, a `STATUS_HEAP_CORRUPTION` termination or silent corruption is the heap's decision, so `zp_nms_arena` asserts only the knowable part (the pointer stops being a member after the first free) and does not run a double free |
 | the arena's request size is a 32-bit sum | a request of `2^32 - 2*unit` bytes or more (`0xFFFFFFE0` at the `0x10` floor) | `0x1003838B`'s `lea eax,[edi+esi*2]` adds `want + 2*unit` in 32 bits, so the request wraps to a tiny block while the `memset` at `0x100383C9` still fills `want` bytes - the allocate returns a block it cannot fill and the fill runs off the heap. The rebuild computes `want + unit * 2u` in `uint32_t` too, so the same input wraps the same way; the failure path the test asserts uses `0x7FFFFFF0`, whose sum `0x80000010` does not wrap, and the wrapping case is recorded here rather than run |
 | the DFA close-handle frame retries a faulting call for ever | a fault inside the guarded `CloseHandle` call -- an import slot whose target faults; no handle value reaches it | `0x10004790`'s scope table (`0x10153FC0`) names the filter `0x100047EC` (`or eax,-1; ret`, i.e. `EXCEPTION_CONTINUE_EXECUTION`) and the handler `0x100047F0` (the `return TRUE` arm). The filter's answer *resumes* the faulting instruction, so the fault is retried and the handler is never entered; the wrapper has no answer for a faulting call at all. The rebuild compiles the same frame -- byte-identical except the four relocated operands (`rebuilt.md` §2l) -- and `zp_dfa_close` replaces the test exe's `CloseHandle` import slot with a callee that writes one probe byte on entry and then faults; the child must be *still running* at the 1 s watchdog with the probe byte present and no answer written, and the test then terminates and reaps it. Unreachable through the wrapper's own argument: `CloseHandle` validates every handle value and returns `FALSE` |
+| the `MiscFixes` first literal is base-dependent, so the original's first write fires on some launches only | any launch whose relocation delta makes the fixup at `0x739731` read `C7 06`; every other launch misses the scan | the original handler `0x10023DD0` scans its own string `C7 06 ? ? ? ? 74 19` (`ZolikaPatch_reconstruction/evidence/handler_table.json`, whose own `game_hits` row records **0 hits** on the unrelocated 1.0.8.0 image). The fixup at `0x739731` (`0x016703C4`) covers the literal's first two bytes, so only a delta whose high word is `0x0560` makes them read `C7 06` -- measured witness `0x05600000`, one hit at RVA `0x739733` -- and the arm then writes `EB` at `0x739739`; at delta `0` or the dump's pinned `0x2FC00000` it has no hit. The transcription keeps the original's string verbatim (`source/misc.ixx:225`), so its *effect* depends on the game's live base exactly as the original's does: on most launches the original writes nothing there. Our dump pins one delta, at which the arm is inert, and that matches the stored baseline (also taken at a zero delta), so the scoreboard is measuring the original's common case. Widening the literal over the fixup bytes would make us write where the original does not -- a divergence dressed as a robustness fix |
 
 Two of the rows above used to be assumptions, and so did the CRLF note below them.
 All three are measurements now, and the two facts that were missing were both in the
@@ -1674,22 +1675,22 @@ Two halves fix it, and they must stay together:
   (`stability.ixx`'s ped array, `audio.ixx`'s three MouseFix words). This is the
   behaviour the original has and `readable/` uses; the arm-written bytes are
   unchanged in the dump.
-- **The dump relocates its copy.** `tests/dump_main.cpp` maps the image into a
-  64 KiB-aligned `VirtualAlloc` allocation (so its delta is a loader delta, a
-  multiple of the allocation granularity) and applies every HIGHLOW entry with
-  `delta = hostBase - OptionalHeader.ImageBase`. It refuses a file with no `.reloc`,
-  a `.reloc` that runs past the buffer, a fixup outside the buffer, a malformed
-  block and a non-HIGHLOW entry type -- loudly, with the RVA -- instead of skipping
-  them. Every dump run then asserts the property that was violated: at
-  `IncreaseVehicleModelLimit`'s anchor, the unrelocated `mov ecx, imm32` operand must
-  become `hostBase + RVA`, the pointee must be a writable dword of the buffer, and a
-  byte-equal result fails the run (revert the pass and it prints
-  `FAILED: ... the .reloc pass did not run` and exits 1).
+- **The dump relocates its copy at a pinned base.** `tests/dump_main.cpp` maps the
+  image at the image's preferred base when that address is free and otherwise at the
+  fixed `kFixedImageBase` (`0x30000000`), so the delta is one of exactly two
+  constants (`0` or `0x2FC00000`) and never the allocator's choice; it applies every
+  HIGHLOW entry with `delta = hostBase - OptionalHeader.ImageBase` and refuses any
+  base it did not pin. It refuses a file with no `.reloc`, a `.reloc` that runs past
+  the buffer, a fixup outside the buffer, a malformed block and a non-HIGHLOW entry
+  type -- loudly, with the RVA -- instead of skipping them. Every dump run then
+  asserts the property that was violated: at `IncreaseVehicleModelLimit`'s anchor,
+  the unrelocated `mov ecx, imm32` operand must become `hostBase + RVA`, the pointee
+  must be a writable dword of the buffer, and a byte-equal result fails the run.
 
 The dump's rows still speak the baselines' coordinate system: `0xD0000000` for a
 substituted published pointer, and the *original* image's bytes for every byte a
 mod wrote, so a relocated dword the loader moved is not reported as a write set.
-Building 9's per-key file is byte-identical before and after the change (12,834
+Building 9's per-key file is byte-identical before and after the change (12,898
 lines, 0 differing lines), and `tools/parity_report.py 9` still reports 98 closed /
 0 open / 1 oracle-verified.
 
@@ -1729,7 +1730,17 @@ body reads a table through an indexed absolute operand:
 
 1. **The body's asm**, transcribed into the owning module's tail, with the recovered
    VA in a comment. A naked function in a module interface unit must be `static` at
-   module scope: in a namespace, or with external linkage, MSVC rejects it.
+   module scope: in a namespace, or with external linkage, MSVC rejects it. Each
+   module reads in one order — the header, the published state with the original's
+   addresses, the plain C++ helpers, `Publish<Key>`, `Install<Key>`, `Register<Key>`,
+   then a marked *Transcribed bodies* tail holding every `__asm` block — so the intent
+   is read before the instruction stream. Readable code above a body's definition
+   names it through a plain `static` prototype (`static void Foo();`): MSVC rejects
+   `__declspec(naked)` on a declaration (C2488, `'naked' can only be applied to
+   non-member function definitions`), so only the definition in the tail keeps the
+   attribute. The prototype changes neither linkage nor code generation — the body is
+   still `static` at module scope — and the arm's registration keeps the body's
+   address.
 2. **The published module words** the body reads, written *before* the site is
    installed: the original reads a site's original bytes for its resume, so
    publishing after the write resumes into the jump itself.
@@ -1842,6 +1853,64 @@ called, so on 1.0.0.0/1.0.4.0 the baseline lacks the six-byte NOP fill this tree
 writes from the recovered `@noE` row. `CarDynamicShadowFix` therefore reports six
 extra bytes on 1.0.4.0; it is a baseline omission, not a difference in the bytes
 both sides write.
+
+### The per-option dump pins its image base
+
+`zp_dump` maps its copy of the game image at a **fixed** base, so the relocation
+delta is a constant and the dump's bytes are a function of the source image and the
+arms only -- never of the run's ASLR. The image's own preferred base (`0x00400000`)
+is tried first; a Win32 process cannot have it, because the loader maps the NLS
+section `C_1252.NLS` at `0x00400000` before any user code runs and the heap follows
+it, so the 26 MB range is never free. Measured: a no-CRT, custom-entry 32-bit probe
+fails `VirtualAlloc(0x400000, 0x18B2000)` with `ERROR_INVALID_ADDRESS` 487 on its
+first instruction, `VirtualQuery` showing the NLS view at `0x400000`; the same
+happens with the tool linked at `0x10000`/`0x20000000`/`0x400000`, with ASLR on or
+off, and with a static-import DLL at `0x400000` (the DLL was relocated to
+`0x960000`). The reference tree records the same and builds its dump 64-bit for that
+reason (`../readable/CMakeLists.txt:172-185`). The copy therefore goes to
+`0x30000000` (`tests/dump_main.cpp`'s `kFixedImageBase`), the `.reloc` pass runs with
+the fixed delta `0x2FC00000`, and `ApplyRelocations` refuses any base it did not pin.
+The tools that map the image are linked at `/BASE:0x20000000` with
+`/DYNAMICBASE:NO` (`CMakeLists.txt`) so their own images cannot collide with either
+address; **any future tool that maps the image must do the same**, or the harness is
+ASLR-dependent again.
+
+Why the pin matters: at a run-dependent delta, a signature whose fixed bytes cover
+the **high half of a HIGHLOW fixup** matches on some runs and not others, and the
+dump's own high-half suppression can hide an arm's write on some runs and report it
+on others. The recorded row is `MiscFixes`' first literal (`C7 06 ? ? ? ? 74 19`):
+it matches at RVA `0x739733` when the fixup at `0x739731` (`0x016703C4`) is
+relocated by a delta whose high word is `0x0560` (witness `0x05600000`, measured),
+because that makes the fixup's bytes read `C4 03 C7 06` and the `74 19` two bytes
+later still follow; the arm then writes `EB` at `0x739739`, one row no clean delta
+has. With delta `0x055F` the same bytes read `C4 03 C6 06` and the signature does not
+match. That literal is the original handler's own string, so the base-dependence is
+the original's, not a transcription bug; it is recorded under Preserved faults.
+
+The defect was measured on the pre-pin binary, whose `VirtualAlloc` delta was the
+allocator's: six runs of the **same** `zp_dump.exe` gave
+`E20AF4EAD811021BAB1D6475A3EC3E0900C9CDF341CD328515F7E76CC2845327` five times and
+`FD0060368E17939F38EC9C63490C526F3964C1512513EFA664EC2F4C1D630B19` once. The
+differing run was missing exactly one row, `NewMemorySystem 001082 00`: at that
+run's delta the relocated high half at `0x1082` happened to equal the byte the arm
+wrote, so the row convention suppressed it. (The older recorded variants were
+`9BAB526C…` at a delta with the `0x0560` `MiscFixes` row and `C454EC38…` once at
+delta `0x05D9`.) With the pin, six runs are byte-identical and equal the clean hash.
+
+The guard for the class is `tools/check_relocated_literals.py` (ctest
+`zp_relocated_literals`): every pattern-like literal in `source/*.ixx`, **including
+the table rows** (`kMiscFixSites`, the `kModChecks*` tables, the launcher and audio
+tables -- the old `find_pattern("...")`-only extraction could not see them), is
+measured in each of the nine images at six deltas (`0x00010000`, `0x01000000`,
+`0x05600000`, `0x05D90000`, `0x2FC00000`, `0xFFFF0000`), and its hit set (count and
+every RVA) must be identical at every delta to the unrelocated hit set. A literal
+whose hit set changes is classified against the key's recovered original strings: the
+`MiscFixes` literal is the original's own string and is a preserved fault; a literal
+that differs from a safe original string is a failure to fix. The full sweep --
+319 literals (254 distinct patterns) x 9 images x 6 deltas -- currently finds
+exactly one changed literal, `misc.ixx:225`, the `MiscFixes` row above, and no
+literal of the second
+kind.
 
 ## Signature parity: the original's own pattern strings
 

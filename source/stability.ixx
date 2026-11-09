@@ -139,29 +139,29 @@ extern "C"
 
 // The transcribed bodies are defined in the tail of this file. MSVC rejects a
 // __declspec(naked) declaration (C2488: "'naked' can only be applied to non-member
-// function definitions"), so the readable code above them takes each body's address
-// through one of these accessors; their definitions follow the bodies.
-static uintptr_t AimProjectileShimAddress();
-static uintptr_t Smpa60ShimAddress();
-static uintptr_t Smpa60TailShimAddress();
-static uintptr_t WantedLevelShimAddress();
-static uintptr_t EpisodeSwitchStoreShimAddress();
-static uintptr_t EpisodeSwitchShimBAddress();
-static uintptr_t EpisodeSwitchShimCAddress();
-static uintptr_t EpisodeSwitchSumAddress();
-static uintptr_t EpisodeSwitchVcallAddress();
-static uintptr_t PlaneCrashShimAddress();
-static uintptr_t CrashMsgShimAddress();
-static uintptr_t BlackscreenShimAddress();
-static uintptr_t PathNodeShimAddress();
-static uintptr_t GroupHackShimAddress();
-static uintptr_t FreezeGunShimAddress();
-static uintptr_t BpmFormatAddress();
-static uintptr_t BpmModelNameBodyAddress();
-static uintptr_t BpmWhoBodyAddress();
-static uintptr_t BpmPrintBodyAddress();
-static uintptr_t BpmCheckBodyAddress();
-static uintptr_t BpmTrampolineAddress();
+// function definitions"), so the readable code above them names each body through a
+// plain prototype; only the definition in the tail keeps the attribute.
+static void AimProjectileShim();
+static void Smpa60Shim();
+static void Smpa60TailShim();
+static void WantedLevelShim();
+static void EpisodeSwitchStoreShim();
+static void EpisodeSwitchShimB();
+static void EpisodeSwitchShimC();
+static void EpisodeSwitchSum();
+static void EpisodeSwitchVcall();
+static void PlaneCrashShim();
+static void CrashMsgShim();
+static void BlackscreenShim();
+static void PathNodeShim();
+static void GroupHackShim();
+static void FreezeGunShim();
+static void BpmFormat();
+static void BpmModelNameBody();
+static void BpmWhoBody();
+static void BpmPrintBody();
+static void BpmCheckBody();
+static void BpmTrampoline();
 
 // The block zeroing the wrappers open with. The original calls the CRT `memset`
 // through its IAT thunk (0x10060D6E) with the same argument order; the inline
@@ -494,8 +494,8 @@ namespace
         if (pattern.empty())
             return;
 
-        Bodies::Register(FreezeGunShimAddress(), 0x10036EB0u);
-        injector::MakeJMP(pattern.get_first(-21), reinterpret_cast<void*>(FreezeGunShimAddress()), true);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&FreezeGunShim), 0x10036EB0u);
+        injector::MakeJMP(pattern.get_first(-21), reinterpret_cast<void*>(&FreezeGunShim), true);
     }
 
     // GroupHackFix: the group walk's entry becomes a jump into the shim, which
@@ -509,8 +509,8 @@ namespace
         if (pattern.empty())
             return;
 
-        Bodies::Register(GroupHackShimAddress(), 0x10036E90u);
-        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(GroupHackShimAddress()), true);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&GroupHackShim), 0x10036E90u);
+        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(&GroupHackShim), true);
     }
 
     // PathNodeCrashFix: the `mov dl,[eax+1Fh]; test dl,1` at the anchor's +53 is
@@ -524,8 +524,8 @@ namespace
         if (pattern.empty())
             return;
 
-        Bodies::Register(PathNodeShimAddress(), 0x1003D7B0u);
-        injector::MakeJMP(pattern.get_first(53), reinterpret_cast<void*>(PathNodeShimAddress()), true);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&PathNodeShim), 0x1003D7B0u);
+        injector::MakeJMP(pattern.get_first(53), reinterpret_cast<void*>(&PathNodeShim), true);
     }
 
     // PlaneCrashFix: the anchor's +3 is the state store the body replays after its
@@ -539,8 +539,8 @@ namespace
         if (pattern.empty())
             return;
 
-        Bodies::Register(PlaneCrashShimAddress(), 0x1003D870u);
-        injector::MakeJMP(pattern.get_first(3), reinterpret_cast<void*>(PlaneCrashShimAddress()), true);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&PlaneCrashShim), 0x1003D870u);
+        injector::MakeJMP(pattern.get_first(3), reinterpret_cast<void*>(&PlaneCrashShim), true);
     }
 
     // BlackscreenFix: the tail jump at the anchor's +81 becomes a jump into the shim.
@@ -553,8 +553,8 @@ namespace
         if (pattern.empty())
             return;
 
-        Bodies::Register(BlackscreenShimAddress(), 0x10036EE0u);
-        injector::MakeJMP(pattern.get_first(81), reinterpret_cast<void*>(BlackscreenShimAddress()), true);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&BlackscreenShim), 0x10036EE0u);
+        injector::MakeJMP(pattern.get_first(81), reinterpret_cast<void*>(&BlackscreenShim), true);
     }
 
     // CrashMsgFix: the thunk loses its branch to the message getter; a call into the
@@ -569,8 +569,8 @@ namespace
         if (site == nullptr)
             return;
 
-        Bodies::Register(CrashMsgShimAddress(), 0x10036F00u);
-        injector::MakeCALL(site, reinterpret_cast<void*>(CrashMsgShimAddress()), true);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&CrashMsgShim), 0x10036F00u);
+        injector::MakeCALL(site, reinterpret_cast<void*>(&CrashMsgShim), true);
     }
 
     // WantedLevelCrashFix: the update's entry becomes the shim, which skips it for a
@@ -584,8 +584,8 @@ namespace
         if (pattern.empty())
             return;
 
-        Bodies::Register(WantedLevelShimAddress(), 0x10050490u);
-        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(WantedLevelShimAddress()), true);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&WantedLevelShim), 0x10050490u);
+        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(&WantedLevelShim), true);
     }
 
     // EpisodeSwitchFreezeFix: five sites, rewritten in the original's order: the ECX
@@ -611,26 +611,26 @@ namespace
             return;
         auto* shimB = pattern.get_first<std::byte>(0);
 
-        Bodies::Register(EpisodeSwitchShimCAddress(), 0x1001B0C0u);
-        injector::MakeJMP(shimC, reinterpret_cast<void*>(EpisodeSwitchShimCAddress()), true);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&EpisodeSwitchShimC), 0x1001B0C0u);
+        injector::MakeJMP(shimC, reinterpret_cast<void*>(&EpisodeSwitchShimC), true);
 
-        Bodies::Register(EpisodeSwitchStoreShimAddress(), 0x1001B040u);
-        injector::MakeJMP(store, reinterpret_cast<void*>(EpisodeSwitchStoreShimAddress()), true);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&EpisodeSwitchStoreShim), 0x1001B040u);
+        injector::MakeJMP(store, reinterpret_cast<void*>(&EpisodeSwitchStoreShim), true);
 
         pattern = find_pattern("8B 41 10 03 41 0C C3");
         if (pattern.empty())
             return;
-        Bodies::Register(EpisodeSwitchSumAddress(), 0x1001B080u);
-        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(EpisodeSwitchSumAddress()), true);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&EpisodeSwitchSum), 0x1001B080u);
+        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(&EpisodeSwitchSum), true);
 
-        Bodies::Register(EpisodeSwitchShimBAddress(), 0x1001B060u);
-        injector::MakeJMP(shimB, reinterpret_cast<void*>(EpisodeSwitchShimBAddress()), true);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&EpisodeSwitchShimB), 0x1001B060u);
+        injector::MakeJMP(shimB, reinterpret_cast<void*>(&EpisodeSwitchShimB), true);
 
         pattern = find_pattern("8B C1 8B 08 8B 11 8B 40 04 8B 52 30 50 FF D2 C3");
         if (pattern.empty())
             return;
-        Bodies::Register(EpisodeSwitchVcallAddress(), 0x1001B0A0u);
-        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(EpisodeSwitchVcallAddress()), true);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&EpisodeSwitchVcall), 0x1001B0A0u);
+        injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(&EpisodeSwitchVcall), true);
     }
 
     // SMPA60Fix: two bodies. The `jz` at the primary anchor's -38 becomes an
@@ -653,12 +653,12 @@ namespace
 
         auto* shim = pattern.get_first<std::byte>(0);
 
-        Bodies::Register(Smpa60TailShimAddress(), 0x10046780u);
-        injector::MakeJMP(primary + 123, reinterpret_cast<void*>(Smpa60TailShimAddress()), true);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&Smpa60TailShim), 0x10046780u);
+        injector::MakeJMP(primary + 123, reinterpret_cast<void*>(&Smpa60TailShim), true);
         injector::WriteMemory<std::byte>(primary - 38, Bytes::ShortJmp, true);
 
-        Bodies::Register(Smpa60ShimAddress(), 0x10046750u);
-        injector::MakeJMP(shim, reinterpret_cast<void*>(Smpa60ShimAddress()), true);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&Smpa60Shim), 0x10046750u);
+        injector::MakeJMP(shim, reinterpret_cast<void*>(&Smpa60Shim), true);
     }
 
     // PlayerAsPedComponentsFix: the anchor's +5 is the `movzx edx,[eax+219h]` whose
@@ -743,8 +743,8 @@ namespace
         auto pattern = find_pattern("8B 44 24 08 89 41 20 8B 44 24 0C 89 41 24 F7 D8");
         if (!pattern.empty())
         {
-            Bodies::Register(AimProjectileShimAddress(), 0x10005590u);
-            injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(AimProjectileShimAddress()),
+            Bodies::Register(reinterpret_cast<uintptr_t>(&AimProjectileShim), 0x10005590u);
+            injector::MakeJMP(pattern.get_first(0), reinterpret_cast<void*>(&AimProjectileShim),
                 true);
         }
     }
@@ -761,11 +761,11 @@ namespace
         if (pattern.empty())
             return;
 
-        Bodies::Register(BpmTrampolineAddress(), 0x10037BA0u);
-        Bodies::Register(BpmCheckBodyAddress(), 0x10037AC0u);
-        Bodies::Register(BpmWhoBodyAddress(), 0x1005B290u);
-        Bodies::Register(BpmPrintBodyAddress(), 0x1005B530u);
-        Bodies::Register(BpmModelNameBodyAddress(), 0x10003F00u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&BpmTrampoline), 0x10037BA0u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&BpmCheckBody), 0x10037AC0u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&BpmWhoBody), 0x1005B290u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&BpmPrintBody), 0x1005B530u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&BpmModelNameBody), 0x10003F00u);
 
         // The 38,455-entry name table the transcribed lookup reads. Its operand is
         // the original's `[table + esi*4]`, so the table is named here (the
@@ -777,7 +777,7 @@ namespace
             0x100DE770u, sizeof(kBadPlayerModelNames));
 
         injector::MakeJMP(pattern.get_first<std::byte>(0),
-            reinterpret_cast<void*>(BpmTrampolineAddress()), true);
+            reinterpret_cast<void*>(&BpmTrampoline), true);
     }
 }
 
@@ -789,7 +789,7 @@ export void RegisterStability()
     // reached from three modules, so neither slot may sit behind a key's gate: a
     // run with BadPlayerModelCrashFix off still formats livery, OOC and DLC paths.
     zpatch_format_entry = static_cast<uint32_t>(
-        BpmFormatAddress());
+        reinterpret_cast<uintptr_t>(&BpmFormat));
     zpatch_bpm_stdio_common_vsprintf = static_cast<uint32_t>(
         reinterpret_cast<uintptr_t>(&__stdio_common_vsprintf));
 
@@ -1358,9 +1358,10 @@ static __declspec(naked) void BpmResolverEntry()
 // (`push [table + esi*4]`, `mov eax, [table + esi*4]`): the table is recovered
 // data (source/model_names.inc, in the table's own order) and this module reads
 // its copy. The whole-body proof resolves such an operand through
-// Bodies::RegisterTable - registered below with the original's VA and length -
-// and compares the table's contents instead of its displacement. Every other
-// instruction is the original's; the body has no frame and no /GS cookie.
+// Bodies::RegisterTable - registered by the BadPlayerModelCrashFix arm with the
+// original's VA and length - and compares the table's contents instead of its
+// displacement. Every other instruction is the original's; the body has no frame
+// and no /GS cookie.
 //
 // The 10-byte `nop word ptr [eax+eax+0]` at 0x10003F06 (`66 66 0F 1F 84 00 00 00
 // 00 00`) is the original's loop padding. The inline assembler's `nop` is one byte,
@@ -1670,27 +1671,3 @@ static __declspec(naked) void BpmTrampoline()
         jmp DWORD PTR [zpatch_bpm_resume]
     }
 }
-
-// The body accessors the readable code above uses: each body is defined above, so
-// its address can be taken here (a declaration cannot carry __declspec(naked)).
-static uintptr_t AimProjectileShimAddress() { return reinterpret_cast<uintptr_t>(&AimProjectileShim); }
-static uintptr_t Smpa60ShimAddress() { return reinterpret_cast<uintptr_t>(&Smpa60Shim); }
-static uintptr_t Smpa60TailShimAddress() { return reinterpret_cast<uintptr_t>(&Smpa60TailShim); }
-static uintptr_t WantedLevelShimAddress() { return reinterpret_cast<uintptr_t>(&WantedLevelShim); }
-static uintptr_t EpisodeSwitchStoreShimAddress() { return reinterpret_cast<uintptr_t>(&EpisodeSwitchStoreShim); }
-static uintptr_t EpisodeSwitchShimBAddress() { return reinterpret_cast<uintptr_t>(&EpisodeSwitchShimB); }
-static uintptr_t EpisodeSwitchShimCAddress() { return reinterpret_cast<uintptr_t>(&EpisodeSwitchShimC); }
-static uintptr_t EpisodeSwitchSumAddress() { return reinterpret_cast<uintptr_t>(&EpisodeSwitchSum); }
-static uintptr_t EpisodeSwitchVcallAddress() { return reinterpret_cast<uintptr_t>(&EpisodeSwitchVcall); }
-static uintptr_t PlaneCrashShimAddress() { return reinterpret_cast<uintptr_t>(&PlaneCrashShim); }
-static uintptr_t CrashMsgShimAddress() { return reinterpret_cast<uintptr_t>(&CrashMsgShim); }
-static uintptr_t BlackscreenShimAddress() { return reinterpret_cast<uintptr_t>(&BlackscreenShim); }
-static uintptr_t PathNodeShimAddress() { return reinterpret_cast<uintptr_t>(&PathNodeShim); }
-static uintptr_t GroupHackShimAddress() { return reinterpret_cast<uintptr_t>(&GroupHackShim); }
-static uintptr_t FreezeGunShimAddress() { return reinterpret_cast<uintptr_t>(&FreezeGunShim); }
-static uintptr_t BpmFormatAddress() { return reinterpret_cast<uintptr_t>(&BpmFormat); }
-static uintptr_t BpmModelNameBodyAddress() { return reinterpret_cast<uintptr_t>(&BpmModelNameBody); }
-static uintptr_t BpmWhoBodyAddress() { return reinterpret_cast<uintptr_t>(&BpmWhoBody); }
-static uintptr_t BpmPrintBodyAddress() { return reinterpret_cast<uintptr_t>(&BpmPrintBody); }
-static uintptr_t BpmCheckBodyAddress() { return reinterpret_cast<uintptr_t>(&BpmCheckBody); }
-static uintptr_t BpmTrampolineAddress() { return reinterpret_cast<uintptr_t>(&BpmTrampoline); }

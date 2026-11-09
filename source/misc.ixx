@@ -172,22 +172,22 @@ extern "C"
 
 // The transcribed bodies are defined in the tail of this file. MSVC rejects a
 // __declspec(naked) declaration (C2488: "'naked' can only be applied to non-member
-// function definitions"), so the readable code above them takes each body's address
-// through one of these accessors; their definitions follow the bodies.
-static uintptr_t DrivebyResolveEntryAddress();
-static uintptr_t DrivebyFovHelperBodyAddress();
-static uintptr_t DrivebyFovShimBodyAddress();
-static uintptr_t Patch4StubBodyAddress();
-static uintptr_t IdeParseBodyAddress();
-static uintptr_t CopSirensCheckABodyAddress();
-static uintptr_t CopSirensCheckBBodyAddress();
-static uintptr_t CopSirensShimABodyAddress();
-static uintptr_t CopSirensShimBBodyAddress();
-static uintptr_t IdeHookBodyAddress();
-static uintptr_t PopupHeadlightsCheckBodyAddress();
-static uintptr_t PopupHeadlightsBodyAAddress();
-static uintptr_t PopupHeadlightsBodyBAddress();
-static uintptr_t VramFixShimBodyAddress();
+// function definitions"), so the readable code above them names each body through a
+// plain prototype; only the definition in the tail keeps the attribute.
+static void DrivebyResolveEntry();
+static void DrivebyFovHelperBody();
+static void DrivebyFovShimBody();
+static void Patch4StubBody();
+static void IdeParseBody();
+static void CopSirensCheckABody();
+static void CopSirensCheckBBody();
+static void CopSirensShimABody();
+static void CopSirensShimBBody();
+static void IdeHookBody();
+static void PopupHeadlightsCheckBody();
+static void PopupHeadlightsBodyA();
+static void PopupHeadlightsBodyB();
+static void VramFixShimBody();
 
 // `mov eax, imm32`: the MiscFixes token-activation row writes it. bytes.ixx does
 // not carry it, and that module is outside this task's edit scope, so the opcode
@@ -861,13 +861,13 @@ namespace
         auto pattern = find_pattern("F3 0F 10 46 60 F3 0F 5C CA");
         if (!pattern.empty())
         {
-            Bodies::Register(DrivebyFovShimBodyAddress(), 0x100064B0u);
-            Bodies::Register(DrivebyFovHelperBodyAddress(), 0x10006450u);
+            Bodies::Register(reinterpret_cast<uintptr_t>(&DrivebyFovShimBody), 0x100064B0u);
+            Bodies::Register(reinterpret_cast<uintptr_t>(&DrivebyFovHelperBody), 0x10006450u);
             // The helper's call names the original's guarded resolve entry; recording
             // that VA keeps every registered branch in the original's coordinates.
-            Bodies::Register(DrivebyResolveEntryAddress(), 0x10003980u);
+            Bodies::Register(reinterpret_cast<uintptr_t>(&DrivebyResolveEntry), 0x10003980u);
             injector::MakeJMP(pattern.get_first(0),
-                reinterpret_cast<void*>(DrivebyFovShimBodyAddress()), true);
+                reinterpret_cast<void*>(&DrivebyFovShimBody), true);
         }
     }
 
@@ -890,7 +890,7 @@ namespace
             "2B C1 1B D6 89 44 24 0C 89 54 24 10 DF 6C 24 0C D8 0D ? ? ? ? D9 5C 24 08");
         if (!pattern.empty())
             injector::MakeJMP(pattern.get_first<std::byte>(0),
-                reinterpret_cast<void*>(Patch4StubBodyAddress()), true);
+                reinterpret_cast<void*>(&Patch4StubBody), true);
     }
 
     void InstallCopSirensFlag()
@@ -901,17 +901,17 @@ namespace
         auto pattern = find_pattern("E8 ? ? ? ? C0 E0 ? 32 86 6F 0F 00");
         if (!pattern.empty())
             injector::MakeJMP(pattern.get_first<std::byte>(0),
-                reinterpret_cast<void*>(CopSirensShimABodyAddress()), true);
+                reinterpret_cast<void*>(&CopSirensShimABody), true);
 
         pattern = find_pattern("0F BF 41 2E 39 05");
         if (!pattern.empty())
             injector::MakeJMP(pattern.get_first<std::byte>(22),
-                reinterpret_cast<void*>(CopSirensShimBBodyAddress()), true);
+                reinterpret_cast<void*>(&CopSirensShimBBody), true);
 
         pattern = find_pattern("0C 83 88 94 00 00 00 04");
         if (!pattern.empty())
             injector::MakeJMP(pattern.get_first<std::byte>(-10),
-                reinterpret_cast<void*>(IdeHookBodyAddress()), true);
+                reinterpret_cast<void*>(&IdeHookBody), true);
     }
 
     // VRAMFix: the matched function's entry becomes a jump to the shim.
@@ -924,9 +924,9 @@ namespace
         if (pattern.empty())
             return;
 
-        Bodies::Register(VramFixShimBodyAddress(), 0x1004AAB0u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&VramFixShimBody), 0x1004AAB0u);
         injector::MakeJMP(pattern.get_first<std::byte>(0),
-            reinterpret_cast<void*>(VramFixShimBodyAddress()), true);
+            reinterpret_cast<void*>(&VramFixShimBody), true);
     }
 
     void InstallPopupHeadlightsFlag()
@@ -938,7 +938,7 @@ namespace
         if (!pattern.empty())
         {
             auto* match = pattern.get_first<std::byte>(0);
-            injector::MakeJMP(match, reinterpret_cast<void*>(PopupHeadlightsBodyAAddress()), true);
+            injector::MakeJMP(match, reinterpret_cast<void*>(&PopupHeadlightsBodyA), true);
             injector::WriteMemory<std::byte>(match + 10, Bytes::ShortJmp, true);
             injector::WriteMemory<uint32_t>(match + 82,
                 static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&zpatch_popup_angle)), true);
@@ -948,13 +948,13 @@ namespace
         pattern = find_pattern("0C 83 88 94 00 00 00 04");
         if (!pattern.empty())
             injector::MakeJMP(pattern.get_first<std::byte>(-10),
-                reinterpret_cast<void*>(IdeHookBodyAddress()), true);
+                reinterpret_cast<void*>(&IdeHookBody), true);
 
         pattern = find_pattern("0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1");
         if (!pattern.empty())
         {
             auto* match = pattern.get_first<std::byte>(0);
-            injector::MakeJMP(match, reinterpret_cast<void*>(PopupHeadlightsBodyBAddress()), true);
+            injector::MakeJMP(match, reinterpret_cast<void*>(&PopupHeadlightsBodyB), true);
             injector::WriteMemory<std::byte>(match + 10, Bytes::ShortJmp, true);
             injector::WriteMemory<uint32_t>(match + 82,
                 static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&zpatch_popup_angle)), true);
@@ -991,12 +991,12 @@ export void RegisterMisc()
     // The bodies' recovered VAs, so the dump expresses each arm's branch in the
     // original's coordinates.
     Bodies::Register(reinterpret_cast<uintptr_t>(&SpeedupBugFixBody), 0x10050540u);
-    Bodies::Register(Patch4StubBodyAddress(), 0x100054E0u);
-    Bodies::Register(CopSirensShimABodyAddress(), 0x10006310u);
-    Bodies::Register(CopSirensShimBBodyAddress(), 0x10006330u);
-    Bodies::Register(IdeHookBodyAddress(), 0x100040E0u);
-    Bodies::Register(PopupHeadlightsBodyAAddress(), 0x10044530u);
-    Bodies::Register(PopupHeadlightsBodyBAddress(), 0x10044560u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&Patch4StubBody), 0x100054E0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&CopSirensShimABody), 0x10006310u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&CopSirensShimBBody), 0x10006330u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&IdeHookBody), 0x100040E0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&PopupHeadlightsBodyA), 0x10044530u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&PopupHeadlightsBodyB), 0x10044560u);
 
     // The second siren check's table: the IDE parser hook's +siren list, which the
     // transcription reads as `[esi + zpatch_copsirens_models]` and as a plain absolute
@@ -1035,10 +1035,10 @@ export void RegisterMisc()
     // its out-of-line definition in the image.
     [[maybe_unused]] const uintptr_t helpers[] = {
         reinterpret_cast<uintptr_t>(&Patch4Step),
-        CopSirensCheckABodyAddress(),
-        CopSirensCheckBBodyAddress(),
-        IdeParseBodyAddress(),
-        PopupHeadlightsCheckBodyAddress(),
+        reinterpret_cast<uintptr_t>(&CopSirensCheckABody),
+        reinterpret_cast<uintptr_t>(&CopSirensCheckBBody),
+        reinterpret_cast<uintptr_t>(&IdeParseBody),
+        reinterpret_cast<uintptr_t>(&PopupHeadlightsCheckBody),
     };
 }
 
@@ -1906,20 +1906,3 @@ static __declspec(naked) void VramFixShimBody()
         ret
     }
 }
-
-// The body accessors the readable code above uses: each body is defined above, so
-// its address can be taken here (a declaration cannot carry __declspec(naked)).
-static uintptr_t DrivebyResolveEntryAddress() { return reinterpret_cast<uintptr_t>(&DrivebyResolveEntry); }
-static uintptr_t DrivebyFovHelperBodyAddress() { return reinterpret_cast<uintptr_t>(&DrivebyFovHelperBody); }
-static uintptr_t DrivebyFovShimBodyAddress() { return reinterpret_cast<uintptr_t>(&DrivebyFovShimBody); }
-static uintptr_t Patch4StubBodyAddress() { return reinterpret_cast<uintptr_t>(&Patch4StubBody); }
-static uintptr_t IdeParseBodyAddress() { return reinterpret_cast<uintptr_t>(&IdeParseBody); }
-static uintptr_t CopSirensCheckABodyAddress() { return reinterpret_cast<uintptr_t>(&CopSirensCheckABody); }
-static uintptr_t CopSirensCheckBBodyAddress() { return reinterpret_cast<uintptr_t>(&CopSirensCheckBBody); }
-static uintptr_t CopSirensShimABodyAddress() { return reinterpret_cast<uintptr_t>(&CopSirensShimABody); }
-static uintptr_t CopSirensShimBBodyAddress() { return reinterpret_cast<uintptr_t>(&CopSirensShimBBody); }
-static uintptr_t IdeHookBodyAddress() { return reinterpret_cast<uintptr_t>(&IdeHookBody); }
-static uintptr_t PopupHeadlightsCheckBodyAddress() { return reinterpret_cast<uintptr_t>(&PopupHeadlightsCheckBody); }
-static uintptr_t PopupHeadlightsBodyAAddress() { return reinterpret_cast<uintptr_t>(&PopupHeadlightsBodyA); }
-static uintptr_t PopupHeadlightsBodyBAddress() { return reinterpret_cast<uintptr_t>(&PopupHeadlightsBodyB); }
-static uintptr_t VramFixShimBodyAddress() { return reinterpret_cast<uintptr_t>(&VramFixShimBody); }

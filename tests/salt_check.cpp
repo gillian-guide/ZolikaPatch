@@ -1,5 +1,6 @@
 #include <common.hxx>
 #include <cstdio>
+#include <system_error>
 
 import common;
 import game;
@@ -74,34 +75,97 @@ namespace
         std::printf("\n");
     }
 
-    // The same mapping dump_main.cpp uses: the headers and every section at its
-    // virtual address, the rest zeroed. The scan range is then the one the ASI
-    // sees in the game.
-    bool Load(const std::filesystem::path& path, std::vector<uint8_t>& bytes, size_t& size)
+    // The mapping the dump uses (tests/dump_main.cpp): the headers and every section
+    // at its virtual address, the rest zeroed, in an allocation at the image's own
+    // preferred base when that address is free and at the same fixed fallback the
+    // dump uses otherwise. Pinning the base is what makes the input a function of
+    // the file and not of the run's ASLR; the tool is linked at /BASE:0x20000000
+    // (CMakeLists.txt) so its own image is out of the way. The copy is not
+    // relocated: nothing here reads a captured operand, and the bytes are the file
+    // image at either base. A base that is neither is a loud failure.
+    constexpr uintptr_t kFixedImageBase = 0x30000000;
+
+    struct Image
+    {
+        uint8_t* bytes{};
+        size_t size{};
+
+        ~Image()
+        {
+            if (bytes != nullptr)
+                VirtualFree(bytes, 0, MEM_RELEASE);
+        }
+        Image() = default;
+        Image(const Image&) = delete;
+        Image& operator=(const Image&) = delete;
+    };
+
+    enum class Mapped { ok, unreadable, unmappable };
+
+    Mapped Load(const std::filesystem::path& path, Image& image)
     {
         std::ifstream file(path, std::ios::binary);
         if (!file)
-            return false;
+            return Mapped::unreadable;
 
+        // The headers come first and the copy is mapped before the file body: the
+        // whole file is itself a large allocation, and the CRT heap can otherwise
+        // take the address the copy needs.
+        IMAGE_DOS_HEADER dos{};
+        file.read(reinterpret_cast<char*>(&dos), sizeof(dos));
+        if (!file)
+            return Mapped::unreadable;
+        file.seekg(static_cast<std::streamoff>(dos.e_lfanew));
+        IMAGE_NT_HEADERS nt{};
+        file.read(reinterpret_cast<char*>(&nt), sizeof(nt));
+        if (!file)
+            return Mapped::unreadable;
+
+        image.size = nt.OptionalHeader.SizeOfImage;
+        image.bytes = static_cast<uint8_t*>(VirtualAlloc(
+            reinterpret_cast<void*>(nt.OptionalHeader.ImageBase), image.size,
+            MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+        if (image.bytes == nullptr)
+        {
+            const auto error = static_cast<int>(GetLastError());
+            std::printf("%s: the preferred base %08zX is not available (VirtualAlloc: error %d: %s); "
+                        "pinning the copy at the fixed base %08zX instead\n",
+                path.string().c_str(), static_cast<size_t>(nt.OptionalHeader.ImageBase), error,
+                std::error_code(error, std::system_category()).message().c_str(),
+                static_cast<size_t>(kFixedImageBase));
+            image.bytes = static_cast<uint8_t*>(VirtualAlloc(
+                reinterpret_cast<void*>(kFixedImageBase), image.size,
+                MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+            if (image.bytes == nullptr)
+            {
+                const auto fallback = static_cast<int>(GetLastError());
+                std::printf("%s: cannot map the %zX-byte image at the fixed base %08zX either "
+                            "(VirtualAlloc: error %d: %s)\n",
+                    path.string().c_str(), image.size, static_cast<size_t>(kFixedImageBase),
+                    fallback, std::error_code(fallback, std::system_category()).message().c_str());
+                return Mapped::unmappable;
+            }
+        }
+
+        file.clear();
+        file.seekg(0);
         std::vector<uint8_t> raw((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
         if (raw.size() < sizeof(IMAGE_DOS_HEADER))
-            return false;
+            return Mapped::unreadable;
+        const auto* rawDos = reinterpret_cast<const IMAGE_DOS_HEADER*>(raw.data());
+        const auto* rawNt = reinterpret_cast<const IMAGE_NT_HEADERS*>(raw.data() + rawDos->e_lfanew);
+        std::memset(image.bytes, 0, image.size);
 
-        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(raw.data());
-        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(raw.data() + dos->e_lfanew);
-        size = nt->OptionalHeader.SizeOfImage;
-        bytes.assign(size, 0);
-
-        const auto* section = IMAGE_FIRST_SECTION(nt);
-        for (WORD index = 0; index < nt->FileHeader.NumberOfSections; ++index, ++section)
+        const auto* section = IMAGE_FIRST_SECTION(rawNt);
+        for (WORD index = 0; index < rawNt->FileHeader.NumberOfSections; ++index, ++section)
         {
-            const auto count = std::min<size_t>(section->SizeOfRawData, size - section->VirtualAddress);
+            const auto count = std::min<size_t>(section->SizeOfRawData, image.size - section->VirtualAddress);
             if (section->PointerToRawData + count <= raw.size())
-                std::memcpy(bytes.data() + section->VirtualAddress, raw.data() + section->PointerToRawData, count);
+                std::memcpy(image.bytes + section->VirtualAddress, raw.data() + section->PointerToRawData, count);
         }
-        const auto headers = std::min<size_t>(nt->OptionalHeader.SizeOfHeaders, raw.size());
-        std::memcpy(bytes.data(), raw.data(), headers);
-        return true;
+        const auto headers = std::min<size_t>(rawNt->OptionalHeader.SizeOfHeaders, raw.size());
+        std::memcpy(image.bytes, raw.data(), headers);
+        return Mapped::ok;
     }
 }
 
@@ -114,15 +178,23 @@ int main(int argc, char** argv)
     for (const auto& test : kCases)
     {
         const auto path = gameRefs / test.image;
-        std::vector<uint8_t> bytes;
-        size_t size = 0;
-        if (!Load(path, bytes, size))
+        Image image;
+        const auto mapped = Load(path, image);
+        if (mapped == Mapped::unreadable)
         {
             std::printf("SKIP %s: cannot read %s\n", test.image, path.string().c_str());
             continue;
         }
+        if (mapped == Mapped::unmappable)
+        {
+            // A failed mapping is a harness failure, not a skip: the whole point of
+            // the pin is that the input must not depend on where the allocator puts
+            // it.
+            Check(false, (std::string(test.image) + ": the image maps at its preferred base").c_str());
+            continue;
+        }
 
-        Game::Get().AttachImage(reinterpret_cast<uintptr_t>(bytes.data()), size, path, {});
+        Game::Get().AttachImage(reinterpret_cast<uintptr_t>(image.bytes), image.size, path, {});
         Native::ResolveSalts();
 
         // The probe itself, through the layer's scan: a hit is the reason the

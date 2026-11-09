@@ -267,38 +267,38 @@ extern "C"
 
 // The transcribed bodies are defined in the tail of this file. MSVC rejects a
 // __declspec(naked) declaration (C2488: "'naked' can only be applied to non-member
-// function definitions"), so the readable code above them takes each body's address
-// through one of these accessors; their definitions follow the bodies.
-static uintptr_t GfwlStubBodyAddress();
-static uintptr_t RgscLoginRemovedBodyAddress();
-static uintptr_t BenchmarkBodyAAddress();
-static uintptr_t BenchmarkBodyBAddress();
-static uintptr_t SkipIntroBodyAddress();
-static uintptr_t SkipMenuBodyAddress();
-static uintptr_t SavegameNullBodyAddress();
-static uintptr_t SavegameCloseBodyAddress();
-static uintptr_t SavegameMutexBodyAddress();
-static uintptr_t SavegameCopyBodyAddress();
-static uintptr_t LocalSettingsDetourBodyAddress();
-static uintptr_t LocalSettingsFallbackBodyAddress();
-static uintptr_t NmsNoopRet0BodyAddress();
-static uintptr_t NmsCtorBodyAddress();
-static uintptr_t NmsRejectPtrBodyAddress();
-static uintptr_t NmsSelfBodyAddress();
-static uintptr_t NmsZeroBodyAddress();
-static uintptr_t NmsNoopPairBodyAddress();
-static uintptr_t NmsRejectBodyAddress();
-static uintptr_t NmsSyncBodyAddress();
-static uintptr_t NmsNoopArgBodyAddress();
-static uintptr_t NmsThunk18BodyAddress();
-static uintptr_t NmsApplyBodyAddress();
-static uintptr_t NewfilesRegisterBodyAddress();
-static uintptr_t NewSavesReadHookAddress();
-static uintptr_t NewSavesSecondLoadHookAddress();
-static uintptr_t NewSavesTrampolineAddress();
-static uintptr_t DlcDiscoveryAddress();
-static uintptr_t DlcDummyBodyAddress();
-static uintptr_t DlcStructFixupBodyAddress();
+// function definitions"), so the readable code above them names each body through a
+// plain prototype; only the definition in the tail keeps the attribute.
+static void GfwlStubBody();
+static void RgscLoginRemovedBody();
+static void BenchmarkBodyA();
+static void BenchmarkBodyB();
+static void SkipIntroBody();
+static void SkipMenuBody();
+static void SavegameNullBody();
+static void SavegameCloseBody();
+static void SavegameMutexBody();
+static void SavegameCopyBody();
+static void LocalSettingsDetourBody();
+static void LocalSettingsFallbackBody();
+static void NmsNoopRet0Body();
+static void* NmsCtorBody();
+static void NmsRejectPtrBody();
+static void* NmsSelfBody();
+static void* NmsZeroBody();
+static void NmsNoopPairBody();
+static void NmsRejectBody();
+static void NmsSyncBody();
+static void NmsNoopArgBody();
+static void NmsThunk18Body();
+static void NmsApplyBody();
+static void NewfilesRegisterBody();
+static void NewSavesReadHook();
+static void NewSavesSecondLoadHook();
+static void NewSavesTrampoline();
+static void DlcDiscovery();
+static void DlcDummyBody();
+static void DlcStructFixupBody();
 
 // The original's FusionFix probe (sub_10003E20): a loaded
 // GTAIV.EFLC.FusionFix.asi whose two signature dwords do not match the known
@@ -551,30 +551,30 @@ namespace
     void PublishNmsVtable()
     {
         const uint32_t entries[kNmsVtableSlots] = {
-            static_cast<uint32_t>(NmsCtorBodyAddress()),           // [0]  0x10038640
-            static_cast<uint32_t>(NmsRejectPtrBodyAddress()),      // [1]  0x10038350
+            reinterpret_cast<uint32_t>(&NmsCtorBody),           // [0]  0x10038640
+            reinterpret_cast<uint32_t>(&NmsRejectPtrBody),      // [1]  0x10038350
             reinterpret_cast<uint32_t>(&NmsAllocateBody),       // [2]  0x10038360
             reinterpret_cast<uint32_t>(&NmsFreeBody),           // [3]  0x10038430
-            static_cast<uint32_t>(NmsSelfBodyAddress()),           // [4]  0x10038540
-            static_cast<uint32_t>(NmsSelfBodyAddress()),           // [5]  0x10038540
-            static_cast<uint32_t>(NmsZeroBodyAddress()),           // [6]  0x10001950
-            static_cast<uint32_t>(NmsZeroBodyAddress()),           // [7]  0x10001950
-            static_cast<uint32_t>(NmsSyncBodyAddress()),           // [8]  0x100057F0
-            static_cast<uint32_t>(NmsSyncBodyAddress()),           // [9]  0x100057F0
-            static_cast<uint32_t>(RgscLoginRemovedBodyAddress()),  // [10] 0x10038550
-            static_cast<uint32_t>(NmsNoopRet0BodyAddress()),       // [11] 0x10038560
-            static_cast<uint32_t>(SavegameNullBodyAddress()),      // [12] 0x10038570
-            static_cast<uint32_t>(NmsNoopPairBodyAddress()),       // [13] 0x10038580
-            static_cast<uint32_t>(NmsNoopRet0BodyAddress()),       // [14] 0x10038560
-            static_cast<uint32_t>(NmsRejectBodyAddress()),         // [15] 0x10038590
-            static_cast<uint32_t>(NmsRejectBodyAddress()),         // [16] 0x10038590
-            static_cast<uint32_t>(NmsNoopRet0BodyAddress()),       // [17] 0x10038560
+            reinterpret_cast<uint32_t>(&NmsSelfBody),           // [4]  0x10038540
+            reinterpret_cast<uint32_t>(&NmsSelfBody),           // [5]  0x10038540
+            reinterpret_cast<uint32_t>(&NmsZeroBody),           // [6]  0x10001950
+            reinterpret_cast<uint32_t>(&NmsZeroBody),           // [7]  0x10001950
+            reinterpret_cast<uint32_t>(&NmsSyncBody),           // [8]  0x100057F0
+            reinterpret_cast<uint32_t>(&NmsSyncBody),           // [9]  0x100057F0
+            reinterpret_cast<uint32_t>(&RgscLoginRemovedBody),  // [10] 0x10038550
+            reinterpret_cast<uint32_t>(&NmsNoopRet0Body),       // [11] 0x10038560
+            reinterpret_cast<uint32_t>(&SavegameNullBody),      // [12] 0x10038570
+            reinterpret_cast<uint32_t>(&NmsNoopPairBody),       // [13] 0x10038580
+            reinterpret_cast<uint32_t>(&NmsNoopRet0Body),       // [14] 0x10038560
+            reinterpret_cast<uint32_t>(&NmsRejectBody),         // [15] 0x10038590
+            reinterpret_cast<uint32_t>(&NmsRejectBody),         // [16] 0x10038590
+            reinterpret_cast<uint32_t>(&NmsNoopRet0Body),       // [17] 0x10038560
             reinterpret_cast<uint32_t>(&NmsContainsBody),       // [18] 0x100385A0
-            static_cast<uint32_t>(NmsThunk18BodyAddress()),        // [19] 0x10038620
-            static_cast<uint32_t>(NmsSyncBodyAddress()),           // [20] 0x100057F0
-            static_cast<uint32_t>(NmsSyncBodyAddress()),           // [21] 0x100057F0
-            static_cast<uint32_t>(NmsNoopArgBodyAddress()),        // [22] 0x10038630
-            static_cast<uint32_t>(NmsRejectBodyAddress()),         // [23] 0x10038590
+            reinterpret_cast<uint32_t>(&NmsThunk18Body),        // [19] 0x10038620
+            reinterpret_cast<uint32_t>(&NmsSyncBody),           // [20] 0x100057F0
+            reinterpret_cast<uint32_t>(&NmsSyncBody),           // [21] 0x100057F0
+            reinterpret_cast<uint32_t>(&NmsNoopArgBody),        // [22] 0x10038630
+            reinterpret_cast<uint32_t>(&NmsRejectBody),         // [23] 0x10038590
         };
         std::memcpy(zpatch_nms_vtable, entries, sizeof(entries));
     }
@@ -908,7 +908,7 @@ namespace
                                             static_cast<uint32_t>(displacement);
 
             injector::MakeCALL(reinterpret_cast<void*>(site + kNewSavesCallSite),
-                reinterpret_cast<void*>(NewSavesReadHookAddress()), true);
+                reinterpret_cast<void*>(&NewSavesReadHook), true);
             if (zpatch_new_saves_loaddata == 0)
                 zpatch_new_saves_loaddata = originalTarget;
 
@@ -928,7 +928,7 @@ namespace
                                             static_cast<uint32_t>(displacement);
 
             injector::MakeCALL(reinterpret_cast<void*>(site + kNewSavesCallSite),
-                reinterpret_cast<void*>(NewSavesSecondLoadHookAddress()), true);
+                reinterpret_cast<void*>(&NewSavesSecondLoadHook), true);
             if (zpatch_new_saves_p3_original == 0)
                 zpatch_new_saves_p3_original = originalTarget;
 
@@ -1331,7 +1331,7 @@ namespace
         {
             auto* match = pattern.get_first<std::byte>(0);
             zpatch_gfwl_resume = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match) + 12);
-            injector::MakeJMP(match, reinterpret_cast<void*>(GfwlStubBodyAddress()), true);
+            injector::MakeJMP(match, reinterpret_cast<void*>(&GfwlStubBody), true);
         }
     }
 
@@ -1348,14 +1348,14 @@ namespace
         if (Loader::Current() == Build::v1080 && !pattern.empty())
         {
             auto* site = pattern.get_first<std::byte>(0);  // 0x498460
-            injector::MakeJMP(site, reinterpret_cast<void*>(RgscLoginRemovedBodyAddress()), true);
-            injector::MakeJMP(site, reinterpret_cast<void*>(RgscLoginRemovedBodyAddress()), true);
+            injector::MakeJMP(site, reinterpret_cast<void*>(&RgscLoginRemovedBody), true);
+            injector::MakeJMP(site, reinterpret_cast<void*>(&RgscLoginRemovedBody), true);
         }
 
         pattern = find_pattern("83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53 8B 5C 24 4C 56 68 ? ? ? ? E8 ? ? ? ? 83 C4");
         if (!pattern.empty())
             injector::MakeJMP(pattern.get_first<std::byte>(0),
-                reinterpret_cast<void*>(RgscLoginRemovedBodyAddress()), true);
+                reinterpret_cast<void*>(&RgscLoginRemovedBody), true);
     }
 
     void InstallStartupTimeFix()
@@ -1415,9 +1415,9 @@ namespace
             zpatch_benchmark_resume_a = resume;
             zpatch_benchmark_resume_b = resume;
 
-            injector::MakeJMP(pattern.get(0).get<std::byte>(8), reinterpret_cast<void*>(BenchmarkBodyAAddress()), true);
+            injector::MakeJMP(pattern.get(0).get<std::byte>(8), reinterpret_cast<void*>(&BenchmarkBodyA), true);
             if (pattern.size() > 1)
-                injector::MakeJMP(pattern.get(1).get<std::byte>(8), reinterpret_cast<void*>(BenchmarkBodyBAddress()), true);
+                injector::MakeJMP(pattern.get(1).get<std::byte>(8), reinterpret_cast<void*>(&BenchmarkBodyB), true);
         }
     }
 
@@ -1449,7 +1449,7 @@ namespace
         {
             auto* match = pattern.get_first<std::byte>(0);
             zpatch_skip_intro_match = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(match));
-            injector::MakeJMP(match - 6, reinterpret_cast<void*>(SkipIntroBodyAddress()), true);
+            injector::MakeJMP(match - 6, reinterpret_cast<void*>(&SkipIntroBody), true);
         }
     }
 
@@ -1469,7 +1469,7 @@ namespace
             std::memcpy(&displacement, match + 24, sizeof(displacement));
             zpatch_skip_menu_resume = static_cast<uint32_t>(
                 reinterpret_cast<uintptr_t>(match) + 28 + displacement);
-            injector::MakeCALL(match + 23, reinterpret_cast<void*>(SkipMenuBodyAddress()), true);
+            injector::MakeCALL(match + 23, reinterpret_cast<void*>(&SkipMenuBody), true);
         }
 
         pattern = find_pattern("6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5D 5B 33 CC E8 ? ? ? ? 81 C4 ? ? ? ? C3");
@@ -1480,7 +1480,7 @@ namespace
             std::memcpy(&displacement, match + 3, sizeof(displacement));
             zpatch_skip_menu_resume = static_cast<uint32_t>(
                 reinterpret_cast<uintptr_t>(match) + 7 + displacement);
-            injector::MakeCALL(match + 2, reinterpret_cast<void*>(SkipMenuBodyAddress()), true);
+            injector::MakeCALL(match + 2, reinterpret_cast<void*>(&SkipMenuBody), true);
         }
 
         pattern = find_pattern("6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC E8 ? ? ? ? 8B E5 5D C3");
@@ -1491,7 +1491,7 @@ namespace
             std::memcpy(&displacement, match + 3, sizeof(displacement));
             zpatch_skip_menu_resume = static_cast<uint32_t>(
                 reinterpret_cast<uintptr_t>(match) + 7 + displacement);
-            injector::MakeCALL(match + 2, reinterpret_cast<void*>(SkipMenuBodyAddress()), true);
+            injector::MakeCALL(match + 2, reinterpret_cast<void*>(&SkipMenuBody), true);
         }
     }
 
@@ -1507,11 +1507,11 @@ namespace
         if (!pattern.empty())
         {
             auto* match = pattern.get_first<std::byte>(0);
-            injector::MakeCALL(match - 73, reinterpret_cast<void*>(SavegameCloseBodyAddress()), true);
-            injector::MakeCALL(match - 143, reinterpret_cast<void*>(SavegameCopyBodyAddress()), true);
-            injector::MakeCALL(match - 176, reinterpret_cast<void*>(SavegameCopyBodyAddress()), true);
-            injector::MakeCALL(match - 280, reinterpret_cast<void*>(SavegameMutexBodyAddress()), true);
-            injector::MakeCALL(match - 240, reinterpret_cast<void*>(SavegameNullBodyAddress()), true);
+            injector::MakeCALL(match - 73, reinterpret_cast<void*>(&SavegameCloseBody), true);
+            injector::MakeCALL(match - 143, reinterpret_cast<void*>(&SavegameCopyBody), true);
+            injector::MakeCALL(match - 176, reinterpret_cast<void*>(&SavegameCopyBody), true);
+            injector::MakeCALL(match - 280, reinterpret_cast<void*>(&SavegameMutexBody), true);
+            injector::MakeCALL(match - 240, reinterpret_cast<void*>(&SavegameNullBody), true);
             injector::MakeNOP(match, 2, true);
         }
 
@@ -1519,11 +1519,11 @@ namespace
         if (!pattern.empty())
         {
             auto* match = pattern.get_first<std::byte>(0);
-            injector::MakeCALL(match - 86, reinterpret_cast<void*>(SavegameMutexBodyAddress()), true);
-            injector::MakeCALL(match - 47, reinterpret_cast<void*>(SavegameNullBodyAddress()), true);
-            injector::MakeCALL(match + 10, reinterpret_cast<void*>(SavegameCopyBodyAddress()), true);
-            injector::MakeCALL(match + 90, reinterpret_cast<void*>(SavegameCopyBodyAddress()), true);
-            injector::MakeCALL(match + 128, reinterpret_cast<void*>(SavegameCloseBodyAddress()), true);
+            injector::MakeCALL(match - 86, reinterpret_cast<void*>(&SavegameMutexBody), true);
+            injector::MakeCALL(match - 47, reinterpret_cast<void*>(&SavegameNullBody), true);
+            injector::MakeCALL(match + 10, reinterpret_cast<void*>(&SavegameCopyBody), true);
+            injector::MakeCALL(match + 90, reinterpret_cast<void*>(&SavegameCopyBody), true);
+            injector::MakeCALL(match + 128, reinterpret_cast<void*>(&SavegameCloseBody), true);
         }
     }
 
@@ -1550,12 +1550,12 @@ namespace
         pattern = find_pattern("7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D6 5F 5E 5B C3");
         if (!pattern.empty())
             injector::MakeJMP(pattern.get_first<std::byte>(14),
-                reinterpret_cast<void*>(LocalSettingsDetourBodyAddress()), true);
+                reinterpret_cast<void*>(&LocalSettingsDetourBody), true);
 
         pattern = find_pattern("7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D7 5F C3");
         if (!pattern.empty())
             injector::MakeJMP(pattern.get_first<std::byte>(-13),
-                reinterpret_cast<void*>(LocalSettingsFallbackBodyAddress()), true);
+                reinterpret_cast<void*>(&LocalSettingsFallbackBody), true);
 
         // The detour body's inline `call` is invisible to C++; naming the helper
         // here keeps its out-of-line definition in the image.
@@ -1574,7 +1574,7 @@ namespace
             auto* match = pattern.get_first<std::byte>(0);
             // -34 is the call the original retargets, -29 the five-slot clear's
             // first store; the jump resumes four instructions later at -16.
-            injector::MakeCALL(match - 34, reinterpret_cast<void*>(NmsApplyBodyAddress()), true);
+            injector::MakeCALL(match - 34, reinterpret_cast<void*>(&NmsApplyBody), true);
             injector::MakeJMP(match - 29, reinterpret_cast<void*>(match - 16), true);
         }
     }
@@ -1597,7 +1597,7 @@ namespace
         pattern = find_pattern("68 64 28 C8 67 E8");
         if (!pattern.empty())
             injector::MakeJMP(pattern.get_first<std::byte>(28),
-                reinterpret_cast<void*>(NewfilesRegisterBodyAddress()), true);
+                reinterpret_cast<void*>(&NewfilesRegisterBody), true);
     }
 
     // The same load entry is the write. The original returns before this scan when
@@ -1616,7 +1616,7 @@ namespace
         auto pattern = find_pattern("89 84 24 E0 01 00 00 8B 45 08 53 33 DB");
         if (!pattern.empty())
             injector::MakeJMP(pattern.get_first<std::byte>(0),
-                reinterpret_cast<void*>(NewSavesTrampolineAddress()), true);
+                reinterpret_cast<void*>(&NewSavesTrampoline), true);
     }
 
     void InstallLoadDLCs()
@@ -1641,10 +1641,10 @@ namespace
                 injector::MakeCALL(site, base + write.target, true);
                 break;
             case DlcWriteKind::jump_body:
-                injector::MakeJMP(site, reinterpret_cast<void*>(DlcStructFixupBodyAddress()), true);
+                injector::MakeJMP(site, reinterpret_cast<void*>(&DlcStructFixupBody), true);
                 break;
             case DlcWriteKind::call_body:
-                injector::MakeCALL(site, reinterpret_cast<void*>(DlcDummyBodyAddress()), true);
+                injector::MakeCALL(site, reinterpret_cast<void*>(&DlcDummyBody), true);
                 break;
             case DlcWriteKind::nop_tail:
                 injector::MakeNOP(site, kDlcTailNopLength, true);
@@ -1705,56 +1705,56 @@ export void RegisterLoading()
 
     // The hook bodies carry their recovered VAs so the dump can express every
     // branch in the original's coordinates.
-    Bodies::Register(LocalSettingsDetourBodyAddress(), 0x100512F0u);
-    Bodies::Register(LocalSettingsFallbackBodyAddress(), 0x10051300u);
-    Bodies::Register(GfwlStubBodyAddress(), 0x100054E0u);
-    Bodies::Register(RgscLoginRemovedBodyAddress(), 0x10038550u);
-    Bodies::Register(BenchmarkBodyAAddress(), 0x10005650u);
-    Bodies::Register(BenchmarkBodyBAddress(), 0x10005670u);
-    Bodies::Register(SkipIntroBodyAddress(), 0x10045C30u);
-    Bodies::Register(SkipMenuBodyAddress(), 0x10046610u);
-    Bodies::Register(SavegameNullBodyAddress(), 0x10038570u);
-    Bodies::Register(SavegameCloseBodyAddress(), 0x10045580u);
-    Bodies::Register(SavegameCopyBodyAddress(), 0x100455A0u);
-    Bodies::Register(SavegameMutexBodyAddress(), 0x100455E0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&LocalSettingsDetourBody), 0x100512F0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&LocalSettingsFallbackBody), 0x10051300u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&GfwlStubBody), 0x100054E0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&RgscLoginRemovedBody), 0x10038550u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&BenchmarkBodyA), 0x10005650u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&BenchmarkBodyB), 0x10005670u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&SkipIntroBody), 0x10045C30u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&SkipMenuBody), 0x10046610u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&SavegameNullBody), 0x10038570u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&SavegameCloseBody), 0x10045580u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&SavegameCopyBody), 0x100455A0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&SavegameMutexBody), 0x100455E0u);
 
     // NewMemorySystem's ten transcribed methods and the three rebuilt arena
     // methods of its vtable (0x100B5038).
-    Bodies::Register(NmsCtorBodyAddress(), 0x10038640u);
-    Bodies::Register(NmsRejectPtrBodyAddress(), 0x10038350u);
-    Bodies::Register(NmsSelfBodyAddress(), 0x10038540u);
-    Bodies::Register(NmsZeroBodyAddress(), 0x10001950u);
-    Bodies::Register(NmsNoopRet0BodyAddress(), 0x10038560u);
-    Bodies::Register(NmsNoopPairBodyAddress(), 0x10038580u);
-    Bodies::Register(NmsRejectBodyAddress(), 0x10038590u);
-    Bodies::Register(NmsSyncBodyAddress(), 0x100057F0u);
-    Bodies::Register(NmsThunk18BodyAddress(), 0x10038620u);
-    Bodies::Register(NmsNoopArgBodyAddress(), 0x10038630u);
-    Bodies::Register(NmsApplyBodyAddress(), 0x10038670u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsCtorBody), 0x10038640u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsRejectPtrBody), 0x10038350u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsSelfBody), 0x10038540u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsZeroBody), 0x10001950u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsNoopRet0Body), 0x10038560u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsNoopPairBody), 0x10038580u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsRejectBody), 0x10038590u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsSyncBody), 0x100057F0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsThunk18Body), 0x10038620u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsNoopArgBody), 0x10038630u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NmsApplyBody), 0x10038670u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&NmsAllocateBody), 0x10038360u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&NmsFreeBody), 0x10038430u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&NmsContainsBody), 0x100385A0u);
 
     // NewFilesCompatibility's registration tail (transcribed) and its two update
     // bodies (rebuilt, so they carry no proof row).
-    Bodies::Register(NewfilesRegisterBodyAddress(), 0x10051600u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NewfilesRegisterBody), 0x10051600u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&NewfilesUpdateABody), 0x10051890u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&NewfilesUpdateBBody), 0x100518D0u);
 
     // NewSavesCompatibility's trampoline (transcribed) and the four steps behind it
     // (the original's compiled C, rebuilt, so they carry no proof row): the prepare
     // step, the converter, and the two hooks it installs at conversion time.
-    Bodies::Register(NewSavesTrampolineAddress(), 0x100521E0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NewSavesTrampoline), 0x100521E0u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&NewSavesPrepare), 0x10051FD0u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&NewSavesConvert), 0x10051B30u);
-    Bodies::Register(NewSavesReadHookAddress(), 0x10051A90u);
-    Bodies::Register(NewSavesSecondLoadHookAddress(), 0x10051AD0u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NewSavesReadHook), 0x10051A90u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&NewSavesSecondLoadHook), 0x10051AD0u);
 
     // LoadDLCs' two bodies, and the discovery pass the fixup body calls (a rebuild,
     // so it carries no proof row).
-    Bodies::Register(DlcDummyBodyAddress(), 0x10023480u);
-    Bodies::Register(DlcStructFixupBodyAddress(), 0x10023490u);
-    Bodies::Register(DlcDiscoveryAddress(), 0x10023150u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&DlcDummyBody), 0x10023480u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&DlcStructFixupBody), 0x10023490u);
+    Bodies::Register(reinterpret_cast<uintptr_t>(&DlcDiscovery), 0x10023150u);
 
     // The registrar's inline-asm `call` and the callbacks it names are invisible
     // to C++; naming them here keeps their out-of-line definitions in the image.
@@ -2635,36 +2635,3 @@ static __declspec(naked) void DlcStructFixupBody()
         jmp dlc_fixup_exit
     }
 }
-
-// The body accessors the readable code above uses: each body is defined above, so
-// its address can be taken here (a declaration cannot carry __declspec(naked)).
-static uintptr_t GfwlStubBodyAddress() { return reinterpret_cast<uintptr_t>(&GfwlStubBody); }
-static uintptr_t RgscLoginRemovedBodyAddress() { return reinterpret_cast<uintptr_t>(&RgscLoginRemovedBody); }
-static uintptr_t BenchmarkBodyAAddress() { return reinterpret_cast<uintptr_t>(&BenchmarkBodyA); }
-static uintptr_t BenchmarkBodyBAddress() { return reinterpret_cast<uintptr_t>(&BenchmarkBodyB); }
-static uintptr_t SkipIntroBodyAddress() { return reinterpret_cast<uintptr_t>(&SkipIntroBody); }
-static uintptr_t SkipMenuBodyAddress() { return reinterpret_cast<uintptr_t>(&SkipMenuBody); }
-static uintptr_t SavegameNullBodyAddress() { return reinterpret_cast<uintptr_t>(&SavegameNullBody); }
-static uintptr_t SavegameCloseBodyAddress() { return reinterpret_cast<uintptr_t>(&SavegameCloseBody); }
-static uintptr_t SavegameMutexBodyAddress() { return reinterpret_cast<uintptr_t>(&SavegameMutexBody); }
-static uintptr_t SavegameCopyBodyAddress() { return reinterpret_cast<uintptr_t>(&SavegameCopyBody); }
-static uintptr_t LocalSettingsDetourBodyAddress() { return reinterpret_cast<uintptr_t>(&LocalSettingsDetourBody); }
-static uintptr_t LocalSettingsFallbackBodyAddress() { return reinterpret_cast<uintptr_t>(&LocalSettingsFallbackBody); }
-static uintptr_t NmsNoopRet0BodyAddress() { return reinterpret_cast<uintptr_t>(&NmsNoopRet0Body); }
-static uintptr_t NmsCtorBodyAddress() { return reinterpret_cast<uintptr_t>(&NmsCtorBody); }
-static uintptr_t NmsRejectPtrBodyAddress() { return reinterpret_cast<uintptr_t>(&NmsRejectPtrBody); }
-static uintptr_t NmsSelfBodyAddress() { return reinterpret_cast<uintptr_t>(&NmsSelfBody); }
-static uintptr_t NmsZeroBodyAddress() { return reinterpret_cast<uintptr_t>(&NmsZeroBody); }
-static uintptr_t NmsNoopPairBodyAddress() { return reinterpret_cast<uintptr_t>(&NmsNoopPairBody); }
-static uintptr_t NmsRejectBodyAddress() { return reinterpret_cast<uintptr_t>(&NmsRejectBody); }
-static uintptr_t NmsSyncBodyAddress() { return reinterpret_cast<uintptr_t>(&NmsSyncBody); }
-static uintptr_t NmsNoopArgBodyAddress() { return reinterpret_cast<uintptr_t>(&NmsNoopArgBody); }
-static uintptr_t NmsThunk18BodyAddress() { return reinterpret_cast<uintptr_t>(&NmsThunk18Body); }
-static uintptr_t NmsApplyBodyAddress() { return reinterpret_cast<uintptr_t>(&NmsApplyBody); }
-static uintptr_t NewfilesRegisterBodyAddress() { return reinterpret_cast<uintptr_t>(&NewfilesRegisterBody); }
-static uintptr_t NewSavesReadHookAddress() { return reinterpret_cast<uintptr_t>(&NewSavesReadHook); }
-static uintptr_t NewSavesSecondLoadHookAddress() { return reinterpret_cast<uintptr_t>(&NewSavesSecondLoadHook); }
-static uintptr_t NewSavesTrampolineAddress() { return reinterpret_cast<uintptr_t>(&NewSavesTrampoline); }
-static uintptr_t DlcDiscoveryAddress() { return reinterpret_cast<uintptr_t>(&DlcDiscovery); }
-static uintptr_t DlcDummyBodyAddress() { return reinterpret_cast<uintptr_t>(&DlcDummyBody); }
-static uintptr_t DlcStructFixupBodyAddress() { return reinterpret_cast<uintptr_t>(&DlcStructFixupBody); }

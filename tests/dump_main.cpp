@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <system_error>
 
 import bodies;
 import common;
@@ -27,29 +28,52 @@ import ooc;
 // `<RVA> <byte>` in RVA order. That is the parity artefact -- it is what the
 // per-build baselines and the original's oracle are compared against.
 //
-// The copy is laid out by RVA in a 64 KiB-aligned allocation, not at the
-// preferred base: nothing here needs 0x400000, so the tool stays 32-bit like the
-// ASI. The allocation's alignment matters: the loader's delta is always a
-// multiple of the 64 KiB allocation granularity, so keeping the dump's delta the
-// same keeps the relocation's effect on the low two bytes of a dword identical
-// to the game's. The relocation pass moves every absolute operand the image
-// carries by `hostBase - OptionalHeader.ImageBase`, so from then on a captured
-// pattern operand read out of the buffer is a live address in *this* process --
-// exactly what it is in the game. An arm's identity cast is therefore right in
-// both places, and the dump can no longer reward a per-arm rebase that would be
-// wrong at run time.
+// The copy is mapped at the image's own preferred base (`0x00400000`) when that
+// address is free -- the loader delta is then exactly zero -- and otherwise at the
+// fixed base `kFixedImageBase`. Either way the delta is a constant, so the dump's
+// bytes are a function of the source image and the arms only, never of the run's
+// ASLR. That pin is what makes this a stable oracle. A Win32 process cannot have
+// 0x00400000: the loader maps the NLS section `C_1252.NLS` there before any user
+// code runs and the heap follows it, so the 26 MB range is never free (measured,
+// and the reference tree records the same -- `../readable/CMakeLists.txt` builds
+// its dump 64-bit for this reason). The fixed fallback keeps the oracle stable;
+// it is not the image's own coordinate system, so the `.reloc` pass runs with a
+// non-zero constant delta and `ApplyRelocations` refuses any base it did not pin.
+//
+// The relocation pass moves every absolute operand the image carries by
+// `hostBase - OptionalHeader.ImageBase`; at a *run-dependent* delta a signature
+// whose fixed bytes span the high half of a HIGHLOW fixup matches on some runs and
+// not others, and the row convention's high-half suppression can hide an arm's
+// write on some runs and report it on others. Both were measured before the pin
+// (docs/parity.md, "The per-option dump pins its image base"). A
+// captured pattern operand read out of the buffer is a live address in *this*
+// process at either pinned base -- exactly what it is in the game -- so an arm's
+// identity cast is right in both places, and the dump cannot reward a per-arm
+// rebase that would be wrong at run time.
+//
+// The tool itself is linked at `/BASE:0x20000000` (CMakeLists.txt) so its own
+// image cannot occupy the address the copy needs. A base that is neither the
+// preferred one nor the fixed one is a loud failure: an unstable oracle is worse
+// than a missing one.
 
 namespace
 {
+    // The base the copy falls back to when the image's preferred base is not free.
+    // It is a constant on purpose: the whole point of the pin is that two runs of
+    // this binary produce the same bytes, so the copy must never sit where the
+    // allocator happens to put it. 0x30000000 is clear of the image's preferred
+    // 0x00400000, of this tool's own /BASE:0x20000000 and of the ASI's 0x10000000.
+    // The image's preferred base is tried first (Load), and delta 0 is preferred.
+    constexpr uintptr_t kFixedImageBase = 0x30000000;
+
     struct Image
     {
-        uint8_t* bytes{};                  // the copy the arms run against, 64 KiB-aligned
+        uint8_t* bytes{};                  // the copy the arms run against, at the pinned base
         size_t size{};
         uintptr_t imageBase{};             // the image's own preferred base
         std::vector<uint8_t> unrelocated;  // the copy before the .reloc pass
         std::vector<uint8_t> pristine;     // the copy after it, before any arm ran
         std::vector<size_t> fixupFields;   // the first byte of every HIGHLOW fixup
-        uint32_t delta{};                  // hostBase - ImageBase, the loader's delta
 
         ~Image()
         {
@@ -99,16 +123,16 @@ namespace
         return { 0, std::min(end, image.size) };
     }
 
-    // The check that would have caught the double-rebase: an arm captures a dword
-    // out of the image and casts it to a pointer. The image as loaded holds live
-    // addresses, so after this loader's relocation that dword must be exactly
-    // `hostBase + RVA`. Measured at IncreaseVehicleModelLimit's anchor, whose
-    // `mov ecx, imm32` at match+77 names the model-limit object: the unrelocated
-    // dword is a preferred-base VA, the relocated one must differ from it by the
-    // loader's delta, and the object it names must be a writable word of the buffer.
-    // With the relocation step removed the dword is still the preferred VA and this
-    // fails loudly instead of the dump measuring the arm against an address that is
-    // not in this process.
+    // The check that the mapped copy speaks the image's own coordinate system: an
+    // arm captures a dword out of the image and casts it to a pointer. Measured at
+    // IncreaseVehicleModelLimit's anchor, whose `mov ecx, imm32` at match+77 names
+    // the model-limit object: the unrelocated dword must be a preferred-base VA of
+    // this image, the copy's dword must name `hostBase + RVA` (the .reloc pass has
+    // run, so at the preferred base the two are the same value and at the fixed base
+    // they differ by its constant delta), and the object it names must be a writable
+    // word of the buffer. A copy mapped at neither pinned base, or an operand that
+    // is not this image's VA, fails loudly here instead of the dump measuring the
+    // arm against an address that is not in this process.
     bool VerifyRelocatedOperand(const Image& image, const std::vector<uint8_t>& unrelocated)
     {
         // The recovered 1.0.8.0 anchor is build-agnostic: it is the allocator's
@@ -150,7 +174,8 @@ namespace
         if (relocated != expected)
         {
             std::printf("relocation check: FAILED: the operand at RVA %zX is %08X, expected %08X "
-                        "(host base %08X, image base %08X); the .reloc pass did not run\n",
+                        "(host base %08X, image base %08X); the copy is not the image's "
+                        "coordinate system\n",
                 field, relocated, expected, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(image.bytes)),
                 static_cast<uint32_t>(image.imageBase));
             return false;
@@ -170,12 +195,14 @@ namespace
     }
 
     // Applies the image's `.reloc` entries with the delta the Windows loader would
-    // use: the buffer sits at a 64 KiB-aligned heap address, so every preferred-base
-    // VA baked into the image moves by `hostBase - OptionalHeader.ImageBase` and the
-    // relocation's effect on each dword is the same in kind as the game's. A file
-    // with no `.reloc` cannot be modelled (nothing would tell a relocated copy from
-    // a preferred-base one), and a fixup outside the buffer is a corrupt image, so
-    // both are refused loudly rather than skipped.
+    // use. Load maps the copy at the image's preferred base when that address is
+    // free -- the delta is then zero and the pass adds nothing -- and at
+    // kFixedImageBase otherwise, so the delta is one of exactly two constants. The
+    // pass still runs in both modes, because that is the loader's behaviour and
+    // because this is where the base is asserted; anything else is refused loudly
+    // instead of being measured. A file with no `.reloc` cannot be modelled
+    // (nothing would tell a relocated copy from a preferred-base one), and a fixup
+    // outside the buffer is a corrupt image, so both are refused too.
     bool ApplyRelocations(Image& image, const std::vector<uint8_t>& unrelocated, const std::string& name)
     {
         const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(image.bytes);
@@ -197,17 +224,19 @@ namespace
         }
 
         const auto hostBase = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(image.bytes));
-        const auto delta = static_cast<uint32_t>(hostBase - static_cast<uint32_t>(image.imageBase));
-        if ((delta & 0xFFFFu) != 0)
+        if (hostBase != static_cast<uint32_t>(image.imageBase) &&
+            hostBase != static_cast<uint32_t>(kFixedImageBase))
         {
-            std::printf("%s: refused: the mapped copy is not 64 KiB-aligned with the image base, "
-                        "so the delta is not a loader delta (%08X)\n", name.c_str(), delta);
+            std::printf("%s: refused: the copy is at %08X, neither the image's preferred base %08X "
+                        "nor the fixed base %08X; the dump does not measure a base it did not pin\n",
+                name.c_str(), hostBase, static_cast<uint32_t>(image.imageBase),
+                static_cast<uint32_t>(kFixedImageBase));
             return false;
         }
+        const auto delta = static_cast<uint32_t>(hostBase - static_cast<uint32_t>(image.imageBase));
 
         auto* bytes = image.bytes;
         image.fixupFields.clear();
-        image.delta = delta;
         const size_t end = static_cast<size_t>(directory.VirtualAddress) + directory.Size;
         size_t applied = 0;
         size_t offset = directory.VirtualAddress;
@@ -267,7 +296,9 @@ namespace
     }
 
     // Copies the headers and every section to its virtual address, leaving the
-    // rest zeroed, which is what the loader maps, then relocates the copy.
+    // rest zeroed, which is what the loader maps, then relocates the copy. The
+    // allocation is the image's preferred base when it is free and kFixedImageBase
+    // otherwise, so the loader delta is a constant and the copy is reproducible.
     bool Load(const std::filesystem::path& path, Image& image)
     {
         std::ifstream file(path, std::ios::binary);
@@ -276,34 +307,76 @@ namespace
             std::printf("cannot open %s\n", path.string().c_str());
             return false;
         }
+
+        // The headers are read first and the copy is mapped before the file body:
+        // the whole file is itself a large allocation, and the CRT heap can otherwise
+        // take the very address the copy needs (measured: the 26 MB buffer landed on
+        // 0x00400000 and the mapping then failed with ERROR_INVALID_ADDRESS).
+        IMAGE_DOS_HEADER dos{};
+        file.read(reinterpret_cast<char*>(&dos), sizeof(dos));
+        if (!file)
+            return false;
+        file.seekg(static_cast<std::streamoff>(dos.e_lfanew));
+        IMAGE_NT_HEADERS nt{};
+        file.read(reinterpret_cast<char*>(&nt), sizeof(nt));
+        if (!file)
+            return false;
+
+        image.size = nt.OptionalHeader.SizeOfImage;
+        image.imageBase = nt.OptionalHeader.ImageBase;
+        // The image's own preferred base first: that is its own coordinate system,
+        // and the delta is then zero. A Win32 process cannot have it -- the loader
+        // maps the NLS section C_1252.NLS at 0x00400000 before any user code runs
+        // and the heap follows, so the 26 MB range is never free (docs/parity.md,
+        // "The per-option dump pins its image base"). The copy then goes
+        // to a fixed 64 KiB-aligned base, never to the allocator's choice: a
+        // run-dependent delta is the defect this tool exists to avoid, and an
+        // unstable oracle is worse than a missing one. The tool is linked at
+        // /BASE:0x20000000 so its own image is out of both addresses' way.
+        image.bytes = static_cast<uint8_t*>(VirtualAlloc(
+            reinterpret_cast<void*>(image.imageBase), image.size,
+            MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+        if (image.bytes == nullptr)
+        {
+            const auto error = static_cast<int>(GetLastError());
+            std::printf("%s: the preferred base %08zX is not available (VirtualAlloc: error %d: %s); "
+                        "pinning the copy at the fixed base %08zX instead\n",
+                path.string().c_str(), static_cast<size_t>(image.imageBase), error,
+                std::error_code(error, std::system_category()).message().c_str(),
+                static_cast<size_t>(kFixedImageBase));
+            image.bytes = static_cast<uint8_t*>(VirtualAlloc(
+                reinterpret_cast<void*>(kFixedImageBase), image.size,
+                MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+            if (image.bytes == nullptr)
+            {
+                const auto fallback = static_cast<int>(GetLastError());
+                std::printf("%s: cannot map the %zX-byte image at the fixed base %08zX either "
+                            "(VirtualAlloc: error %d: %s)\n",
+                    path.string().c_str(), image.size, static_cast<size_t>(kFixedImageBase),
+                    fallback, std::error_code(fallback, std::system_category()).message().c_str());
+                return false;
+            }
+        }
+
+        // Now the whole file, whose headers the copy above already read once.
+        file.clear();
+        file.seekg(0);
         std::vector<uint8_t> raw((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
         if (raw.size() < sizeof(IMAGE_DOS_HEADER))
             return false;
-
-        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(raw.data());
-        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(raw.data() + dos->e_lfanew);
-        image.size = nt->OptionalHeader.SizeOfImage;
-        image.imageBase = nt->OptionalHeader.ImageBase;
-        // VirtualAlloc's result is 64 KiB-aligned, which is what makes the delta a
-        // loader delta (see ApplyRelocations).
-        image.bytes = static_cast<uint8_t*>(
-            VirtualAlloc(nullptr, image.size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
-        if (image.bytes == nullptr)
-        {
-            std::printf("%s: cannot allocate the %zX-byte image buffer\n", path.string().c_str(), image.size);
-            return false;
-        }
+        const auto* rawDos = reinterpret_cast<const IMAGE_DOS_HEADER*>(raw.data());
+        const auto* rawNt = reinterpret_cast<const IMAGE_NT_HEADERS*>(raw.data() + rawDos->e_lfanew);
         std::memset(image.bytes, 0, image.size);
 
-        const auto* section = IMAGE_FIRST_SECTION(nt);
-        for (WORD index = 0; index < nt->FileHeader.NumberOfSections; ++index, ++section)
+        const auto* section = IMAGE_FIRST_SECTION(rawNt);
+        for (WORD index = 0; index < rawNt->FileHeader.NumberOfSections; ++index, ++section)
         {
             const auto count = std::min<size_t>(section->SizeOfRawData, image.size - section->VirtualAddress);
             if (section->PointerToRawData + count <= raw.size() && count <= image.size)
                 std::memcpy(image.bytes + section->VirtualAddress, raw.data() + section->PointerToRawData, count);
         }
         // The headers are part of the image too.
-        const auto headers = std::min<size_t>(nt->OptionalHeader.SizeOfHeaders, raw.size());
+        const auto headers = std::min<size_t>(rawNt->OptionalHeader.SizeOfHeaders, raw.size());
         std::memcpy(image.bytes, raw.data(), headers);
 
         // The unrelocated copy is what the relocated-operand check measures against,
@@ -324,11 +397,13 @@ namespace
     //  * A byte outside a fixup is compared against the unrelocated copy (which is
     //    what the image held there).
     //  * A byte in the low half of a fixup dword is also compared against the
-    //    unrelocated copy: the delta is 64 KiB-aligned, so relocation does not move
-    //    those bytes and anything that differs is the mod's.
+    //    unrelocated copy: a loader delta is 64 KiB-aligned, so relocation does not
+    //    move those bytes and anything that differs is the mod's.
     //  * A byte in the high half of a fixup dword is compared against the relocated
-    //    pristine copy: relocation does move it, so a difference means the mod wrote
-    //    there, not the loader.
+    //    pristine copy: at a non-zero delta relocation does move it, so a difference
+    //    means the mod wrote there, not the loader. At delta zero (the preferred-base
+    //    mode) the two copies are equal and this is the ordinary comparison; the rule
+    //    stays because it is the convention the fixed-delta mode keeps.
     //  * A substituted published pointer is a stand-in for an arm's own pointer
     //    write, so its four bytes are always compared against the original image.
     void Dump(const Image& image, std::FILE* out, std::string_view prefix,
@@ -349,10 +424,12 @@ namespace
             }
 
             // The fixup dword that covers this byte, if any. Its high half is the
-            // half the 64 KiB-aligned delta moves: a high byte that still equals the
-            // relocated pristine byte was moved by the loader, not written by the
-            // mod, so it is not a row. Anything else the mod wrote is expressed
-            // against the original image, exactly like every other byte.
+            // half a 64 KiB-aligned delta moves: at a non-zero delta a high byte that
+            // still equals the relocated pristine byte was moved by the loader, not
+            // written by the mod, so it is not a row. At delta zero (the preferred-base
+            // mode) the two copies are equal and the comparison below is the ordinary
+            // one; anything the mod wrote is expressed against the original image,
+            // exactly like every other byte.
             bool high = false;
             const auto next = std::upper_bound(image.fixupFields.begin(), image.fixupFields.end(), rva);
             if (next != image.fixupFields.begin())

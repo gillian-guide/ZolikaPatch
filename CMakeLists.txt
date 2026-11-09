@@ -242,16 +242,31 @@ set_tests_properties(zp_fault_parity PROPERTIES
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   TIMEOUT 300)
 
+# A tool that maps a copy of the game image must pin where the copy lands: a
+# Win32 process cannot own the image's preferred base (0x00400000) -- the loader
+# maps the NLS section there before user code -- so `tests/dump_main.cpp` pins the
+# copy at `kFixedImageBase` (0x30000000) and the relocation delta is a constant
+# instead of the allocator's choice; the dump's bytes are a function of the source
+# image, not of the run's ASLR. An executable's default base is 0x00400000, so the
+# image-mapping tools are linked at 0x20000000 and with ASLR off; otherwise a
+# relocated tool could land on the address the copy needs and the dump would fail
+# instead of being reproducible. (The ASI keeps its own base; nothing here changes
+# it.)
 add_executable(zp_dump tests/dump_main.cpp)
-set_target_properties(zp_dump PROPERTIES CXX_SCAN_FOR_MODULES ON)
+set_target_properties(zp_dump PROPERTIES
+  CXX_SCAN_FOR_MODULES ON
+  LINK_FLAGS "/BASE:0x20000000 /DYNAMICBASE:NO")
 target_link_libraries(zp_dump PRIVATE zp_modules)
 add_dependencies(zp_dump ${ZP_NAME})
 
 # The loader preamble's salt rule, pinned on the real images: the probe hits on
 # 1.0.8.0 (shipped `.data` values stand) and misses on 1.0.0.0 / 1.0.4.0 (the ten
-# fallback stores run). Not a game launch: the images are files.
+# fallback stores run). Not a game launch: the images are files. It maps each
+# image at its preferred base like the dump, so it gets the same link pin.
 add_executable(zp_salt_check tests/salt_check.cpp)
-set_target_properties(zp_salt_check PROPERTIES CXX_SCAN_FOR_MODULES ON)
+set_target_properties(zp_salt_check PROPERTIES
+  CXX_SCAN_FOR_MODULES ON
+  LINK_FLAGS "/BASE:0x20000000 /DYNAMICBASE:NO")
 target_link_libraries(zp_salt_check PRIVATE zp_modules)
 add_dependencies(zp_salt_check ${ZP_NAME})
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/GTAIV.exe
@@ -299,10 +314,14 @@ if(Python3_Interpreter_FOUND)
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_oracle_verified.py)
   add_test(NAME zp_fault_dialogs
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_fault_dialogs.py)
-  # A recovered signature that spells out a .reloc-covered dword can never match
-  # the running game (the loader rewrites those bytes on every run), so the arm
-  # silently never fires. This is the lint for that class: `68 34 EE DA 00` and
-  # two EpisodicVehicleSupport patterns were exactly it.
+  # A recovered signature whose fixed bytes cover a .reloc dword can match on one
+  # launch and miss on another (the game's base is arbitrary every run), so the arm
+  # silently fires or misses depending on ASLR. This is the lint for that class:
+  # every pattern-like literal in source/*.ixx, including the table rows, is
+  # measured at six relocation deltas, and its hit set must be identical at each.
+  # A literal whose hit set changes is classified against the key's recovered
+  # original string: `MiscFixes`' first row is the original's own string and is a
+  # preserved fault (docs/parity.md), anything else is a failure to fix.
   if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../game_refs/GTAIV.exe)
     add_test(NAME zp_relocated_literals
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_relocated_literals.py

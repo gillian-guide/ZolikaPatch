@@ -84,10 +84,26 @@ extern "C"
     const char zpatch_resolver_player_name[] = "player";
 }
 
-// PlayerPedHelperBody's address, for the arm's registration below. It is
-// defined with the transcribed bodies at the end of the file, because a
-// declaration cannot carry __declspec(naked) (C2488).
-static uintptr_t PlayerPedHelperBodyAddress();
+// The transcribed bodies are defined in the tail of this file. MSVC rejects a
+// __declspec(naked) declaration (C2488: "'naked' can only be applied to non-member
+// function definitions"), so the readable code above them names each body through a
+// plain prototype; only the definition in the tail keeps the attribute.
+static void ValueResolverBody();
+static void PlayerPedHelperBody();
+static void PlayerPedComponentsShimBody();
+
+namespace Shared
+{
+    uintptr_t ValueResolver()
+    {
+        return reinterpret_cast<uintptr_t>(&ValueResolverBody);
+    }
+
+    uintptr_t PlayerPedComponentsShim()
+    {
+        return reinterpret_cast<uintptr_t>(&PlayerPedComponentsShimBody);
+    }
+}
 
 namespace Shared
 {
@@ -112,9 +128,9 @@ namespace Shared
         if (!pattern.empty())
             zpatch_model_lookup = reinterpret_cast<uintptr_t>(pattern.get_first<std::byte>(0));
 
-        Bodies::Register(Shared::ValueResolver(), 0x10003E50u);
-        Bodies::Register(Shared::PlayerPedComponentsShim(), 0x1003D9A0u);
-        Bodies::Register(PlayerPedHelperBodyAddress(), 0x1003D930u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&ValueResolverBody), 0x10003E50u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&PlayerPedComponentsShimBody), 0x1003D9A0u);
+        Bodies::Register(reinterpret_cast<uintptr_t>(&PlayerPedHelperBody), 0x1003D930u);
     }
 }
 
@@ -289,23 +305,4 @@ static __declspec(naked) void PlayerPedComponentsShimBody()
         push ecx
         jmp DWORD PTR [zpatch_player_ped_resume]
     }
-}
-
-namespace Shared
-{
-    uintptr_t ValueResolver()
-    {
-        return reinterpret_cast<uintptr_t>(&ValueResolverBody);
-    }
-
-    uintptr_t PlayerPedComponentsShim()
-    {
-        return reinterpret_cast<uintptr_t>(&PlayerPedComponentsShimBody);
-    }
-}
-
-// PlayerPedHelperBody's address accessor, defined here beside the body.
-static uintptr_t PlayerPedHelperBodyAddress()
-{
-    return reinterpret_cast<uintptr_t>(&PlayerPedHelperBody);
 }
