@@ -383,4 +383,48 @@ FreezeCarFix.short	0x7163A4	32 DB 8B 54 24 24 52 E8	7
 # 0x61C725, 1.0.7.0 at 0x61C8D5, 1.1.1.0 at 0x4025A5 and 1.1.2.0 at 0x4025C5.
 # The handler has no build gate: a miss is the original's own clean skip.
 VRAMFix	-	8B 44 24 10 D9 2C 24 83 C4 1C C3	10
+# BenchmarkFix (source/loading.ixx): handler 0x10005690's only signature, quoted
+# from the ASI. The handler returns before scanning on 1.0.8.0/1.1.3.0, and the
+# signature is absent on 1.0.0.0/1.0.4.0; on each build below it has exactly two
+# hits. The arm writes an E9 at each anchor's +8 -- first hit to 0x10005650,
+# second to 0x10005670 -- and publishes each anchor's +13 as that body's resume
+# (0x100056FF..0x10005702, 0x1000574C..0x10005755). The second hit on each build
+# is 0x5164F0 / 0x40ED20 / 0x40ED00 / 0x47F190 / 0x47ED40.
+BenchmarkFix.1004	0x516430	E8 ? ? ? ? 83 C4 04 57 8B D8 FF D6 8B 77 20	16
+BenchmarkFix.1060	0x40EC30	E8 ? ? ? ? 83 C4 04 57 8B D8 FF D6 8B 77 20	16
+BenchmarkFix.1070	0x40EC10	E8 ? ? ? ? 83 C4 04 57 8B D8 FF D6 8B 77 20	16
+BenchmarkFix.1110	0x47F0A0	E8 ? ? ? ? 83 C4 04 57 8B D8 FF D6 8B 77 20	16
+BenchmarkFix.1120	0x47EC50	E8 ? ? ? ? 83 C4 04 57 8B D8 FF D6 8B 77 20	16
+# VSyncFix (source/loading.ixx): handler 0x100503B0's two anchors. Each writes
+# the module pointer &zpatch_vsync_flag (the original's unk_10159BC0, a zero
+# dword) over the operand at anchor+13 (a) and anchor+30 (b). The handler's own
+# gate excludes 1.0.0.0/1.0.4.0/1.0.8.0/1.1.3.0 -- 1.0.4.0 carries both strings,
+# so the gate is load-bearing -- and the strings are absent on the others.
+VSyncFix.1004.a	0x408A24	8B 10 50 8B 82 A8 00 00 00 FF D0 83	12
+VSyncFix.1004.b	0x408B09	8B 08 8B 51 0C 6A 01 6A 00 6A 00 6A 00 6A 00 50 FF D2 8B F0 81 FE ? ? ? ? 74	26
+VSyncFix.1060.a	0x622634	8B 10 50 8B 82 A8 00 00 00 FF D0 83	12
+VSyncFix.1060.b	0x622719	8B 08 8B 51 0C 6A 01 6A 00 6A 00 6A 00 6A 00 50 FF D2 8B F0 81 FE ? ? ? ? 74	26
+VSyncFix.1070.a	0x622814	8B 10 50 8B 82 A8 00 00 00 FF D0 83	12
+VSyncFix.1070.b	0x6228F9	8B 08 8B 51 0C 6A 01 6A 00 6A 00 6A 00 6A 00 50 FF D2 8B F0 81 FE ? ? ? ? 74	26
+VSyncFix.1110.a	0x4072D4	8B 10 50 8B 82 A8 00 00 00 FF D0 83	12
+VSyncFix.1110.b	0x4073B9	8B 08 8B 51 0C 6A 01 6A 00 6A 00 6A 00 6A 00 50 FF D2 8B F0 81 FE ? ? ? ? 74	26
+VSyncFix.1120.a	0x407304	8B 10 50 8B 82 A8 00 00 00 FF D0 83	12
+VSyncFix.1120.b	0x4073E9	8B 08 8B 51 0C 6A 01 6A 00 6A 00 6A 00 6A 00 50 FF D2 8B F0 81 FE ? ? ? ? 74	26
+# LaunchWithPlayGTAIV (source/launcher.ixx): handler 0x100441B0's two launch
+# slots. The handler writes fixed RVAs per case; the arm scans the 16-byte slot
+# text and the two hits on each build below are exactly those RVAs, so the scan
+# is write-equivalent. The 16 bytes written are "PlayGTAIV.exe\0e\0"
+# (50 6C 61 79 47 54 41 49 56 2E 65 78 65 00 65 00), and only when a
+# PlayGTAIV.exe process is alive (sub_10003A10). 1.0.0.4 also carries two slots
+# and EFLC one, but the handler's switch has no case for those builds.
+LaunchWithPlayGTAIV.1000.a	0xDF043C	4C 61 75 6E 63 68 47 54 41 49 56 2E 65 78 65 00	16
+LaunchWithPlayGTAIV.1000.b	0xD8FA0C	4C 61 75 6E 63 68 47 54 41 49 56 2E 65 78 65 00	16
+LaunchWithPlayGTAIV.1040.a	0xDEA184	4C 61 75 6E 63 68 47 54 41 49 56 2E 65 78 65 00	16
+LaunchWithPlayGTAIV.1040.b	0xDDD8A0	4C 61 75 6E 63 68 47 54 41 49 56 2E 65 78 65 00	16
+LaunchWithPlayGTAIV.1060.a	0xDF8F40	4C 61 75 6E 63 68 47 54 41 49 56 2E 65 78 65 00	16
+LaunchWithPlayGTAIV.1060.b	0xE9D0D8	4C 61 75 6E 63 68 47 54 41 49 56 2E 65 78 65 00	16
+LaunchWithPlayGTAIV.1070.a	0xDF9F70	4C 61 75 6E 63 68 47 54 41 49 56 2E 65 78 65 00	16
+LaunchWithPlayGTAIV.1070.b	0xE9E118	4C 61 75 6E 63 68 47 54 41 49 56 2E 65 78 65 00	16
+LaunchWithPlayGTAIV.1080.a	0xE508F8	4C 61 75 6E 63 68 47 54 41 49 56 2E 65 78 65 00	16
+LaunchWithPlayGTAIV.1080.b	0xE5A5E4	4C 61 75 6E 63 68 47 54 41 49 56 2E 65 78 65 00	16
 

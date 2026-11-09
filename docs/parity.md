@@ -107,7 +107,9 @@ record of *behaviour* and *faults*; the rebuild reasons are not repeated here.
 
 Measured on 1.0.8.0 with `tools/parity_report.py 9`: `build 9: 98 key(s) closed, 0
 open, 1 oracle-verified (baseline incomplete)`. The oracle-verified key is the
-`SkipLauncher` baseline gap (see below). `NewSavesCompatibility`, the last substantial
+`SkipLauncher` baseline gap (see below). On 1.0.0.0 and 1.0.4.0 the same class also
+covers `CarDynamicShadowFix`'s baseline gap, and that row names those two builds
+only. `NewSavesCompatibility`, the last substantial
 feature key, is closed by the converter recorded in its own section below;
 `HighQualityReflections` closed with the site-arithmetic resolution recorded below.
 
@@ -276,9 +278,12 @@ cross-check found missing (`BorderlessWindowed` x2, `SuperLODFix`,
 bytes, `differing 0`, `extra 57` (SkipLauncher), `98/99`; `verify_bodies.py` is
 `164 body(ies), 0 failure(s)` (the 13 new rows included; the probe is the largest
 transcribed body at 394 instructions). `parity_report.py` on builds 5, 6, 7, 8, 11
-and 12 no longer lists `VRAMFix` open (the remaining open keys there are the
-pre-existing `CarDynamicShadowFix` on 1.0.4.0 and the `Patch7RemoveModChecks`
-catalogue alias on 1.0.6.0/1.0.7.0, plus the oracle-verified `SkipLauncher`). The
+and 12 no longer lists `VRAMFix` open, and the `Patch7RemoveModChecks`
+catalogue alias on 1.0.6.0/1.0.7.0 is now reported as an oracle-verified baseline
+shortfall rather than an open key (see its own section below); `CarDynamicShadowFix`
+is reported as an oracle-verified baseline omission on 1.0.0.0 and 1.0.4.0 only
+(`tests/oracle_verified.tsv`, per key and build) and scored normally elsewhere -- not
+open there, and not counted as closed on those two builds. The
 independent cross-check now reports build 9 `confirmed 89, different 0, recon_only
 0, ours_only 0` (`FreezeCarFix` counted confirmed), no `VRAMFix` recon-only row on
 any of the six builds, and part 2 `173 row(s): 2 disagreement(s), 0 with no key in
@@ -1847,12 +1852,14 @@ call our equivalent helper instead of the original's compiled target:
   its two epilogues call the CRT's `__security_check_cookie`, which is the function
   the original's `E8` names.
 
-The stored baselines have one gap of their own: they were produced by the
-reference tree, whose `ApplyCarDynamicShadowFixNoE` pass is defined but never
-called, so on 1.0.0.0/1.0.4.0 the baseline lacks the six-byte NOP fill this tree
-writes from the recovered `@noE` row. `CarDynamicShadowFix` therefore reports six
-extra bytes on 1.0.4.0; it is a baseline omission, not a difference in the bytes
-both sides write.
+The stored baselines have a gap of their own: they were produced by the
+reference tree before its `ApplyCarDynamicShadowFixNoE` pass was wired into the
+installed arms, so on the builds that fill runs the baseline lacks the six-byte NOP
+fill this tree writes from the recovered `@noE` row. `CarDynamicShadowFix` therefore
+reports six extra bytes on 1.0.0.0 and 1.0.4.0; it is a baseline omission, not a
+difference in the bytes both sides write, and the oracle-verified class (below)
+excuses exactly those two cells while the key is closed and scored normally on
+1.0.8.0.
 
 ### The per-option dump pins its image base
 
@@ -2011,14 +2018,14 @@ and are outside its claim by design.
 arms (the reference tree's arms scan the original's strings), so the fix *closes* the
 keys per build instead of moving them. With a binary built from this tree:
 1.0.8.0 is `98 closed / 0 open / 1 oracle-verified`; 1.0.0.4, 1.1.1.0, 1.1.2.0 and
-1.1.3.0 are `98 / 0 / 1`; 1.0.4.0 is `97 / 1` and 1.0.6.0/1.0.7.0 are `97 / 1`, the open
-key in each case being the `CarDynamicShadowFix` baseline omission above or the
-`Patch7RemoveModChecks` attribution alias (`Patch6and7RemoveModChecks` is closed with
-the same sites). 1.0.0.0 cannot be scored by the one-process dump: its post-loop
-full-cell run faults at `NoImpostorHeightCutoff` by design, so `parity_report.py 1`
-raises after writing a *complete* per-option file; scored from that file it is `96
-closed, 2 open` (`CarDynamicShadowFix`'s baseline omission and the designed fault
-cell), with every arm above closed. The comparison also ran against a freshly built
+1.1.3.0 are `98 / 0 / 1`; 1.0.4.0 is `97 / 0 / 2` (the second oracle-verified key is
+`CarDynamicShadowFix`'s baseline omission, excused on 1.0.0.0 and 1.0.4.0 -- see
+below), and 1.0.6.0/1.0.7.0 are `97 / 0 / 2`, the second key being the
+`Patch7RemoveModChecks` baseline shortfall. 1.0.0.0 cannot be scored by the
+one-process dump: its full-cell run faults at `NoImpostorHeightCutoff` by design, so
+it is scored one key per process instead, where it is `96 closed, 0 open, 2
+oracle-verified` with `NoImpostorHeightCutoff` the one designed fault cell, every arm
+above closed. The comparison also ran against a freshly built
 binary while the artifacts in `build/` were older than `source/`, which closed
 `VRAMFix` on the six builds where its signature exists; that arm was already in the
 tree and is not part of this change.
@@ -2234,19 +2241,271 @@ the whole catalogue. The 1.0.0.0 fault above therefore surfaces from a
 original's clean skip there. Only the explicit all-`0` document isolates a key.
 
 
-## Open item: an oracle-verified class for baselines that are incomplete
+## The ten keys that had only the baseline: arbitrated against the original ASI
 
-`SkipLauncher` is measured against the oracle rather than the baseline, and the
-scoreboard has no way to say so: it reports the key as open, which is accurate about
-the comparison and misleading about the work. The intended fix is a sidecar
-(`tests/oracle_verified.tsv`: key, why, doc anchor, how it was measured) that the
-scoreboard reports *apart* from the open keys and never counts as closed, so the line
-reads `98 closed, 0 open, 1 oracle-verified (baseline incomplete)`.
+`tools/parity_report.py` compares every catalogue key against the per-option cells
+`../readable/` produced. Ten keys were recorded there **only** as bytes the
+reference arm wrote, with nothing independent behind them: `VRAMFix`,
+`BenchmarkFix`, `OverrideGTADatPathTo`, `VSyncFix`,
+`Patch6and7RemoveModChecks`, `Patch7RemoveModChecks`, `AddOptionsInMenu`,
+`DebugPrintSpawns`, `FixPCIDKickbug`, `LaunchWithPlayGTAIV`. The reference tree
+has already been shown incomplete twice (`FreezeCarFix` missing entirely and six
+bytes of `CarDynamicShadowFix` on 1.0.4.0), and `ZolikaPatch_reconstruction/`
+carries no recovered table for any of the ten either, so the original binary
+(`game_refs/ZolikaPatch_original.asi.off`, IDA base `0x10000000`) is the only
+independent source. This section is that arbitration; the method is
+`.agents/rewrite/09-baseline-only-keys.md`.
 
-Implemented in `tests/oracle_verified.tsv` (key, why, doc anchor, how it was
-measured) and reported by the scoreboard as
-`98 key(s) closed, 0 open, 1 oracle-verified (baseline incomplete)`. It never counts
-as closed, and `tools/check_oracle_verified.py` (ctest `zp_oracle_verified`) keeps
-the class honest: every entry must name a catalogue key, a document that exists, a real
-justification and a real measurement, and the list may not exceed the two keys the
-project has evidence for.
+All ten are **read** inside the original's config walker `sub_100523C0`; eight
+dispatch to a handler and four have no install handler at all (the key's whole
+effect is a flag, a string copy, a registry delete, or a library load). The
+handler's own strings and per-build site VAs are now pinned in
+`tests/signatures.tsv` (`BenchmarkFix.*`, `VSyncFix.*`, `LaunchWithPlayGTAIV.*`;
+`VRAMFix`'s row already carried them).
+
+| key | handler | recovered write set (from the handler's own instructions) | our arm | verdict |
+|---|---|---|---|---|
+| `VRAMFix` | `0x1004AAE0` | pattern `8B 44 24 10 D9 2C 24 83 C4 1C C3`, `E9` at the match + rel32 to `0x1004AAB0`; **no build gate**, the scan is the gate; one site on 1.0.4.0/1.0.0.4/1.0.6.0/1.0.7.0/1.1.1.0/1.1.2.0 | `InstallVRAMFix` scans the same string and jumps to the body registered `0x1004AAB0`; no extra gate | agrees |
+| `BenchmarkFix` | `0x10005690` | gate `build != 9 && build != 13`; pattern `E8 ? ? ? ? 83 C4 04 57 8B D8 FF D6 8B 77 20`, two hits; `E9` at `match[0]+8` -> `0x10005650`, `match[1]+8` -> `0x10005670`; resumes `match[0]+13`/`match[1]+13` | same sites, targets and gate; the second resume was the first match's | fixed |
+| `OverrideGTADatPathTo` | none (inline) | no image write: when the value is not `"0"`, `strcpy_s` it into the 64-byte `aCommonDataGtaD` (`0x10158068`, seeded `common:/data/gta.dat`) | `CopyOverrideDatPath` reads the same key, tests `"0"`, copies into the same-size buffer | agrees (no handler) |
+| `VSyncFix` | `0x100503B0` | gate `build not in {1,2,3,4,5,9,13}`; two patterns; a 4-byte module pointer `&unk_10159BC0` at `match+13` and at `match+30` | `InstallVSyncFix` writes `&zpatch_vsync_flag` at the same two offsets; the catalogue mask is the same gate | agrees |
+| `Patch6and7RemoveModChecks` | `0x10044710` | gate `build == 7 || build == 8`; 16 fixed-RVA bytes on 1.0.6.0 and 21 on 1.0.7.0 (rows below) | per-build signature rows resolve to exactly those RVAs and bytes | agrees |
+| `Patch7RemoveModChecks` | **none of its own** | it is the OR alternative in `0x100523C0`, feeding the same `0x10044710`: with only `Patch7RemoveModChecks=1` the original writes the full 16/21 bytes | gated only on `Patch6and7RemoveModChecks`, so it wrote nothing | fixed, baseline short |
+| `AddOptionsInMenu` | none of its own | no dedicated install handler, but **not write-free**: sets `byte_10158038`; `sub_10052380` then loads `IVMenuAPI.asi`, and only when that load succeeds does the caller run `sub_1001EDE0` (scan `6A 0A 56 50 FF D2 A1`, `mov byte ptr [match+1], 6`) plus `sub_10050BD0` and the two `0x10050A30`/`0x10050A40` callback registrations | no arm at all | no handler; integration unimplemented |
+| `DebugPrintSpawns` | none | no image write: read **only** inside the `FreezeCarFix` gate, raises `byte_10159C15`, which the spawn probe `0x10037510` reads | read inside the same gate (`zpatch_spawns_debug`) | agrees (no handler) |
+| `FixPCIDKickbug` | none | no image write: `SHDeleteValueW(HKEY_CURRENT_USER, L"Software\\Classes\\Software\\Microsoft\\XLive", L"PCID")` | no arm at all | no handler, unimplemented |
+| `LaunchWithPlayGTAIV` | `0x100441B0` | gate `sub_10003A10` (a live `PlayGTAIV.exe` process) plus a switch with cases 1/5/7/8/9; 16 bytes `"PlayGTAIV.exe\0e\0"` at two fixed RVAs per case | same sites, payload, build list; the gate was `Game::Module()==nullptr`, not the process check | fixed |
+
+### `BenchmarkFix`: the second resume was the first match's
+
+The bug is invisible to every cell comparison, because a resume word is a plugin
+global, not an image byte. The handler publishes a **per-match** resume before it
+writes either site:
+
+```
+100056F7  mov eax, [edx]            ; the first match
+100056FF  add eax, 0Dh
+10005702  mov dword_1015AD50, eax   ; body A's resume
+...
+1000574C  mov ecx, [ebp+Block]
+1000574F  mov eax, [ecx+4]          ; the second match
+10005752  add eax, 0Dh
+10005755  mov dword_1015AD54, eax   ; body B's resume
+```
+
+and the bodies read their own word: `10005667 jmp dword ptr [dword_1015AD50]` in
+`sub_10005650`, `10005687 jmp dword ptr [dword_1015AD54]` in `sub_10005670`. Our
+`InstallBenchmarkFix` published `match[0]+13` into both, so body B tail-jumped
+into body A's continuation (the two matches are in different functions). Fixed to
+publish the second match's own `+13`; on all five builds that carry two hits the
+sites and targets are unchanged, so no cell moves.
+
+### `Patch7RemoveModChecks`: the OR, an alternate handler
+
+`0x100523C0` reads the two keys and ORs them into one flag, then calls the same
+handler. The instructions (also quoted in the fix's comment):
+
+```
+10055360  push offset "Patch6and7RemoveModChecks"
+1005539E  cmp eax, 1
+100553A1  jz short loc_100553F5          ; -> write the OR flag = 1
+100553A8  push offset "Patch7RemoveModChecks"
+100553F0  cmp eax, 1
+100553F3  jnz short loc_100553FC         ; neither key -> no handler
+100553F5  mov byte ptr [ebp-0D1h], 1
+1005543F  cmp byte ptr [ebp-0D1h], 0
+10055448  call sub_10044710
+```
+
+`sub_10044710` is the fixed-RVA writer: `build == 7` takes
+`0x392E <- 0xEB`, `0x42E7..0x42ED <- 0x90`, `0x3982 <- E9 (to 0x3A09)`,
+`0x3A14 <- 0xEB`, `0x38AC <- 0x00`, `0x397E <- 0x00` (16 bytes);
+`build == 8` takes `0x390E <- 0xEB`, `0x42C7..0x42CD <- 0x90`,
+`0x3962 <- E9 (to 0x39E9)`, `0x39F4 <- 0xEB`, `0x389C <- E9 (to 0x38AE)`,
+`0x388C <- 0x00`, `0x395E <- 0x00` (21 bytes).
+
+The arm now gates on `Loader::Enabled("Patch6and7RemoveModChecks") ||
+Loader::Enabled("Patch7RemoveModChecks")`, so a Patch7-only INI installs that whole
+set. The stored baseline's Patch7 cell is a **different arm**: the reference tree's
+own `ApplyPatch7RemoveModChecks` writes only the "all checks in one function"
+jump(s) -- 5 bytes on 1.0.6.0 (`0x3982..0x3986`) and 10 on 1.0.7.0 (`0x389C..0x38A0`,
+`0x3962..0x3966`) -- so ours is a strict superset and the scoreboard reports
+`extra 11, missing 0, differing 0` on both builds.
+That is a baseline shortfall, not a regression. It is recorded in
+`tests/oracle_verified.tsv` (`Patch7RemoveModChecks`, builds `7,8`, whose anchor is
+this section), so `python tools/parity_report.py 7` and `8` read `97 key(s)
+closed, 0 open, 2 oracle-verified (baseline incomplete)`.
+
+### `LaunchWithPlayGTAIV`: the process gate, not the module guard
+
+The handler's first instruction is the guard, and only then the build switch:
+
+```
+100441C3  call sub_10003A10          ; Toolhelp32 walk for "PlayGTAIV.exe"
+100441C8  test eax, eax
+100441CA  jz loc_100442F4            ; not launched through PlayGTAIV -> no write
+100441D5  cmp eax, 1                 ; case 1
+100441DA  mov ebx, 9F043Ch
+100441DF  mov [ebp+var_C], 98FA0Ch
+...                                  ; cases 5, 7, 8, 9 likewise
+10044236  mov esi, dword_1015AD70    ; the game module's relocation delta
+```
+
+then two 16-byte stores per case. Sites (game RVAs): 1.0.0.0
+`0x9F043C`/`0x98FA0C`; 1.0.4.0 `0x9EA184`/`0x9DD8A0`; 1.0.6.0
+`0x9F8F40`/`0xA9D0D8`; 1.0.7.0 `0x9F9F70`/`0xA9E118`; 1.0.8.0
+`0xA508F8`/`0xA5A5E4`. The payload is `PlayGTAIV.exe\0e\0`
+(`50 6C 61 79 47 54 41 49 56 2E 65 78 65 00 65 00`), the same two
+`mov dword ptr [..], imm32` rows the compiler emitted from a 16-byte
+`strcpy_s`. Our arm already had the sites, the payload and the build list right
+(the 16-byte literal `LaunchGTAIV.exe\0` has exactly two hits, at exactly those
+RVAs, on the five cases; 1.0.0.4 also has two and EFLC one, and the switch has no
+case there), but it substituted `Game::Module()==nullptr` for the handler's
+process check: a direct `GTAIV.exe` launch rewrote slots the original leaves
+alone. It now runs `PlayGtaivLauncherRunning()` (`CreateToolhelp32Snapshot` /
+`Process32First` / `wcscmp "...PlayGTAIV.exe"` / `Process32Next`) first and keeps
+the module guard as the offline-dump guard, so the game behaviour is the
+handler's and the pinned-base dump stays inert on all nine builds (0 rows: the
+dump attaches an image, not a loaded module, so the whole arm is outside it).
+
+### The four keys with no install handler
+
+`OverrideGTADatPathTo` and `DebugPrintSpawns` are implemented and their empty
+baseline cells are correct: the first only copies into a plugin global, the
+second only sets a flag that is read inside `FreezeCarFix`'s gate. Neither writes
+an image byte on any build, so no cell can or should show one.
+
+`AddOptionsInMenu` and `FixPCIDKickbug` are **unimplemented in this tree**, and one
+of them is not write-free:
+
+* `AddOptionsInMenu` sets `byte_10158038` (the IDB's static initial value is 1, the
+  same as the handler's absent default). `sub_10052380` then does
+  `GetModuleHandleA("IVMenuAPI.asi")` / `LoadLibraryA("IVMenuAPI.asi")` and returns
+  1 only when the library is (now) loaded; the caller then runs three integration
+  steps: `sub_1001EDE0`, `sub_10050BD0` and the two callback registrations at
+  `0x10055BEF` (`push offset sub_10050A40; push offset sub_10050A30`).
+  `sub_1001EDE0` is an image writer: it calls `sub_1001ECB0` (scan
+  `75 ? 8B 0D ? ? ? ? 51 FF 15 ? ? ? ? 85 C0 75 ? 8B 15`, write `9090` only when
+  `DoNotPauseOnMinimize` set `byte_1015AD43`, otherwise the original word back),
+  then scans `6A 0A 56 50 FF D2 A1` and does `mov byte ptr [v2], 6` at the match's
+  `+1` (`0x1001EE23`). The tree has no IVMenuAPI integration, so the key does
+  nothing here -- and, because that write is conditional on the library loading,
+  the baseline produced without `IVMenuAPI.asi` correctly has an empty cell. The
+  one byte it would add is the same site and value `DoNotPauseOnMinimize` writes
+  (`source/audio.ixx`, `6A 0A 56 50 FF D2 A1`), so the shared write is covered;
+  the load and the three registrations are not. Implementing the key means
+  porting that integration, not adding a one-line install.
+* `FixPCIDKickbug` calls `SHDeleteValueW(HKEY_CURRENT_USER,
+  L"Software\\Classes\\Software\\Microsoft\\XLive", L"PCID")`. Implementing it
+  is a small registry arm, but it must be kept out of the offline dump (whose
+  per-option cell would otherwise delete the value on every run), so it belongs
+  beside the launch arm's module guard, not in a bare installer.
+
+Neither key writes an image byte, so the baseline's empty cells are truthful; the
+gap is a behaviour gap, recorded here rather than papered over with a scoreboard
+movement.
+
+### Measured
+
+```
+python tools/parity_report.py 5    97 closed, 0 open, 2 oracle-verified
+python tools/parity_report.py 6    98 closed, 0 open, 1 oracle-verified
+python tools/parity_report.py 7    97 closed, 0 open, 2 oracle-verified
+python tools/parity_report.py 8    97 closed, 0 open, 2 oracle-verified
+python tools/parity_report.py 9    98 closed, 0 open, 1 oracle-verified
+python tools/parity_report.py 11   98 closed, 0 open, 1 oracle-verified
+python tools/parity_report.py 12   98 closed, 0 open, 1 oracle-verified
+python tools/parity_report.py 13   98 closed, 0 open, 1 oracle-verified
+```
+
+and an independent image scan of each handler's own pattern (never reading the
+baseline) agrees with our cell on every image, for every one of the ten keys; the
+scan tool and the per-build table are in
+`.agents/rewrite/09-baseline-only-keys.md`.
+
+## The oracle-verified class: baselines that are incomplete
+
+`SkipLauncher`, `CarDynamicShadowFix` on 1.0.0.0/1.0.4.0 and
+`Patch7RemoveModChecks` on 1.0.6.0/1.0.7.0 are measured against the oracle rather
+than the baseline: their stored cells are missing bytes the original writes, so a raw
+comparison reports them open. That is accurate about the comparison and misleading
+about the work. `tests/oracle_verified.tsv` is the sidecar that says so; the
+scoreboard reports those keys *apart* from the open ones and never counts them as
+closed.
+
+**A row is per key and build.** Its shape is
+
+```
+key <TAB> builds <TAB> why <TAB> the anchor in docs/parity.md <TAB> how it was measured
+```
+
+`builds` is the comma-separated list of build ids the excuse covers, or `*` for every
+build the key's catalogue mask allows. The scoreboard consults the row only on the
+builds it names and scores the key normally everywhere else, so an omitted build
+cannot hide behind an excused one. That is load-bearing for the second row:
+`CarDynamicShadowFix` is closed on 1.0.8.0 and differs only on 1.0.0.0/1.0.4.0, so a
+global row would report a real 1.0.8.0 regression as a baseline gap. With the
+per-build row, `python tools/parity_report.py 5` reads
+
+```
+build 5: 97 key(s) closed, 0 open, 2 oracle-verified (baseline incomplete)
+```
+
+while `python tools/parity_report.py 9` is unchanged at `98 key(s) closed, 0 open, 1
+oracle-verified (baseline incomplete)`.
+
+`tools/check_oracle_verified.py` (ctest `zp_oracle_verified`) keeps the class honest.
+A row must name a catalogue key, a build the catalogue mask allows *and* the measured
+evidence covers, an existing heading in this file (`docs/parity.md#...`), a real
+justification and a real measurement. The evidence is pinned to the omissions
+measured so far -- `SkipLauncher` on every build, `CarDynamicShadowFix` on 1.0.0.0
+and 1.0.4.0, `Patch7RemoveModChecks` on 1.0.6.0 and 1.0.7.0 -- and a row may not
+excuse a build outside its omission: flipping the `CarDynamicShadowFix` row to `*`
+fails the guard (it names the builds the evidence does not cover), instead of hiding
+behind the closed 1.0.8.0 cell.
+
+### The `@noE` fill: `CarDynamicShadowFix` on 1.0.0.0 and 1.0.4.0
+
+The stored baseline's `CarDynamicShadowFix` cells miss the same six bytes on the two
+builds where pattern E is absent. On 1.0.4.0 the baseline cell has 21 rows and none at
+`0x46E028`; our cell has the same 21 plus six `90` bytes there, so the scoreboard
+counts `extra 6`. On 1.0.0.0 the same comparison is only available from the isolated
+one-key cell (the shared per-option cell faults at `NoImpostorHeightCutoff`), and it
+shows the same six bytes at `0x44DF59`. The original's own handler writes them.
+
+The path is the C/D/E branch of the shared installer `sub_10010B60` (ASI VA; image
+base `0x10000000`). The C pattern `83 F8 14 7D 05 83 F8 06 7D 14` matches 1.0.4.0 at
+RVA `0x46DFEA` (C) and 1.0.0.0 at RVA `0x44DF1B` (C); the handler saves the match in
+`[ebp-0x330C]` at `0x100162A1`..`0x100162A6`. At the C/D/E tail it scans pattern E and
+fills the six bytes only when the scan misses:
+
+```
+10019039  e8 f2 a7 fe ff     call 0x10003830         ; scan pattern E: match, or 0
+1001903e  85 c0              test eax,eax
+10019040  0f 85 aa 1c 00 00  jne  0x1001ACF0          ; E present -> no fill
+10019046  8b 8d f4 cc ff ff  mov  ecx,[ebp-0x330C]    ; the C match
+1001904c  8d 50 06           lea  edx,[eax+0x6]      ; eax is 0 here: six bytes
+1001904f  83 c1 3e           add  ecx,0x3e           ; C + 0x3E: 0x46E028 / 0x44DF59
+10019052  e8 29 86 fe ff     call 0x10001680         ; fill
+```
+
+`0x10001680` is the fill helper, and it is a fill, not a store of ours:
+
+```
+10001698  6a 40              push 0x40               ; PAGE_EXECUTE_READWRITE
+1000169e  ff 15 10 30 06 10  call dword [0x10063010] ; VirtualProtect(a1, size, 0x40, ...)
+100016a5  68 90 00 00 00     push 0x90
+100016ab  e8 be f6 05 00     call 0x10060d6e         ; memset(a1, 0x90, size)
+```
+
+So the value is six `90` bytes. The gate that admits both builds is the E scan:
+pattern E (`F6 86 68 02 00 00 04 0F 85 E6 00 00 00`) has exactly one hit in the nine
+images, on 1.0.0.4 at RVA `0x64A6AB`; it has none on 1.0.0.0 or 1.0.4.0, so `eax` is
+zero and the fill runs. The six bytes it NOPs are the game's 6-byte `jz` at C+0x3E:
+`0F 84 E6 00 00 00` on 1.0.4.0, `0F 84 ED 00 00 00` on 1.0.0.0.
+
+The baseline cannot contain that write. It was produced by `../readable` before that
+tree wired its `ApplyCarDynamicShadowFixNoE` pass (the same `MakeNOP(match + 62, 6)`,
+`../readable/source/vehicles.ixx`) into the installed arms; the stored per-build dumps
+predate the source that lists it. The oracle, not the baseline, decides the write, and
+it writes the six NOPs.

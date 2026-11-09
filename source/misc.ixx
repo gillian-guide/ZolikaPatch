@@ -818,7 +818,14 @@ namespace
 
     void InstallPatch6and7RemoveModChecks()
     {
-        if (!Loader::Enabled("Patch6and7RemoveModChecks"))
+        // The original has one handler for two keys: `stoi(ini.get(
+        // "Patch6and7RemoveModChecks","0")) == 1 || stoi(ini.get(
+        // "Patch7RemoveModChecks","0")) == 1` (0x10053FBD..0x10053FE5), both feeding
+        // 0x10044710. Patch7RemoveModChecks is therefore not an alias that does
+        // nothing -- it is the alternate trigger for the same full write set, and a
+        // Patch7-only INI installs all 16/21 bytes on 1.0.6.0/1.0.7.0.
+        if (!Loader::Enabled("Patch6and7RemoveModChecks")
+            && !Loader::Enabled("Patch7RemoveModChecks"))
             return;
 
         for (const auto& row : kModChecksSites)

@@ -3,6 +3,7 @@ module;
 #include <common.hxx>
 
 #include <cstring>
+#include <tlhelp32.h>
 
 export module launcher;
 
@@ -470,9 +471,12 @@ namespace
 
 // LaunchWithPlayGTAIV: the two launch slots carry `LaunchGTAIV.exe\0`; the mod
 // rewrites both to `PlayGTAIV.exe\0e\0` so the game relaunches through the DRM
-// bypass. The scan is wildcard-free and hits exactly the two slots on the five
-// builds the original gated, and unrelated slots on the builds it excluded - so
-// the gate is load-bearing, not decoration.
+// bypass. The handler 0x100441B0 gates the whole switch on sub_10003A10, a
+// Toolhelp32 walk for a live `PlayGTAIV.exe` process, so the rewrite happens only
+// when the game was started through the launcher (a direct GTAIV.exe start leaves
+// both slots alone). The scan is wildcard-free and hits exactly the two slots on
+// the five builds the original gated, and unrelated slots on the builds it
+// excluded - so the build gate is load-bearing too, not decoration.
 namespace
 {
     inline constexpr std::array<std::byte, 16> kLauncherName = {
@@ -485,15 +489,49 @@ namespace
     // "LaunchGTAIV.exe\0", the text both slots currently hold.
     inline constexpr std::string_view kLauncherSlot = "4C 61 75 6E 63 68 47 54 41 49 56 2E 65 78 65 00";
 
+    // sub_10003A10: `CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)`,
+    // `Process32First`, then `strcmp(pe.szExeFile, "PlayGTAIV.exe")` over
+    // `Process32Next`; the handler writes only when the walk finds the launcher
+    // alive and returns its pid. The `cmp esi,1` test at 0x10055351 gates the
+    // write set on that answer. The tree builds with UNICODE, so the walk is the
+    // W form of the same record and the comparison is `wcscmp`.
+    bool PlayGtaivLauncherRunning()
+    {
+        const HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (snapshot == INVALID_HANDLE_VALUE)
+            return false;
+
+        PROCESSENTRY32 entry{};
+        entry.dwSize = sizeof(entry);
+        bool found = false;
+        if (Process32First(snapshot, &entry) != FALSE)
+        {
+            do
+            {
+                if (wcscmp(entry.szExeFile, L"PlayGTAIV.exe") == 0)
+                {
+                    found = true;
+                    break;
+                }
+            } while (Process32Next(snapshot, &entry) != FALSE);
+        }
+        CloseHandle(snapshot);
+        return found;
+    }
+
     void InstallLaunchWithPlayGTAIV()
     {
         if (!Loader::Enabled("LaunchWithPlayGTAIV"))
             return;
 
-        // The launch slots exist in the game process, which is where this arm
-        // belongs: the offline dump has no module context, and the original only
-        // rewrites the slots when PlayGTAIV.exe is the launcher.
+        // Two gates, both the original's: the module guard keeps the offline dump
+        // (which attaches an image, not a loaded module) from depending on whether
+        // this host happens to be running the game, and the process walk is the
+        // handler's own sub_10003A10.
         if (Game::Get().Module() == nullptr)
+            return;
+
+        if (!PlayGtaivLauncherRunning())
             return;
 
         if (!BuildIs(Loader::Current(),

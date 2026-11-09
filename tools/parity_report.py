@@ -3,7 +3,10 @@
 
 For every catalogue key, compares our per-option dump with the baseline the old
 tree produced, and prints one line per key: matched, missing, extra, differing.
-A key is closed only when all four are zero (or both sides are empty).
+A key is closed only when all four are zero (or both sides are empty). A key whose
+difference is a known baseline omission is reported as ORACLE instead of OPEN, on
+the builds `tests/oracle_verified.tsv` names for it (never globally), and is never
+counted as closed.
 
     python tools/parity_report.py <build> [--baseline DIR] [--ours FILE]
 
@@ -80,13 +83,19 @@ def rows(path, key=None):
 
 
 def load_oracle_verified():
-    """Keys whose measured difference is the baseline's incompleteness, not ours.
+    """Keys whose measured difference is the baseline's incompleteness, not ours,
+    and the builds each excuse covers.
 
-    The stored baselines came from the reference tree. For one key that tree's live
-    arm is a 7-row subset of what the original ASI scans, so the key is measured
-    against the oracle instead. It is reported apart from the open keys and never
-    counted as closed: nothing here closes a key, it only stops a known-bad baseline
-    from reading as unfinished work.
+    The stored baselines came from the reference tree, which is incomplete in two
+    measured ways: its live launcher arm is a 7-row subset of what the original ASI
+    scans, and its CarDynamicShadowFix arm never ran the tree's own `@noE` pass. The
+    gap is *per key and build*: CarDynamicShadowFix is closed on 1.0.8.0 and only
+    differs on 1.0.4.0, so excusing the key globally would let a regression on
+    1.0.8.0 report as an oracle gap. A row therefore names the builds it covers
+    (`*` = every build the catalogue mask allows) and the key is reported apart from
+    the open ones only on those builds. It never counts as closed: nothing here
+    closes a key, it only stops a known-bad baseline cell from reading as unfinished
+    work.
     """
     path = ROOT / "tests" / "oracle_verified.tsv"
     if not path.exists():
@@ -96,9 +105,25 @@ def load_oracle_verified():
         if not line.strip() or line.lstrip().startswith("#"):
             continue
         parts = line.split("\t")
-        if len(parts) >= 2 and parts[0].strip():
-            out[parts[0].strip()] = parts[1].strip()
+        if len(parts) < 5:
+            continue
+        key, builds, why = parts[0].strip(), parts[1].strip(), parts[2].strip()
+        if not key or not builds:
+            continue
+        if builds == "*":
+            out[key] = (None, why)
+        else:
+            try:
+                out[key] = (frozenset(int(item) for item in builds.split(",")), why)
+            except ValueError:
+                out[key] = (frozenset(), why)  # malformed: never excuses a build
     return out
+
+
+def oracle_excuses(entry, build):
+    """Does this row excuse `build`? `*` (builds is None) excuses every build."""
+    builds, _ = entry
+    return builds is None or build in builds
 
 
 def keys():
@@ -113,7 +138,7 @@ def keys():
 def main() -> int:
     if len(sys.argv) < 2:
         raise SystemExit(__doc__)
-    build = sys.argv[1]
+    build = int(sys.argv[1])
     baseline_dir = ROOT.parent / "readable" / "build" / "p3-final-dumps3"
     ours_path = None
     index = 2
@@ -127,13 +152,13 @@ def main() -> int:
         else:
             raise SystemExit(__doc__)
 
-    pristine = (ROOT.parent / "game_refs" / f"{BUILDS[int(build)]}.exe").read_bytes()
+    pristine = (ROOT.parent / "game_refs" / f"{BUILDS[build]}.exe").read_bytes()
 
     if ours_path is None:
         ours_path = ROOT / "build" / "win-x86" / f"per-b{build}.txt"
         dump = ROOT / "build" / "win-x86" / "Release" / "zp_dump.exe"
-        image = ROOT.parent / "game_refs" / f"{BUILDS[int(build)]}.exe"
-        subprocess.run([str(dump), "--per-option", "--exe", str(image), "--build", build,
+        image = ROOT.parent / "game_refs" / f"{BUILDS[build]}.exe"
+        subprocess.run([str(dump), "--per-option", "--exe", str(image), "--build", str(build),
                         str(ours_path), "no-such.ini"], check=True, capture_output=True)
 
     baseline_path = baseline_dir / f"b{build}-per.txt"
@@ -160,11 +185,12 @@ def main() -> int:
             closed += 1
             continue
         if missing or extra or differing:
-            if key in oracle_verified:
+            entry = oracle_verified.get(key)
+            if entry is not None and oracle_excuses(entry, build):
                 excused += 1
-                print(f"ORACLE {key}: baseline {len(want)}, ours {len(have)}, "
+                print(f"ORACLE {key} [build {build}]: baseline {len(want)}, ours {len(have)}, "
                       f"missing {missing}, extra {extra}, differing {differing} "
-                      f"- {oracle_verified[key]}")
+                      f"- {entry[1]}")
                 continue
             open_keys += 1
             print(f"OPEN {key}: baseline {len(want)}, ours {len(have)}, "

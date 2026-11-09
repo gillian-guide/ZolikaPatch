@@ -1410,10 +1410,18 @@ namespace
         auto pattern = find_pattern<2>("E8 ? ? ? ? 83 C4 04 57 8B D8 FF D6 8B 77 20");
         if (!pattern.empty())
         {
-            const auto resume = static_cast<uint32_t>(
+            // The two resumes are each match's own +13, not one shared value:
+            // `mov eax,[edx]; add eax,0Dh; mov dword_1015AD50,eax` publishes the
+            // first, `mov eax,[ecx+4]; add eax,0Dh; mov dword_1015AD54,eax` the
+            // second, and the bodies read their own word
+            // (`jmp [dword_1015AD50]` / `jmp [dword_1015AD54]`, 0x10005667 /
+            // 0x10005687). The matches sit in different functions, so one shared
+            // resume sends body B to body A's continuation.
+            zpatch_benchmark_resume_a = static_cast<uint32_t>(
                 reinterpret_cast<uintptr_t>(pattern.get(0).get<std::byte>(0)) + 13);
-            zpatch_benchmark_resume_a = resume;
-            zpatch_benchmark_resume_b = resume;
+            if (pattern.size() > 1)
+                zpatch_benchmark_resume_b = static_cast<uint32_t>(
+                    reinterpret_cast<uintptr_t>(pattern.get(1).get<std::byte>(0)) + 13);
 
             injector::MakeJMP(pattern.get(0).get<std::byte>(8), reinterpret_cast<void*>(&BenchmarkBodyA), true);
             if (pattern.size() > 1)

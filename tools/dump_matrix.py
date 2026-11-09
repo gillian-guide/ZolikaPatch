@@ -54,7 +54,7 @@ EXCEPTIONS = {
 }
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from parity_report import branch_bytes  # noqa: E402
+from parity_report import branch_bytes, load_oracle_verified, oracle_excuses  # noqa: E402
 
 
 def exception_of(code: int) -> str:
@@ -122,6 +122,7 @@ class PerOption:
     rows: dict = field(default_factory=dict)      # key -> {RVA: byte} this build wrote
     closed: int = 0
     opened: list = field(default_factory=list)    # [(key, missing, extra, differing)]
+    oracle: list = field(default_factory=list)    # same shape, excused per build
     faulted: list = field(default_factory=list)   # [(key, exception text)]
     isolated: bool = False                        # measured one key per subprocess
     wrote: int = 0                                # bytes in the kept partial file
@@ -206,6 +207,7 @@ def per_option_cell(build: int, exe: Path, baseline: Path, dump: Path, work: Pat
     pristine = exe.read_bytes()
     want_path = baseline / f"b{build}-per.txt"
     dead = {key for key, _ in cell.faulted}
+    oracle_verified = load_oracle_verified()
     for key in table:
         if key in dead:
             continue
@@ -219,7 +221,11 @@ def per_option_cell(build: int, exe: Path, baseline: Path, dump: Path, work: Pat
         if not want and not ours:
             cell.closed += 1
         elif missing or extra or differing:
-            cell.opened.append((key, missing, extra, differing))
+            entry = oracle_verified.get(key)
+            if entry is not None and oracle_excuses(entry, build):
+                cell.oracle.append((key, missing, extra, differing))
+            else:
+                cell.opened.append((key, missing, extra, differing))
         else:
             cell.closed += 1
     return cell
@@ -246,6 +252,7 @@ def attribution(build: int, baseline: Path, cell: PerOption, full: Full) -> list
             have_by_key.setdefault(rva, set()).add(key)
 
     open_keys = {key for key, *_ in cell.opened}
+    oracle_keys = {key for key, *_ in cell.oracle}
     lines = []
     for kind, rvas in (("missing", full.missing), ("extra", full.extra),
                        ("differing", full.differing)):
@@ -260,14 +267,25 @@ def attribution(build: int, baseline: Path, cell: PerOption, full: Full) -> list
                 continue
             for name in names:
                 count[name] += 1
-        parts = [f"`{key}` {hits} ({'open' if key in open_keys else 'closed'})"
-                 for key, hits in sorted(count.items(), key=lambda item: (-item[1], item[0]))]
+        parts = []
+        for key, hits in sorted(count.items(), key=lambda item: (-item[1], item[0])):
+            if key in open_keys:
+                state = "open"
+            elif key in oracle_keys:
+                state = "oracle-verified baseline omission"
+            else:
+                state = "closed"
+            parts.append(f"`{key}` {hits} ({state})")
         if unnamed:
             parts.append(f"no per-key cell {unnamed}")
-        explained = count and not unnamed and set(count) <= open_keys
-        if explained:
+        named = set(count)
+        if count and not unnamed and named <= open_keys:
             suffix = ", all from open keys"
-        elif count and set(count) & open_keys:
+        elif count and not unnamed and named <= oracle_keys:
+            suffix = ", all oracle-verified baseline omissions"
+        elif count and named & oracle_keys and not named & open_keys:
+            suffix = ", the omissions being oracle-verified baseline gaps"
+        elif count and named & open_keys:
             suffix = ", partly from open keys"
         elif not count:
             suffix = ""
@@ -292,10 +310,11 @@ def run_matrix(builds, baseline: Path, dump: Path, ini: Path, work: Path, table)
 
 def print_table(results, table) -> None:
     print(f"{'build':>6} {'full':>7} {'diff':>5} {'miss':>5} {'extra':>5} "
-          f"{'closed':>8} {'fault':>26}")
+          f"{'closed':>8} {'oracle':>7} {'fault':>26}")
     for build, full, cell, residual in results:
         print(f"{build:>6} {full.wrote:>7} {len(full.differing):>5} {len(full.missing):>5} "
               f"{len(full.extra):>5} {str(cell.closed) + '/' + str(len(table)):>8} "
+              f"{len(cell.oracle):>7} "
               f"{(cell.faulted[0][0] if cell.faulted else cell.fault or '-')[:26]:>26}")
         if full.fault:
             print(f"       full cell FAULTED: {full.fault}, {full.partial} byte(s) kept")
@@ -330,7 +349,8 @@ def markdown(results, table) -> str:
         "",
         "`bytes` is what our cell writes; the rest is against the baseline. The residual",
         "column names the keys whose per-key cell writes those bytes (a byte can be named",
-        "by more than one key, so the counts need not add up to the byte count).",
+        "by more than one key, so the counts need not add up to the byte count), each with",
+        "its scoreboard state: `closed`, `open`, or `oracle-verified baseline omission`.",
         "",
         "| build | version | image | bytes | differing | missing | extra | residual |",
         "|---:|---|---|---:|---:|---:|---:|---|",
@@ -345,10 +365,12 @@ def markdown(results, table) -> str:
         "",
         "`closed / 99` is the key scoreboard: a key is closed when its cell has the same",
         "rows as the baseline's, branch displacements aside. `open` names the keys that",
-        "are not; `fault` names the cell that died.",
+        "are not; `oracle` names the keys whose difference is a measured omission in the",
+        "stored baseline (`tests/oracle_verified.tsv`, per key and build) and is therefore",
+        "reported apart and never counted as closed; `fault` names the cell that died.",
         "",
-        "| build | version | closed / 99 | open | fault |",
-        "|---:|---|---:|---|---|",
+        "| build | version | closed / 99 | open | oracle | fault |",
+        "|---:|---|---:|---|---|---|",
     ]
     for build, full, cell, _ in results:
         fault = "-"
@@ -357,8 +379,9 @@ def markdown(results, table) -> str:
         elif cell.fault:
             fault = f"FAULTED ({cell.fault})"
         opened = ", ".join(f"`{key}`" for key, *_ in cell.opened) or "-"
+        oracle = ", ".join(f"`{key}`" for key, *_ in cell.oracle) or "-"
         closed = str(cell.closed) + (" (isolated)" if cell.isolated else "")
-        lines.append(f"| {build} | {VERSIONS[build]} | {closed} | {opened} | {fault} |")
+        lines.append(f"| {build} | {VERSIONS[build]} | {closed} | {opened} | {oracle} | {fault} |")
 
     faulted = [(build, cell) for build, _, cell, _ in results if cell.faulted or cell.fault]
     lines += ["", "## The fault", ""]
