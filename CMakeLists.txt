@@ -9,15 +9,18 @@ option(ZPATCH_BUILD_ASI "Build the Windows .asi entry target" ${WIN32})
 option(ZPATCH_BUILD_TESTS "Build portable unit tests" ON)
 
 add_library(zpatch STATIC
-  src/config.cpp src/game.cpp src/model_catalog.cpp src/vehicle_tables.cpp src/ide_flags.cpp src/vehicle_animation.cpp src/hook_bodies.cpp src/hook_install.cpp src/skip_launcher.cpp src/skip_launcher_win.cpp src/rebased_values.cpp src/rva_installs.cpp src/op_corrections.cpp src/hook_bodies_win.cpp src/patch.cpp src/patch_catalog.cpp src/patch_manifest.cpp src/pattern.cpp src/option_flags.cpp src/recovered_sites.cpp src/recovered_ops.cpp src/recovered_extra_signatures.cpp src/recovered_rva_jumps.cpp src/recovered_sig_jumps.cpp src/recovered_indirect_writes.cpp src/recovered_match_jumps.cpp src/recovered_literal_stores.cpp src/recovered_match_literals.cpp src/recovered_build_gates.cpp src/recovered_preamble.cpp src/preamble_apply.cpp src/recovered_apply.cpp src/game_image.cpp src/menu_integration.cpp src/number_format.cpp src/zmenu_guard.cpp src/useless_checks.cpp src/runtime.cpp)
+  src/config.cpp src/game.cpp src/model_catalog.cpp src/vehicle_tables.cpp src/ide_flags.cpp src/vehicle_animation.cpp src/hook_bodies.cpp src/hook_install.cpp src/skip_launcher.cpp src/skip_launcher_win.cpp src/rebased_values.cpp src/rva_installs.cpp src/op_corrections.cpp src/hook_bodies_win.cpp src/patch.cpp src/patch_catalog.cpp src/patch_manifest.cpp src/pattern.cpp src/option_flags.cpp src/recovered_sites.cpp src/recovered_ops.cpp src/recovered_extra_signatures.cpp src/recovered_rva_jumps.cpp src/recovered_sig_jumps.cpp src/recovered_indirect_writes.cpp src/recovered_match_jumps.cpp src/recovered_literal_stores.cpp src/recovered_match_literals.cpp src/recovered_build_gates.cpp src/recovered_preamble.cpp src/preamble_apply.cpp src/recovered_apply.cpp src/game_image.cpp src/menu_integration.cpp src/number_format.cpp src/zmenu_guard.cpp src/useless_checks.cpp src/runtime.cpp src/log.cpp)
 target_include_directories(zpatch PUBLIC include)
 target_compile_features(zpatch PUBLIC cxx_std_17)
 if(WIN32)
-  target_link_libraries(zpatch PUBLIC version)
+  target_link_libraries(zpatch PUBLIC version shlwapi)
 else()
   target_link_libraries(zpatch PUBLIC Threads::Threads)
 endif()
 set_target_properties(zpatch PROPERTIES CXX_EXTENSIONS OFF)
+# windows.h defines max/min as macros; every std::max in the tree would stop
+# compiling without this, in the library and in the tests that include it.
+target_compile_definitions(zpatch PUBLIC NOMINMAX)
 if(MSVC)
   target_compile_options(zpatch PRIVATE /W4)
 else()
@@ -44,6 +47,17 @@ if(ZPATCH_BUILD_TESTS)
   enable_testing()
   add_executable(zpatch_tests tests/test_main.cpp)
   target_link_libraries(zpatch_tests PRIVATE zpatch)
+  # The suite loads a ZMenuIV.asi next to the executable to exercise the version
+  # guard's present-library path; without it the test can only prove the
+  # module-absent branch, so the fake module is built beside the binary.
+  if(WIN32)
+    add_library(zmenu_guard_fake SHARED tests/zmenu_guard_fake.cpp)
+    set_target_properties(zmenu_guard_fake PROPERTIES
+      PREFIX "" SUFFIX ".asi" OUTPUT_NAME "ZMenuIV")
+    set_target_properties(zmenu_guard_fake PROPERTIES
+      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>")
+    add_dependencies(zpatch_tests zmenu_guard_fake)
+  endif()
   add_test(NAME zpatch_tests COMMAND zpatch_tests)
   add_executable(zpatch_smoke tests/smoke.cpp)
   target_link_libraries(zpatch_smoke PRIVATE zpatch)

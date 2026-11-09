@@ -802,7 +802,7 @@ int main(int argc, char** argv) {
     CHECK(zpatch::build_allows_option(zpatch::GameBuild::v1040, "CarDynamicShadowFix@noE", known));
     CHECK(!zpatch::build_allows_option(zpatch::GameBuild::v1004, "CarDynamicShadowFix@noE", known));
     std::size_t gate_count = 0;
-    CHECK(zpatch::recovered_build_gates(gate_count) && gate_count==15);
+    CHECK(zpatch::recovered_build_gates(gate_count) && gate_count==16);
   }
 
   // Build-gated apply: an option whose gate excludes the build performs nothing.
