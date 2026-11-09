@@ -39,6 +39,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ZolikaPatch-asi
-          path: build/ci/Release/ZolikaPatch.asi
-          if-no-files-found: warn
+          name: ZolikaPatch
+          path: |
+            build/ci/Release/ZolikaPatch.asi
+            ZolikaPatch.ini
+          if-no-files-found: error
