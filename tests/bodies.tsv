@@ -367,6 +367,13 @@ vram_fix_shim 1004AAB0 ?VramFixShimBody@@YAXXZ 13
 # configuration). The four callbacks are the function pointers the two
 # AddIVMenuOption registrations pass. sub_1001ECB0 and sub_10050AD0 are compiler
 # output (EH4 frame + TLS static-init guard) and rebuilt in C++; no rows.
+#
+# The ZMenuIV version guard 0x10052300 is not part of this key: the walker calls
+# it unconditionally at 0x1005527B. It is a plain /GS body, so it is transcribed
+# like the writers above (38 instructions, 0x76 bytes) and the row is what proves
+# the probe, the export lookup, the comparison and the terminate path are the
+# original's.
+zmenu_version_guard 10052300 ?ZMenuVersionGuardBody@@YAXXZ 38
 ivmenu_writer 1001EDE0 ?MenuWriterBody@@YAXXZ 36
 ivmenu_installer 10050BD0 ?MenuInstallerBody@@YAXXZ 133
 ivmenu_death_gate 10050A50 ?MenuDeathGateBody@@YA_NXZ 41

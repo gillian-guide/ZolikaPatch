@@ -58,11 +58,66 @@ import patch;
 // not "improved" -- the call is made from the install tier, which the startup
 // driver runs synchronously from DllMain.
 //
-// One gate-shape note: the original stores `strtol(value) != 0` in
-// byte_10158038, not `== 1`. The arm uses the tree's uniform `Loader::Enabled`
-// gate (the catalogue's `== 1`), which is the shape every other arm has; the two
-// agree for the shipped value, the absent default and 0/1, and differ only for a
-// value like `2`. Recorded, not silently widened.
+// The gate is the original's own, and it is not `== 1`: the walker stores the
+// parse's *answer*, `0x1005332E test ecx,ecx` / `0x10053337 setnz
+// byte_10158038`, over the inlined `std::stoi` of the value it read at
+// 0x1005327B with the default "1" (0x1005323F):
+//
+//   100532FD  push 0Ah ; Radix
+//   100532FF  push eax ; EndPtr
+//   10053300  push esi ; String
+//   10053301  call ds:strtol
+//   1005330A  mov ecx, eax
+//   1005330C  cmp esi, [ebp-0C8h]
+//   10053312  jnz short loc_1005331F      ; else _Xinvalid_argument
+//   1005332E  test ecx, ecx
+//   10053337  setnz byte_10158038
+//
+// So `AddOptionsInMenu=2` enables the key exactly as `1` does, and a non-numeric
+// value still throws out of the loader. This module asks
+// `Loader::EnabledNonZero` for that reason; every other key keeps the house
+// `== 1` (`Loader::Enabled`).
+//
+// One entry point here is *not* part of this key: the ZMenuIV version guard
+// sub_10052300, which the walker calls unconditionally at 0x1005527B. It has no
+// key test in front of it -- the call is reached by falling through from
+// SuperLODFix's handler (0x10055276) and returns to VSyncFix's read
+// (0x10055280) -- so it is registered as an unconditional startup handler, in the
+// publish tier (the tree's first pass; see the registration).
+//
+// The guard is a whole body, transcribed: 38 instructions, a plain /GS frame (no
+// exception frame and no TLS static-init guard), one import call per step. In the
+// original it reads:
+//
+//   10052310  push offset "ZMenuIV.asi"; call ds:GetModuleHandleA
+//   1005231B  test eax, eax
+//   1005231D  jz  short loc_10052368            ; no library -> clean skip
+//   1005231F  push offset "GetZMenuVersion"
+//   10052324  push eax; call ds:GetProcAddress
+//   1005232B  test eax, eax
+//   1005232D  jz  short loc_10052368            ; no export  -> clean skip
+//   1005232F  lea ecx,[ebp+var_C]; push ecx
+//   10052333  lea ecx,[ebp+var_8]; push ecx
+//   10052337  call eax                          ; GetZMenuVersion(&version, &unused)
+//   10052339  add esp, 8
+//   1005233C  cmp [ebp+var_8], 35DD1h
+//   10052343  jnb short loc_10052368            ; 220625 or newer -> nothing
+//   10052345  push 10h                          ; MB_ICONERROR
+//   10052347  push offset Caption               ; the .rdata empty string, 0x10063CD6
+//   1005234C  push offset "Incompatible/outdated version of ZMenu detected! ..."
+//   10052351  push 0; call ds:MessageBoxA
+//   10052359  push 0; call ds:GetCurrentProcess
+//   10052361  push eax; call ds:TerminateProcess
+//   10052368  mov ecx,[ebp+var_4]; xor ecx,ebp; call __security_check_cookie
+//   10052372  mov esp,ebp; pop ebp; retn
+//
+// Nothing else consumes the answer: no log, no store, no patch. The library's
+// export is handed two stack out-parameters and the second (`var_C`) is never
+// read, and the first (`var_8`) is read *uninitialised* if the library writes
+// neither -- the original's own fault profile, kept: the slot is not zeroed here
+// either. A missing library or a missing export is the original's clean path (the
+// two `jz loc_10052368`s), which is also what keeps this arm inert in the
+// harness: `zp_dump` has no `ZMenuIV.asi` beside it.
 //
 // The two writers (sub_1001EDE0, sub_10050BD0) are transcribed as bodies. The
 // two helpers they call are C++ rebuilds because they are compiler output for
@@ -134,6 +189,14 @@ extern "C"
     // original): GetModuleHandleA(0) and VirtualProtect.
     uintptr_t zpatch_menu_get_module = 0;
     uintptr_t zpatch_menu_virtual_protect = 0;
+
+    // The four imports the ZMenuIV guard calls, one per `call ds:...` in the
+    // original: GetModuleHandleA("ZMenuIV.asi"), GetProcAddress(h, ...),
+    // MessageBoxA and the process pair the outdated-version path terminates.
+    uintptr_t zpatch_menu_get_proc_address = 0;
+    uintptr_t zpatch_menu_message_box = 0;
+    uintptr_t zpatch_menu_get_current_process = 0;
+    uintptr_t zpatch_menu_terminate_process = 0;
 }
 
 // The transcribed bodies are defined in the tail. MSVC rejects a
@@ -150,6 +213,7 @@ static void MenuDeathGetBody();
 static void MenuDeathSetBody(unsigned int, unsigned int);
 static void MenuFocusGetBody();
 static void MenuFocusSetBody(unsigned int, unsigned int);
+static void ZMenuVersionGuardBody();
 static void MenuContextInitEntry();
 static void MenuInvokeEntry();
 static void MenuCleanupDwordEntry();
@@ -166,6 +230,15 @@ static const char kMenuPausePattern[] = "6A 0A 56 50 FF D2 A1";
 static const char kMenuDeathPatternA[] = "0F 57 C0 F3 0F 11 86 20 02 00 00";
 static const char kMenuDeathPatternB[] = "C7 86 04 02 00 00 04 00 00 00 E9";
 static const char kMenuDeathPatternC[] = "E8 ? ? ? ? 84 C0 74 C6 8B BE";
+
+// The ZMenuIV guard's own strings, the original's `.rdata` at 0x1012FD34,
+// 0x1012FD88, 0x1012FDE0 and 0x10063CD6. The caption is the image's shared empty
+// literal (a single 0x00 byte, also used as a `std::string` source elsewhere), so
+// the original's message box has an empty title -- reproduced, not tidied up.
+static const char kZmenuLibraryName[] = "ZMenuIV.asi";
+static const char kZmenuVersionExport[] = "GetZMenuVersion";
+static const char kZmenuOutdatedText[] = "Incompatible/outdated version of ZMenu detected! The game will now exit.";
+static const char kZmenuCaption[] = "";
 
 // The CRT `memset` the three wrappers open with. The original calls the CRT's
 // own thunk (0x10060D6E) with the same argument order; the inline assembler
@@ -320,7 +393,7 @@ namespace
     // then a no-op exactly like the original's null `lpAddress`.
     void PublishAddOptionsInMenu()
     {
-        if (!Loader::Enabled("AddOptionsInMenu"))
+        if (!Loader::EnabledNonZero("AddOptionsInMenu"))
             return;
 
         auto pattern = find_pattern("75 ? 8B 0D ? ? ? ? 51 FF 15 ? ? ? ? 85 C0 75 ? 8B 15");
@@ -338,7 +411,7 @@ namespace
     // a failed LoadLibraryA runs nothing at all.
     void InstallAddOptionsInMenu()
     {
-        if (!Loader::Enabled("AddOptionsInMenu"))
+        if (!Loader::EnabledNonZero("AddOptionsInMenu"))
             return;
 
         if (!MenuIvMenuApiLoad())
@@ -375,6 +448,13 @@ export void RegisterMenu()
     zpatch_menu_get_module = reinterpret_cast<uintptr_t>(&GetModuleHandleA);
     zpatch_menu_virtual_protect = reinterpret_cast<uintptr_t>(&VirtualProtect);
 
+    // ... and the four the ZMenuIV guard adds (its GetModuleHandleA call reuses
+    // the slot above).
+    zpatch_menu_get_proc_address = reinterpret_cast<uintptr_t>(&GetProcAddress);
+    zpatch_menu_message_box = reinterpret_cast<uintptr_t>(&MessageBoxA);
+    zpatch_menu_get_current_process = reinterpret_cast<uintptr_t>(&GetCurrentProcess);
+    zpatch_menu_terminate_process = reinterpret_cast<uintptr_t>(&TerminateProcess);
+
     // The native-layer pieces the wrappers call, by their recovered VAs.
     zpatch_menu_context_init = RegisteredBody(0x100038C0u);
     zpatch_menu_invoke_entry = RegisteredBody(0x100038E0u);
@@ -393,6 +473,22 @@ export void RegisterMenu()
     // DoNotPauseOnMinimize before any menu callback can read it.
     zpatch_menu_focus_flag = Loader::Enabled("DoNotPauseOnMinimize") ? 1 : 0;
 
+    // The ZMenuIV version guard, unconditionally. In the original it is not an
+    // arm: the walker calls sub_10052300 at 0x1005527B with no key test and no
+    // build test in front of it, so the tree registers it as a handler that no
+    // gate can suppress. It goes in the publish tier because that is the first
+    // pass of the load: the guard reads no site (it probes a module and calls its
+    // export), writes no site, and its verdict -- carry on, or terminate after a
+    // message box -- is the mod's pre-flight decision, so it has to have run
+    // before any arm's install. The original's own position, after SuperLODFix's
+    // handler and before VSyncFix's read, is the interleave of a walk this tree
+    // splits into tiers; the move is unobservable for this call (nothing here
+    // depends on an arm's write, and the failure path ends the process).
+    Loader::PublishEvent() += []
+    {
+        ZMenuVersionGuardBody();
+    };
+
     Loader::PublishEvent() += []
     {
         PublishAddOptionsInMenu();
@@ -408,6 +504,7 @@ export void RegisterMenu()
     // itself (only when this arm owns those installs): audio's copies carry the
     // same two VAs in the other configuration, and one live body per VA is the
     // rule.
+    Bodies::Register(reinterpret_cast<uintptr_t>(&ZMenuVersionGuardBody), 0x10052300u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&MenuWriterBody), 0x1001EDE0u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&MenuInstallerBody), 0x10050BD0u);
     Bodies::Register(reinterpret_cast<uintptr_t>(&MenuDeathGetBody), 0x10050A30u);
@@ -423,6 +520,61 @@ export void RegisterMenu()
 // Transcribed bodies. Each is the original's instruction stream, kept as asm
 // because that is what it is; the code above is what installs it.
 // ---------------------------------------------------------------------------
+
+// sub_10052300, recovered VA 0x10052300 (38 instructions): the ZMenuIV version
+// guard. Probe the library, probe its export, call it with the original's two
+// stack out-parameters, and terminate the process with a message box when the
+// answer is below 0x35DD1. A missing library or export is the original's clean
+// skip (both `jz loc_10052368`); the second out-parameter is never read, and the
+// first is read uninitialised if the library leaves it alone -- the two locals are
+// deliberately not zeroed. The /GS frame and every call shape are the original's;
+// the five `call ds:...` imports are slot calls here, which the proof compares as
+// `call abs` on both sides.
+static __declspec(naked) void ZMenuVersionGuardBody()
+{
+    __asm
+    {
+        push ebp
+        mov ebp, esp
+        sub esp, 0Ch
+        mov eax, DWORD PTR [__security_cookie]
+        xor eax, ebp
+        mov DWORD PTR [ebp - 4], eax
+        push OFFSET kZmenuLibraryName
+        call DWORD PTR [zpatch_menu_get_module]
+        test eax, eax
+        jz zmenu_guard_done
+        push OFFSET kZmenuVersionExport
+        push eax
+        call DWORD PTR [zpatch_menu_get_proc_address]
+        test eax, eax
+        jz zmenu_guard_done
+        lea ecx, [ebp - 0Ch]
+        push ecx
+        lea ecx, [ebp - 8]
+        push ecx
+        call eax
+        add esp, 8
+        cmp DWORD PTR [ebp - 8], 35DD1h
+        jnb zmenu_guard_done
+        push 10h
+        push OFFSET kZmenuCaption
+        push OFFSET kZmenuOutdatedText
+        push 0
+        call DWORD PTR [zpatch_menu_message_box]
+        push 0
+        call DWORD PTR [zpatch_menu_get_current_process]
+        push eax
+        call DWORD PTR [zpatch_menu_terminate_process]
+    zmenu_guard_done:
+        mov ecx, DWORD PTR [ebp - 4]
+        xor ecx, ebp
+        call __security_check_cookie
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
 
 // sub_1001EDE0, recovered VA 0x1001EDE0 (36 instructions): the writer. It calls
 // sub_1001ECB0 first, then scans `6A 0A 56 50 FF D2 A1` and writes byte 6 at

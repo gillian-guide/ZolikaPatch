@@ -10,6 +10,7 @@ fix.
 | --- | --- |
 | INI grammar (feather-ini-parser 1.41): 255-byte line buffer (a 256th byte sets a sticky `failbit` and the parse then spins -- see the faults table), no live BOM branch (a first line starting with `0xEF` is a malformed line, so a BOM-prefixed `[Options]` header is lost -- see the faults table), `#`/`//` comments only, strtok-on-`=` keys that keep a trailing space, values that keep their spaces, empty values not stored, last duplicate wins, a re-opened section starts empty, case-sensitive sections and keys | `zp_tests`, `TestConfigGrammar`; the 255-byte boundary and the spin: `zp_fault_parity` |
 | Read boundary is `std::stoi` on the stored text with the arm's default | `zp_tests`, `TestConfigGrammar` |
+| One key's stored flag is the parse's *answer*, not `== 1`: `AddOptionsInMenu` is enabled by `2` (and by `-1`), disabled by `0`, keeps the absent default `1` and the catalogue's build mask, while an ordinary key still requires exactly `1`; the old `== 1` rule is asserted to answer false for `2`, which is the divergence it replaced | `zp_tests`, `TestOptionGates` (9 checks; the falsification run is quoted in the key's section) |
 | The INI faults, by behaviour: `std::invalid_argument` of exactly that type on `Key=abc` and on a spaces-only `Key= `, nothing on an empty `Key=` (which reads the arm default); `std::out_of_range` of exactly that type past `int`, with `INT_MAX`/`INT_MIN` still read; a key-before-section store killing a child process with `0xC0000005` after its diagnostic line, while empty values, lines without `=` and lines starting with `=` never reach the store; a first-line BOM leaving the `[Options]` header unparsed so the key line under it dies in the same null store (a child process); and the line-buffer boundary -- a 255-byte line parses and its child exits 0, a 256-byte line leaves the parse spinning, so its child must still be running after the test's 5 s timeout and the test terminates it | `zp_fault_parity` (29 checks; the two null stores and both line-buffer cases are fresh processes) |
 | The two light tables: `Car<N>Name` / `Car<N>Angle` / `Car<N>Offset` with `N` = 1..512, the section gate, an empty name skipping the row, the hash stored before the value, the degrees-to-radians conversion, and the reader running before any option is read | `zp_model_tables` |
 | Build classification: the four version fields concatenated (`1.0.7.0` -> 1070, `1.2.0.43` -> 12043) and the original's switch; an unsupported executable is `unknown` and applies nothing | `zp_tests`, `TestBuilds` |
@@ -46,6 +47,7 @@ fix.
 | the arena's request size is a 32-bit sum | a request of `2^32 - 2*unit` bytes or more (`0xFFFFFFE0` at the `0x10` floor) | `0x1003838B`'s `lea eax,[edi+esi*2]` adds `want + 2*unit` in 32 bits, so the request wraps to a tiny block while the `memset` at `0x100383C9` still fills `want` bytes - the allocate returns a block it cannot fill and the fill runs off the heap. The rebuild computes `want + unit * 2u` in `uint32_t` too, so the same input wraps the same way; the failure path the test asserts uses `0x7FFFFFF0`, whose sum `0x80000010` does not wrap, and the wrapping case is recorded here rather than run |
 | the DFA close-handle frame retries a faulting call for ever | a fault inside the guarded `CloseHandle` call -- an import slot whose target faults; no handle value reaches it | `0x10004790`'s scope table (`0x10153FC0`) names the filter `0x100047EC` (`or eax,-1; ret`, i.e. `EXCEPTION_CONTINUE_EXECUTION`) and the handler `0x100047F0` (the `return TRUE` arm). The filter's answer *resumes* the faulting instruction, so the fault is retried and the handler is never entered; the wrapper has no answer for a faulting call at all. The rebuild compiles the same frame -- byte-identical except the four relocated operands (`rebuilt.md` §2l) -- and `zp_dfa_close` replaces the test exe's `CloseHandle` import slot with a callee that writes one probe byte on entry and then faults; the child must be *still running* at the 1 s watchdog with the probe byte present and no answer written, and the test then terminates and reaps it. Unreachable through the wrapper's own argument: `CloseHandle` validates every handle value and returns `FALSE` |
 | the `MiscFixes` first literal is base-dependent, so the original's first write fires on some launches only | any launch whose relocation delta makes the fixup at `0x739731` read `C7 06`; every other launch misses the scan | the original handler `0x10023DD0` scans its own string `C7 06 ? ? ? ? 74 19` (`ZolikaPatch_reconstruction/evidence/handler_table.json`, whose own `game_hits` row records **0 hits** on the unrelocated 1.0.8.0 image). The fixup at `0x739731` (`0x016703C4`) covers the literal's first two bytes, so only a delta whose high word is `0x0560` makes them read `C7 06` -- measured witness `0x05600000`, one hit at RVA `0x739733` -- and the arm then writes `EB` at `0x739739`; at delta `0` or the dump's pinned `0x2FC00000` it has no hit. The transcription keeps the original's string verbatim (`source/misc.ixx:225`), so its *effect* depends on the game's live base exactly as the original's does: on most launches the original writes nothing there. Our dump pins one delta, at which the arm is inert, and that matches the stored baseline (also taken at a zero delta), so the scoreboard is measuring the original's common case. Widening the literal over the fixup bytes would make us write where the original does not -- a divergence dressed as a robustness fix |
+| the ZMenuIV version compare can read an uninitialised stack word | a `ZMenuIV.asi` whose `GetZMenuVersion` returns without writing its first out-parameter | `sub_10052300` reserves the slot with `sub esp, 0Ch` (`0x10052303`) and never initialises it; the slot is written only by the library's own `call eax` (`0x10052337`), and `cmp [ebp+var_8], 35DD1h` (`0x1005233C`) then decides between nothing and `MessageBoxA` + `TerminateProcess` (`0x10052345..0x10052362`). With a library that writes neither out-parameter the compare reads whatever the caller's stack held, so the outcome is undefined -- the original's, kept: the transcription is the same instruction stream over the same two unzeroed locals. Unreachable with a library that writes the version it is asked for, and inert in the harness (no library at all: the first `jz` at `0x1005231D`) |
 
 Two of the rows above used to be assumptions, and so did the CRLF note below them.
 All three are measurements now, and the two facts that were missing were both in the
@@ -117,8 +119,11 @@ feature key, is closed by the converter recorded in its own section below;
   (`AddOptionsInMenu`, `FixPCIDKickbug`) are now implemented too, so the scoreboard's
   count is backed by arms rather than by two empty cells (their effects are
   conditional on the companion library and on the live registry, so the cells stay
-  empty and the count does not move);
-- **174 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
+  empty and the count does not move). `AddOptionsInMenu`'s gate is the original's own
+  `std::stoi(value) != 0` (`setnz byte_10158038`), not the house `== 1`, so `2`
+  enables it (see the key's section), and the `ZMenuIV.asi` version guard the same
+  walker calls unconditionally (`sub_10052300`) is transcribed and wired at startup;
+- **175 hook bodies transcribed, registered and proven whole** (`zp_body_proof`, a
   linear sweep of each body's exact instruction count); the rest of the original's
   bodies are still to transcribe, and the compiled bodies listed in
   [`rebuilt.md`](rebuilt.md) are rebuilt in C++ instead, with no proof row. That file
@@ -2385,13 +2390,74 @@ Both keys had no arm in the tree before this pass, and one of them is not
 write-free. Both are now implemented. The build-9 per-option dump is byte-identical
 before and after (SHA-256 `E20AF4EA…2845327`), because both arms' effects are
 conditional on state the offline harness does not have: `AddOptionsInMenu` needs
-`IVMenuAPI.asi` to load, and `FixPCIDKickbug` is a live-only registry delete.
+`IVMenuAPI.asi` to load, and `FixPCIDKickbug` is a live-only registry delete. The
+same holds for the one entry point beside the key that is *not* the key: the
+`ZMenuIV.asi` version guard, which has no gate at all and whose missing library is
+the original's own clean skip (both arms are inert in the harness, so the dump hash
+is the proof; the guard's section below records it).
 
 #### `AddOptionsInMenu` (`source/menu.ixx`)
 
-The key is read into `byte_10158038` (`strtol(ini.get(key,"1")) != 0`; the IDB's
-static initial value is 1, the same as the absent default). Its consumer
-`sub_10052380` is the companion-library probe, quoted in full:
+The key is read into `byte_10158038` and the stored flag is the **parse's answer**,
+not its equality with 1: the walker reads the key at `0x1005327B` with the default
+`"1"` (`push offset "1"` at `0x1005323F`) and stores `std::stoi(value) != 0`. The
+whole sequence, from the original's own instructions:
+
+```
+100532FD  push 0Ah ; Radix                       ; std::stoi is base 10
+100532FF  push eax ; EndPtr
+10053300  push esi ; String
+10053301  call ds:strtol
+10053307  add esp, 0Ch
+1005330A  mov ecx, eax
+1005330C  cmp esi, [ebp-0C8h]
+10053312  jnz short loc_1005331F                 ; a conversion happened
+10053314  push offset aInvalidStoiArg ; "invalid stoi argument"
+10053319  call ds:?_Xinvalid_argument@std@@YAXPBD@Z
+1005331F  mov eax, [ebp-0DCh]
+10053325  cmp dword ptr [eax], 22h ; '"'         ; errno == ERANGE (34)
+10053328  jz loc_10055C62                        ; -> _Xout_of_range
+1005332E  test ecx, ecx
+10053330  mov byte ptr [ebp-4], 0
+10053334  mov edx, [ebp-64h]
+10053337  setnz byte_10158038
+```
+
+The tail is the answer to everything about this key's gate: `test ecx,ecx` then
+`setnz byte_10158038`, so **`AddOptionsInMenu=2` enables it exactly as `1` does** and
+`-1` does too, while the parse is still `std::stoi` (base 10, with the
+`_Xinvalid_argument` / `_Xout_of_range` throws the tree already reproduces). The
+out-of-line twin of that inlined block is `sub_100014B0`, and it says the same thing
+in C: `strtol(String, &EndPtr, Radix)`, `if (String == EndPtr)
+std::_Xinvalid_argument("invalid stoi argument")`, `if (*errno == 34)
+std::_Xout_of_range("stoi argument out of range")`.
+
+The arm now asks `Loader::EnabledNonZero("AddOptionsInMenu")` instead of
+`Loader::Enabled`, in both places it gates on the key (`PublishAddOptionsInMenu`
+and `InstallAddOptionsInMenu`). `Loader::EnabledNonZero` is the smallest mechanism
+that carries one key's rule without touching another key's: it keeps the catalogue's
+build mask and absent-key default and reads through the same `Catalogue::Read`
+(`std::stoi` with the throws), and differs from `Loader::Enabled` only in the final
+comparison (`!= 0` against `== 1`). Every other arm still calls `Loader::Enabled`.
+
+Proven by the contract suite, `TestOptionGates` in `tests/test_main.cpp` (9 checks):
+`AddOptionsInMenu` is enabled by `"2"`, by `"1"` and by `"-1"`, disabled by `"0"`,
+enabled by an absent key (the catalogue's absent default `"1"`), refused on a build
+its mask excludes, and an ordinary key (`MiscFixes`) still requires exactly `1`.
+The falsification is in the same test: `Loader::Enabled` -- the old gate -- is
+asserted **not** to enable the key for `"2"`, and running the new check against the
+old predicate fails it:
+
+```
+PASS gate: AddOptionsInMenu=2 enables the key (the original stores != 0)
+FAIL gate: FALSIFICATION -- the old == 1 rule against the same requirement
+PASS gate: AddOptionsInMenu=1 enables the key
+PASS gate: AddOptionsInMenu=0 disables the key
+PASS gate: an absent AddOptionsInMenu keeps the default 1
+85 check(s), 1 failure(s)
+```
+
+Its consumer `sub_10052380` is the companion-library probe, quoted in full:
 
 ```
 10052380  cmp byte_10158038, 0
@@ -2624,6 +2690,7 @@ The pieces, and how each is carried:
 | death-music install body `sub_10050AD0` | `0x10050AD0` | — | C++ rebuild (EH4 + TLS guard) |
 | library probe `sub_10052380` | `0x10052380` | — | C++ rebuild (plain handler) |
 | `AddIVMenuOption` wrapper `sub_100522B0` | `0x100522B0` | — | C++ rebuild (plain handler) |
+| ZMenuIV version guard `sub_10052300` | `0x10052300` | 38 | transcribed, `zmenu_version_guard` (not this key's arm -- see below) |
 
 The four callbacks are the original's streams, not approximations:
 
@@ -2661,15 +2728,9 @@ menu's when `RestoreDeathMusic` is off and the library loaded. The shared
 setter drive the same byte whichever gate is installed.
 
 **What is covered and what remains.** The load, the one-byte write, the three
-death-music installs, both registrations and all four callbacks are reproduced. What
-is not:
+death-music installs, both registrations and all four callbacks are reproduced, and
+so is the `ZMenuIV.asi` version guard below (which is not this key's). What is not:
 
-- the **`ZMenuIV.asi` `GetZMenuVersion` guard** (`sub_10052300`, called
-  unconditionally at `0x1005527B`, not from the `AddOptionsInMenu` chain). It is the
-  other companion-library entry point the original calls; this tree does not
-  implement it, and it is a separate key's gap (the version check at
-  `cmp [ebp-8], 35DD1h`, then `MessageBoxA` + `TerminateProcess`). It is named here
-  so the omission is recorded, not hidden;
 - the **`IVMenuAPI.asi` library itself**: only its `AddIVMenuOption` export is
   called, and that call is the library's code, not a body to transcribe. No other
   `IVMenuAPI.asi` entry point is referenced anywhere in the ASI (the only two
@@ -2684,6 +2745,115 @@ The harness is inert by construction: `zp_dump` has no `IVMenuAPI.asi` next to i
 `LoadLibraryA` fails, and the probe's answer is the original's clean skip. The proof
 is the per-option dump: build 9's file is byte-identical before and after this pass
 (SHA-256 `E20AF4EA…2845327`, 384,422 bytes, 12,898 lines).
+
+#### The `ZMenuIV.asi` `GetZMenuVersion` guard: reproduced (not this key's)
+
+The original calls it **unconditionally**, and this tree now does the same. The
+walker's only reference to `sub_10052300` is the `call` at `0x1005527B`, with no key
+test and no build test in front of it: it is reached by falling through from
+SuperLODFix's handler and returns to VSyncFix's read:
+
+```
+10055271  cmp esi, 1
+10055274  jnz short loc_1005527B
+10055276  call sub_10046A10                 ; SuperLODFix's handler
+1005527B  call sub_10052300                 ; <- the ZMenuIV guard, unconditional
+10055280  push offset "0"                   ; VSyncFix's default, next key
+```
+
+`sub_10052300` is one 118-byte body, 38 instructions, with a plain /GS frame and no
+exception frame or TLS static-init guard, so it is transcribed rather than rebuilt
+and proved whole (`zmenu_version_guard` in `tests/bodies.tsv`, 38 instructions,
+`PASS zmenu_version_guard (38 instruction(s), 6 absolute operand(s))`):
+
+```
+10052300  push ebp
+10052301  mov ebp, esp
+10052303  sub esp, 0Ch
+10052306  mov eax, ___security_cookie
+1005230B  xor eax, ebp
+1005230D  mov [ebp+var_4], eax
+10052310  push offset "ZMenuIV.asi"; call ds:GetModuleHandleA
+1005231B  test eax, eax
+1005231D  jz short loc_10052368            ; no library -> clean skip
+1005231F  push offset "GetZMenuVersion"
+10052324  push eax; call ds:GetProcAddress
+1005232B  test eax, eax
+1005232D  jz short loc_10052368            ; no export  -> clean skip
+1005232F  lea ecx, [ebp+var_C]; push ecx
+10052333  lea ecx, [ebp+var_8]; push ecx
+10052337  call eax                         ; GetZMenuVersion(&version, &unused)
+10052339  add esp, 8
+1005233C  cmp [ebp+var_8], 35DD1h
+10052343  jnb short loc_10052368           ; 220625 or newer -> nothing
+10052345  push 10h                         ; MB_ICONERROR
+10052347  push offset Caption
+1005234C  push offset "Incompatible/outdated version of ZMenu detected! The game will now exit."
+10052351  push 0; call ds:MessageBoxA
+10052359  push 0; call ds:GetCurrentProcess
+10052361  push eax; call ds:TerminateProcess
+10052368  mov ecx, [ebp+var_4]
+1005236B  xor ecx, ebp
+1005236D  call @__security_check_cookie@4
+10052372  mov esp, ebp
+10052374  pop ebp
+10052375  retn
+```
+
+What each step is, and what the tree carries:
+
+- **the probe**: `GetModuleHandleA("ZMenuIV.asi")` — the exact library name, no path,
+  no extension guessing. A missing library takes the first `jz` to the epilogue: the
+  original's own **clean skip**, no log, no write, no error, no retry.
+- **the export lookup**: `GetProcAddress(h, "GetZMenuVersion")` — the exact export
+  name. A missing export is the second `jz`, the same clean skip.
+- **the call and the comparison**: the export is called with `&version` (a dword at
+  `[ebp-8]`) and `&unused` (a 4-byte slot at `[ebp-0Ch]`) pushed in that order, and
+  `cmp [ebp-8], 35DD1h` / `jnb` is an **unsigned** "below 0x35DD1 = outdated"
+  (0x35DD1 = 220625). Nothing is written back to the library and nothing else reads
+  either slot. The dword is *not* initialised, and the transcription does not zero it
+  either: a library that answers without writing it makes the compare read the
+  original's own undefined stack word — the fault profile, kept.
+- **the answer**: no log, no store, no patch. Below the threshold the mod shows
+  `MessageBoxA(0, "Incompatible/outdated version of ZMenu detected! The game will now
+  exit.", "", MB_ICONERROR)` and then calls
+  `TerminateProcess(GetCurrentProcess(), 0)`, and nothing after it runs.
+
+The caption is the image's shared **empty** string: the `push offset Caption` at
+`0x10052347` targets `0x10063CD6`, a lone `0x00` byte in `.rdata` (the walker uses the
+same address as a `std::string` source through `sub_10001530`), so the original's box
+has an empty title bar. Reproduced, not tidied up. All four of the body's string
+literals were checked byte for byte against the ASI (`ZMenuIV.asi`,
+`GetZMenuVersion`, the 72-byte message text and the empty caption).
+
+**Where it is wired.** `RegisterMenu` subscribes it to the **publish tier** with no
+gate of any kind. The original's call belongs to the startup config walk rather than
+to a key's arm, and the publish tier is the tree's first pass over a load: the
+guard's verdict — carry on, or message and terminate — is therefore taken before any
+arm's install, and no build mask or INI value can suppress or delay it. The
+original's exact position *inside* the walk (after SuperLODFix's install, before
+VSyncFix's read) is an interleave the tree's tier split does not express; for this
+call the move is unobservable, because it reads no site, writes no site, and its only
+other outcome ends the process.
+
+The five imports it makes are taken through slots
+(`GetModuleHandleA`, `GetProcAddress`, `MessageBoxA`, `GetCurrentProcess`,
+`TerminateProcess`), the same shape the transcribed writers use for
+`GetModuleHandleA`/`VirtualProtect`, and the body is registered at its recovered VA
+so the dump expresses its branches in the original's coordinates.
+
+**Inert in the harness, and that is the measurement.** `zp_dump` and `zp_tests` have
+no `ZMenuIV.asi` next to them, so the guard takes its first `jz` on every one of the
+dump's 99 per-option cells and in the ASI load check; the build-9 per-option dump is
+byte-identical to the pinned hash (`E20AF4EA…2845327`, 384,422 bytes, 12,898 lines)
+with the guard registered and running, and `zp_tests`' 84 checks still pass.
+
+That the call site really fires was measured, not assumed: with a one-shot file
+marker written from the same handler for the length of one build (a temporary
+measurement, removed before the final binary; the marker string is not in the shipped
+ASI), a single `zp_tests` run -- which loads the ASI once -- produced exactly one
+marker line. So the guard is reached unconditionally once per load, and its clean
+skip is what leaves the dump untouched.
 
 #### `FixPCIDKickbug` (`source/misc.ixx`)
 
@@ -2728,16 +2898,20 @@ scan tool and the per-build table are in
 
 The two former unimplemented keys leave every scoreboard line unchanged, and that is
 the expected result, not a missing measurement: their cells are empty on both sides
-because the harness has no `IVMenuAPI.asi` and no live registry. The gates for the
-implemented arms are:
+because the harness has no `IVMenuAPI.asi`, no `ZMenuIV.asi` and no live registry.
+What *did* change in the tree is the `AddOptionsInMenu` gate (now the original's
+`!= 0`) and the ZMenuIV guard (now transcribed and installed); neither moves a dump
+byte, and the identical hash is the proof. The gates for the implemented arms are:
 
 ```
 cmake --build --preset release                          clean
-ctest --preset release                                  22/22 pass (182.6 s)
+ctest --preset release                                  22/22 pass (final runs: 122.9 s,
+                                                        201.3 s; `zp_relocated_literals`
+                                                        is most of it)
 python tools/parity_report.py 9                         98 closed, 0 open, 1 oracle
 build 9 per-option dump, before == after                SHA-256 E20AF4EA…2845327,
                                                         384,422 bytes, 12,898 lines
-python tools/verify_bodies.py …                         174 body(ies), 0 failure(s)
+python tools/verify_bodies.py …                         175 body(ies), 0 failure(s)
 python tools/check_signature_parity.py --game ../game_refs
                                                         132 signature(s) on 9 images:
                                                         0 mismatch(es), 0 loosening(s)
@@ -2746,6 +2920,10 @@ python tools/check_fault_dialogs.py                     12 test source(s), 0 fai
 zp_dump --ooc-selftest                                  ooc selftest: PASS
 python tools/gen_body_targets.py --check                body_targets.tsv up to date (100 rows)
 ```
+
+`ctest` stays at 22 tests because the gate's check lives in `zp_tests` (nine added
+checks: 84 in total, 0 failures) rather than in a target of its own; `verify_bodies`
+rose from 174 to 175 rows with the guard.
 
 ## The oracle-verified class: baselines that are incomplete
 

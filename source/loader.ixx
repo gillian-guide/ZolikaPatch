@@ -45,6 +45,22 @@ export namespace Loader
         return Catalogue::Read(key) == 1;
     }
 
+    // One key's stored flag is the parse's answer, not its equality with 1.
+    // `AddOptionsInMenu` is stored as `setnz` (`0x1005332E test ecx,ecx` /
+    // `0x10053337 setnz byte_10158038`) over the inlined `std::stoi` of the value
+    // (`push 0Ah ; Radix` / `call ds:strtol` / `cmp esi,[ebp-0C8h]` /
+    // `jnz` -> `_Xinvalid_argument`, i.e. base 10 and the same throw), so `2`
+    // enables it as surely as `1` does. The mask and the absent-key default still
+    // come from the catalogue, and the read is the same `Catalogue::Read` every
+    // other key gets; only the comparison differs, and only where an arm asks for
+    // this one.
+    inline bool EnabledNonZero(std::string_view key)
+    {
+        if (!Catalogue::AppliesTo(key, Current()))
+            return false;
+        return Catalogue::Read(key) != 0;
+    }
+
     inline void Run()
     {
         PublishEvent().executeAll();
