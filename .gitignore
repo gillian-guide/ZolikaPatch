@@ -1,0 +1,13 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs/ZolikaPatch/FileContentIndex
+/.vs/ZolikaPatch/v17/ipch
+/.vs/ZolikaPatch/v17
+/.vs
+/ZolikaPatch/x64/Debug
+/ZolikaPatch/Debug
+/Debug
+/ZolikaPatch/Release
+/Release
