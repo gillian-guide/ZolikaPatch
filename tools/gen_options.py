@@ -132,6 +132,11 @@ def render(rows):
 
 
 def main():
+    if not INVENTORY.exists():
+        # The inventory is a research note kept outside this repository. Without it
+        # there is nothing to compare the catalogue against, which is not drift.
+        print(f"skip: {INVENTORY} is absent, so the catalogue has nothing to be checked against")
+        return
     rows = parse()
     if len(rows) < 99:
         raise SystemExit(f"only {len(rows)} option rows parsed -- the inventory layout changed")

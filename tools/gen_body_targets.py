@@ -89,6 +89,11 @@ def arm_bodies():
 
 
 def main() -> int:
+    if not TABLE.exists():
+        # The reference tree is not part of this repository. Without it the table
+        # cannot be regenerated, which is not drift.
+        print(f"skip: {TABLE} is absent, so the body table cannot be checked")
+        return 0
     table = bodies()
     pairs = arm_bodies()
     rows = []
