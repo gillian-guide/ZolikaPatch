@@ -12,7 +12,7 @@ catalogue keys are closed on 1.0.8.0, with 164 hook bodies transcribed and prove
 instruction-for-instruction against the original ASI. The shipped-INI cell now shows
 zero differing and zero extra bytes: everything the tree writes agrees with the
 baseline, and what remains is unimplemented, not wrong. The pieces that are *not*
-transcribed are rebuilt in C++ instead, and `docs/rebuilt.md` is their catalogue: the
+transcribed are rebuilt in C++ instead, and `docs/parity.md` is their catalogue: the
 recovered VA and size, the exact instruction pattern that blocks the transcription,
 what the rebuild reproduces, how that was verified and what stays unproven. Class A of
 that catalogue is empty: a table operand no longer justifies a rebuild, because the
