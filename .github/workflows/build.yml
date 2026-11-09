@@ -1,0 +1,29 @@
+name: build
+
+# The reconstruction is portable C++17 with a CMake tree and a small Makefile; CI
+# builds both targets it defines and runs whichever tests the tree registers.
+# It is published for provenance, so this job exists to prove it still compiles.
+
+on:
+  push:
+    branches: [decompile]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Configure
+        run: cmake -S . -B build/ci -G "Visual Studio 17 2022" -A Win32 -DZPATCH_BUILD_ASI=OFF -DZPATCH_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build/ci --config Release --parallel
+
+      - name: Test
+        run: ctest --test-dir build/ci -C Release --output-on-failure
