@@ -18,7 +18,7 @@ jobs:
       - uses: microsoft/setup-msbuild@v2
 
       - name: Build (Win32 Release, as the solution defines it)
-        run: msbuild ZolikaPatch.sln /p:Configuration=Release /p:Platform=Win32 /m
+        run: msbuild ZolikaPatch.sln /p:Configuration=Release /p:Platform=x86 /m
         # No continue-on-error: if this branch stops compiling, the job is meant to
         # say so in red rather than succeed while producing nothing.
 
