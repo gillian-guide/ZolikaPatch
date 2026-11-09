@@ -1,0 +1,27 @@
+name: build
+
+# The old source mirror is preservation only: this job exists to notice when it
+# stops compiling, not to produce anything that ships. The maintained code is on
+# master and the recovered data it was rebuilt from is on decompile.
+
+on:
+  push:
+    branches: [old_source]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build (Win32 Release, as the solution defines it)
+        run: msbuild ZolikaPatch.sln /p:Configuration=Release /p:Platform=Win32 /m
+        continue-on-error: true
+
+      - name: Report whether the mirror still compiles
+        run: |
+          if (Test-Path ZolikaPatch.asi) { Write-Host "produced ZolikaPatch.asi" }
+          elseif (Test-Path Release\ZolikaPatch.asi) { Write-Host "produced Release\ZolikaPatch.asi" }
+          else { Write-Warning "no artifact; the mirror does not build in this toolchain" }
+        shell: pwsh
