@@ -7,6 +7,11 @@
 #include <cwchar>
 
 #if defined(_WIN32)
+// windows.h defines max/min as macros, which breaks every std::max in this file.
+# ifndef NOMINMAX
+#  define NOMINMAX
+# endif
+
 # include <windows.h>
 # include <winver.h>
 # include <tlhelp32.h>
