@@ -1,0 +1,16 @@
+{
+ "note": "RemoveUselessChecks' sub_10044BD0 table-driven writes (rec. from the oracle cells); the op/rva tables already carry the non-loop writes, which are excluded here. finding N5.",
+ "rows": 7489,
+ "per_build": {
+  "1": 0,
+  "6": 0,
+  "5": 2466,
+  "7": 0,
+  "8": 2288,
+  "9": 2735,
+  "11": 0,
+  "12": 0,
+  "13": 0
+ },
+ "sha256": "aa9338704dc07352ecd59b5aa1b6e702850b5956f609907b7c006a8b71f46f23"
+}

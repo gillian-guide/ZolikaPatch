@@ -1,0 +1,4881 @@
+{
+  "meta": {
+    "task": "Verify every recovered ZolikaPatch patch operation against the real game (GTAIV.exe 1.0.8.0)",
+    "inputs": [
+      "ZolikaPatch_reconstruction/evidence/patch_operations_all.json",
+      "ZolikaPatch_reconstruction/evidence/option_handlers.json",
+      "ZolikaPatch_reconstruction/evidence/option_build_gates.json"
+    ],
+    "method": "For kind=='signature': parse the recovered pattern with tools/verify_game_signatures.py (whitespace tokens, '?'/'??' wildcards, else strtoul-hex low byte) and find_all over the .text raw bytes of the read-only GTAIV.exe. For kind=='rva': map the module-relative RVA into the .text raw image and read the current bytes (read-only). The owning option comes from option_handlers.json; its recovered build gate is cross-referenced against build ordinal 9 (v1080).",
+    "gate_semantics": "includes_9 iff no '!=' gate names 9 and (no '==' gate or some '==' gate names 9). NOTE: recovered gates are heuristic; positive '==' gates are reliable, negative '!=' gates may encode branch/target selection rather than applicability.",
+    "game": {
+      "path": "/Users/kreato/Downloads/GTAIV.exe",
+      "sha256": "3d90e7c516fa450ca002e5031e62c0f66b404590f33e6cc9793b0da4fffbfd0f",
+      "image_base": "0x400000",
+      "build": "v1080 (ordinal 9)",
+      "text_va": "0x1000",
+      "text_raw_size": 9871360
+    }
+  },
+  "summary": {
+    "task": "Verify every recovered ZolikaPatch patch operation against real GTAIV.exe 1.0.8.0",
+    "game": {
+      "path": "/Users/kreato/Downloads/GTAIV.exe",
+      "sha256": "3d90e7c516fa450ca002e5031e62c0f66b404590f33e6cc9793b0da4fffbfd0f",
+      "image_base": "0x400000",
+      "text_va": "0x1000",
+      "text_raw_size": 9871360,
+      "build": "v1080 (ordinal 9)"
+    },
+    "totals": {
+      "operations": 192
+    },
+    "by_kind": {
+      "signature": 138,
+      "rva": 54
+    },
+    "signature_results": {
+      "present": 117,
+      "absent": 21,
+      "unique_hit": 116,
+      "multi_hit": 1,
+      "total": 138
+    },
+    "rva_results": {
+      "total": 54,
+      "addresses_inside_text": 54,
+      "outside_text": 0,
+      "applicable_to_build_9": 41,
+      "per_build_branch_excluded_for_9": 13
+    },
+    "options": {
+      "mapped_options_for_ops": 59,
+      "options_with_absent_signature_op": 8
+    },
+    "gated_handlers_covereage": {
+      "handlers_in_ops_with_build_gate": [
+        "10006770",
+        "1001b380",
+        "1001b580",
+        "100234e0",
+        "10044710",
+        "10044bd0",
+        "10045490"
+      ],
+      "n_ops_with_gate_info": 90
+    },
+    "anomaly_counts": {
+      "signature_absent_gate_includes_1080": 2,
+      "signature_present_gate_excludes_1080": 1,
+      "signature_absent_no_recovered_gate": 19,
+      "rva_op_build_gate_excludes_1080": 13
+    },
+    "confidence": "high for present/absent hit counts (direct byte search on the immutable binary); medium for gate cross-reference (build_gates are a heuristic extraction; POSITIVE gates are reliable, NEGATIVE '!=' gates can be selection-only)."
+  },
+  "anomalies": {
+    "flagged": [
+      {
+        "type": "signature_absent_gate_includes_1080",
+        "handler": "10045490",
+        "option": "RemoveRGSCLoginRequirement",
+        "signature": "83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53 8B 5C 24 4C 56 68 ? ? ? ? E8 ? ? ? ? 83 C4",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "includes_9",
+        "severity": "high",
+        "explained": true,
+        "note": "Handler FUN_10045490 first pattern-scans this signature; on failure with build==9 it patches module-relative RVA 0x498460 (see evidence/fallback_patch_sites.json). Signature absence for build 9 is therefore expected and the patch still applies."
+      },
+      {
+        "type": "signature_absent_gate_includes_1080",
+        "handler": "10045490",
+        "option": "RemoveRGSCLoginRequirement",
+        "signature": "83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53 8B 5C 24 4C 56 68 ? ? ? ? E8 ? ? ? ? 83 C4",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "includes_9",
+        "severity": "high",
+        "explained": true,
+        "note": "Handler FUN_10045490 first pattern-scans this signature; on failure with build==9 it patches module-relative RVA 0x498460 (see evidence/fallback_patch_sites.json). Signature absence for build 9 is therefore expected and the patch still applies."
+      },
+      {
+        "type": "signature_present_gate_excludes_1080",
+        "handler": "10006770",
+        "option": "DualVehicleHeadlights",
+        "signature": "8B 17 8B 42 64 8B CF FF D0 8B 54",
+        "hit_count": 1,
+        "first_rva": "0x4f7ce5",
+        "gate_build_1080": "excludes_9",
+        "severity": "info",
+        "explained": true,
+        "note": "Handler FUN_10006770 pattern-scans this signature UNCONDITIONALLY and only selects a different trampoline target per build (==1..6 vs else). Presence in 1.0.8.0 .text is expected; the build_gates entry describes target selection, not applicability, so this is a gate-semantics false positive, not a defect."
+      }
+    ],
+    "informational": [
+      {
+        "type": "signature_absent_no_recovered_gate",
+        "handler": "1003d420",
+        "option": "NoLiveryLimit",
+        "signature": "8D AF 3C 01 00 00 8D 54 24 20",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "no_gate",
+        "severity": "low",
+        "option_has_resolving_sibling_signature": true,
+        "note": "Option still resolves in-game via an alternate recovered signature."
+      },
+      {
+        "type": "signature_absent_no_recovered_gate",
+        "handler": "10044590",
+        "option": "PopupHeadlightsFlag",
+        "signature": "0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "no_gate",
+        "severity": "low",
+        "option_has_resolving_sibling_signature": false,
+        "note": "No signature of this option resolves in 1.0.8.0 .text; treat as build-variant or unresolved."
+      },
+      {
+        "type": "signature_absent_no_recovered_gate",
+        "handler": "10044590",
+        "option": "PopupHeadlightsFlag",
+        "signature": "0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "no_gate",
+        "severity": "low",
+        "option_has_resolving_sibling_signature": false,
+        "note": "No signature of this option resolves in 1.0.8.0 .text; treat as build-variant or unresolved."
+      },
+      {
+        "type": "signature_absent_no_recovered_gate",
+        "handler": "10045ce0",
+        "option": "SkipLauncher",
+        "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "no_gate",
+        "severity": "low",
+        "option_has_resolving_sibling_signature": true,
+        "note": "Option still resolves in-game via an alternate recovered signature."
+      },
+      {
+        "type": "signature_absent_no_recovered_gate",
+        "handler": "10045ce0",
+        "option": "SkipLauncher",
+        "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "no_gate",
+        "severity": "low",
+        "option_has_resolving_sibling_signature": true,
+        "note": "Option still resolves in-game via an alternate recovered signature."
+      },
+      {
+        "type": "signature_absent_no_recovered_gate",
+        "handler": "10045ce0",
+        "option": "SkipLauncher",
+        "signature": "74 EC 38 5E 06 74 E7 68",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "no_gate",
+        "severity": "low",
+        "option_has_resolving_sibling_signature": true,
+        "note": "Option still resolves in-game via an alternate recovered signature."
+      },
+      {
+        "type": "signature_absent_no_recovered_gate",
+        "handler": "10045ce0",
+        "option": "SkipLauncher",
+        "signature": "74 C4 8B 07 3B 46 18 75 BD 68",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "no_gate",
+        "severity": "low",
+        "option_has_resolving_sibling_signature": true,
+        "note": "Option still resolves in-game via an alternate recovered signature."
+      },
+      {
+        "type": "signature_absent_no_recovered_gate",
+        "handler": "10045ce0",
+        "option": "SkipLauncher",
+        "signature": "3B 56 18 0F 85",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "no_gate",
+        "severity": "low",
+        "option_has_resolving_sibling_signature": true,
+        "note": "Option still resolves in-game via an alternate recovered signature."
+      },
+      {
+        "type": "signature_absent_no_recovered_gate",
+        "handler": "10045ce0",
+        "option": "SkipLauncher",
+        "signature": "3B 4E 18 0F 85",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "no_gate",
+        "severity": "low",
+        "option_has_resolving_sibling_signature": true,
+        "note": "Option still resolves in-game via an alternate recovered signature."
+      },
+      {
+        "type": "signature_absent_no_recovered_gate",
+        "handler": "10046640",
+        "option": "SkipMenu",
+        "signature": "6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC E8 ? ? ? ? 8B E5 5D C3",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "no_gate",
+        "severity": "low",
+        "option_has_resolving_sibling_signature": false,
+        "note": "No signature of this option resolves in 1.0.8.0 .text; treat as build-variant or unresolved."
+      },
+      {
+        "type": "signature_absent_no_recovered_gate",
+        "handler": "10046640",
+        "option": "SkipMenu",
+        "signature": "6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC E8 ? ? ? ? 8B E5 5D C3",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "no_gate",
+        "severity": "low",
+        "option_has_resolving_sibling_signature": false,
+        "note": "No signature of this option resolves in 1.0.8.0 .text; treat as build-variant or unresolved."
+      },
+      {
+        "type": "signature_absent_no_recovered_gate",
+        "handler": "1004aae0",
+        "option": "VRAMFix",
+        "signature": "8B 44 24 10 D9 2C 24 83 C4 1C C3",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "no_gate",
+        "severity": "low",
+        "option_has_resolving_sibling_signature": false,
+        "note": "No signature of this option resolves in 1.0.8.0 .text; treat as build-variant or unresolved."
+      },
+      {
+        "type": "signature_absent_no_recovered_gate",
+        "handler": "100513a0",
+        "option": "LocalSettingsPath",
+        "signature": "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D7 5F C3",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "no_gate",
+        "severity": "low",
+        "option_has_resolving_sibling_signature": false,
+        "note": "No signature of this option resolves in 1.0.8.0 .text; treat as build-variant or unresolved."
+      },
+      {
+        "type": "signature_absent_no_recovered_gate",
+        "handler": "100513a0",
+        "option": "LocalSettingsPath",
+        "signature": "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D7 5F C3",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "no_gate",
+        "severity": "low",
+        "option_has_resolving_sibling_signature": false,
+        "note": "No signature of this option resolves in 1.0.8.0 .text; treat as build-variant or unresolved."
+      },
+      {
+        "type": "signature_absent_no_recovered_gate",
+        "handler": "10023dd0",
+        "option": "MiscFixes",
+        "signature": "C7 06 ? ? ? ? 74 19",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "no_gate",
+        "severity": "low",
+        "option_has_resolving_sibling_signature": true,
+        "note": "Option still resolves in-game via an alternate recovered signature."
+      },
+      {
+        "type": "signature_absent_no_recovered_gate",
+        "handler": "10023dd0",
+        "option": "MiscFixes",
+        "signature": "8B 54 24 04 52 A3",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "no_gate",
+        "severity": "low",
+        "option_has_resolving_sibling_signature": true,
+        "note": "Option still resolves in-game via an alternate recovered signature."
+      },
+      {
+        "type": "signature_absent_no_recovered_gate",
+        "handler": "10023dd0",
+        "option": "MiscFixes",
+        "signature": "83 F8 01 75 30 A3",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "no_gate",
+        "severity": "low",
+        "option_has_resolving_sibling_signature": true,
+        "note": "Option still resolves in-game via an alternate recovered signature."
+      },
+      {
+        "type": "signature_absent_no_recovered_gate",
+        "handler": "10023dd0",
+        "option": "MiscFixes",
+        "signature": "FF 15 ? ? ? ? 85 C0 75 18",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "no_gate",
+        "severity": "low",
+        "option_has_resolving_sibling_signature": true,
+        "note": "Option still resolves in-game via an alternate recovered signature."
+      },
+      {
+        "type": "signature_absent_no_recovered_gate",
+        "handler": "10023dd0",
+        "option": "MiscFixes",
+        "signature": "FF 15 ? ? ? ? 85 C0 75 04 32",
+        "hit_count": 0,
+        "first_rva": null,
+        "gate_build_1080": "no_gate",
+        "severity": "low",
+        "option_has_resolving_sibling_signature": true,
+        "note": "Option still resolves in-game via an alternate recovered signature."
+      },
+      {
+        "type": "rva_op_build_gate_excludes_1080",
+        "handler": "10044710",
+        "option": "Patch6and7RemoveModChecks",
+        "rva": 14638,
+        "rva_hex": "0x392e",
+        "gate_build_1080": "excludes_9",
+        "severity": "info",
+        "note": "Module-relative patch site recovered from a per-build branch that is not taken on 1.0.8.0; recorded as evidence but not applicable to build 9."
+      },
+      {
+        "type": "rva_op_build_gate_excludes_1080",
+        "handler": "10044710",
+        "option": "Patch6and7RemoveModChecks",
+        "rva": 17127,
+        "rva_hex": "0x42e7",
+        "gate_build_1080": "excludes_9",
+        "severity": "info",
+        "note": "Module-relative patch site recovered from a per-build branch that is not taken on 1.0.8.0; recorded as evidence but not applicable to build 9."
+      },
+      {
+        "type": "rva_op_build_gate_excludes_1080",
+        "handler": "10044710",
+        "option": "Patch6and7RemoveModChecks",
+        "rva": 17128,
+        "rva_hex": "0x42e8",
+        "gate_build_1080": "excludes_9",
+        "severity": "info",
+        "note": "Module-relative patch site recovered from a per-build branch that is not taken on 1.0.8.0; recorded as evidence but not applicable to build 9."
+      },
+      {
+        "type": "rva_op_build_gate_excludes_1080",
+        "handler": "10044710",
+        "option": "Patch6and7RemoveModChecks",
+        "rva": 17129,
+        "rva_hex": "0x42e9",
+        "gate_build_1080": "excludes_9",
+        "severity": "info",
+        "note": "Module-relative patch site recovered from a per-build branch that is not taken on 1.0.8.0; recorded as evidence but not applicable to build 9."
+      },
+      {
+        "type": "rva_op_build_gate_excludes_1080",
+        "handler": "10044710",
+        "option": "Patch6and7RemoveModChecks",
+        "rva": 17130,
+        "rva_hex": "0x42ea",
+        "gate_build_1080": "excludes_9",
+        "severity": "info",
+        "note": "Module-relative patch site recovered from a per-build branch that is not taken on 1.0.8.0; recorded as evidence but not applicable to build 9."
+      },
+      {
+        "type": "rva_op_build_gate_excludes_1080",
+        "handler": "10044710",
+        "option": "Patch6and7RemoveModChecks",
+        "rva": 17131,
+        "rva_hex": "0x42eb",
+        "gate_build_1080": "excludes_9",
+        "severity": "info",
+        "note": "Module-relative patch site recovered from a per-build branch that is not taken on 1.0.8.0; recorded as evidence but not applicable to build 9."
+      },
+      {
+        "type": "rva_op_build_gate_excludes_1080",
+        "handler": "10044710",
+        "option": "Patch6and7RemoveModChecks",
+        "rva": 17132,
+        "rva_hex": "0x42ec",
+        "gate_build_1080": "excludes_9",
+        "severity": "info",
+        "note": "Module-relative patch site recovered from a per-build branch that is not taken on 1.0.8.0; recorded as evidence but not applicable to build 9."
+      },
+      {
+        "type": "rva_op_build_gate_excludes_1080",
+        "handler": "10044710",
+        "option": "Patch6and7RemoveModChecks",
+        "rva": 17133,
+        "rva_hex": "0x42ed",
+        "gate_build_1080": "excludes_9",
+        "severity": "info",
+        "note": "Module-relative patch site recovered from a per-build branch that is not taken on 1.0.8.0; recorded as evidence but not applicable to build 9."
+      },
+      {
+        "type": "rva_op_build_gate_excludes_1080",
+        "handler": "10044710",
+        "option": "Patch6and7RemoveModChecks",
+        "rva": 14722,
+        "rva_hex": "0x3982",
+        "gate_build_1080": "excludes_9",
+        "severity": "info",
+        "note": "Module-relative patch site recovered from a per-build branch that is not taken on 1.0.8.0; recorded as evidence but not applicable to build 9."
+      },
+      {
+        "type": "rva_op_build_gate_excludes_1080",
+        "handler": "10044710",
+        "option": "Patch6and7RemoveModChecks",
+        "rva": 14868,
+        "rva_hex": "0x3a14",
+        "gate_build_1080": "excludes_9",
+        "severity": "info",
+        "note": "Module-relative patch site recovered from a per-build branch that is not taken on 1.0.8.0; recorded as evidence but not applicable to build 9."
+      },
+      {
+        "type": "rva_op_build_gate_excludes_1080",
+        "handler": "10044710",
+        "option": "Patch6and7RemoveModChecks",
+        "rva": 14690,
+        "rva_hex": "0x3962",
+        "gate_build_1080": "excludes_9",
+        "severity": "info",
+        "note": "Module-relative patch site recovered from a per-build branch that is not taken on 1.0.8.0; recorded as evidence but not applicable to build 9."
+      },
+      {
+        "type": "rva_op_build_gate_excludes_1080",
+        "handler": "10044710",
+        "option": "Patch6and7RemoveModChecks",
+        "rva": 14836,
+        "rva_hex": "0x39f4",
+        "gate_build_1080": "excludes_9",
+        "severity": "info",
+        "note": "Module-relative patch site recovered from a per-build branch that is not taken on 1.0.8.0; recorded as evidence but not applicable to build 9."
+      },
+      {
+        "type": "rva_op_build_gate_excludes_1080",
+        "handler": "10044710",
+        "option": "Patch6and7RemoveModChecks",
+        "rva": 14492,
+        "rva_hex": "0x389c",
+        "gate_build_1080": "excludes_9",
+        "severity": "info",
+        "note": "Module-relative patch site recovered from a per-build branch that is not taken on 1.0.8.0; recorded as evidence but not applicable to build 9."
+      }
+    ],
+    "gate_options_without_signature_ops": {
+      "note": "Options whose recovered build gate was cross-referenced, but whose handler contributed no signature-kind operation (so step 2 is vacuous for them): BenchmarkFix, LaunchWithPlayGTAIV, SuperLODFix, VSyncFix, plus the rva-only options LoadDLCs / RemoveUselessChecks / Patch6and7RemoveModChecks / RemoveRGSCLoginRequirement handled above.",
+      "options": [
+        "BenchmarkFix",
+        "LaunchWithPlayGTAIV",
+        "SuperLODFix",
+        "VSyncFix"
+      ]
+    },
+    "duplicate_signature_ops": {
+      "10044590|0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1": 2,
+      "10045490|83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53 8B 5C 24 4C 56 68 ? ? ? ? E8 ? ? ? ? 83 C4": 2,
+      "10045610|8D 4C 24 18 51 6A 00 6A 0C 57": 2,
+      "10045ad0|33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24": 2,
+      "10045ce0|84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1": 2,
+      "10046640|6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC E8 ? ? ? ? 8B E5 5D C3": 2,
+      "100513a0|7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D7 5F C3": 2,
+      "1001b580|83 3D ? ? ? ? 02 7C 4A 0F BF 46 2E": 2,
+      "1001b580|83 3D ? ? ? ? 02 7C 26 8B 85 40 0B 00 00": 3,
+      "1001ee50|F7 46 4C 00 80 00 00 74": 2,
+      "10023b30|0F 2F C1 76 03 0F 28 C8 F3 0F 10 15": 8
+    }
+  },
+  "per_op": [
+    {
+      "index": 0,
+      "handler": "10036f30",
+      "kind": "signature",
+      "option": "GroupHackFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "33 C0 83 C1 04 8D 50 07 83 39 00 75 06 83 79 04",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x568ad0"
+      ],
+      "first_rva": "0x568ad0",
+      "first_va": "0x968ad0",
+      "site_rva": "0x568ad0",
+      "site_va": "0x968ad0",
+      "status": "present"
+    },
+    {
+      "index": 1,
+      "handler": "10036fd0",
+      "kind": "signature",
+      "option": "BlackscreenFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "75 54 8B 48 28 8B 40 2C",
+      "offset": 81,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x2c6ef8"
+      ],
+      "first_rva": "0x2c6ef8",
+      "first_va": "0x6c6ef8",
+      "site_rva": "0x2c6f49",
+      "site_va": "0x6c6f49",
+      "status": "present"
+    },
+    {
+      "index": 2,
+      "handler": "10037070",
+      "kind": "signature",
+      "option": "FreezeGunFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "2B C2 D1 F8 39 3C C6 7D 0D 83 CA FF",
+      "offset": -21,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x78c463"
+      ],
+      "first_rva": "0x78c463",
+      "first_va": "0xb8c463",
+      "site_rva": "0x78c44e",
+      "site_va": "0xb8c44e",
+      "status": "present"
+    },
+    {
+      "index": 3,
+      "handler": "10037100",
+      "kind": "signature",
+      "option": "RemoveAllWeaponsProtection",
+      "gate_build_1080": "no_gate",
+      "length": 12,
+      "values": [
+        "90909090",
+        "90909090",
+        "90909090"
+      ],
+      "signature": "E9 ? ? ? ? 57 8D 8F ? ? 00 00",
+      "offset": 5,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x2e8622"
+      ],
+      "first_rva": "0x2e8622",
+      "first_va": "0x6e8622",
+      "site_rva": "0x2e8627",
+      "site_va": "0x6e8627",
+      "status": "present"
+    },
+    {
+      "index": 4,
+      "handler": "10037170",
+      "kind": "signature",
+      "option": "TeleportProtection",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "c2"
+      ],
+      "signature": "55 8B EC 83 E4 F8 51 53 8B 5D 08 56 57 6A 08 8D 44 24 10 8B F1 8D 7B 04 50 8B CF C7 44 24 14 00",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x2e7be0"
+      ],
+      "first_rva": "0x2e7be0",
+      "first_va": "0x6e7be0",
+      "site_rva": "0x2e7be0",
+      "site_va": "0x6e7be0",
+      "status": "present"
+    },
+    {
+      "index": 5,
+      "handler": "10037290",
+      "kind": "signature",
+      "option": "MPNikoCrashFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "eb"
+      ],
+      "signature": "74 2B 57 E8 ? ? ? ? 8B BE A8 0E 00 00",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x59a7f1"
+      ],
+      "first_rva": "0x59a7f1",
+      "first_va": "0x99a7f1",
+      "site_rva": "0x59a7f1",
+      "site_va": "0x99a7f1",
+      "status": "present"
+    },
+    {
+      "index": 6,
+      "handler": "10037be0",
+      "kind": "signature",
+      "option": "BadPlayerModelCrashFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "83 E4 F0 83 EC 54 0F 57 C0 53 8B 5D 0C",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x3cf803"
+      ],
+      "first_rva": "0x3cf803",
+      "first_va": "0x7cf803",
+      "site_rva": "0x3cf803",
+      "site_va": "0x7cf803",
+      "status": "present"
+    },
+    {
+      "index": 7,
+      "handler": "10038680",
+      "kind": "signature",
+      "option": "NewMemorySystem",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e8"
+      ],
+      "signature": "3D 80 99 99 59 73 05",
+      "offset": -29,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x109c"
+      ],
+      "first_rva": "0x109c",
+      "first_va": "0x40109c",
+      "site_rva": "0x107f",
+      "site_va": "0x40107f",
+      "status": "present"
+    },
+    {
+      "index": 8,
+      "handler": "10038680",
+      "kind": "signature",
+      "option": "NewMemorySystem",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "3D 80 99 99 59 73 05",
+      "offset": -29,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x109c"
+      ],
+      "first_rva": "0x109c",
+      "first_va": "0x40109c",
+      "site_rva": "0x107f",
+      "site_va": "0x40107f",
+      "status": "present"
+    },
+    {
+      "index": 9,
+      "handler": "10038770",
+      "kind": "signature",
+      "option": "RemoveBoundingBoxCulling",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "3C 01 57 0F 85",
+      "offset": 3,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x557460"
+      ],
+      "first_rva": "0x557460",
+      "first_va": "0x957460",
+      "site_rva": "0x557463",
+      "site_va": "0x957463",
+      "status": "present"
+    },
+    {
+      "index": 10,
+      "handler": "10038800",
+      "kind": "signature",
+      "option": "RemoveStaticCarShadows",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "eb"
+      ],
+      "signature": "F3 0F 11 4C 24 0C 76 5B D9 45 14",
+      "offset": 6,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x4f7011"
+      ],
+      "first_rva": "0x4f7011",
+      "first_va": "0x8f7011",
+      "site_rva": "0x4f7017",
+      "site_va": "0x8f7017",
+      "status": "present"
+    },
+    {
+      "index": 11,
+      "handler": "10038860",
+      "kind": "signature",
+      "option": "RemoveStaticCutsceneCarShadows",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "eb"
+      ],
+      "signature": "F3 0F 11 44 24 0C 76 5B D9 45 14",
+      "offset": 6,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x624a63"
+      ],
+      "first_rva": "0x624a63",
+      "first_va": "0xa24a63",
+      "site_rva": "0x624a69",
+      "site_va": "0xa24a69",
+      "status": "present"
+    },
+    {
+      "index": 12,
+      "handler": "1003d420",
+      "kind": "signature",
+      "option": "NoLiveryLimit",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "8D AF 3C 01 00 00 8D 54 24 20",
+      "offset": 0,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 13,
+      "handler": "1003d420",
+      "kind": "signature",
+      "option": "NoLiveryLimit",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "8B 8C 83 3C 01 00 00 0F BF 53 48",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x797a29"
+      ],
+      "first_rva": "0x797a29",
+      "first_va": "0xb97a29",
+      "site_rva": "0x797a29",
+      "site_va": "0xb97a29",
+      "status": "present"
+    },
+    {
+      "index": 14,
+      "handler": "1003d7d0",
+      "kind": "signature",
+      "option": "PathNodeCrashFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "8B 04 B1 0F B7 D0 81 FA FF FF 00 00",
+      "offset": 53,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x66d270"
+      ],
+      "first_rva": "0x66d270",
+      "first_va": "0xa6d270",
+      "site_rva": "0x66d2a5",
+      "site_va": "0xa6d2a5",
+      "status": "present"
+    },
+    {
+      "index": 15,
+      "handler": "1003d890",
+      "kind": "signature",
+      "option": "PlaneCrashFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "83 C4 04 88 58 26 8B 16 8B 82 F4 00 00 00",
+      "offset": 3,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x5e0d08"
+      ],
+      "first_rva": "0x5e0d08",
+      "first_va": "0x9e0d08",
+      "site_rva": "0x5e0d0b",
+      "site_va": "0x9e0d0b",
+      "status": "present"
+    },
+    {
+      "index": 16,
+      "handler": "1003d9c0",
+      "kind": "signature",
+      "option": "PlayerAsPedComponentsFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "8B 54 24 10 52 0F B6 90 19 02 00 00",
+      "offset": 5,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x740804"
+      ],
+      "first_rva": "0x740804",
+      "first_va": "0xb40804",
+      "site_rva": "0x740809",
+      "site_va": "0xb40809",
+      "status": "present"
+    },
+    {
+      "index": 17,
+      "handler": "10044590",
+      "kind": "signature",
+      "option": "PopupHeadlightsFlag",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1",
+      "offset": 0,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 18,
+      "handler": "10044590",
+      "kind": "signature",
+      "option": "PopupHeadlightsFlag",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1",
+      "offset": 0,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 19,
+      "handler": "10044710",
+      "kind": "rva",
+      "option": "Patch6and7RemoveModChecks",
+      "gate_build_1080": "excludes_9",
+      "length": 1,
+      "values": [
+        "eb"
+      ],
+      "rva": 14638,
+      "rva_hex": "0x392e",
+      "rva_va": "0x40392e",
+      "in_text": true,
+      "current_bytes": "CC",
+      "status": "rva_address",
+      "gate_applicable_to_1080": false,
+      "build_branch": [
+        [
+          "==",
+          7
+        ]
+      ]
+    },
+    {
+      "index": 20,
+      "handler": "10044710",
+      "kind": "rva",
+      "option": "Patch6and7RemoveModChecks",
+      "gate_build_1080": "excludes_9",
+      "length": 1,
+      "values": [
+        "90"
+      ],
+      "rva": 17127,
+      "rva_hex": "0x42e7",
+      "rva_va": "0x4042e7",
+      "in_text": true,
+      "current_bytes": "11",
+      "status": "rva_address",
+      "gate_applicable_to_1080": false,
+      "build_branch": [
+        [
+          "==",
+          7
+        ]
+      ]
+    },
+    {
+      "index": 21,
+      "handler": "10044710",
+      "kind": "rva",
+      "option": "Patch6and7RemoveModChecks",
+      "gate_build_1080": "excludes_9",
+      "length": 1,
+      "values": [
+        "90"
+      ],
+      "rva": 17128,
+      "rva_hex": "0x42e8",
+      "rva_va": "0x4042e8",
+      "in_text": true,
+      "current_bytes": "00",
+      "status": "rva_address",
+      "gate_applicable_to_1080": false,
+      "build_branch": [
+        [
+          "==",
+          7
+        ]
+      ]
+    },
+    {
+      "index": 22,
+      "handler": "10044710",
+      "kind": "rva",
+      "option": "Patch6and7RemoveModChecks",
+      "gate_build_1080": "excludes_9",
+      "length": 1,
+      "values": [
+        "90"
+      ],
+      "rva": 17129,
+      "rva_hex": "0x42e9",
+      "rva_va": "0x4042e9",
+      "in_text": true,
+      "current_bytes": "00",
+      "status": "rva_address",
+      "gate_applicable_to_1080": false,
+      "build_branch": [
+        [
+          "==",
+          7
+        ]
+      ]
+    },
+    {
+      "index": 23,
+      "handler": "10044710",
+      "kind": "rva",
+      "option": "Patch6and7RemoveModChecks",
+      "gate_build_1080": "excludes_9",
+      "length": 1,
+      "values": [
+        "90"
+      ],
+      "rva": 17130,
+      "rva_hex": "0x42ea",
+      "rva_va": "0x4042ea",
+      "in_text": true,
+      "current_bytes": "8B",
+      "status": "rva_address",
+      "gate_applicable_to_1080": false,
+      "build_branch": [
+        [
+          "==",
+          7
+        ]
+      ]
+    },
+    {
+      "index": 24,
+      "handler": "10044710",
+      "kind": "rva",
+      "option": "Patch6and7RemoveModChecks",
+      "gate_build_1080": "excludes_9",
+      "length": 1,
+      "values": [
+        "90"
+      ],
+      "rva": 17131,
+      "rva_hex": "0x42eb",
+      "rva_va": "0x4042eb",
+      "in_text": true,
+      "current_bytes": "08",
+      "status": "rva_address",
+      "gate_applicable_to_1080": false,
+      "build_branch": [
+        [
+          "==",
+          7
+        ]
+      ]
+    },
+    {
+      "index": 25,
+      "handler": "10044710",
+      "kind": "rva",
+      "option": "Patch6and7RemoveModChecks",
+      "gate_build_1080": "excludes_9",
+      "length": 1,
+      "values": [
+        "90"
+      ],
+      "rva": 17132,
+      "rva_hex": "0x42ec",
+      "rva_va": "0x4042ec",
+      "in_text": true,
+      "current_bytes": "89",
+      "status": "rva_address",
+      "gate_applicable_to_1080": false,
+      "build_branch": [
+        [
+          "==",
+          7
+        ]
+      ]
+    },
+    {
+      "index": 26,
+      "handler": "10044710",
+      "kind": "rva",
+      "option": "Patch6and7RemoveModChecks",
+      "gate_build_1080": "excludes_9",
+      "length": 1,
+      "values": [
+        "90"
+      ],
+      "rva": 17133,
+      "rva_hex": "0x42ed",
+      "rva_va": "0x4042ed",
+      "in_text": true,
+      "current_bytes": "44",
+      "status": "rva_address",
+      "gate_applicable_to_1080": false,
+      "build_branch": [
+        [
+          "==",
+          7
+        ]
+      ]
+    },
+    {
+      "index": 27,
+      "handler": "10044710",
+      "kind": "rva",
+      "option": "Patch6and7RemoveModChecks",
+      "gate_build_1080": "excludes_9",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "rva": 14722,
+      "rva_hex": "0x3982",
+      "rva_va": "0x403982",
+      "in_text": true,
+      "current_bytes": "8B",
+      "status": "rva_address",
+      "gate_applicable_to_1080": false,
+      "build_branch": [
+        [
+          "==",
+          7
+        ]
+      ]
+    },
+    {
+      "index": 28,
+      "handler": "10044710",
+      "kind": "rva",
+      "option": "Patch6and7RemoveModChecks",
+      "gate_build_1080": "excludes_9",
+      "length": 1,
+      "values": [
+        "eb"
+      ],
+      "rva": 14868,
+      "rva_hex": "0x3a14",
+      "rva_va": "0x403a14",
+      "in_text": true,
+      "current_bytes": "00",
+      "status": "rva_address",
+      "gate_applicable_to_1080": false,
+      "build_branch": [
+        [
+          "==",
+          7
+        ]
+      ]
+    },
+    {
+      "index": 29,
+      "handler": "10044710",
+      "kind": "rva",
+      "option": "Patch6and7RemoveModChecks",
+      "gate_build_1080": "excludes_9",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "rva": 14690,
+      "rva_hex": "0x3962",
+      "rva_va": "0x403962",
+      "in_text": true,
+      "current_bytes": "01",
+      "status": "rva_address",
+      "gate_applicable_to_1080": false,
+      "build_branch": [
+        [
+          "==",
+          8
+        ]
+      ]
+    },
+    {
+      "index": 30,
+      "handler": "10044710",
+      "kind": "rva",
+      "option": "Patch6and7RemoveModChecks",
+      "gate_build_1080": "excludes_9",
+      "length": 1,
+      "values": [
+        "eb"
+      ],
+      "rva": 14836,
+      "rva_hex": "0x39f4",
+      "rva_va": "0x4039f4",
+      "in_text": true,
+      "current_bytes": "24",
+      "status": "rva_address",
+      "gate_applicable_to_1080": false,
+      "build_branch": [
+        [
+          "==",
+          8
+        ]
+      ]
+    },
+    {
+      "index": 31,
+      "handler": "10044710",
+      "kind": "rva",
+      "option": "Patch6and7RemoveModChecks",
+      "gate_build_1080": "excludes_9",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "rva": 14492,
+      "rva_hex": "0x389c",
+      "rva_va": "0x40389c",
+      "in_text": true,
+      "current_bytes": "89",
+      "status": "rva_address",
+      "gate_applicable_to_1080": false,
+      "build_branch": [
+        [
+          "==",
+          8
+        ]
+      ]
+    },
+    {
+      "index": 32,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 38,
+      "values": [
+        "90909090",
+        "9090"
+      ],
+      "rva": 5607719,
+      "rva_hex": "0x559127",
+      "rva_va": "0x959127",
+      "in_text": true,
+      "current_bytes": "A8 40 74 11 80 3D 05 B9 29 01 00 74 08 84 C0 0F 89 CC 00 00 00 84 C0 79 0D 80 3D 06 B9 29 01 00 0F 85 BB 00 00 00",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 33,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 38,
+      "values": [
+        "90909090",
+        "9090"
+      ],
+      "rva": 5608103,
+      "rva_hex": "0x5592a7",
+      "rva_va": "0x9592a7",
+      "in_text": true,
+      "current_bytes": "A8 40 74 11 80 3D 05 B9 29 01 00 74 08 84 C0 0F 89 CC 00 00 00 84 C0 79 0D 80 3D 06 B9 29 01 00 0F 85 BB 00 00 00",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 34,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 6,
+      "values": [
+        "90909090",
+        "9090"
+      ],
+      "rva": 5607443,
+      "rva_hex": "0x559013",
+      "rva_va": "0x959013",
+      "in_text": true,
+      "current_bytes": "38 1D 75 B9 29 01",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 35,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 7,
+      "values": [
+        "90909090",
+        "9090",
+        "90"
+      ],
+      "rva": 5633461,
+      "rva_hex": "0x55f5b5",
+      "rva_va": "0x95f5b5",
+      "in_text": true,
+      "current_bytes": "80 3D 75 B9 29 01 00",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 36,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 6,
+      "values": [
+        "90909090",
+        "9090"
+      ],
+      "rva": 5633469,
+      "rva_hex": "0x55f5bd",
+      "rva_va": "0x95f5bd",
+      "in_text": true,
+      "current_bytes": "0F 85 F5 04 00 00",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 37,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 7,
+      "values": [
+        "90909090",
+        "9090",
+        "90"
+      ],
+      "rva": 5635105,
+      "rva_hex": "0x55fc21",
+      "rva_va": "0x95fc21",
+      "in_text": true,
+      "current_bytes": "80 3D 75 B9 29 01 00",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 38,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 6,
+      "values": [
+        "90909090",
+        "9090"
+      ],
+      "rva": 5635118,
+      "rva_hex": "0x55fc2e",
+      "rva_va": "0x95fc2e",
+      "in_text": true,
+      "current_bytes": "0F 85 A4 02 00 00",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 39,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 7,
+      "values": [
+        "90909090",
+        "9090",
+        "90"
+      ],
+      "rva": 5630666,
+      "rva_hex": "0x55eaca",
+      "rva_va": "0x95eaca",
+      "in_text": true,
+      "current_bytes": "80 3D 4B 29 F4 00 00",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 40,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 6,
+      "values": [
+        "90909090",
+        "9090"
+      ],
+      "rva": 5630687,
+      "rva_hex": "0x55eadf",
+      "rva_va": "0x95eadf",
+      "in_text": true,
+      "current_bytes": "0F 84 84 00 00 00",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 41,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 13,
+      "values": [
+        "90909090",
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "rva": 5630851,
+      "rva_hex": "0x55eb83",
+      "rva_va": "0x95eb83",
+      "in_text": true,
+      "current_bytes": "80 3D 4B 29 F4 00 00 0F 84 72 02 00 00",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 42,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 7,
+      "values": [
+        "90909090",
+        "9090",
+        "90"
+      ],
+      "rva": 5608650,
+      "rva_hex": "0x5594ca",
+      "rva_va": "0x9594ca",
+      "in_text": true,
+      "current_bytes": "A0 16 B9 29 01 84 C0",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 43,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 7,
+      "values": [
+        "90909090",
+        "9090",
+        "90"
+      ],
+      "rva": 5608610,
+      "rva_hex": "0x5594a2",
+      "rva_va": "0x9594a2",
+      "in_text": true,
+      "current_bytes": "80 3D 48 29 F4 00 01",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 44,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "rva": 5608631,
+      "rva_hex": "0x5594b7",
+      "rva_va": "0x9594b7",
+      "in_text": true,
+      "current_bytes": "75 11",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 45,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 9,
+      "values": [
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "rva": 5610688,
+      "rva_hex": "0x559cc0",
+      "rva_va": "0x959cc0",
+      "in_text": true,
+      "current_bytes": "80 3D 48 29 F4 00 01 75 17",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 46,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 9,
+      "values": [
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "rva": 7799418,
+      "rva_hex": "0x77027a",
+      "rva_va": "0xb7027a",
+      "in_text": true,
+      "current_bytes": "80 3D 48 29 F4 00 01 75 1A",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 47,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 7,
+      "values": [
+        "90909090",
+        "9090",
+        "90"
+      ],
+      "rva": 5608849,
+      "rva_hex": "0x559591",
+      "rva_va": "0x959591",
+      "in_text": true,
+      "current_bytes": "80 3D 16 B9 29 01 00",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 48,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 1,
+      "values": [
+        "eb"
+      ],
+      "rva": 5608856,
+      "rva_hex": "0x559598",
+      "rva_va": "0x959598",
+      "in_text": true,
+      "current_bytes": "74",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 49,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 7,
+      "values": [
+        "90909090",
+        "9090",
+        "90"
+      ],
+      "rva": 6444374,
+      "rva_hex": "0x625556",
+      "rva_va": "0xa25556",
+      "in_text": true,
+      "current_bytes": "80 3D B2 D9 4F 01 00",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 50,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 1,
+      "values": [
+        "eb"
+      ],
+      "rva": 6444381,
+      "rva_hex": "0x62555d",
+      "rva_va": "0xa2555d",
+      "in_text": true,
+      "current_bytes": "75",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 51,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 38,
+      "values": [
+        "90909090",
+        "9090"
+      ],
+      "rva": 4039095,
+      "rva_hex": "0x3da1b7",
+      "rva_va": "0x7da1b7",
+      "in_text": true,
+      "current_bytes": "0F 84 A8 00 00 00 8B 07 8B 90 A0 00 00 00 8B CF FF D2 85 C0 74 1A 8B 07 8B 90 A0 00 00 00 8B CF FF D2 8B 10 8B C8",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          8
+        ]
+      ]
+    },
+    {
+      "index": 52,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 38,
+      "values": [
+        "90909090",
+        "9090"
+      ],
+      "rva": 4039479,
+      "rva_hex": "0x3da337",
+      "rva_va": "0x7da337",
+      "in_text": true,
+      "current_bytes": "10 C0 EB 03 80 E3 07 E8 9D EC 1F 00 8B 54 24 08 0F B6 CB 03 04 8D 38 E1 12 01 5B 89 02 C3 CC CC CC CC CC CC CC CC",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          8
+        ]
+      ]
+    },
+    {
+      "index": 53,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 38,
+      "values": [
+        "90909090",
+        "9090"
+      ],
+      "rva": 4639975,
+      "rva_hex": "0x46cce7",
+      "rva_va": "0x86cce7",
+      "in_text": true,
+      "current_bytes": "11 4C 24 04 8B 44 24 04 89 4C 24 1C F3 0F 11 4C 24 08 8B 4C 24 08 89 44 24 24 8D 14 24 52 8D 44 24 28 50 89 4C 24",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          5
+        ]
+      ]
+    },
+    {
+      "index": 54,
+      "handler": "10044bd0",
+      "kind": "rva",
+      "option": "RemoveUselessChecks",
+      "gate_build_1080": "includes_9",
+      "length": 38,
+      "values": [
+        "90909090",
+        "9090"
+      ],
+      "rva": 4640359,
+      "rva_hex": "0x46ce67",
+      "rva_va": "0x86ce67",
+      "in_text": true,
+      "current_bytes": "00 00 F3 0F 10 15 C8 D7 D6 00 F3 0F 5E D5 0F 28 DA 8D 44 24 08 52 F3 0F 59 D8 F3 0F 59 D1 50 F3 0F 11 1A F3 0F 11",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          5
+        ]
+      ]
+    },
+    {
+      "index": 55,
+      "handler": "10045430",
+      "kind": "signature",
+      "option": "ReversingLightFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "60"
+      ],
+      "signature": "11 01 00 00 8B 16 8B 42 64 8B CE FF D0 F3 0F 10",
+      "offset": 8,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x4f8840"
+      ],
+      "first_rva": "0x4f8840",
+      "first_va": "0x8f8840",
+      "site_rva": "0x4f8848",
+      "site_va": "0x8f8848",
+      "status": "present"
+    },
+    {
+      "index": 56,
+      "handler": "10045490",
+      "kind": "signature",
+      "option": "RemoveRGSCLoginRequirement",
+      "gate_build_1080": "includes_9",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53 8B 5C 24 4C 56 68 ? ? ? ? E8 ? ? ? ? 83 C4",
+      "offset": 0,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 57,
+      "handler": "10045490",
+      "kind": "signature",
+      "option": "RemoveRGSCLoginRequirement",
+      "gate_build_1080": "includes_9",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53 8B 5C 24 4C 56 68 ? ? ? ? E8 ? ? ? ? 83 C4",
+      "offset": 0,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 58,
+      "handler": "10045490",
+      "kind": "rva",
+      "option": "RemoveRGSCLoginRequirement",
+      "gate_build_1080": "includes_9",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "rva": 4818016,
+      "rva_hex": "0x498460",
+      "rva_va": "0x898460",
+      "in_text": true,
+      "current_bytes": "8B",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 59,
+      "handler": "10045610",
+      "kind": "signature",
+      "option": "SavegameFix",
+      "gate_build_1080": "no_gate",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "75 ? 83 C1 01 83 C0 01 83 F9 04",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x21edb5"
+      ],
+      "first_rva": "0x21edb5",
+      "first_va": "0x61edb5",
+      "site_rva": "0x21edb5",
+      "site_va": "0x61edb5",
+      "status": "present"
+    },
+    {
+      "index": 60,
+      "handler": "10045610",
+      "kind": "signature",
+      "option": "SavegameFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e8"
+      ],
+      "signature": "8D 4C 24 18 51 6A 00 6A 0C 57",
+      "offset": -47,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x21eba1"
+      ],
+      "first_rva": "0x21eba1",
+      "first_va": "0x61eba1",
+      "site_rva": "0x21eb72",
+      "site_va": "0x61eb72",
+      "status": "present"
+    },
+    {
+      "index": 61,
+      "handler": "10045610",
+      "kind": "signature",
+      "option": "SavegameFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e8"
+      ],
+      "signature": "8D 4C 24 18 51 6A 00 6A 0C 57",
+      "offset": -47,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x21eba1"
+      ],
+      "first_rva": "0x21eba1",
+      "first_va": "0x61eba1",
+      "site_rva": "0x21eb72",
+      "site_va": "0x61eb72",
+      "status": "present"
+    },
+    {
+      "index": 62,
+      "handler": "10045980",
+      "kind": "signature",
+      "option": "SCOSignatureFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "eb"
+      ],
+      "signature": "8B 6C 24 1C 66 89 6E 14 64 8B 0D 2C 00 00 00 8B",
+      "offset": -32,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x226dc0"
+      ],
+      "first_rva": "0x226dc0",
+      "first_va": "0x626dc0",
+      "site_rva": "0x226da0",
+      "site_va": "0x626da0",
+      "status": "present"
+    },
+    {
+      "index": 63,
+      "handler": "10045ad0",
+      "kind": "signature",
+      "option": "ImprovedShaderStreaming",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e8"
+      ],
+      "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+      "offset": 253,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x8b21f1"
+      ],
+      "first_rva": "0x8b21f1",
+      "first_va": "0xcb21f1",
+      "site_rva": "0x8b22ee",
+      "site_va": "0xcb22ee",
+      "status": "present"
+    },
+    {
+      "index": 64,
+      "handler": "10045ad0",
+      "kind": "signature",
+      "option": "ImprovedShaderStreaming",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+      "offset": 253,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x8b21f1"
+      ],
+      "first_rva": "0x8b21f1",
+      "first_va": "0xcb21f1",
+      "site_rva": "0x8b22ee",
+      "site_va": "0xcb22ee",
+      "status": "present"
+    },
+    {
+      "index": 65,
+      "handler": "10045ad0",
+      "kind": "signature",
+      "option": "ImprovedShaderStreaming",
+      "gate_build_1080": "no_gate",
+      "length": 4,
+      "values": [
+        "8e"
+      ],
+      "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+      "offset": 267,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x8b21f1"
+      ],
+      "first_rva": "0x8b21f1",
+      "first_va": "0xcb21f1",
+      "site_rva": "0x8b22fc",
+      "site_va": "0xcb22fc",
+      "status": "present"
+    },
+    {
+      "index": 66,
+      "handler": "10045ad0",
+      "kind": "signature",
+      "option": "ImprovedShaderStreaming",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e8"
+      ],
+      "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+      "offset": 253,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x8b21f1"
+      ],
+      "first_rva": "0x8b21f1",
+      "first_va": "0xcb21f1",
+      "site_rva": "0x8b22ee",
+      "site_va": "0xcb22ee",
+      "status": "present"
+    },
+    {
+      "index": 67,
+      "handler": "10045ad0",
+      "kind": "signature",
+      "option": "ImprovedShaderStreaming",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+      "offset": 253,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x8b21f1"
+      ],
+      "first_rva": "0x8b21f1",
+      "first_va": "0xcb21f1",
+      "site_rva": "0x8b22ee",
+      "site_va": "0xcb22ee",
+      "status": "present"
+    },
+    {
+      "index": 68,
+      "handler": "10045ad0",
+      "kind": "signature",
+      "option": "ImprovedShaderStreaming",
+      "gate_build_1080": "no_gate",
+      "length": 4,
+      "values": [
+        "377"
+      ],
+      "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+      "offset": 267,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x8b21f1"
+      ],
+      "first_rva": "0x8b21f1",
+      "first_va": "0xcb21f1",
+      "site_rva": "0x8b22fc",
+      "site_va": "0xcb22fc",
+      "status": "present"
+    },
+    {
+      "index": 69,
+      "handler": "10045c50",
+      "kind": "signature",
+      "option": "SkipIntro",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "89 91 ? ? ? ? 8D 44 24 ? 68 ? ? ? ? 50",
+      "offset": -6,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0xa347e"
+      ],
+      "first_rva": "0xa347e",
+      "first_va": "0x4a347e",
+      "site_rva": "0xa3478",
+      "site_va": "0x4a3478",
+      "status": "present"
+    },
+    {
+      "index": 70,
+      "handler": "10045ce0",
+      "kind": "signature",
+      "option": "SkipLauncher",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "eb"
+      ],
+      "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+      "offset": 223,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 71,
+      "handler": "10045ce0",
+      "kind": "signature",
+      "option": "SkipLauncher",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "eb"
+      ],
+      "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+      "offset": 223,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 72,
+      "handler": "10045ce0",
+      "kind": "signature",
+      "option": "SkipLauncher",
+      "gate_build_1080": "no_gate",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "74 EC 38 5E 06 74 E7 68",
+      "offset": 0,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 73,
+      "handler": "10045ce0",
+      "kind": "signature",
+      "option": "SkipLauncher",
+      "gate_build_1080": "no_gate",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "74 C4 8B 07 3B 46 18 75 BD 68",
+      "offset": 0,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 74,
+      "handler": "10045ce0",
+      "kind": "signature",
+      "option": "SkipLauncher",
+      "gate_build_1080": "no_gate",
+      "length": 6,
+      "values": [
+        "90909090",
+        "9090"
+      ],
+      "signature": "3B 56 18 0F 85",
+      "offset": 3,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 75,
+      "handler": "10045ce0",
+      "kind": "signature",
+      "option": "SkipLauncher",
+      "gate_build_1080": "no_gate",
+      "length": 6,
+      "values": [
+        "90909090",
+        "9090"
+      ],
+      "signature": "3B 4E 18 0F 85",
+      "offset": 3,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 76,
+      "handler": "10045ce0",
+      "kind": "signature",
+      "option": "SkipLauncher",
+      "gate_build_1080": "no_gate",
+      "length": 6,
+      "values": [
+        "90909090",
+        "9090"
+      ],
+      "signature": "0F 85 ? ? ? ? 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC C6",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x9017d"
+      ],
+      "first_rva": "0x9017d",
+      "first_va": "0x49017d",
+      "site_rva": "0x9017d",
+      "site_va": "0x49017d",
+      "status": "present"
+    },
+    {
+      "index": 77,
+      "handler": "10045ce0",
+      "kind": "signature",
+      "option": "SkipLauncher",
+      "gate_build_1080": "no_gate",
+      "length": 2,
+      "values": [
+        "c033"
+      ],
+      "signature": "8B 56 1C 3B 56 20 ? ? 6A 00 6A 00",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x8fe8d"
+      ],
+      "first_rva": "0x8fe8d",
+      "first_va": "0x48fe8d",
+      "site_rva": "0x8fe8d",
+      "site_va": "0x48fe8d",
+      "status": "present"
+    },
+    {
+      "index": 78,
+      "handler": "10046640",
+      "kind": "signature",
+      "option": "SkipMenu",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e8"
+      ],
+      "signature": "6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC E8 ? ? ? ? 8B E5 5D C3",
+      "offset": 23,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 79,
+      "handler": "10046640",
+      "kind": "signature",
+      "option": "SkipMenu",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e8"
+      ],
+      "signature": "6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC E8 ? ? ? ? 8B E5 5D C3",
+      "offset": 23,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 80,
+      "handler": "100467a0",
+      "kind": "signature",
+      "option": "SMPA60Fix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C",
+      "offset": -38,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x54d71"
+      ],
+      "first_rva": "0x54d71",
+      "first_va": "0x454d71",
+      "site_rva": "0x54d4b",
+      "site_va": "0x454d4b",
+      "status": "present"
+    },
+    {
+      "index": 81,
+      "handler": "100467a0",
+      "kind": "signature",
+      "option": "SMPA60Fix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "eb"
+      ],
+      "signature": "01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C",
+      "offset": -38,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x54d71"
+      ],
+      "first_rva": "0x54d71",
+      "first_va": "0x454d71",
+      "site_rva": "0x54d4b",
+      "site_va": "0x454d4b",
+      "status": "present"
+    },
+    {
+      "index": 82,
+      "handler": "100467a0",
+      "kind": "signature",
+      "option": "SMPA60Fix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "8B 48 70 83 C0 40 50 51 8D 51 10",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x66973d"
+      ],
+      "first_rva": "0x66973d",
+      "first_va": "0xa6973d",
+      "site_rva": "0x66973d",
+      "site_va": "0xa6973d",
+      "status": "present"
+    },
+    {
+      "index": 83,
+      "handler": "10046b30",
+      "kind": "signature",
+      "option": "TryToSkipAllErrors",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "c3"
+      ],
+      "signature": "81 EC 40 08 00 00 53 55 8B AC 24 4C 08 00 00",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x56680"
+      ],
+      "first_rva": "0x56680",
+      "first_va": "0x456680",
+      "site_rva": "0x56680",
+      "site_va": "0x456680",
+      "status": "present"
+    },
+    {
+      "index": 84,
+      "handler": "1004aae0",
+      "kind": "signature",
+      "option": "VRAMFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "8B 44 24 10 D9 2C 24 83 C4 1C C3",
+      "offset": 0,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 85,
+      "handler": "100504b0",
+      "kind": "signature",
+      "option": "WantedLevelCrashFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "8B 01 8B 90 28 01 00 00 FF D2 84 C0 0F 84 88 00 00 00",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x5b26c9"
+      ],
+      "first_rva": "0x5b26c9",
+      "first_va": "0x9b26c9",
+      "site_rva": "0x5b26c9",
+      "site_va": "0x9b26c9",
+      "status": "present"
+    },
+    {
+      "index": 86,
+      "handler": "100506b0",
+      "kind": "signature",
+      "option": "SpeedupBugFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "50 64 89 25 00 00 00 00 83 EC 34",
+      "offset": -21,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x571c5"
+      ],
+      "first_rva": "0x571c5",
+      "first_va": "0x4571c5",
+      "site_rva": "0x571b0",
+      "site_va": "0x4571b0",
+      "status": "present"
+    },
+    {
+      "index": 87,
+      "handler": "100508c0",
+      "kind": "signature",
+      "option": "PedModelsInCutscenesFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "56 8B F1 E8 ? ? ? ? 85 C0 74 0E 66 8B 40 2E",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x623820"
+      ],
+      "first_rva": "0x623820",
+      "first_va": "0xa23820",
+      "site_rva": "0x623820",
+      "site_va": "0xa23820",
+      "status": "present"
+    },
+    {
+      "index": 88,
+      "handler": "100513a0",
+      "kind": "signature",
+      "option": "LocalSettingsPath",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D7 5F C3",
+      "offset": -13,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 89,
+      "handler": "100513a0",
+      "kind": "signature",
+      "option": "LocalSettingsPath",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D7 5F C3",
+      "offset": -13,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 90,
+      "handler": "10051920",
+      "kind": "signature",
+      "option": "NewFilesCompatibility",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "68 64 28 C8 67 E8",
+      "offset": 28,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x70a954"
+      ],
+      "first_rva": "0x70a954",
+      "first_va": "0xb0a954",
+      "site_rva": "0x70a970",
+      "site_va": "0xb0a970",
+      "status": "present"
+    },
+    {
+      "index": 91,
+      "handler": "10051920",
+      "kind": "signature",
+      "option": "NewFilesCompatibility",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e8"
+      ],
+      "signature": "E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 7B FF FF FF",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x496149"
+      ],
+      "first_rva": "0x496149",
+      "first_va": "0x896149",
+      "site_rva": "0x496149",
+      "site_va": "0x896149",
+      "status": "present"
+    },
+    {
+      "index": 92,
+      "handler": "10051920",
+      "kind": "signature",
+      "option": "NewFilesCompatibility",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e8"
+      ],
+      "signature": "E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 6C FF FF FF",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x496228"
+      ],
+      "first_rva": "0x496228",
+      "first_va": "0x896228",
+      "site_rva": "0x496228",
+      "site_va": "0x896228",
+      "status": "present"
+    },
+    {
+      "index": 93,
+      "handler": "10052200",
+      "kind": "signature",
+      "option": "NewSavesCompatibility",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "89 84 24 E0 01 00 00 8B 45 08 53 33 DB",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x45b093"
+      ],
+      "first_rva": "0x45b093",
+      "first_va": "0x85b093",
+      "site_rva": "0x45b093",
+      "site_va": "0x85b093",
+      "status": "present"
+    },
+    {
+      "index": 94,
+      "handler": "100055c0",
+      "kind": "signature",
+      "option": "AimProjectileCrashFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "8B 44 24 08 89 41 20 8B 44 24 0C 89 41 24 F7 D8",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x632620"
+      ],
+      "first_rva": "0x632620",
+      "first_va": "0xa32620",
+      "site_rva": "0x632620",
+      "site_va": "0xa32620",
+      "status": "present"
+    },
+    {
+      "index": 95,
+      "handler": "10005800",
+      "kind": "signature",
+      "option": "BetterMPSync",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e8"
+      ],
+      "signature": "8B 90 E8 00 00 00 55 8B CE FF",
+      "offset": 6,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x2d9356"
+      ],
+      "first_rva": "0x2d9356",
+      "first_va": "0x6d9356",
+      "site_rva": "0x2d935c",
+      "site_va": "0x6d935c",
+      "status": "present"
+    },
+    {
+      "index": 96,
+      "handler": "10005b20",
+      "kind": "signature",
+      "option": "BuildingDynamicShadows",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "8B 47 28 C1 E8 06 83 E0 0F 83 C0",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x558955"
+      ],
+      "first_rva": "0x558955",
+      "first_va": "0x958955",
+      "site_rva": "0x558955",
+      "site_va": "0x958955",
+      "status": "present"
+    },
+    {
+      "index": 97,
+      "handler": "10005ca0",
+      "kind": "signature",
+      "option": "BuildingAlphaFix",
+      "gate_build_1080": "no_gate",
+      "length": 13,
+      "values": [
+        "90909090",
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "signature": "F7 46 24 00 00 00 40 0F 85",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x559cd3"
+      ],
+      "first_rva": "0x559cd3",
+      "first_va": "0x959cd3",
+      "site_rva": "0x559cd3",
+      "site_va": "0x959cd3",
+      "status": "present"
+    },
+    {
+      "index": 98,
+      "handler": "10005ca0",
+      "kind": "signature",
+      "option": "BuildingAlphaFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "F7 46 24 00 00 00 40 0F 84",
+      "offset": 7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x5594bd"
+      ],
+      "first_rva": "0x5594bd",
+      "first_va": "0x9594bd",
+      "site_rva": "0x5594c4",
+      "site_va": "0x9594c4",
+      "status": "present"
+    },
+    {
+      "index": 99,
+      "handler": "10005e30",
+      "kind": "signature",
+      "option": "CollisionDeadlockFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "55 8B EC 83 E4 F8 51 8B 45 0C 0F B7 48 66",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0xe6250"
+      ],
+      "first_rva": "0xe6250",
+      "first_va": "0x4e6250",
+      "site_rva": "0xe6250",
+      "site_va": "0x4e6250",
+      "status": "present"
+    },
+    {
+      "index": 100,
+      "handler": "10005ee0",
+      "kind": "signature",
+      "option": "CombinedRadioFreezeFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e8"
+      ],
+      "signature": "E8 ? ? ? ? 8B 35 ? ? ? ? 3B F0",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x495f59"
+      ],
+      "first_rva": "0x495f59",
+      "first_va": "0x895f59",
+      "site_rva": "0x495f59",
+      "site_va": "0x895f59",
+      "status": "present"
+    },
+    {
+      "index": 101,
+      "handler": "10006350",
+      "kind": "signature",
+      "option": "CopSirensFlag",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "E8 ? ? ? ? C0 E0 ? 32 86 6F 0F 00",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x4febd3"
+      ],
+      "first_rva": "0x4febd3",
+      "first_va": "0x8febd3",
+      "site_rva": "0x4febd3",
+      "site_va": "0x8febd3",
+      "status": "present"
+    },
+    {
+      "index": 102,
+      "handler": "10006350",
+      "kind": "signature",
+      "option": "CopSirensFlag",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "0F BF 41 2E 39 05",
+      "offset": 22,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x4fabd0"
+      ],
+      "first_rva": "0x4fabd0",
+      "first_va": "0x8fabd0",
+      "site_rva": "0x4fabe6",
+      "site_va": "0x8fabe6",
+      "status": "present"
+    },
+    {
+      "index": 103,
+      "handler": "10006770",
+      "kind": "signature",
+      "option": "DualVehicleHeadlights",
+      "gate_build_1080": "excludes_9",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "8B 17 8B 42 64 8B CF FF D0 8B 54",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x4f7ce5"
+      ],
+      "first_rva": "0x4f7ce5",
+      "first_va": "0x8f7ce5",
+      "site_rva": "0x4f7ce5",
+      "site_va": "0x8f7ce5",
+      "status": "present"
+    },
+    {
+      "index": 104,
+      "handler": "1001afa0",
+      "kind": "signature",
+      "option": "EmissiveLerpFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "F3 0F 58 C1 F3 0F 2A C8 F3 0F 58 C1",
+      "offset": -24,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x3f8bb9"
+      ],
+      "first_rva": "0x3f8bb9",
+      "first_va": "0x7f8bb9",
+      "site_rva": "0x3f8ba1",
+      "site_va": "0x7f8ba1",
+      "status": "present"
+    },
+    {
+      "index": 105,
+      "handler": "1001b0e0",
+      "kind": "signature",
+      "option": "EpisodeSwitchFreezeFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x5ec46"
+      ],
+      "first_rva": "0x5ec46",
+      "first_va": "0x45ec46",
+      "site_rva": "0x5ec46",
+      "site_va": "0x45ec46",
+      "status": "present"
+    },
+    {
+      "index": 106,
+      "handler": "1001b0e0",
+      "kind": "signature",
+      "option": "EpisodeSwitchFreezeFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "8B 4B 10 3B 4B 14 7D 0F",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x605f6"
+      ],
+      "first_rva": "0x605f6",
+      "first_va": "0x4605f6",
+      "site_rva": "0x605f6",
+      "site_va": "0x4605f6",
+      "status": "present"
+    },
+    {
+      "index": 107,
+      "handler": "1001b0e0",
+      "kind": "signature",
+      "option": "EpisodeSwitchFreezeFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "8B 41 10 03 41 0C C3",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x604c0"
+      ],
+      "first_rva": "0x604c0",
+      "first_va": "0x4604c0",
+      "site_rva": "0x604c0",
+      "site_va": "0x4604c0",
+      "status": "present"
+    },
+    {
+      "index": 108,
+      "handler": "1001b0e0",
+      "kind": "signature",
+      "option": "EpisodeSwitchFreezeFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "8B C1 8B 08 8B 11 8B 40 04 8B 52 30 50 FF D2 C3",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x60510"
+      ],
+      "first_rva": "0x60510",
+      "first_va": "0x460510",
+      "site_rva": "0x60510",
+      "site_va": "0x460510",
+      "status": "present"
+    },
+    {
+      "index": 109,
+      "handler": "1001b0e0",
+      "kind": "signature",
+      "option": "EpisodeSwitchFreezeFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "56 8B F1 83 7E 14 00 75 0B 83 7E 10 00 74 05",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x604d0"
+      ],
+      "first_rva": "0x604d0",
+      "first_va": "0x4604d0",
+      "site_rva": "0x604d0",
+      "site_va": "0x4604d0",
+      "status": "present"
+    },
+    {
+      "index": 110,
+      "handler": "1001b310",
+      "kind": "signature",
+      "option": "TBoGTHeliHeightLimit",
+      "gate_build_1080": "no_gate",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "83 3D ? ? ? ? 02 7C 0A F3 0F",
+      "offset": 7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x4f0071"
+      ],
+      "first_rva": "0x4f0071",
+      "first_va": "0x8f0071",
+      "site_rva": "0x4f0078",
+      "site_va": "0x8f0078",
+      "status": "present"
+    },
+    {
+      "index": 111,
+      "handler": "1001b380",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 13,
+      "values": [
+        "90909090",
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "signature": "83 3D ? ? ? ? 02 0F 8C D5 00",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x5d25d5"
+      ],
+      "first_rva": "0x5d25d5",
+      "first_va": "0x9d25d5",
+      "site_rva": "0x5d25d5",
+      "site_va": "0x9d25d5",
+      "status": "present"
+    },
+    {
+      "index": 112,
+      "handler": "1001b380",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "83 3D ? ? ? ? 02 7C 32 8B 41",
+      "offset": 7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0xa9d3a"
+      ],
+      "first_rva": "0xa9d3a",
+      "first_va": "0x4a9d3a",
+      "site_rva": "0xa9d41",
+      "site_va": "0x4a9d41",
+      "status": "present"
+    },
+    {
+      "index": 113,
+      "handler": "1001b380",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "75 5B 83 3D ? ? ? ? 00 75",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0xab7c7"
+      ],
+      "first_rva": "0xab7c7",
+      "first_va": "0x4ab7c7",
+      "site_rva": "0xab7c7",
+      "site_va": "0x4ab7c7",
+      "status": "present"
+    },
+    {
+      "index": 114,
+      "handler": "1001b380",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "83 3D ? ? ? ? 02 7C 7D 8B 4C 24 0C",
+      "offset": 7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x597768"
+      ],
+      "first_rva": "0x597768",
+      "first_va": "0x997768",
+      "site_rva": "0x59776f",
+      "site_va": "0x99776f",
+      "status": "present"
+    },
+    {
+      "index": 115,
+      "handler": "1001b380",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "83 3D ? ? ? ? 02 75 50",
+      "offset": 7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x661409"
+      ],
+      "first_rva": "0x661409",
+      "first_va": "0xa61409",
+      "site_rva": "0x661410",
+      "site_va": "0xa61410",
+      "status": "present"
+    },
+    {
+      "index": 116,
+      "handler": "1001b380",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 6,
+      "values": [
+        "90909090",
+        "9090"
+      ],
+      "signature": "83 3D ? ? ? ? 02 0F 85 8C 01 00 00",
+      "offset": 7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x6ae8e2"
+      ],
+      "first_rva": "0x6ae8e2",
+      "first_va": "0xaae8e2",
+      "site_rva": "0x6ae8e9",
+      "site_va": "0xaae8e9",
+      "status": "present"
+    },
+    {
+      "index": 117,
+      "handler": "1001b380",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "83 3D ? ? ? ? 02 75 20 8B CD E8",
+      "offset": 7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0xa6f1e"
+      ],
+      "first_rva": "0xa6f1e",
+      "first_va": "0x4a6f1e",
+      "site_rva": "0xa6f25",
+      "site_va": "0x4a6f25",
+      "status": "present"
+    },
+    {
+      "index": 118,
+      "handler": "1001b380",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "83 3D ? ? ? ? 02 7C 21 8B 44 24 0C",
+      "offset": 7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x5900a6"
+      ],
+      "first_rva": "0x5900a6",
+      "first_va": "0x9900a6",
+      "site_rva": "0x5900ad",
+      "site_va": "0x9900ad",
+      "status": "present"
+    },
+    {
+      "index": 119,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 13,
+      "values": [
+        "90909090",
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x6530fd"
+      ],
+      "first_rva": "0x6530fd",
+      "first_va": "0xa530fd",
+      "site_rva": "0x6530fd",
+      "site_va": "0xa530fd",
+      "status": "present"
+    },
+    {
+      "index": 120,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 9,
+      "values": [
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "signature": "83 3D ? ? ? ? 02 7C 35 0F BF 43 2E",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x4fc61f"
+      ],
+      "first_rva": "0x4fc61f",
+      "first_va": "0x8fc61f",
+      "site_rva": "0x4fc61f",
+      "site_va": "0x8fc61f",
+      "status": "present"
+    },
+    {
+      "index": 121,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 7,
+      "values": [
+        "90909090",
+        "9090",
+        "90"
+      ],
+      "signature": "83 3D ? ? ? ? 02 8A 0D",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0xa86ee"
+      ],
+      "first_rva": "0xa86ee",
+      "first_va": "0x4a86ee",
+      "site_rva": "0xa86ee",
+      "site_va": "0x4a86ee",
+      "status": "present"
+    },
+    {
+      "index": 122,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 9,
+      "values": [
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "signature": "83 3D ? ? ? ? 02 75 21 8B 96 20 08 00 00",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x435771"
+      ],
+      "first_rva": "0x435771",
+      "first_va": "0x835771",
+      "site_rva": "0x435771",
+      "site_va": "0x835771",
+      "status": "present"
+    },
+    {
+      "index": 123,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 13,
+      "values": [
+        "90909090",
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "signature": "83 3D ? ? ? ? 02 7C 4A 0F BF 46 2E",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x31c81a"
+      ],
+      "first_rva": "0x31c81a",
+      "first_va": "0x71c81a",
+      "site_rva": "0x31c81a",
+      "site_va": "0x71c81a",
+      "status": "present"
+    },
+    {
+      "index": 124,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 8,
+      "values": [
+        "90909090",
+        "90909090"
+      ],
+      "signature": "83 3D ? ? ? ? 02 7C 4A 0F BF 46 2E",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x31c81a"
+      ],
+      "first_rva": "0x31c81a",
+      "first_va": "0x71c81a",
+      "site_rva": "0x31c81a",
+      "site_va": "0x71c81a",
+      "status": "present"
+    },
+    {
+      "index": 125,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 8,
+      "values": [
+        "90909090",
+        "90909090"
+      ],
+      "signature": "83 3D ? ? ? ? 02 7C 4A 0F BF 46 2E",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x31c81a"
+      ],
+      "first_rva": "0x31c81a",
+      "first_va": "0x71c81a",
+      "site_rva": "0x31c81a",
+      "site_va": "0x71c81a",
+      "status": "present"
+    },
+    {
+      "index": 126,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 9,
+      "values": [
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "signature": "83 3D ? ? ? ? 02 75 08 3B 05",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x565823"
+      ],
+      "first_rva": "0x565823",
+      "first_va": "0x965823",
+      "site_rva": "0x565823",
+      "site_va": "0x965823",
+      "status": "present"
+    },
+    {
+      "index": 127,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 9,
+      "values": [
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "signature": "83 3D ? ? ? ? 02 75 1F 8B 44 24 04",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x565d30"
+      ],
+      "first_rva": "0x565d30",
+      "first_va": "0x965d30",
+      "site_rva": "0x565d30",
+      "site_va": "0x965d30",
+      "status": "present"
+    },
+    {
+      "index": 128,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 9,
+      "values": [
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "signature": "83 3D ? ? ? ? 02 75 38 8B 16",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x589974"
+      ],
+      "first_rva": "0x589974",
+      "first_va": "0x989974",
+      "site_rva": "0x589974",
+      "site_va": "0x989974",
+      "status": "present"
+    },
+    {
+      "index": 129,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 9,
+      "values": [
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "signature": "83 3D ? ? ? ? 02 75 24 F6 87 6C 02 00 00 04",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x58ac20"
+      ],
+      "first_rva": "0x58ac20",
+      "first_va": "0x98ac20",
+      "site_rva": "0x58ac20",
+      "site_va": "0x98ac20",
+      "status": "present"
+    },
+    {
+      "index": 130,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 9,
+      "values": [
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "signature": "74 17 83 3D ? ? ? ? 02 75 0E F3 0F 10 05",
+      "offset": 2,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x58c7de"
+      ],
+      "first_rva": "0x58c7de",
+      "first_va": "0x98c7de",
+      "site_rva": "0x58c7e0",
+      "site_va": "0x98c7e0",
+      "status": "present"
+    },
+    {
+      "index": 131,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 7,
+      "values": [
+        "90909090",
+        "9090",
+        "90"
+      ],
+      "signature": "8B 56 04 8B 4A 0C 89 4C 24 1C 7C 18",
+      "offset": -15,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x5f21b8"
+      ],
+      "first_rva": "0x5f21b8",
+      "first_va": "0x9f21b8",
+      "site_rva": "0x5f21a9",
+      "site_va": "0x9f21a9",
+      "status": "present"
+    },
+    {
+      "index": 132,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 9,
+      "values": [
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "signature": "83 3D ? ? ? ? 02 75 35 0F BF 46 2E",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x67a951"
+      ],
+      "first_rva": "0x67a951",
+      "first_va": "0xa7a951",
+      "site_rva": "0x67a951",
+      "site_va": "0xa7a951",
+      "status": "present"
+    },
+    {
+      "index": 133,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 9,
+      "values": [
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "signature": "83 3D ? ? ? ? 02 7C 26 8B 85 40 0B 00 00",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x6a704d"
+      ],
+      "first_rva": "0x6a704d",
+      "first_va": "0xaa704d",
+      "site_rva": "0x6a704d",
+      "site_va": "0xaa704d",
+      "status": "present"
+    },
+    {
+      "index": 134,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 9,
+      "values": [
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "signature": "83 3D ? ? ? ? 02 7C 26 8B 85 40 0B 00 00",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x6a704d"
+      ],
+      "first_rva": "0x6a704d",
+      "first_va": "0xaa704d",
+      "site_rva": "0x6a704d",
+      "site_va": "0xaa704d",
+      "status": "present"
+    },
+    {
+      "index": 135,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 9,
+      "values": [
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "signature": "83 3D ? ? ? ? 02 7C 26 8B 85 40 0B 00 00",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x6a704d"
+      ],
+      "first_rva": "0x6a704d",
+      "first_va": "0xaa704d",
+      "site_rva": "0x6a704d",
+      "site_va": "0xaa704d",
+      "status": "present"
+    },
+    {
+      "index": 136,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 9,
+      "values": [
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "signature": "83 3D ? ? ? ? 02 75 17 F3 0F 10 44 24 0C",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x720f3c"
+      ],
+      "first_rva": "0x720f3c",
+      "first_va": "0xb20f3c",
+      "site_rva": "0x720f3c",
+      "site_va": "0xb20f3c",
+      "status": "present"
+    },
+    {
+      "index": 137,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "83 3D ? ? ? ? 02 F3 0F 10 05 ? ? ? ? F3 0F 11 44 24 20 75 4C",
+      "offset": 21,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x403035"
+      ],
+      "first_rva": "0x403035",
+      "first_va": "0x803035",
+      "site_rva": "0x40304a",
+      "site_va": "0x80304a",
+      "status": "present"
+    },
+    {
+      "index": 138,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "7C 22 83 F8 28 75 1D",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x401039"
+      ],
+      "first_rva": "0x401039",
+      "first_va": "0x801039",
+      "site_rva": "0x401039",
+      "site_va": "0x801039",
+      "status": "present"
+    },
+    {
+      "index": 139,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 6,
+      "values": [
+        "90909090",
+        "9090"
+      ],
+      "signature": "83 3D ? ? ? ? 02 89 44 24 38",
+      "offset": 11,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x401273"
+      ],
+      "first_rva": "0x401273",
+      "first_va": "0x801273",
+      "site_rva": "0x40127e",
+      "site_va": "0x80127e",
+      "status": "present"
+    },
+    {
+      "index": 140,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "83 3D ? ? ? ? 02 7C 43",
+      "offset": 7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x450f03"
+      ],
+      "first_rva": "0x450f03",
+      "first_va": "0x850f03",
+      "site_rva": "0x450f0a",
+      "site_va": "0x850f0a",
+      "status": "present"
+    },
+    {
+      "index": 141,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "83 3D ? ? ? ? 02 7C 1F 8B",
+      "offset": 7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x5d223e"
+      ],
+      "first_rva": "0x5d223e",
+      "first_va": "0x9d223e",
+      "site_rva": "0x5d2245",
+      "site_va": "0x9d2245",
+      "status": "present"
+    },
+    {
+      "index": 142,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "83 3D ? ? ? ? 02 7C 11 8B 4E",
+      "offset": 7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x5d22e9"
+      ],
+      "first_rva": "0x5d22e9",
+      "first_va": "0x9d22e9",
+      "site_rva": "0x5d22f0",
+      "site_va": "0x9d22f0",
+      "status": "present"
+    },
+    {
+      "index": 143,
+      "handler": "1001b580",
+      "kind": "signature",
+      "option": "EpisodicVehicleSupport",
+      "gate_build_1080": "includes_9",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "39 35 ? ? ? ? 75 0E 80 3D",
+      "offset": 6,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x949b09"
+      ],
+      "first_rva": "0x949b09",
+      "first_va": "0xd49b09",
+      "site_rva": "0x949b0f",
+      "site_va": "0xd49b0f",
+      "status": "present"
+    },
+    {
+      "index": 144,
+      "handler": "1001bd60",
+      "kind": "signature",
+      "option": "BikePhoneAnimsFix",
+      "gate_build_1080": "no_gate",
+      "length": 6,
+      "values": [
+        "90909090",
+        "9090"
+      ],
+      "signature": "80 BE 18 02 00 00 00 0F 85 36 01 00 00 80 BE",
+      "offset": 33,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x767f01"
+      ],
+      "first_rva": "0x767f01",
+      "first_va": "0xb67f01",
+      "site_rva": "0x767f22",
+      "site_va": "0xb67f22",
+      "status": "present"
+    },
+    {
+      "index": 145,
+      "handler": "1001bdd0",
+      "kind": "signature",
+      "option": "BikeFeetFix",
+      "gate_build_1080": "no_gate",
+      "length": 12,
+      "values": [
+        "90909090",
+        "90909090",
+        "90909090"
+      ],
+      "signature": "39 82 54 13 00 00 0F 85 94 04 00 00",
+      "offset": 12,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x7cb919"
+      ],
+      "first_rva": "0x7cb919",
+      "first_va": "0xbcb919",
+      "site_rva": "0x7cb925",
+      "site_va": "0xbcb925",
+      "status": "present"
+    },
+    {
+      "index": 146,
+      "handler": "1001be40",
+      "kind": "signature",
+      "option": "PipeBombDropIconSupport",
+      "gate_build_1080": "no_gate",
+      "length": 9,
+      "values": [
+        "90909090",
+        "90909090",
+        "90"
+      ],
+      "signature": "83 7D 18 1C 75 14",
+      "offset": -9,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0xa6f50"
+      ],
+      "first_rva": "0xa6f50",
+      "first_va": "0x4a6f50",
+      "site_rva": "0xa6f47",
+      "site_va": "0x4a6f47",
+      "status": "present"
+    },
+    {
+      "index": 147,
+      "handler": "1001bec0",
+      "kind": "signature",
+      "option": "PoliceEpisodicWeaponSupport",
+      "gate_build_1080": "no_gate",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "39 2D ? ? ? ? 75 3E",
+      "offset": 6,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x9f18c"
+      ],
+      "first_rva": "0x9f18c",
+      "first_va": "0x49f18c",
+      "site_rva": "0x9f192",
+      "site_va": "0x49f192",
+      "status": "present"
+    },
+    {
+      "index": 148,
+      "handler": "1001ee50",
+      "kind": "signature",
+      "option": "ForceDynamicShadowsEverywhere",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "90"
+      ],
+      "signature": "F7 46 4C 00 80 00 00 74",
+      "offset": 8,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x6700ca"
+      ],
+      "first_rva": "0x6700ca",
+      "first_va": "0xa700ca",
+      "site_rva": "0x6700d2",
+      "site_va": "0xa700d2",
+      "status": "present"
+    },
+    {
+      "index": 149,
+      "handler": "1001ee50",
+      "kind": "signature",
+      "option": "ForceDynamicShadowsEverywhere",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "90"
+      ],
+      "signature": "F7 46 4C 00 80 00 00 74",
+      "offset": 8,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x6700ca"
+      ],
+      "first_rva": "0x6700ca",
+      "first_va": "0xa700ca",
+      "site_rva": "0x6700d2",
+      "site_va": "0xa700d2",
+      "status": "present"
+    },
+    {
+      "index": 150,
+      "handler": "1001eed0",
+      "kind": "signature",
+      "option": "ForceShadowsOnObjects",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "eb"
+      ],
+      "signature": "F7 47 40 00 10 00 00 74 07 81 4E 24 00 00",
+      "offset": 7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x505e12"
+      ],
+      "first_rva": "0x505e12",
+      "first_va": "0x905e12",
+      "site_rva": "0x505e19",
+      "site_va": "0x905e19",
+      "status": "present"
+    },
+    {
+      "index": 151,
+      "handler": "1001efa0",
+      "kind": "signature",
+      "option": "HighFPSBikePhysicsFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "D9 45 08 51 8B CE D9 1C 24 E8 ? ? ? ? 8A 86 90 14 00 00",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x79c05b"
+      ],
+      "first_rva": "0x79c05b",
+      "first_va": "0xb9c05b",
+      "site_rva": "0x79c05b",
+      "site_va": "0xb9c05b",
+      "status": "present"
+    },
+    {
+      "index": 152,
+      "handler": "10022cf0",
+      "kind": "signature",
+      "option": "AllowHashesForIDE",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "signature": "8B 4C 24 08 56 8B 74 24 08 80 3E 22",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x5cf50"
+      ],
+      "first_rva": "0x5cf50",
+      "first_va": "0x45cf50",
+      "site_rva": "0x5cf50",
+      "site_va": "0x45cf50",
+      "status": "present"
+    },
+    {
+      "index": 153,
+      "handler": "10022d80",
+      "kind": "signature",
+      "option": "InfiniteCarBottomDistance",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "eb"
+      ],
+      "signature": "0F 2F D0 76 25 0F 28 C2",
+      "offset": 4,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x4fb180"
+      ],
+      "first_rva": "0x4fb180",
+      "first_va": "0x8fb180",
+      "site_rva": "0x4fb184",
+      "site_va": "0x8fb184",
+      "status": "present"
+    },
+    {
+      "index": 154,
+      "handler": "10022d80",
+      "kind": "signature",
+      "option": "InfiniteCarBottomDistance",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "2a"
+      ],
+      "signature": "0F 2F D0 76 25 0F 28 C2",
+      "offset": 4,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x4fb180"
+      ],
+      "first_rva": "0x4fb180",
+      "first_va": "0x8fb180",
+      "site_rva": "0x4fb184",
+      "site_va": "0x8fb184",
+      "status": "present"
+    },
+    {
+      "index": 155,
+      "handler": "100234e0",
+      "kind": "rva",
+      "option": "LoadDLCs",
+      "gate_build_1080": "includes_9",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "rva": 4277518,
+      "rva_hex": "0x41450e",
+      "rva_va": "0x81450e",
+      "in_text": true,
+      "current_bytes": "C4",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          7
+        ]
+      ]
+    },
+    {
+      "index": 156,
+      "handler": "100234e0",
+      "kind": "rva",
+      "option": "LoadDLCs",
+      "gate_build_1080": "includes_9",
+      "length": 1,
+      "values": [
+        "e8"
+      ],
+      "rva": 4277562,
+      "rva_hex": "0x41453a",
+      "rva_va": "0x81453a",
+      "in_text": true,
+      "current_bytes": "24",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          7
+        ]
+      ]
+    },
+    {
+      "index": 157,
+      "handler": "100234e0",
+      "kind": "rva",
+      "option": "LoadDLCs",
+      "gate_build_1080": "includes_9",
+      "length": 12,
+      "values": [
+        "90909090",
+        "90909090",
+        "90909090"
+      ],
+      "rva": 4277567,
+      "rva_hex": "0x41453f",
+      "rva_va": "0x81453f",
+      "in_text": true,
+      "current_bytes": "94 24 80 00 00 00 F3 0F 11 9C 24 84",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          7
+        ]
+      ]
+    },
+    {
+      "index": 158,
+      "handler": "100234e0",
+      "kind": "rva",
+      "option": "LoadDLCs",
+      "gate_build_1080": "includes_9",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "rva": 4277340,
+      "rva_hex": "0x41445c",
+      "rva_va": "0x81445c",
+      "in_text": true,
+      "current_bytes": "8B",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          7
+        ]
+      ]
+    },
+    {
+      "index": 159,
+      "handler": "100234e0",
+      "kind": "rva",
+      "option": "LoadDLCs",
+      "gate_build_1080": "includes_9",
+      "length": 1,
+      "values": [
+        "e8"
+      ],
+      "rva": 4274125,
+      "rva_hex": "0x4137cd",
+      "rva_va": "0x8137cd",
+      "in_text": true,
+      "current_bytes": "0F",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          7
+        ]
+      ]
+    },
+    {
+      "index": 160,
+      "handler": "100234e0",
+      "kind": "rva",
+      "option": "LoadDLCs",
+      "gate_build_1080": "includes_9",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "rva": 4277460,
+      "rva_hex": "0x4144d4",
+      "rva_va": "0x8144d4",
+      "in_text": true,
+      "current_bytes": "E5",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          7
+        ]
+      ]
+    },
+    {
+      "index": 161,
+      "handler": "100234e0",
+      "kind": "rva",
+      "option": "LoadDLCs",
+      "gate_build_1080": "includes_9",
+      "length": 1,
+      "values": [
+        "e8"
+      ],
+      "rva": 4276954,
+      "rva_hex": "0x4142da",
+      "rva_va": "0x8142da",
+      "in_text": true,
+      "current_bytes": "58",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          8
+        ]
+      ]
+    },
+    {
+      "index": 162,
+      "handler": "100234e0",
+      "kind": "rva",
+      "option": "LoadDLCs",
+      "gate_build_1080": "includes_9",
+      "length": 12,
+      "values": [
+        "90909090",
+        "90909090",
+        "90909090"
+      ],
+      "rva": 4276959,
+      "rva_hex": "0x4142df",
+      "rva_va": "0x8142df",
+      "in_text": true,
+      "current_bytes": "FD F3 0F 51 E7 F3 0F 11 24 8E 8D 8C",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          8
+        ]
+      ]
+    },
+    {
+      "index": 163,
+      "handler": "100234e0",
+      "kind": "rva",
+      "option": "LoadDLCs",
+      "gate_build_1080": "includes_9",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "rva": 4276732,
+      "rva_hex": "0x4141fc",
+      "rva_va": "0x8141fc",
+      "in_text": true,
+      "current_bytes": "8C",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          8
+        ]
+      ]
+    },
+    {
+      "index": 164,
+      "handler": "100234e0",
+      "kind": "rva",
+      "option": "LoadDLCs",
+      "gate_build_1080": "includes_9",
+      "length": 1,
+      "values": [
+        "e8"
+      ],
+      "rva": 4273517,
+      "rva_hex": "0x41356d",
+      "rva_va": "0x81356d",
+      "in_text": true,
+      "current_bytes": "0F",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          8
+        ]
+      ]
+    },
+    {
+      "index": 165,
+      "handler": "100234e0",
+      "kind": "rva",
+      "option": "LoadDLCs",
+      "gate_build_1080": "includes_9",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "rva": 4276852,
+      "rva_hex": "0x414274",
+      "rva_va": "0x814274",
+      "in_text": true,
+      "current_bytes": "06",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          8
+        ]
+      ]
+    },
+    {
+      "index": 166,
+      "handler": "100234e0",
+      "kind": "rva",
+      "option": "LoadDLCs",
+      "gate_build_1080": "includes_9",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "rva": 4785166,
+      "rva_hex": "0x49040e",
+      "rva_va": "0x89040e",
+      "in_text": true,
+      "current_bytes": "80",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 167,
+      "handler": "100234e0",
+      "kind": "rva",
+      "option": "LoadDLCs",
+      "gate_build_1080": "includes_9",
+      "length": 1,
+      "values": [
+        "e8"
+      ],
+      "rva": 4785210,
+      "rva_hex": "0x49043a",
+      "rva_va": "0x89043a",
+      "in_text": true,
+      "current_bytes": "E8",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 168,
+      "handler": "100234e0",
+      "kind": "rva",
+      "option": "LoadDLCs",
+      "gate_build_1080": "includes_9",
+      "length": 12,
+      "values": [
+        "90909090",
+        "90909090",
+        "90909090"
+      ],
+      "rva": 4785215,
+      "rva_hex": "0x49043f",
+      "rva_va": "0x89043f",
+      "in_text": true,
+      "current_bytes": "8B CE E8 CA FA FF FF E8 F5 9B 25 00",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 169,
+      "handler": "100234e0",
+      "kind": "rva",
+      "option": "LoadDLCs",
+      "gate_build_1080": "includes_9",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "rva": 4784988,
+      "rva_hex": "0x49035c",
+      "rva_va": "0x89035c",
+      "in_text": true,
+      "current_bytes": "E8",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 170,
+      "handler": "100234e0",
+      "kind": "rva",
+      "option": "LoadDLCs",
+      "gate_build_1080": "includes_9",
+      "length": 1,
+      "values": [
+        "e8"
+      ],
+      "rva": 4781400,
+      "rva_hex": "0x48f558",
+      "rva_va": "0x88f558",
+      "in_text": true,
+      "current_bytes": "E8",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 171,
+      "handler": "100234e0",
+      "kind": "rva",
+      "option": "LoadDLCs",
+      "gate_build_1080": "includes_9",
+      "length": 1,
+      "values": [
+        "e9"
+      ],
+      "rva": 4785108,
+      "rva_hex": "0x4903d4",
+      "rva_va": "0x8903d4",
+      "in_text": true,
+      "current_bytes": "B8",
+      "status": "rva_address",
+      "gate_applicable_to_1080": true,
+      "build_branch": [
+        [
+          "==",
+          9
+        ]
+      ]
+    },
+    {
+      "index": 172,
+      "handler": "10023b30",
+      "kind": "signature",
+      "option": "HighFPSSpeedupFix",
+      "gate_build_1080": "no_gate",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+      "offset": -7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x3cbfe9"
+      ],
+      "first_rva": "0x3cbfe9",
+      "first_va": "0x7cbfe9",
+      "site_rva": "0x3cbfe2",
+      "site_va": "0x7cbfe2",
+      "status": "present"
+    },
+    {
+      "index": 173,
+      "handler": "10023b30",
+      "kind": "signature",
+      "option": "HighFPSSpeedupFix",
+      "gate_build_1080": "no_gate",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+      "offset": -7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x3cbfe9"
+      ],
+      "first_rva": "0x3cbfe9",
+      "first_va": "0x7cbfe9",
+      "site_rva": "0x3cbfe2",
+      "site_va": "0x7cbfe2",
+      "status": "present"
+    },
+    {
+      "index": 174,
+      "handler": "10023b30",
+      "kind": "signature",
+      "option": "HighFPSSpeedupFix",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "eb"
+      ],
+      "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+      "offset": 224,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x3cbfe9"
+      ],
+      "first_rva": "0x3cbfe9",
+      "first_va": "0x7cbfe9",
+      "site_rva": "0x3cc0c9",
+      "site_va": "0x7cc0c9",
+      "status": "present"
+    },
+    {
+      "index": 175,
+      "handler": "10023b30",
+      "kind": "signature",
+      "option": "HighFPSSpeedupFix",
+      "gate_build_1080": "no_gate",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+      "offset": -7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x3cbfe9"
+      ],
+      "first_rva": "0x3cbfe9",
+      "first_va": "0x7cbfe9",
+      "site_rva": "0x3cbfe2",
+      "site_va": "0x7cbfe2",
+      "status": "present"
+    },
+    {
+      "index": 176,
+      "handler": "10023b30",
+      "kind": "signature",
+      "option": "HighFPSSpeedupFix",
+      "gate_build_1080": "no_gate",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+      "offset": -7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x3cbfe9"
+      ],
+      "first_rva": "0x3cbfe9",
+      "first_va": "0x7cbfe9",
+      "site_rva": "0x3cbfe2",
+      "site_va": "0x7cbfe2",
+      "status": "present"
+    },
+    {
+      "index": 177,
+      "handler": "10023b30",
+      "kind": "signature",
+      "option": "HighFPSSpeedupFix",
+      "gate_build_1080": "no_gate",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+      "offset": -7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x3cbfe9"
+      ],
+      "first_rva": "0x3cbfe9",
+      "first_va": "0x7cbfe9",
+      "site_rva": "0x3cbfe2",
+      "site_va": "0x7cbfe2",
+      "status": "present"
+    },
+    {
+      "index": 178,
+      "handler": "10023b30",
+      "kind": "signature",
+      "option": "HighFPSSpeedupFix",
+      "gate_build_1080": "no_gate",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+      "offset": -7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x3cbfe9"
+      ],
+      "first_rva": "0x3cbfe9",
+      "first_va": "0x7cbfe9",
+      "site_rva": "0x3cbfe2",
+      "site_va": "0x7cbfe2",
+      "status": "present"
+    },
+    {
+      "index": 179,
+      "handler": "10023b30",
+      "kind": "signature",
+      "option": "HighFPSSpeedupFix",
+      "gate_build_1080": "no_gate",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+      "offset": -7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x3cbfe9"
+      ],
+      "first_rva": "0x3cbfe9",
+      "first_va": "0x7cbfe9",
+      "site_rva": "0x3cbfe2",
+      "site_va": "0x7cbfe2",
+      "status": "present"
+    },
+    {
+      "index": 180,
+      "handler": "10023b30",
+      "kind": "signature",
+      "option": "HighFPSSpeedupFix",
+      "gate_build_1080": "no_gate",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+      "offset": -7,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x3cbfe9"
+      ],
+      "first_rva": "0x3cbfe9",
+      "first_va": "0x7cbfe9",
+      "site_rva": "0x3cbfe2",
+      "site_va": "0x7cbfe2",
+      "status": "present"
+    },
+    {
+      "index": 181,
+      "handler": "10023dd0",
+      "kind": "signature",
+      "option": "MiscFixes",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "eb"
+      ],
+      "signature": "C7 06 ? ? ? ? 74 19",
+      "offset": 6,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 182,
+      "handler": "10023dd0",
+      "kind": "signature",
+      "option": "MiscFixes",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "eb"
+      ],
+      "signature": "83 C4 ? 3B 46 20",
+      "offset": 12,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x90141"
+      ],
+      "first_rva": "0x90141",
+      "first_va": "0x490141",
+      "site_rva": "0x9014d",
+      "site_va": "0x49014d",
+      "status": "present"
+    },
+    {
+      "index": 183,
+      "handler": "10023dd0",
+      "kind": "signature",
+      "option": "MiscFixes",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "eb"
+      ],
+      "signature": "75 28 6A 00 6A 00 68 ? ? ? ? E8 ? ? ? ? 83 C4 0C",
+      "offset": 0,
+      "hit_count": 2,
+      "all_hit_rvas": [
+        "0x8fe63",
+        "0x8fec9"
+      ],
+      "first_rva": "0x8fe63",
+      "first_va": "0x48fe63",
+      "site_rva": "0x8fe63",
+      "site_va": "0x48fe63",
+      "status": "present"
+    },
+    {
+      "index": 184,
+      "handler": "10023dd0",
+      "kind": "signature",
+      "option": "MiscFixes",
+      "gate_build_1080": "no_gate",
+      "length": 2,
+      "values": [
+        "c9eb"
+      ],
+      "signature": "8B 54 24 04 52 A3",
+      "offset": 0,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 185,
+      "handler": "10023dd0",
+      "kind": "signature",
+      "option": "MiscFixes",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "b8"
+      ],
+      "signature": "83 F8 01 75 30 A3",
+      "offset": 0,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 186,
+      "handler": "10023dd0",
+      "kind": "signature",
+      "option": "MiscFixes",
+      "gate_build_1080": "no_gate",
+      "length": 2,
+      "values": [
+        "deb"
+      ],
+      "signature": "C7 05 ? ? ? ? 03 00 00 00 33 C0 5E 59 C3 C7",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x45c509"
+      ],
+      "first_rva": "0x45c509",
+      "first_va": "0x85c509",
+      "site_rva": "0x45c509",
+      "site_va": "0x85c509",
+      "status": "present"
+    },
+    {
+      "index": 187,
+      "handler": "10023dd0",
+      "kind": "signature",
+      "option": "MiscFixes",
+      "gate_build_1080": "no_gate",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "FF 15 ? ? ? ? 85 C0 75 18",
+      "offset": 8,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 188,
+      "handler": "10023dd0",
+      "kind": "signature",
+      "option": "MiscFixes",
+      "gate_build_1080": "no_gate",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "FF 15 ? ? ? ? 85 C0 75 04 32",
+      "offset": 8,
+      "hit_count": 0,
+      "all_hit_rvas": [],
+      "first_rva": null,
+      "first_va": null,
+      "site_rva": null,
+      "site_va": null,
+      "status": "absent"
+    },
+    {
+      "index": 189,
+      "handler": "10023dd0",
+      "kind": "signature",
+      "option": "MiscFixes",
+      "gate_build_1080": "no_gate",
+      "length": 2,
+      "values": [
+        "9090"
+      ],
+      "signature": "FF 15 ? ? ? ? 85 C0 75 07 A0",
+      "offset": 8,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x49842f"
+      ],
+      "first_rva": "0x49842f",
+      "first_va": "0x89842f",
+      "site_rva": "0x498437",
+      "site_va": "0x898437",
+      "status": "present"
+    },
+    {
+      "index": 190,
+      "handler": "10023dd0",
+      "kind": "signature",
+      "option": "MiscFixes",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "c3"
+      ],
+      "signature": "81 EC ? ? ? ? A1 ? ? ? ? 33 C4 89 84 24 ? ? ? ? 53 ? 6A 3C 33 DB 8D 44 24 ? 53 50 E8",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x4972b0"
+      ],
+      "first_rva": "0x4972b0",
+      "first_va": "0x8972b0",
+      "site_rva": "0x4972b0",
+      "site_va": "0x8972b0",
+      "status": "present"
+    },
+    {
+      "index": 191,
+      "handler": "10023dd0",
+      "kind": "signature",
+      "option": "MiscFixes",
+      "gate_build_1080": "no_gate",
+      "length": 1,
+      "values": [
+        "eb"
+      ],
+      "signature": "74 05 E8 ? ? ? ? 6A 05 E8 ? ? ? ? 83 C4 04 B9",
+      "offset": 0,
+      "hit_count": 1,
+      "all_hit_rvas": [
+        "0x90628"
+      ],
+      "first_rva": "0x90628",
+      "first_va": "0x490628",
+      "site_rva": "0x90628",
+      "site_va": "0x490628",
+      "status": "present"
+    }
+  ]
+}

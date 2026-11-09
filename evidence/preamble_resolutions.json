@@ -1,0 +1,61 @@
+[
+  {
+    "signature": "68 ? ? ? ? 68 A9 54 14 51 E8",
+    "writes": [
+      "0x10158054=0x6b86410e",
+      "0x101580c8=0x406b4b20",
+      "0x10158050=0x6dcd115a",
+      "0x101580b8=0x62bfdb37",
+      "0x10158028=0x931f73a2",
+      "0x101580a8=0x7f6a60d3",
+      "0x10158040=0xc9dbda90",
+      "0x1015803c=0xa4ea0691",
+      "0x101580d4=0x9399528",
+      "0x1015805c=0x1cc648ea"
+    ]
+  },
+  {
+    "signature": "08 0B C2 8B F0 E8",
+    "writes": [
+      "0x1015bde0"
+    ]
+  },
+  {
+    "signature": "85 F6 74 30 8B 16 8B 42 0C 8B CE FF D0 3C 02 75 23",
+    "writes": [
+      "0x10159c74"
+    ]
+  },
+  {
+    "signature": "8B 44 24 04 89 44 24 04 66 A1 ? ? ? ? 66 85 C0 76 3E",
+    "writes": [
+      "0x10159c0c (cmovne fallback)",
+      "0x10159c0c"
+    ]
+  },
+  {
+    "signature": "85 C0 C6 44 24 0C 00 C6 44 24 0D 00 75 07",
+    "writes": [
+      "0x1015ad78"
+    ]
+  },
+  {
+    "signature": "56 8B F1 8B 06 8B 90 A0 00 00 00 57 FF D2 85 C0 74 1C",
+    "writes": [
+      "0x10159b88 (cmovne fallback)",
+      "0x10159b88"
+    ]
+  },
+  {
+    "signature": "0F 10 5E 14 F3 0F 10 66 18 F3 0F 10 4C 24 0C F3",
+    "writes": [
+      "0x1015d63c"
+    ]
+  },
+  {
+    "signature": "0F 10 16 F3 0F 10 5E 04 F3 0F 10 4C 24 0C F3 0F 10 66 08 F2 0F 5A C0",
+    "writes": [
+      "0x10159cdc"
+    ]
+  }
+]

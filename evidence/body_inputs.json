@@ -1,0 +1,622 @@
+{
+ "note": "Curated inputs for the body differential. Values are keyed by the *port* symbol; the same semantic state is written on both sides (the binding table maps it to the original VA). A string is placed in the arena and its pointer stored; 'arena' is a mapped pointer; 'call' is a generic external-call stub address; 'stack' replaces the default argument stack; 'arena_bytes' writes raw bytes at '<arena offset>' after the arena is zeroed.",
+ "bodies": {
+  "abi_nolivery_a": {
+   "globals": {
+    "zpatch_nolivery_name": {
+     "string": "wheel_lf"
+    },
+    "zpatch_nolivery_index": 0
+   }
+  },
+  "abi_nolivery_b": {
+   "globals": {
+    "zpatch_nolivery_name": {
+     "string": "wheel_lf"
+    },
+    "zpatch_nolivery_index": 0
+   }
+  },
+  "abi_nolivery_c": {
+   "globals": {
+    "zpatch_nolivery_name": {
+     "string": "wheel_lf"
+    },
+    "zpatch_nolivery_index": 0
+   }
+  },
+  "abi_nolivery_d": {
+   "stub_returns": {
+    "zpatch_nolivery_fn": [
+     1,
+     1,
+     0
+    ]
+   },
+   "stub_cleanup": {
+    "zpatch_nolivery_fn": 4
+   }
+  },
+  "abi_nolivery_e": {
+   "stub_returns": {
+    "zpatch_nolivery_fn": [
+     1,
+     1,
+     0
+    ]
+   },
+   "stub_cleanup": {
+    "zpatch_nolivery_fn": 4
+   }
+  },
+  "abi_mf_angle_step": {
+   "stub_fpu": {
+    "zpatch_mf_time": 0.016
+   },
+   "globals": {
+    "zpatch_mf_x": {
+     "arena": 4096
+    },
+    "zpatch_mf_y": {
+     "arena": 4100
+    },
+    "zpatch_mf_flag": {
+     "arena": 8192
+    }
+   }
+  },
+  "abi_mouse_axis_flag": {
+   "globals": {
+    "zpatch_mf_x": {
+     "arena": 4096
+    },
+    "zpatch_mf_y": {
+     "arena": 4100
+    },
+    "zpatch_mf_flag": {
+     "arena": 8192
+    }
+   }
+  },
+  "abi_mouse_advance": {
+   "globals": {
+    "zpatch_mf_x": {
+     "arena": 12288
+    },
+    "zpatch_mf_y": {
+     "arena": 12292
+    }
+   },
+   "objects": {
+    "@0x18003000": {
+     "fields": {
+      "0x00": 0
+     }
+    },
+    "@0x18003004": {
+     "fields": {
+      "0x00": 0
+     }
+    }
+   }
+  },
+  "abi_steer_detour_eax": {
+   "regs": {
+    "esi": {
+     "arena": 12288
+    }
+   },
+   "objects": {
+    "@0x18003000": {
+     "fields": {
+      "0x00": {
+       "arena": 20480
+      },
+      "0xE18": {
+       "arena": 61440
+      }
+     }
+    },
+    "@0x18005000": {
+     "fields": {
+      "0x128": {
+       "call": 3
+      }
+     }
+    },
+    "@0x18009000": {
+     "fields": {
+      "0x00": {
+       "arena": 40960
+      }
+     }
+    },
+    "@0x1800A000": {
+     "fields": {
+      "0x08": {
+       "arena": 45056
+      }
+     }
+    },
+    "@0x1800B000": {
+     "fields": {
+      "0xB4": {
+       "arena": 49152
+      }
+     }
+    },
+    "@0x1800C000": {
+     "fields": {
+      "0x0C": {
+       "arena": 53248
+      }
+     }
+    },
+    "@0x1800D000": {
+     "fields": {
+      "0x00": {
+       "arena": 57344
+      },
+      "0x14": 0
+     }
+    },
+    "@0x1800F000": {
+     "fields": {
+      "0x84": 1065353216
+     }
+    }
+   },
+   "globals": {
+    "zpatch_pre_ped_array": {
+     "arena": 36864
+    }
+   },
+   "ecx_only": [
+    "zpatch_driveby_resolver"
+   ]
+  },
+  "abi_steer_detour_edx": {
+   "regs": {
+    "esi": {
+     "arena": 12288
+    }
+   },
+   "objects": {
+    "@0x18003000": {
+     "fields": {
+      "0x00": {
+       "arena": 20480
+      },
+      "0xE18": {
+       "arena": 61440
+      }
+     }
+    },
+    "@0x18005000": {
+     "fields": {
+      "0x128": {
+       "call": 3
+      }
+     }
+    },
+    "@0x18009000": {
+     "fields": {
+      "0x00": {
+       "arena": 40960
+      }
+     }
+    },
+    "@0x1800A000": {
+     "fields": {
+      "0x08": {
+       "arena": 45056
+      }
+     }
+    },
+    "@0x1800B000": {
+     "fields": {
+      "0xB4": {
+       "arena": 49152
+      }
+     }
+    },
+    "@0x1800C000": {
+     "fields": {
+      "0x0C": {
+       "arena": 53248
+      }
+     }
+    },
+    "@0x1800D000": {
+     "fields": {
+      "0x00": {
+       "arena": 57344
+      },
+      "0x14": 0
+     }
+    },
+    "@0x1800F000": {
+     "fields": {
+      "0x84": 1065353216
+     }
+    }
+   },
+   "globals": {
+    "zpatch_pre_ped_array": {
+     "arena": 36864
+    }
+   },
+   "ecx_only": [
+    "zpatch_driveby_resolver"
+   ]
+  },
+  "abi_benchmark_a": {
+   "regs": {
+    "esi": {
+     "call": 1
+    }
+   },
+   "stack_pad": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    "magic"
+   ]
+  },
+  "abi_benchmark_b": {
+   "regs": {
+    "esi": {
+     "call": 1
+    }
+   },
+   "stack_pad": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    "magic"
+   ]
+  },
+  "abi_bad_player_model": {
+   "globals": {
+    "zpatch_pre_ped_array": {
+     "arena": 8192
+    },
+    "zpatch_bpm_model_index": 0
+   },
+   "objects": {
+    "@0x18002000": {
+     "fields": {
+      "0x00": {
+       "arena": 12288
+      }
+     }
+    },
+    "@0x18003000": {
+     "fields": {
+      "0x00": {
+       "arena": 16384
+      }
+     }
+    },
+    "@0x18004000": {
+     "fields": {
+      "0x0c": {
+       "call": 5
+      }
+     }
+    }
+   },
+   "stub_returns": {
+    "zpatch_driveby_resolver": [
+     {
+      "call": "zpatch_model_lookup"
+     }
+    ]
+   }
+  },
+  "abi_copsirens_ide": {
+   "regs": {
+    "edi": {
+     "arena": 524288
+    },
+    "eax": {
+     "arena": 12288
+    }
+   },
+   "arena_bytes": {
+    "0x80000": "siren"
+   },
+   "objects": {
+    "@0x18003000": {
+     "fields": {
+      "0x3c": 1000
+     }
+    }
+   }
+  },
+  "abi_gfwl_stub": {
+   "globals": {
+    "zpatch_flag_patch4_modchecks": 1,
+    "zpatch_flag_gfwl_popup": 1,
+    "zpatch_xlive_base": 0,
+    "zpatch_gfwl_scan_guard": 1,
+    "zpatch_gfwl_site": {
+     "arena": 16384
+    },
+    "zpatch_tls_index": 0
+   },
+   "objects": {
+    "@0x18004000": {
+     "fields": {
+      "0x1e": {
+       "arena": 20480
+      }
+     }
+    }
+   },
+   "tls_state": {
+    "index": 0,
+    "epoch": 1,
+    "array_offset": 983040,
+    "block_offset": 987136
+   }
+  },
+  "abi_borderless_w": {
+   "stack": [
+    65537,
+    5,
+    0,
+    0
+   ]
+  },
+  "abi_nms_thunk18": {
+   "regs": {
+    "ecx": {
+     "arena": 24576
+    }
+   },
+   "objects": {
+    "@0x18006000": {
+     "fields": {
+      "0x00": {
+       "arena": 28672
+      }
+     }
+    },
+    "@0x18007000": {
+     "fields": {
+      "0x18": {
+       "call": 2
+      }
+     }
+    }
+   }
+  },
+  "abi_wanted_level_shim": {
+   "regs": {
+    "ecx": {
+     "arena": 24576
+    }
+   },
+   "objects": {
+    "@0x18006000": {
+     "fields": {
+      "0x00": {
+       "arena": 28672
+      }
+     }
+    },
+    "@0x18007000": {
+     "fields": {
+      "0x128": {
+       "call": 3
+      }
+     }
+    }
+   }
+  },
+  "abi_episode_switch_vcall": {
+   "regs": {
+    "ecx": {
+     "arena": 24576
+    }
+   },
+   "objects": {
+    "@0x18006000": {
+     "fields": {
+      "0x00": {
+       "arena": 28672
+      },
+      "0x04": 4660
+     }
+    },
+    "@0x18007000": {
+     "fields": {
+      "0x00": {
+       "arena": 32768
+      }
+     }
+    },
+    "@0x18008000": {
+     "fields": {
+      "0x30": {
+       "call": 4
+      }
+     }
+    }
+   },
+   "stub_cleanup_call": {
+    "4": 4
+   }
+  },
+  "abi_local_settings_detour": {
+   "stack_pad": [
+    0,
+    0,
+    0,
+    "magic"
+   ]
+  },
+  "abi_local_settings_fallback_detour": {
+   "stack_pad": [
+    0,
+    0,
+    "magic"
+   ],
+   "regs": {
+    "esi": {
+     "call": 6
+    }
+   },
+   "reg_cleanup": {
+    "esi": 16
+   }
+  },
+  "abi_speedup_body": {
+   "globals": {
+    "zpatch_speedup_scan_guard": 1,
+    "zpatch_speedup_clock": 0,
+    "zpatch_tls_index": 0
+   },
+   "tls_state": {
+    "index": 0,
+    "epoch": 1,
+    "array_offset": 983040,
+    "block_offset": 987136
+   }
+  },
+  "abi_death_music_install": {
+   "stub_returns": {
+    "zpatch_driveby_resolver": [
+     {
+      "call": "zpatch_model_lookup"
+     }
+    ]
+   }
+  },
+  "abi_death_music_enabled": {
+   "stub_returns": {
+    "zpatch_driveby_resolver": [
+     {
+      "call": "zpatch_model_lookup"
+     }
+    ]
+   }
+  },
+  "abi_vram_fix_shim": {
+   "stack_pad": [
+    895,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ]
+  },
+  "abi_load_dlcs_struct_fixup": {
+   "stack_pad": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "file_presence": {
+    "\\dlc\\tlad\\content\\": false,
+    "\\tlad\\": true,
+    "\\dlc\\tbogt\\content\\": true,
+    "\\tbogt\\": false,
+    "\\episode3\\": true,
+    "\\episode254\\": true
+   },
+   "port_globals": {
+    "g_dlc_register_rva": 4781120,
+    "g_dlc_apply_rva": 4783616
+   },
+   "game_cleanup": {
+    "0x48F440": 12,
+    "0x48FE00": 4
+   },
+   "instruction_budget": 1000000
+  },
+  "abi_episode_switch_store_shim": {
+   "stack_pad": [
+    0,
+    "magic"
+   ],
+   "regs": {
+    "ebp": 537903072
+   }
+  },
+  "abi_ooc_wrap": {
+   "instruction_budget": 4000000,
+   "globals": {
+    "zpatch_ooc_input_bound": 0,
+    "zpatch_ooc_output_begin": 0,
+    "zpatch_ooc_output_cursor": 0,
+    "zpatch_ooc_output_end": 0,
+    "zpatch_ooc_table_size": 0,
+    "zpatch_ooc_archive_offset": 0,
+    "zpatch_ooc_vector_begin": 0,
+    "zpatch_ooc_vector_end": 0,
+    "zpatch_ooc_vector_capacity": 0
+   }
+  },
+  "abi_cutscene_chain_b": {
+   "globals": {
+    "zpatch_cutscene_poke": {
+     "arena": 8192
+    },
+    "zpatch_cutscene_accum": 0.0,
+    "zpatch_cutscene_limit": 1.0
+   },
+   "regs": {
+    "ecx": {
+     "arena": 65536
+    }
+   },
+   "objects": {
+    "@0x18005000": {
+     "fields": {
+      "0x18": {
+       "arena": 24576
+      }
+     }
+    },
+    "@0x18006000": {
+     "fields": {
+      "0x08": 0
+     }
+    }
+   },
+   "stub_returns": {
+    "zpatch_driveby_resolver": [
+     402673664
+    ]
+   },
+   "stub_cleanup": {
+    "zpatch_cutscene_target": 4
+   },
+   "stub_fpu": {
+    "zpatch_cutscene_target": 0.0
+   },
+   "pointer_globals_from_iat": {
+    "zpatch_cutscene_virtualprotect": "kernel32.dll!VirtualProtect"
+   }
+  },
+  "abi_collision_deadlock_walk": {
+   "instruction_budget": 1000000
+  }
+ }
+}

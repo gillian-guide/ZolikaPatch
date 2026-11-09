@@ -1,0 +1,12 @@
+{
+  "CarDecalsFix": "bits",
+  "CarDynamicShadowFix": "no-string-va",
+  "EpisodicWeaponSupport": "no-push",
+  "FixPCIDKickbug": "unknown",
+  "ForceCarHeadlightShadows": "unknown",
+  "FreezeCarFix": "unknown",
+  "NoImpostorHeightCutoff": "bits",
+  "NoLODLightHeightCutoff": "bits",
+  "NoPhysicsSleep": "bits",
+  "OverrideGTADatPathTo": "unknown"
+}

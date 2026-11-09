@@ -1,0 +1,2846 @@
+{
+  "note": "Curated corrections for op-table rows the Ghidra-era extractor mis-split or mis-attributed. Each entry was re-derived from the handler's decompilation (ZolikaPatch_decompiled/ida/<handler>_*.c); tools/apply_op_corrections.py re-verifies every claim against that file and emits src/recovered_op_corrections.inc. Rows listed here are suppressed in the live apply; the sig_installs describe the handler's real writes for 1.0.8.0.",
+  "anchors": [
+    {
+      "handler": "0x10037c70",
+      "option": "FreezeCarFix",
+      "signature": "32 DB 8B 54 24 24 52 E8 ? ? ? ? 8B F0",
+      "why": "sub_10037C70's first scan (call at 0x10037C92); its `if (result)` wraps every FreezeCarFix write, so a miss jumps to the epilogue (0x10037C99: je 0x100382A7). The sibling rows of the E9-pattern etc. must gate on this anchor: on 1000/1004/1040 the anchor has 0 hits while the sibling signatures still match (N1)."
+    },
+    {
+      "handler": "0x100467a0",
+      "option": "SMPA60Fix",
+      "signature": "01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C",
+      "why": "sub_100467A0's first scan (0x100467C2); `if (result)` gates the E9@+123 install, the EB@-38 write and the second scan's install plus the three slot publishes (0x100467CC: je 0x100468B3). On 1000 the anchor has 0 hits while the second pattern still matches (N1)."
+    },
+    {
+      "handler": "0x10052200",
+      "option": "NewSavesCompatibility",
+      "signature": "68 ? ? ? ? E8 ? ? ? ? 8B 2D ? ? ? ? 83 C4 08",
+      "why": "sub_10052200's first scan (0x10052224); `if (result)` gates the Src publish and the second scan's E9 install (0x1005222B). On 1004 the anchor has 0 hits while the second pattern still matches (N1)."
+    }
+  ],
+  "suppressions": [
+    {
+      "handler": "0x1001b580",
+      "signature": "83 3D ? ? ? ? 02 7C 4A 0F BF 46 2E",
+      "offset": 0,
+      "values": [
+        "90909090",
+        "90909090"
+      ],
+      "why": "handler memsets 13 bytes at the match (memset(v10, 144, 13)); the 8-byte row is a mis-split of the same fill"
+    },
+    {
+      "handler": "0x10022d80",
+      "signature": "0F 2F D0 76 25 0F 28 C2",
+      "offset": 4,
+      "values": [
+        "eb"
+      ],
+      "why": "handler writes EB at +3 and 2A at +4; the row's offset is off by one and overwrites the 2A write"
+    },
+    {
+      "handler": "0x10022d80",
+      "signature": "0F 2F D0 76 25 0F 28 C2",
+      "offset": 4,
+      "values": [
+        "2a"
+      ],
+      "why": "the 2A at +4 is the displacement of the corrected EB write (sig_writes); the lone operand row must not run separately"
+    },
+    {
+      "handler": "0x10038680",
+      "signature": "3D 80 99 99 59 73 05",
+      "offset": -29,
+      "values": [
+        "e8"
+      ],
+      "why": "handler writes E8 at -34 (call to sub_10038670) and E9 at -29 (jump to match+8); the E8 row's offset is wrong"
+    },
+    {
+      "handler": "0x10045ad0",
+      "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+      "offset": 253,
+      "values": [
+        "e8"
+      ],
+      "why": "handler writes E8 at +253 (call to sub_10045A80); the row is a bare opcode whose displacement the installer computes - see sig_installs"
+    },
+    {
+      "handler": "0x10045ad0",
+      "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+      "offset": 253,
+      "values": [
+        "e9"
+      ],
+      "why": "no E9 write exists at +253; the handler's E9 writes are at +98 and +266"
+    },
+    {
+      "handler": "0x10045ad0",
+      "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+      "offset": 267,
+      "values": [
+        "8e"
+      ],
+      "why": "142 (0x8E) is the displacement of the +98 jump; writing it at +267 corrupted the instruction stream - the savefile crash"
+    },
+    {
+      "handler": "0x10045ad0",
+      "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+      "offset": 267,
+      "values": [
+        "77 03"
+      ],
+      "why": "887 (0x377) is the displacement of the +266 jump; the bare operand write must not run without its E9 opcode - see sig_installs"
+    },
+    {
+      "handler": "0x100467a0",
+      "signature": "01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C",
+      "offset": -38,
+      "values": [
+        "e9"
+      ],
+      "why": "handler writes EB (-21) at -38; no E9 write exists there"
+    },
+    {
+      "handler": "0x10045610",
+      "signature": "75 ? 83 C1 01 83 C0 01 83 F9 04",
+      "offset": 0,
+      "values": [
+        "90 90"
+      ],
+      "why": "the CRC-check NOPs at the match are the handler's first write, but applying them in the op stage erases the match's 75 opcode before the sig-install stage scans for it - the call replacements would silently drop. Moved to sig_writes, which runs after the installs."
+    },
+    {
+      "handler": "0x10005ca0",
+      "signature": "F7 46 24 00 00 00 40 0F 84",
+      "offset": 7,
+      "values": [
+        "E9"
+      ],
+      "why": "the generic op row writes the bare E9 opcode without the recomputed displacement; superseded by the curated match_branch sig_install for the same signature+offset"
+    }
+  ],
+  "sig_installs": [
+    {
+      "handler": "0x10045ad0",
+      "option": "ImprovedShaderStreaming",
+      "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+      "site_offset": 85,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10045A30",
+      "why": "E8 call to the plugin's shader-streaming body (sub_10045A30)"
+    },
+    {
+      "handler": "0x10045ad0",
+      "option": "ImprovedShaderStreaming",
+      "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+      "site_offset": 98,
+      "opcode": "e9",
+      "dest_kind": "match_rel",
+      "dest": 245,
+      "why": "E9 jump to match+245 (displacement 142 = 245-98-5)"
+    },
+    {
+      "handler": "0x10045ad0",
+      "option": "ImprovedShaderStreaming",
+      "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+      "site_offset": 253,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10045A80",
+      "why": "E8 call to the plugin's shader-streaming body (sub_10045A80)"
+    },
+    {
+      "handler": "0x10045ad0",
+      "option": "ImprovedShaderStreaming",
+      "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+      "site_offset": 266,
+      "opcode": "e9",
+      "dest_kind": "match_rel",
+      "dest": 1158,
+      "why": "E9 jump to match+1158 (displacement 887 = 1158-266-5)"
+    },
+    {
+      "handler": "0x10038680",
+      "option": "NewMemorySystem",
+      "signature": "3D 80 99 99 59 73 05",
+      "site_offset": -34,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10038670",
+      "why": "E8 call to the plugin's new-memory-system body (sub_10038670)"
+    },
+    {
+      "handler": "0x10038680",
+      "option": "NewMemorySystem",
+      "signature": "3D 80 99 99 59 73 05",
+      "site_offset": -29,
+      "opcode": "e9",
+      "dest_kind": "match_rel",
+      "dest": -16,
+      "why": "E9 at match-29 -> match-16 (the handler writes displacement 8: match-29 + 5 + 8 = match-16; the row stores the match-relative destination the runtime uses, not the raw displacement)"
+    },
+    {
+      "handler": "0x10045c50",
+      "option": "SkipIntro",
+      "signature": "89 91 ? ? ? ? 8D 44 24 ? 68 ? ? ? ? 50",
+      "site_offset": -6,
+      "opcode": "e9",
+      "dest_kind": "module_va",
+      "dest": "0x10045C30",
+      "why": "E9 jump to the plugin's skip-intro body (sub_10045C30)"
+    },
+    {
+      "handler": "0x10046640",
+      "option": "SkipMenu",
+      "signature": "83 F8 03 75 ? A1 ? ? ? ? 80 88 ? ? ? ? ? 84 DB 74 0A 6A 00 E8 ? ? ? ? 83 C4 04 5F 5E",
+      "site_offset": 23,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10046610",
+      "why": "E8 call to the plugin's skip-menu body (sub_10046610)"
+    },
+    {
+      "handler": "0x10046640",
+      "option": "SkipMenu",
+      "signature": "6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5D 5B 33 CC E8 ? ? ? ? 81 C4 ? ? ? ? C3",
+      "site_offset": 2,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10046610",
+      "why": "fallback signature: E8 call to the plugin's skip-menu body"
+    },
+    {
+      "handler": "0x10046640",
+      "option": "SkipMenu",
+      "signature": "6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC E8 ? ? ? ? 8B E5 5D C3",
+      "site_offset": 2,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10046610",
+      "why": "second fallback signature: E8 call to the plugin's skip-menu body"
+    },
+    {
+      "handler": "0x10045610",
+      "option": "SavegameFix",
+      "signature": "75 ? 83 C1 01 83 C0 01 83 F9 04",
+      "site_offset": -73,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10045580",
+      "why": "close: the handler replaces the GFWL close call (GFWL is dead; the local stub replaces it)"
+    },
+    {
+      "handler": "0x10045610",
+      "option": "SavegameFix",
+      "signature": "75 ? 83 C1 01 83 C0 01 83 F9 04",
+      "site_offset": -143,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x100455A0",
+      "why": "read/copy: the handler replaces the GFWL storage read (GFWL is dead; the local stub replaces it)"
+    },
+    {
+      "handler": "0x10045610",
+      "option": "SavegameFix",
+      "signature": "75 ? 83 C1 01 83 C0 01 83 F9 04",
+      "site_offset": -176,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x100455A0",
+      "why": "read/copy: second replaced GFWL read (GFWL is dead; the local stub replaces it)"
+    },
+    {
+      "handler": "0x10045610",
+      "option": "SavegameFix",
+      "signature": "75 ? 83 C1 01 83 C0 01 83 F9 04",
+      "site_offset": -280,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x100455E0",
+      "why": "mutex: the handler replaces the GFWL mutex call (GFWL is dead; the local stub replaces it)"
+    },
+    {
+      "handler": "0x10045610",
+      "option": "SavegameFix",
+      "signature": "75 ? 83 C1 01 83 C0 01 83 F9 04",
+      "site_offset": -240,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10038570",
+      "why": "null: the handler replaces the GFWL status call (GFWL is dead; the local stub replaces it)"
+    },
+    {
+      "handler": "0x10045610",
+      "option": "SavegameFix",
+      "signature": "8D 4C 24 18 51 6A 00 6A 0C 57",
+      "site_offset": -86,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x100455E0",
+      "why": "mutex: the handler replaces the GFWL mutex call (GFWL is dead; the local stub replaces it)"
+    },
+    {
+      "handler": "0x10045610",
+      "option": "SavegameFix",
+      "signature": "8D 4C 24 18 51 6A 00 6A 0C 57",
+      "site_offset": -47,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10038570",
+      "why": "null: the handler replaces the GFWL status call (GFWL is dead; the local stub replaces it)"
+    },
+    {
+      "handler": "0x10045610",
+      "option": "SavegameFix",
+      "signature": "8D 4C 24 18 51 6A 00 6A 0C 57",
+      "site_offset": 10,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x100455A0",
+      "why": "read/copy: the handler replaces the GFWL storage read (GFWL is dead; the local stub replaces it)"
+    },
+    {
+      "handler": "0x10045610",
+      "option": "SavegameFix",
+      "signature": "8D 4C 24 18 51 6A 00 6A 0C 57",
+      "site_offset": 90,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x100455A0",
+      "why": "read/copy: second replaced GFWL read (GFWL is dead; the local stub replaces it)"
+    },
+    {
+      "handler": "0x10045610",
+      "option": "SavegameFix",
+      "signature": "8D 4C 24 18 51 6A 00 6A 0C 57",
+      "site_offset": 128,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10045580",
+      "why": "close: the handler replaces the GFWL close call (GFWL is dead; the local stub replaces it)"
+    },
+    {
+      "handler": "0x100467a0",
+      "option": "SMPA60Fix",
+      "signature": "01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C",
+      "site_offset": 123,
+      "opcode": "e9",
+      "dest_kind": "module_va",
+      "dest": "0x10046780",
+      "why": "tail: E9 to the tail shim (sub_10046780); the -38 E9 op row is suppressed and the -38 EB is the handler's own write"
+    },
+    {
+      "handler": "0x10037070",
+      "option": "FreezeGunFix",
+      "signature": "2B C2 D1 F8 39 3C C6 7D 0D 83 CA FF",
+      "site_offset": -21,
+      "opcode": "e9",
+      "dest_kind": "module_va",
+      "dest": "0x10036EB0",
+      "why": "E9 at match-21 to the FreezeGunFix shim; the op row stores only the E9 byte, so this completes it"
+    },
+    {
+      "handler": "0x1001afa0",
+      "option": "EmissiveLerpFix",
+      "signature": "F3 0F 58 C1 F3 0F 2A C8 F3 0F 58 C1",
+      "site_offset": -24,
+      "opcode": "e9",
+      "dest_kind": "module_va",
+      "dest": "0x1001AF60",
+      "dest_symbol": "tramp_EmissiveLerpFix",
+      "why": "E9 at match-24 to the EmissiveLerpFix shim; the op row stores only the E9 byte"
+    },
+    {
+      "handler": "0x1003d420",
+      "option": "NoLiveryLimit",
+      "signature": "8B 8C 83 3C 01 00 00 0F BF 53 48",
+      "site_offset": -237,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x1003d340",
+      "dest_symbol": "tramp_NoLiveryLimit_b",
+      "why": "handler writes E9 at match-237 to tramp b"
+    },
+    {
+      "handler": "0x1003d420",
+      "option": "NoLiveryLimit",
+      "signature": "8B 8C 83 3C 01 00 00 0F BF 53 48",
+      "site_offset": -199,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x1003d370",
+      "dest_symbol": "tramp_NoLiveryLimit_c",
+      "why": "handler writes E9 at match-199 to tramp c"
+    },
+    {
+      "handler": "0x100371f0",
+      "option": "CrashMsgFix",
+      "signature": "68 6A 10 4E 31",
+      "site_offset": -4,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10036f00",
+      "dest_symbol": "sub_10036F00",
+      "site_deref": 1,
+      "why": "the handler writes E8 at *(match-4) to the sanitizer body"
+    },
+    {
+      "handler": "0x10051920",
+      "option": "NewFilesCompatibility",
+      "signature": "E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 7B FF FF FF",
+      "site_offset": 0,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10051890",
+      "dest_symbol": "sub_10051890",
+      "why": "handler E8s the first per-file update site"
+    },
+    {
+      "handler": "0x10051920",
+      "option": "NewFilesCompatibility",
+      "signature": "E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 6C FF FF FF",
+      "site_offset": 0,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x100518d0",
+      "dest_symbol": "sub_100518D0",
+      "why": "handler E8s the second per-file update site"
+    },
+    {
+      "handler": "0x10006350",
+      "option": "CopSirensFlag",
+      "signature": "E8 ? ? ? ? C0 E0 ? 32 86 6F 0F 00",
+      "site_offset": 0,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x10006310",
+      "dest_symbol": "tramp_CopSirensFlag_a",
+      "why": "handler E9s the first tramp"
+    },
+    {
+      "handler": "0x10006350",
+      "option": "CopSirensFlag",
+      "signature": "0F BF 41 2E 39 05",
+      "site_offset": 22,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x10006330",
+      "dest_symbol": "sub_10006330",
+      "why": "handler E9s match+22 to the second tramp"
+    },
+    {
+      "handler": "0x10004110",
+      "option": "CopSirensFlag",
+      "signature": "0C 83 88 94 00 00 00 04",
+      "site_offset": -10,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x100040e0",
+      "dest_symbol": "sub_100040E0",
+      "why": "IDE installer E9s match-10 to the parser hook"
+    },
+    {
+      "handler": "0x0",
+      "option": "SpeedupBugFix",
+      "signature": "50 64 89 25 00 00 00 00 83 EC 34",
+      "site_offset": -21,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x10050540",
+      "dest_symbol": "sub_10050540",
+      "why": "handler E9s match-0x15 to the timing body"
+    },
+    {
+      "handler": "0x10038770",
+      "option": "RemoveBoundingBoxCulling",
+      "signature": "3C 01 57 0F 85",
+      "site_offset": 3,
+      "opcode": "0xE9",
+      "dest_kind": "match_branch",
+      "dest": 0,
+      "why": "ORIGINAL implementation: handler writes E9 at match+3 keeping the 0F 85 branch target (forces the bbox-cull path). Known-unstable (- see original INI comment) and default 0; disabled in the INI."
+    },
+    {
+      "handler": "0x0",
+      "option": "CarPartsShadowFix",
+      "signature": "85 DB 7E 41 55 EB 0A",
+      "site_offset": -6,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x10006880",
+      "dest_symbol": "sub_10006880",
+      "why": "handler writes E9 at match-6 with displacement to sub_10006880 and publishes dword_1015BDC8=match+2 / dword_1015BDC0=match+69; the generated sig-jump pattern 485 DB 7E 41 55 EB 0A is corrupt (the real pattern is 85 DB 7E 41 55 EB 0A)"
+    },
+    {
+      "handler": "0x10005800",
+      "option": "BetterMPSync",
+      "signature": "8B 90 E8 00 00 00 55 8B CE FF",
+      "site_offset": 6,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x100057F0",
+      "dest_symbol": "sub_100057F0",
+      "why": "re-added after the MP bisect closed on RemoveBoundingBoxCulling/BuildingAlphaFix pattern 2 (handoff re-enable list)"
+    },
+    {
+      "handler": "0x10005EE0",
+      "option": "CombinedRadioFreezeFix",
+      "signature": "E8 ? ? ? ? 8B 35 ? ? ? ? 3B F0",
+      "site_offset": 0,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10005ED0",
+      "dest_symbol": "sub_10005ED0",
+      "why": "re-added after the MP bisect closed on RemoveBoundingBoxCulling/BuildingAlphaFix pattern 2 (handoff re-enable list)"
+    },
+    {
+      "handler": "0x10044590",
+      "option": "PopupHeadlightsFlag",
+      "signature": "0F BF 46 2E 3B 05 ? ? ? ? 75 ? A1",
+      "site_offset": 0,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x10044530",
+      "dest_symbol": "sub_10044530",
+      "why": "handler writes E9 at match+0 to the EAX-variant shim sub_10044530 (pattern B's EDX twin 0x10044560 is a separate row on its own signature)"
+    },
+    {
+      "handler": "0x10044590",
+      "option": "PopupHeadlightsFlag",
+      "signature": "0F BF 46 2E 3B 05 ? ? ? ? 75 ? A1",
+      "site_offset": 10,
+      "opcode": "0xeb",
+      "dest_kind": "literal_byte",
+      "dest_byte": "0xeb",
+      "why": "handler swaps the `75 63` jne opcode at match+0xA for EB, keeping the original displacement byte (unconditional jump to the original target)"
+    },
+    {
+      "handler": "0x10044590",
+      "option": "PopupHeadlightsFlag",
+      "signature": "0F BF 46 2E 3B 05 ? ? ? ? 75 ? A1",
+      "site_offset": 82,
+      "opcode": "0x0",
+      "dest_kind": "rebased_global",
+      "dest": 0,
+      "why": "handler rewrites the game's `fld dword ptr [...]` operand at match+82 to point at its own pi/2 dword (dword_101580CC); ours points at zpatch_popup_angle"
+    },
+    {
+      "handler": "0x1001ADD0",
+      "option": "ForceCarHeadlightShadows",
+      "signature": "3C 01 75 50 84 DB 75 79",
+      "site_offset": 6,
+      "opcode": "0xeb",
+      "dest_kind": "literal_byte",
+      "dest_byte": "0xeb",
+      "why": "handler swaps the `75 79` jne at match+6 for EB (force the test-bl branch), keeping the displacement"
+    },
+    {
+      "handler": "0x1001ADD0",
+      "option": "ForceCarHeadlightShadows",
+      "signature": "3C 01 75 50 84 DB 75 79",
+      "site_offset": 95,
+      "opcode": "0xE9",
+      "dest_kind": "match_rel",
+      "dest": 476,
+      "why": "handler writes E9 at match+95 with displacement 376, i.e. to match+476 (the same target as the 0F 85 jcc it replaces)"
+    },
+    {
+      "handler": "0x1001ADD0",
+      "option": "ForceCarHeadlightShadows",
+      "signature": "3C 01 75 50 84 DB 75 79",
+      "site_offset": 379,
+      "opcode": "0xeb",
+      "dest_kind": "literal_byte",
+      "dest_byte": "0xeb",
+      "why": "handler swaps the `75 5F` jne at match+379 for EB, keeping the displacement"
+    },
+    {
+      "handler": "0x1001ADD0",
+      "option": "ForceCarHeadlightShadows",
+      "signature": "3C 01 75 50 84 DB 75 79",
+      "site_offset": 211,
+      "opcode": "0x0",
+      "dest_kind": "rebased_global",
+      "dest": 0,
+      "why": "handler rewrites the game's `movss xmm2,[0xD95B68]` operand at match+211 to its own 2.0f dword (dword_101580C0); ours points at zpatch_fchs_offset"
+    },
+    {
+      "handler": "0x1001ADD0",
+      "option": "ForceCarHeadlightShadows",
+      "signature": "55 8B EC 83 E4 F0 81 EC D4 00 00 00 8B 45 20 8B",
+      "site_offset": 0,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x1001ADB0",
+      "dest_symbol": "sub_1001ADB0",
+      "why": "handler E9s the game function entry to the thunk sub_1001ADB0 (resume match+12 is published as the slot)"
+    },
+    {
+      "handler": "0x10004110",
+      "option": "PopupHeadlightsFlag",
+      "signature": "0C 83 88 94 00 00 00 04",
+      "site_offset": -10,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x100040e0",
+      "dest_symbol": "sub_100040E0",
+      "why": "the PopupHeadlightsFlag arm calls sub_10004110() at the end, installing the same IDE collector hook as CopSirensFlag (per-option duplicate row; the patch-set logic gates members individually)"
+    },
+    {
+      "handler": "0x0",
+      "option": "CarDecalsFix",
+      "signature": "8B 44 24 08 8B 48 28 81 E1 C0 03 00 00 81 F9 80 00 00 00",
+      "site_offset": 0,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x1001b2e0",
+      "dest_symbol": "sub_1001B2E0",
+      "why": "the loader arm scans this 17-byte pattern with its multi-hit collector and E9s the FIRST match to sub_1001B2E0 (no textual handler to verify against: handler 0x0; the recipe is the arm's, not a handler's)"
+    },
+    {
+      "handler": "0x10037BE0",
+      "option": "BadPlayerModelCrashFix",
+      "signature": "83 E4 F0 83 EC 54 0F 57 C0 53 8B 5D 0C",
+      "site_offset": 0,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x10037ba0",
+      "dest_symbol": "tramp_BadPlayerModelCrashFix",
+      "why": "handler E9s the game function entry (3 bytes into its prologue) to the trampoline and publishes match+0xA as the resume"
+    },
+    {
+      "handler": "0x10050BD0",
+      "option": "RestoreDeathMusic",
+      "signature": "0F 57 C0 F3 0F 11 86 20 02 00 00",
+      "site_offset": -13,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10050ad0",
+      "dest_symbol": "sub_10050AD0",
+      "why": "handler writes E8 at match-13 (the enclosing function's entry) to the track randomizer sub_10050AD0"
+    },
+    {
+      "handler": "0x10050BD0",
+      "option": "RestoreDeathMusic",
+      "signature": "C7 86 04 02 00 00 04 00 00 00 E9",
+      "site_offset": -13,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10050a50",
+      "dest_symbol": "sub_10050A50",
+      "why": "handler writes E8 at match-13 to the death-music gate sub_10050A50"
+    },
+    {
+      "handler": "0x10050BD0",
+      "option": "RestoreDeathMusic",
+      "signature": "E8 ? ? ? ? 84 C0 74 C6 8B BE",
+      "site_offset": 0,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10050a50",
+      "dest_symbol": "sub_10050A50",
+      "why": "handler writes E8 at the matched call to the death-music gate sub_10050A50"
+    },
+    {
+      "handler": "0x10052200",
+      "option": "NewSavesCompatibility",
+      "signature": "89 84 24 E0 01 00 00 8B 45 08 53 33 DB",
+      "site_offset": 0,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x100521E0",
+      "dest_symbol": "sub_100521E0",
+      "why": "handler E9s the savegame-load entry to the converter tramp and publishes match+13 as the resume"
+    },
+    {
+      "handler": "0x10005500",
+      "option": "Patch4RemoveModChecks",
+      "signature": "2B C1 1B D6 89 44 24 0C 89 54 24 10 DF 6C 24 0C D8 0D ? ? ? ? D9 5C 24 08",
+      "site_offset": 0,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x100054e0",
+      "dest_symbol": "sub_100054E0",
+      "why": "shared handler: both Patch4RemoveModChecks and RemoveGFWLUpdatePopup arms call sub_10005500; the stub's helper checks both flags, so the same install is registered per option (idempotent)"
+    },
+    {
+      "handler": "0x10037BE0",
+      "option": "BadPlayerModelCrashFix",
+      "signature": "83 E4 F0 83 EC 54 0F 57 C0 53 8B 5D 0C",
+      "site_offset": 0,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x10037ba0",
+      "dest_symbol": "tramp_BadPlayerModelCrashFix",
+      "why": "handler E9s the game function entry (3 bytes into its prologue) to the trampoline and publishes match+0xA as the resume"
+    },
+    {
+      "handler": "0x100513a0",
+      "option": "LocalSettingsPath",
+      "signature": "53 8B 5C 24 08 56 6A 00 6A 00",
+      "site_offset": 16,
+      "opcode": "0x0",
+      "dest_kind": "rebased_global",
+      "dest": 0,
+      "why": "handler stores &off_10158064 at match+16, retargeting the game's `call dword ptr [0xD6B38C]` (operand at match+16) to call through the plugin's 4-byte slot; ours is rebased_value_for(LocalSettingsPath) = &zpatch_local_saves_slot"
+    },
+    {
+      "handler": "0x100513a0",
+      "option": "LocalSettingsPath",
+      "signature": "53 8B 5C 24 08 56 6A 00 6A 00",
+      "site_offset": 32,
+      "opcode": "0x0",
+      "dest_kind": "plugin_data_ptr",
+      "dest": 0,
+      "dest_symbol": "zpatch_local_iv_suffix",
+      "why": "handler stores the data pointer of its own '\\GTA IV' string at match+32, replacing the pushed literal 'Rockstar Games\\GTA IV' (push imm at match+31); ours is a fixed char buffer"
+    },
+    {
+      "handler": "0x100513a0",
+      "option": "LocalSettingsPath",
+      "signature": "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D6 5F 5E 5B C3",
+      "site_offset": 14,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x100512F0",
+      "dest_symbol": "detour_100512F0",
+      "why": "handler E9s the path-setup function's epilogue at match+14 (game 0x856EE6, swallowing pop edi/esi/ebx/ret + one int3 pad byte) to detour_100512F0; the detour body replays the epilogue"
+    },
+    {
+      "handler": "0x100513a0",
+      "option": "LocalSettingsPath",
+      "signature": "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D7 5F C3",
+      "site_offset": -13,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x10051300",
+      "dest_symbol": "sub_10051300",
+      "why": "fallback build: handler E9s match-13 to sub_10051300; inert on 1.0.8.0 because the pattern has 0 hits"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "32 DB 8B 54 24 24 52 E8 ? ? ? ? 8B F0",
+      "site_offset": 7,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10037510",
+      "dest_symbol": "sub_10037510",
+      "site_deref": 0,
+      "why": "E8 at +7 -> probe body (orig dest match+[match+8]+12 = 0x8DD330)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "8B 4C 24 28 8B 54 24 24 50 51 52 E8 ? ? ? ? 5F 5E 5D 5B",
+      "site_offset": 11,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x100372F0",
+      "dest_symbol": "sub_100372F0",
+      "site_deref": 0,
+      "why": "E8 at +11 -> guard body (orig dest match+[match+12]+16 = 0x6D61A0)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 36,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10037330",
+      "dest_symbol": "sub_10037330",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0x24 -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 61,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x100373F0",
+      "dest_symbol": "sub_100373F0",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0x3d -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 86,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10037420",
+      "dest_symbol": "sub_10037420",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0x56 -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 111,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10037390",
+      "dest_symbol": "sub_10037390",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0x6f -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 136,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10037450",
+      "dest_symbol": "sub_10037450",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0x88 -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 158,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10037480",
+      "dest_symbol": "sub_10037480",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0x9e -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 180,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x100374E0",
+      "dest_symbol": "sub_100374E0",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0xb4 -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 202,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10037360",
+      "dest_symbol": "sub_10037360",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0xca -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 224,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x100373C0",
+      "dest_symbol": "sub_100373C0",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0xe0 -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 246,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x100374B0",
+      "dest_symbol": "sub_100374B0",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0xf6 -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "88 87 40 01 00 00 E8",
+      "site_offset": 6,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10037510",
+      "dest_symbol": "sub_10037510",
+      "site_deref": 0,
+      "why": "E8 at +6 -> probe body"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "88 5C 24 1F 8B 54 24 28 52 E8",
+      "site_offset": 9,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10037510",
+      "dest_symbol": "sub_10037510",
+      "site_deref": 0,
+      "why": "E8 at +9 -> probe body"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "88 5C 24 1F 8B 54 24 28 52 E8",
+      "site_offset": 254,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10037510",
+      "dest_symbol": "sub_10037510",
+      "site_deref": 0,
+      "why": "E8 at +0xFE -> probe body"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "38 98 8C 00 00 00 75 2D 57 E8",
+      "site_offset": 9,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10037510",
+      "dest_symbol": "sub_10037510",
+      "site_deref": 0,
+      "why": "E8 at +9 -> probe body"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "32 DB 8B 54 24 24 52 E8",
+      "site_offset": 7,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10037510",
+      "dest_symbol": "sub_10037510",
+      "site_deref": 0,
+      "why": "E8 at +7 -> probe body (same game site as P1 on 1.0.8.0; duplicate no-op write)"
+    },
+    {
+      "handler": "0x0",
+      "option": "CarDynamicShadowFix",
+      "signature": "56 6A 02 53 53 57 E8 ?? ?? ?? ?? 56 6A 02 6A 04 6A 05 57 E8",
+      "site_offset": 0,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x100068a0",
+      "dest_symbol": "detour_100068A0",
+      "why": "shared installer sub_10010B60 (pattern A, game 0x95ADCF, unique): E9 at match -> body 0x100068A0; handler 0x0 because the pattern string is built at runtime, so the decompile cannot be verified textually (evidence: CarDynamicShadowFix spec report, 2026-10-13)"
+    },
+    {
+      "handler": "0x0",
+      "option": "GarageModelFix",
+      "signature": "8B 57 20 D9 42 34 D9 5E 04 8B 47 20",
+      "site_offset": 0,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x10046c80",
+      "dest_symbol": "sub_10046C80",
+      "why": "GarageModelFix callback install 1 (game 0xC68BB0, unique): E9 at match to the store body; handler 0x0 because the callback builds its patterns at runtime, so no textual verification (evidence: dynamic-callback spec report, 2026-10-13)"
+    },
+    {
+      "handler": "0x0",
+      "option": "GarageModelFix",
+      "signature": "0F B7 0E 50 51 E8",
+      "site_offset": 0,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x10046ca0",
+      "dest_symbol": "sub_10046CA0",
+      "why": "GarageModelFix callback install 2 (game 0x9659C3, unique): E9 at match to the lookup body (resume match+5 = the call 0x8B4D60)"
+    },
+    {
+      "handler": "0x0",
+      "option": "MovingSteeringWheelSupport",
+      "signature": "32 DB 8B 16 8B 82 28 01 00 00 8B CE FF D0",
+      "site_offset": 2,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x100051b0",
+      "dest_symbol": "detour_100051B0",
+      "why": "shared trio installer sub_10005210 (pattern, game 0xA5389E, unique): E9 at match+2 to the detour; publishes dword_1015AD44=match+16 and dword_1015AD4C=match+*(match+423)+427; handler 0x0 (runtime-built pattern)"
+    },
+    {
+      "handler": "0x0",
+      "option": "MovingSteeringWheelSupport",
+      "signature": "7C E0 8B 06 8B 90 28 01 00 00 8B CE FF D2",
+      "site_offset": 2,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x100051e0",
+      "dest_symbol": "sub_100051E0",
+      "why": "fallback build variant of the trio installer (0 hits on 1.0.8.0)"
+    },
+    {
+      "handler": "0x10004110",
+      "option": "MovingSteeringWheelSupport",
+      "signature": "0C 83 88 94 00 00 00 04",
+      "site_offset": -10,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x100040e0",
+      "dest_symbol": "sub_100040E0",
+      "why": "the trio installer calls sub_10004110 on every path, installing the same IDE collector hook as CopSirensFlag/PopupHeadlightsFlag"
+    },
+    {
+      "handler": "0x0",
+      "option": "ShakingEngineBlock",
+      "signature": "32 DB 8B 16 8B 82 28 01 00 00 8B CE FF D0",
+      "site_offset": 2,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x100051b0",
+      "dest_symbol": "detour_100051B0",
+      "why": "shared trio installer sub_10005210 (pattern, game 0xA5389E, unique): E9 at match+2 to the detour; publishes dword_1015AD44=match+16 and dword_1015AD4C=match+*(match+423)+427; handler 0x0 (runtime-built pattern)"
+    },
+    {
+      "handler": "0x0",
+      "option": "ShakingEngineBlock",
+      "signature": "7C E0 8B 06 8B 90 28 01 00 00 8B CE FF D2",
+      "site_offset": 2,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x100051e0",
+      "dest_symbol": "sub_100051E0",
+      "why": "fallback build variant of the trio installer (0 hits on 1.0.8.0)"
+    },
+    {
+      "handler": "0x10004110",
+      "option": "ShakingEngineBlock",
+      "signature": "0C 83 88 94 00 00 00 04",
+      "site_offset": -10,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x100040e0",
+      "dest_symbol": "sub_100040E0",
+      "why": "the trio installer calls sub_10004110 on every path, installing the same IDE collector hook as CopSirensFlag/PopupHeadlightsFlag"
+    },
+    {
+      "handler": "0x0",
+      "option": "MovingPlaneParts",
+      "signature": "32 DB 8B 16 8B 82 28 01 00 00 8B CE FF D0",
+      "site_offset": 2,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x100051b0",
+      "dest_symbol": "detour_100051B0",
+      "why": "shared trio installer sub_10005210 (pattern, game 0xA5389E, unique): E9 at match+2 to the detour; publishes dword_1015AD44=match+16 and dword_1015AD4C=match+*(match+423)+427; handler 0x0 (runtime-built pattern)"
+    },
+    {
+      "handler": "0x0",
+      "option": "MovingPlaneParts",
+      "signature": "7C E0 8B 06 8B 90 28 01 00 00 8B CE FF D2",
+      "site_offset": 2,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x100051e0",
+      "dest_symbol": "sub_100051E0",
+      "why": "fallback build variant of the trio installer (0 hits on 1.0.8.0)"
+    },
+    {
+      "handler": "0x10004110",
+      "option": "MovingPlaneParts",
+      "signature": "0C 83 88 94 00 00 00 04",
+      "site_offset": -10,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x100040e0",
+      "dest_symbol": "sub_100040E0",
+      "why": "the trio installer calls sub_10004110 on every path, installing the same IDE collector hook as CopSirensFlag/PopupHeadlightsFlag"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "51 8B 44 24 0C 85 C0 0F 57 D2 56 8B 35 ? ? ? ? 57 8B 3D ? ? ? ? F3 0F 11 54 24 08 75 0C",
+      "site_offset": 0,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x10024060",
+      "dest_symbol": "sub_10024060",
+      "why": "callback 0x10024600 (loader thunk 0x1003d7a0); pattern verified unique at 0x8A9E10 (game 0x8A9E10); E9 at match -> float-axis body; publishes dword_10159C50=*(match+0xD), dword_10159C3C=*(match+0x14)"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "8B 44 24 08 8B 4C 24 04 50 51 E8 ? ? ? ? D8",
+      "site_offset": 0,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x100240C0",
+      "dest_symbol": "sub_100240C0",
+      "why": "callback 0x10024600 (loader thunk 0x1003d7a0); pattern verified unique at 0x8AA190; E9 at match -> negated float-axis body"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "83 C4 08 F7 D8 F3 0F 2A C0 6A 00 8B CE F3 0F 11 07",
+      "site_offset": 5,
+      "opcode": "0x0",
+      "dest_kind": "literal_bytes",
+      "bytes": "66 0F 6E C0",
+      "why": "callback 0x10024600 (loader thunk 0x1003d7a0); pattern verified unique at 0x1002B6EE (game 0xA84C1F): dword write at +5 cvtsi2ss -> movd"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "83 C4 08 F7 D8 F3 0F 2A C0 6A 00 8B CE F3 0F 11 07",
+      "site_offset": 33,
+      "opcode": "0x0",
+      "dest_kind": "literal_bytes",
+      "bytes": "66 0F 6E C0",
+      "why": "callback 0x10024600 (loader thunk 0x1003d7a0); pattern verified unique: dword write at +0x21 (game 0xA84C40)"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "83 C4 08 F7 D8 F3 0F 2A C0 6A 00 8B CE F3 0F 11 07",
+      "site_offset": 3,
+      "opcode": "0x0",
+      "dest_kind": "literal_bytes",
+      "bytes": "90 90",
+      "why": "callback 0x10024600 (loader thunk 0x1003d7a0); pattern verified unique: word write at +3 (neg eax -> nop)"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "83 C4 08 F7 D8 F3 0F 2A C0 6A 00 8B CE F3 0F 11 07",
+      "site_offset": 31,
+      "opcode": "0x0",
+      "dest_kind": "literal_bytes",
+      "bytes": "90 90",
+      "why": "callback 0x10024600 (loader thunk 0x1003d7a0); pattern verified unique: word write at +0x1F (game 0xA84C3E)"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "83 C4 08 F7 D8 F3 0F 2A C0 6A 01 8B CB F3 0F 11 07",
+      "site_offset": 5,
+      "opcode": "0x0",
+      "dest_kind": "literal_bytes",
+      "bytes": "66 0F 6E C0",
+      "why": "callback 0x10024600 (loader thunk 0x1003d7a0); pattern verified unique at 0x1002D9B2 (game 0xA7CCF7): dword write at +5"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "83 C4 08 F7 D8 F3 0F 2A C0 6A 01 8B CB F3 0F 11 07",
+      "site_offset": 33,
+      "opcode": "0x0",
+      "dest_kind": "literal_bytes",
+      "bytes": "66 0F 6E C0",
+      "why": "callback 0x10024600 (loader thunk 0x1003d7a0); pattern verified unique: dword write at +0x21 (game 0xA7CD18)"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "83 C4 08 F7 D8 F3 0F 2A C0 6A 01 8B CB F3 0F 11 07",
+      "site_offset": 3,
+      "opcode": "0x0",
+      "dest_kind": "literal_bytes",
+      "bytes": "90 90",
+      "why": "callback 0x10024600 (loader thunk 0x1003d7a0); pattern verified unique: word write at +3"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "83 C4 08 F7 D8 F3 0F 2A C0 6A 01 8B CB F3 0F 11 07",
+      "site_offset": 31,
+      "opcode": "0x0",
+      "dest_kind": "literal_bytes",
+      "bytes": "90 90",
+      "why": "callback 0x10024600 (loader thunk 0x1003d7a0); pattern verified unique: word write at +0x1F (game 0xA7CD16)"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "83 C4 08 F7 D8 F3 0F 2A C8 F3 0F 10 46",
+      "site_offset": 5,
+      "opcode": "0x0",
+      "dest_kind": "literal_bytes",
+      "bytes": "66 0F 6E C8",
+      "why": "callback 0x10024600 (loader thunk 0x1003d7a0); pattern verified unique at 0x1002F442 (game 0xA9AB43): dword write at +5 cvtsi2ss -> movd"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "83 C4 08 F7 D8 F3 0F 2A C8 F3 0F 10 46",
+      "site_offset": 3,
+      "opcode": "0x0",
+      "dest_kind": "literal_bytes",
+      "bytes": "90 90",
+      "why": "callback 0x10024600 (loader thunk 0x1003d7a0); pattern verified unique: word write at +3"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "8B 44 24 08 8B 4C 24 04 50 51 E8 ? ? ? ? 83 C4 08 83 3D",
+      "site_offset": 0,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x10024170",
+      "dest_symbol": "sub_10024170",
+      "why": "callback 0x10024600 (loader thunk 0x1003d7a0); pattern verified unique at 0x10033CD2 (game 0x8AA1B0); E9 at match; publishes dword_10159C5C=*(match+0x14) (game 0x010FC0D0)"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "56 8B 74 24 08 57 8B 7C 24 10 C7 06 00 00 00 00",
+      "site_offset": 51,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10024120",
+      "dest_symbol": "sub_10024120",
+      "why": "callback 0x10024600 (loader thunk 0x1003d7a0); pattern verified unique at 0x10035D62 (game 0xB4D230): E8 at match+0x33 -> int-axis body"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "56 8B 74 24 08 57 8B 7C 24 10 C7 06 00 00 00 00",
+      "site_offset": 90,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x10024120",
+      "dest_symbol": "sub_10024120",
+      "why": "callback 0x10024600 (loader thunk 0x1003d7a0); pattern verified unique: E8 at match+0x5A (game 0xB4D28A)"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "53 56 8B F1 57 8B BE 40 01 00 00 85 FF F3 0F 11 46",
+      "site_offset": -15,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x10024560",
+      "dest_symbol": "sub_10024560",
+      "why": "callback 0x10024600 (loader thunk 0x1003d7a0); pattern verified unique module scan 0x10031666 (game 0xA81B1F, module-relative): E9 at match-0xF -> naked mouse-angle body; publishes dword_10159C60=match"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "53 56 8B F1 57 8B BE 40 01 00 00 85 FF F3 0F 11 46",
+      "site_offset": 1862,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x100243A0",
+      "dest_symbol": "sub_100243A0",
+      "why": "callback 0x10024600 (loader thunk 0x1003d7a0); pattern verified unique module scan: E9 at match+0x746 (game 0xA82265) -> naked advance body; publishes dword_10159C40=match-0xF+0x765 (game 0xA82275)"
+    },
+    {
+      "handler": "0x0",
+      "option": "OutOfCommissionFix",
+      "signature": "A9 39 44 24 18",
+      "site_offset": 7,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x1004c3c0",
+      "dest_symbol": "sub_1004C3C0",
+      "why": "callback 0x1004C3F0 scan 1 (sub_1005b7d0, 1 hit game 0xA22E90): E9 written at match+7 -> the branch-widening body; publishes dword_10158034 = match+0x11 (game 0xA22EA1)"
+    },
+    {
+      "handler": "0x0",
+      "option": "OutOfCommissionFix",
+      "signature": "E8 ? ? ? ? 8B 74 24 14 83 C4 08 6A 00 56",
+      "site_offset": 0,
+      "opcode": "0xE8",
+      "dest_kind": "module_va",
+      "dest": "0x1004c350",
+      "dest_symbol": "sub_1004C350",
+      "why": "callback scan 2 (sub_1005b6a0, 1 hit game 0xB70733; the string is assigned fresh at 0x1004D6B1, the earlier A9-pattern chars belong to scan 1): E8 at match -> the wrap body; publishes dword_10159BF8 (target of the E8 at match-0x33 = game 0xA22BE0) and dword_10159C04 (the match E8's original target = game 0xACBE60)"
+    },
+    {
+      "handler": "0x0",
+      "option": "HighQualityReflections",
+      "signature": "8B 87 38 09 00 00 6A 08 68 1D 13 00 00 50 E8",
+      "site_offset": 0,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x1001f030",
+      "dest_symbol": "sub_1001F030",
+      "why": "callback 0x1001F390 install block: scan at 0x10022C89, E9 at the match via sub_1005B5D0 (0x10022CA0), publishes at 0x10022CA8 (dword_10159CFC = match+0x13) and 0x10022CB6 (dword_10159D04 = match + *(match+0xF) + 0x13). Pattern verified unique on builds 1000/1004/1010/1040/1060/1070/1080 and EFLC 1110/1120/1130, absent on 12043. Dest = [0x10192F18], set by the module constructor 0x10023CC0."
+    },
+    {
+      "handler": "0x10005CA0",
+      "option": "BuildingAlphaFix",
+      "signature": "F7 46 24 00 00 00 40 0F 84",
+      "site_offset": 7,
+      "opcode": "0xE9",
+      "dest_kind": "match_branch",
+      "why": "handler 0x10005CA0: E9 at match+7 (the 0F 84 opcode) with the displacement *(match+9) + 13 recomputed, i.e. the conditional je becomes an unconditional jmp to the SAME target (match_branch reads the branch's own rel32). Supersedes the generic bare-E9 op row. Both this and the 0F 85 variant (13-byte NOP) exist on every classic build and EFLC; 12043 has only the 0F 85 variant."
+    },
+    {
+      "handler": "0x0",
+      "option": "CarDynamicShadowFix",
+      "signature": "56 6A 02 6A 00 6A 00 57 E8 ? ? ? ? 56 6A 02 6A 04 6A 05 57 E8",
+      "site_offset": 0,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x100068d0",
+      "dest_symbol": "sub_100068D0",
+      "why": "shared installer sub_10010B60 (0x10014F74 branch): pattern B is the old-build variant (1000/1004/1010/1040); E9 at the match -> 0x100068D0 ([0x1018E57C], set by ctor sub_10022E00), publishes dword_1015BDCC = match+0xD and dword_1015B5B8 = match + *(match+9) + 0xD"
+    },
+    {
+      "handler": "0x0",
+      "option": "CarDynamicShadowFix",
+      "signature": "83 F8 14 7D 05 83 F8 06 7D 14",
+      "site_offset": 3,
+      "opcode": "0xE9",
+      "dest_kind": "match_rel",
+      "dest": "0x1e",
+      "why": "shared installer C branch (0x100162A1/0x10017783): E9 at C+3 -> C+0x1E (skips the second range check); pattern C exists on 1000/1004/1010/1040 only"
+    },
+    {
+      "handler": "0x0",
+      "option": "CarDynamicShadowFix@noE",
+      "signature": "83 F8 14 7D 05 83 F8 06 7D 14",
+      "site_offset": 62,
+      "opcode": "0x0",
+      "dest_kind": "literal_bytes",
+      "bytes": "90 90 90 90 90 90",
+      "why": "shared installer E branch (0x1001903E): when pattern E is MISSING the installer NOP-fills 6 bytes at C+0x3E. E exists only on 1.0.0.4, so this row carries the internal @noE spelling and the build gate 1000/1040"
+    },
+    {
+      "handler": "0x10044590",
+      "option": "PopupHeadlightsFlag",
+      "signature": "0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1",
+      "site_offset": 0,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x10044560",
+      "dest_symbol": "sub_10044560",
+      "why": "handler sub_10044590 twin branch (0x10044651): the EDX-form pattern (0F BF 56 2E = movsx edx,[esi+0x2E]) exists on 1000/1004/1010/1040; E9 at the match -> 0x10044560 (the register-mirrored body)"
+    },
+    {
+      "handler": "0x10044590",
+      "option": "PopupHeadlightsFlag",
+      "signature": "0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1",
+      "site_offset": 10,
+      "opcode": "0xeb",
+      "dest_kind": "literal_byte",
+      "dest_byte": "0xeb",
+      "why": "twin branch swaps the `75` jne opcode at match+0xA for EB (same as the primary)"
+    },
+    {
+      "handler": "0x10044590",
+      "option": "PopupHeadlightsFlag",
+      "signature": "0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1",
+      "site_offset": 82,
+      "opcode": "0x0",
+      "dest_kind": "rebased_global",
+      "dest": 0,
+      "why": "twin branch rewrites the game's `fld dword ptr [...]` operand at match+82 to our dword_101580CC-equivalent global (same as the primary)"
+    },
+    {
+      "handler": "0x0",
+      "option": "CutsceneFixes",
+      "signature": "8B 4C 24 2C 5F 5E 5B 33 CC B0 01 E8",
+      "site_offset": -5,
+      "opcode": "0xe8",
+      "dest_kind": "module_va",
+      "dest": "0x100388C0",
+      "dest_symbol": "sub_100388C0",
+      "why": "CutsceneFixes chain B. Worker sub_10038B40 (registered by ctor 0x10045350 into [0x10164F04], run by the loader arm's sub_10045420 -> forwarder 0x10045410 when CutsceneFixes==1): scan 1 via sub_1005B7D0 at 0x1003B8E0. E8 written at match-5 (the call to the game camera fn, 0xC9A640 on 1080) redirecting to the worker's own body sub_100388C0; the original target is read from the site's rel32 at match-4 and published (dword_1015BDE4 = match + *(match-4), dword_1015BDF0 = that + 0x4F). Pattern recovered by emulating the worker's char-built string (the builder-seed extractor) and verified 1 hit on every classic build + EFLC 1110/1120/1130, absent on 12059."
+    },
+    {
+      "handler": "0x0",
+      "option": "CutsceneFixes",
+      "signature": "8B CF 88 44 24 0F E8 ? ? ? ? A1",
+      "site_offset": -5,
+      "opcode": "0xe8",
+      "dest_kind": "module_va",
+      "dest": "0x100388C0",
+      "dest_symbol": "sub_100388C0",
+      "why": "CutsceneFixes chain B, scan 2 in the same worker (sub_1005B6A0 at 0x1003D1E8, first match, tail block 0x1003D13B-0x1003D1F4): E8 at match-5 -> the same body sub_100388C0 via sub_1005BA00 (which hardcodes the body VA). No publish; the body reuses the target published by scan 1 (both sites call the same game function). Verified 1 hit on every classic build + EFLC 1110/1120/1130, absent on 12059."
+    },
+    {
+      "handler": "0x10006770",
+      "option": "DualVehicleHeadlights@old",
+      "signature": "8B 17 8B 42 64 8B CF FF D0 8B 54",
+      "site_offset": 0,
+      "opcode": "e9",
+      "dest_kind": "module_va",
+      "dest": "0x10006630",
+      "why": "handler 0x10006770: *(_BYTE*)match = -23, displacement to sub_10006630 for game build ordinals 1..6 (dword_1015BE04 == 1..6); gate 1000/1040/1004"
+    },
+    {
+      "handler": "0x10006770",
+      "option": "DualVehicleHeadlights@new",
+      "signature": "8B 17 8B 42 64 8B CF FF D0 8B 54",
+      "site_offset": 0,
+      "opcode": "e9",
+      "dest_kind": "module_va",
+      "dest": "0x100064F0",
+      "why": "handler 0x10006770: same E9, displacement to sub_100064F0 for every other build; the live original run applies this E9 at game 0x8F7CE5 on 1.0.8.0"
+    },
+    {
+      "handler": "0x10005500",
+      "option": "RemoveGFWLUpdatePopup",
+      "signature": "2B C1 1B D6 89 44 24 0C 89 54 24 10 DF 6C 24 0C D8 0D ? ? ? ? D9 5C 24 08",
+      "site_offset": 0,
+      "opcode": "0xE9",
+      "dest_kind": "module_va",
+      "dest": "0x100054e0",
+      "dest_symbol": "sub_100054E0",
+      "why": "shared handler: both Patch4RemoveModChecks and RemoveGFWLUpdatePopup arms call sub_10005500; the stub's helper checks both flags, so the same install is registered per option (idempotent)"
+    }
+  ],
+  "sig_writes": [
+    {
+      "handler": "0x10022d80",
+      "option": "InfiniteCarBottomDistance",
+      "signature": "0F 2F D0 76 25 0F 28 C2",
+      "site_offset": 3,
+      "bytes": "eb 2a",
+      "why": "the handler rewrites the conditional jbe +0x25 into an unconditional jmp +0x2A (EB at +3, 2A at +4). The op table stored the EB at +4 (overwriting the 2A), so both rows are replaced by this single two-byte write."
+    },
+    {
+      "handler": "0x10045610",
+      "option": "SavegameFix",
+      "signature": "75 ? 83 C1 01 83 C0 01 83 F9 04",
+      "site_offset": 0,
+      "bytes": "90 90",
+      "why": "the CRC-check NOPs (the handler's first write); moved here so they run after the signature's call replacements are installed."
+    },
+    {
+      "handler": "0x0",
+      "option": "BorderlessWindowed",
+      "signature": "FF 15 ? ? ? ? 5F 5E 5D 5B 83 C4 10 C2 10 00",
+      "site_offset": 5,
+      "bytes": "90",
+      "match_index": 0,
+      "why": "mod NOPs the 6th byte of the replaced call so the body ret lands on a NOP"
+    },
+    {
+      "handler": "0x0",
+      "option": "BorderlessWindowed",
+      "signature": "FF 15 ? ? ? ? 5F 5E 5D 5B 83 C4 10 C2 10 00",
+      "site_offset": 5,
+      "bytes": "90",
+      "match_index": 1,
+      "why": "same for the second (ANSI) WndProc"
+    },
+    {
+      "handler": "0x0",
+      "option": "FastLoading",
+      "signature": "6A 0A E8 ? ? ? ? 83 C7 0A 83 C4 04 81 FF E8 03 00 00 75 02 33 FF",
+      "site_offset": 1,
+      "bytes": "00",
+      "why": "FastLoading: original writes 0 at dword_1016C3F0-6, turning push 10 (frame/Sleep delay at gtaiv+0x8B1D21) into push 0. Recovered live from the original ASI: dword_1016C3F0 = gtaiv+0x8B1D28."
+    },
+    {
+      "handler": "0x1001EDE0",
+      "option": "DoNotPauseOnMinimize",
+      "signature": "6A 0A 56 50 FF D2 A1",
+      "site_offset": 1,
+      "bytes": "06",
+      "why": "DoNotPauseOnMinimize: the feature fn sub_1001EDE0 sets the game's pause-on-minimize flag byte to 6 (re-added from the handoff re-enable list)"
+    },
+    {
+      "handler": "0x0",
+      "option": "DoNotPauseOnMinimize",
+      "signature": "75 ? 8B 0D ? ? ? ? 51 FF 15 ? ? ? ? 85 C0 75 ? 8B 15",
+      "site_offset": 0,
+      "bytes": "90 90",
+      "why": "DoNotPauseOnMinimize: sub_1001ECB0 writes the WORD 0x9090 at the match when byte_1015AD43 is set (option_flags sets it for this option). The gorified row is the same write; handler 0x0 because the generator's checks look for byte writes."
+    },
+    {
+      "handler": "0x0",
+      "option": "CarDynamicShadowFix",
+      "signature": "83 E0 0F 83 F8 03 75 17 F6 86 6C 02 00 00 04",
+      "site_offset": 6,
+      "bytes": "EB",
+      "why": "pattern F (game 0x95A418, unique): jne +0x17 -> jmp +0x17 (same target 0x95A437)"
+    },
+    {
+      "handler": "0x0",
+      "option": "CarDynamicShadowFix",
+      "signature": "50 68 04 01 00 00 6A 02 6A 00 E8",
+      "site_offset": 2,
+      "bytes": "00",
+      "why": "sub_1000EA00 (game 0x8F7422): push 0x104 -> push 0x100. The original's sub_10010B60 calls sub_1000EA00 on the common tail (10014FB4) regardless of the a1/a2 parameters, so the write is gated by the CarDynamicShadowFix arm itself, not the @noFCHS variant; BuildingDynamicShadows' own handler calls the same installer step (duplicate row)"
+    },
+    {
+      "handler": "0x0",
+      "option": "BuildingDynamicShadows",
+      "signature": "50 68 04 01 00 00 6A 02 6A 00 E8",
+      "site_offset": 2,
+      "bytes": "00",
+      "why": "sub_1000EA00 shared write (the BuildingDynamicShadows handler calls the same installer step)"
+    },
+    {
+      "handler": "0x0",
+      "option": "CarPartsShadowFix@standalone",
+      "signature": "83 F8 04 C6 44 24 0E 00 75 0F",
+      "site_offset": 8,
+      "bytes": "EB",
+      "why": "sub_10007E40 (standalone CarPartsShadowFix arm): jne +0x0F -> jmp +0x0F [gated to the standalone arm: the loader runs sub_10006910 + sub_10007E40 for key==1; the shared CarDynamic installer calls only sub_10006910]"
+    },
+    {
+      "handler": "0x0",
+      "option": "CarPartsShadowFix@standalone",
+      "signature": "83 FA 04 75 0C",
+      "site_offset": 3,
+      "bytes": "EB",
+      "why": "standalone arm sub_10007E40 second scan (0x1000B749): old builds (1000/1004/1010/1040) and 12059 use this variant; writes EB over the `75` at match+3"
+    },
+    {
+      "handler": "0x0",
+      "option": "CutsceneFixes",
+      "signature": "74 24 8B 44 24 2C 83 F8 03",
+      "site_offset": 0,
+      "bytes": "EB",
+      "fallback_signature": "74 0B 83 7C 24 2C 03",
+      "why": "CutsceneFixes chain A (the other half of the loader arm): the hidden worker sub_1003DA50 (CRT thunk 0x10001150, this=0x101806F8) builds the pattern text char-by-char (obfuscated decimal roundtrips) and scans the main module with sub_1005AFA0 (first match); the first match of the first text is stored to this+0x5890 = [0x10185F88]. When that scan has no match the worker RESETS the text (assign '2' + pat[0]='7', 0x10041451) and builds a second, build-variant text, scanned again; its first match is published the same way. The callback 0x10044160 (registered by ctor sub_100440A0, run by the loader arm 0x100550AC when CutsceneFixes==1) writes a single EB at [0x10185F88] if set. Recovered texts: first '74 24 8B 44 24 2C 83 F8 03' (1 hit on 1004/1060/1070/1080 + EFLC 1110/1120/1130; on 1080 the match is the je at game 0xC9A840 in the camera fn F), fallback '74 0B 83 7C 24 2C 03' (1 hit on 1000/1010/1040); neither exists on 12059. The EB turns the je into an unconditional jmp over the 'target found' flag test, complementing chain B's poke."
+    },
+    {
+      "handler": "0x1001b580",
+      "option": "EpisodicVehicleSupport",
+      "signature": "7C 18 0F BF 4E 2E",
+      "site_offset": -6,
+      "bytes": "90 90 90 90 90 90 90 90",
+      "match_index": 0,
+      "why": "find-all fill: matches[0]-6 (8x90), kills cmp [episode_global],edi; jl (1001B76D)"
+    },
+    {
+      "handler": "0x1001b580",
+      "option": "EpisodicVehicleSupport",
+      "signature": "7C 18 0F BF 4E 2E",
+      "site_offset": -6,
+      "bytes": "90 90 90 90 90 90 90 90",
+      "match_index": 1,
+      "why": "find-all fill: matches[1]-6 (8x90) (1001B79A)"
+    },
+    {
+      "handler": "0x1001b580",
+      "option": "EpisodicVehicleSupport",
+      "signature": "83 3D ? ? ? ? 02 75 17 F3 0F 10 44 24 08",
+      "site_offset": 0,
+      "bytes": "90 90 90 90 90 90 90 90 90",
+      "match_index": 0,
+      "why": "find-all fill: matches[0]+0 (9x90) (1001BA3B)"
+    },
+    {
+      "handler": "0x1001b580",
+      "option": "EpisodicVehicleSupport",
+      "signature": "83 3D ? ? ? ? 02 75 17 F3 0F 10 44 24 08",
+      "site_offset": 0,
+      "bytes": "90 90 90 90 90 90 90 90 90",
+      "match_index": 1,
+      "why": "find-all fill: matches[1]+0 (9x90) (1001BA65)"
+    },
+    {
+      "handler": "0x0",
+      "option": "ForceCarHeadlightShadows",
+      "signature": "8D 4C 24 50 51 68 04 05 00 00",
+      "site_offset": 6,
+      "bytes": "04",
+      "why": "sub_1000E870 write 1a (game 0x8F73EC): restore push 0x504 first byte; called from the FCHS handler tail (1001AF0A) only when FCHS == 1"
+    },
+    {
+      "handler": "0x0",
+      "option": "ForceCarHeadlightShadows",
+      "signature": "8D 4C 24 50 51 68 04 05 00 00",
+      "site_offset": 7,
+      "bytes": "05",
+      "why": "sub_1000E870 write 1b (game 0x8F73ED): restore push 0x504 second byte"
+    },
+    {
+      "handler": "0x0",
+      "option": "ForceCarHeadlightShadows",
+      "signature": "8D 44 24 50 50 68 04 01 00 00",
+      "site_offset": 6,
+      "bytes": "04",
+      "why": "sub_1000E870 write 2a (game 0x8F7422): restore push 0x104 first byte"
+    },
+    {
+      "handler": "0x0",
+      "option": "ForceCarHeadlightShadows",
+      "signature": "8D 44 24 50 50 68 04 01 00 00",
+      "site_offset": 7,
+      "bytes": "01",
+      "why": "sub_1000E870 write 2b (game 0x8F7423): restore push 0x104 second byte"
+    },
+    {
+      "handler": "0x0",
+      "option": "ForceCarHeadlightShadows",
+      "signature": "F3 0F 11 44 24 1C 0F 84 9E 00 00 00",
+      "site_offset": 6,
+      "bytes": "0F 84 9E 00 00",
+      "why": "sub_1000E870 write 3 (game 0x8F719F): restore the jz +0x9E (5 bytes)"
+    }
+  ],
+  "slot_installs": [
+    {
+      "handler": "0x10045c50",
+      "option": "SkipIntro",
+      "signature": "89 91 ? ? ? ? 8D 44 24 ? 68 ? ? ? ? 50",
+      "slot_name": "dword_1015AD74",
+      "kind": "match",
+      "why": "the handler publishes the match address; the body resumes through it"
+    },
+    {
+      "handler": "0x10046640",
+      "option": "SkipMenu",
+      "signature": "83 F8 03 75 ? A1 ? ? ? ? 80 88 ? ? ? ? ? 84 DB 74 0A 6A 00 E8 ? ? ? ? 83 C4 04 5F 5E",
+      "slot_name": "dword_10159348",
+      "kind": "match_field",
+      "field_offset": 24,
+      "add": 28,
+      "why": "the handler publishes *(match+24) + match + 28 (the resume address)"
+    },
+    {
+      "handler": "0x10046640",
+      "option": "SkipMenu",
+      "signature": "6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5D 5B 33 CC E8 ? ? ? ? 81 C4 ? ? ? ? C3",
+      "slot_name": "dword_10159348",
+      "kind": "match_field",
+      "field_offset": 3,
+      "add": 7,
+      "why": "fallback signature: the handler publishes *(match+3) + match + 7"
+    },
+    {
+      "handler": "0x10046640",
+      "option": "SkipMenu",
+      "signature": "6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC E8 ? ? ? ? 8B E5 5D C3",
+      "slot_name": "dword_10159348",
+      "kind": "match_field",
+      "field_offset": 3,
+      "add": 7,
+      "why": "second fallback signature: the handler publishes *(match+3) + match + 7"
+    },
+    {
+      "handler": "0x10036fd0",
+      "option": "BlackscreenFix",
+      "signature": "75 54 8B 48 28 8B 40 2C",
+      "slot_name": "dword_1015AD58",
+      "kind": "match_field",
+      "field_offset": 82,
+      "add": 86,
+      "why": "the original call target: match + *(match+82) + 86 (the E8 at +81)"
+    },
+    {
+      "handler": "0x10036fd0",
+      "option": "BlackscreenFix",
+      "signature": "75 54 8B 48 28 8B 40 2C",
+      "slot_name": "dword_1015AD5C",
+      "kind": "call_target_deref",
+      "field_offset": 82,
+      "add": 87,
+      "why": "*(resume + 1): the operand of the target's first instruction is the value pointer"
+    },
+    {
+      "handler": "0x1003d7d0",
+      "option": "PathNodeCrashFix",
+      "signature": "8B 04 B1 0F B7 D0 81 FA FF FF 00 00",
+      "slot_name": "dword_1015BDFC",
+      "kind": "match",
+      "add": 0,
+      "why": "handler publishes the match as the success resume (site is match+53)"
+    },
+    {
+      "handler": "0x1003d7d0",
+      "option": "PathNodeCrashFix",
+      "signature": "8B 04 B1 0F B7 D0 81 FA FF FF 00 00",
+      "slot_name": "dword_1015BE00",
+      "kind": "match",
+      "add": 59,
+      "why": "handler publishes match+59 as the failure resume"
+    },
+    {
+      "handler": "0x1003d890",
+      "option": "PlaneCrashFix",
+      "signature": "83 C4 04 88 58 26 8B 16 8B 82 F4 00 00 00",
+      "slot_name": "dword_1015BE14",
+      "kind": "match",
+      "add": 14,
+      "why": "handler publishes match+14 (after the E9 site at match+3)"
+    },
+    {
+      "handler": "0x1003d890",
+      "option": "PlaneCrashFix",
+      "signature": "83 C4 04 88 58 26 8B 16 8B 82 F4 00 00 00",
+      "slot_name": "dword_1015BE18",
+      "kind": "match",
+      "add": -705,
+      "why": "handler publishes match-705 as the null-pointer resume"
+    },
+    {
+      "handler": "0x100504b0",
+      "option": "WantedLevelCrashFix",
+      "signature": "8B 01 8B 90 28 01 00 00 FF D2 84 C0 0F 84 88 00 00 00",
+      "slot_name": "dword_1015AD6C",
+      "kind": "match",
+      "add": 12,
+      "why": "handler publishes match+12 as the resume"
+    },
+    {
+      "handler": "0x10036f30",
+      "option": "GroupHackFix",
+      "signature": "33 C0 83 C1 04 8D 50 07 83 39 00 75 06 83 79 04",
+      "slot_name": "dword_1015AD60",
+      "kind": "match",
+      "add": 11,
+      "why": "handler publishes match+11 as the resume"
+    },
+    {
+      "handler": "0x100467a0",
+      "option": "SMPA60Fix",
+      "signature": "8B 48 70 83 C0 40 50 51 8D 51 10",
+      "slot_name": "dword_10159C70",
+      "kind": "match",
+      "add": 28,
+      "why": "handler publishes match+28 as the sentinel resume"
+    },
+    {
+      "handler": "0x100467a0",
+      "option": "SMPA60Fix",
+      "signature": "8B 48 70 83 C0 40 50 51 8D 51 10",
+      "slot_name": "dword_10159C68",
+      "kind": "match",
+      "add": 14,
+      "why": "handler publishes match+14 as the normal resume"
+    },
+    {
+      "handler": "0x100467a0",
+      "option": "SMPA60Fix",
+      "signature": "01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C",
+      "slot_name": "dword_10159C6C",
+      "kind": "match",
+      "add": 136,
+      "why": "tail sig: the handler publishes match+136 as the tail shim resume"
+    },
+    {
+      "handler": "0x10037070",
+      "option": "FreezeGunFix",
+      "signature": "2B C2 D1 F8 39 3C C6 7D 0D 83 CA FF",
+      "slot_name": "dword_1015AD64",
+      "kind": "match",
+      "add": -12,
+      "why": "handler publishes match-12 as the FreezeGunFix shim resume"
+    },
+    {
+      "handler": "0x1003d9c0",
+      "option": "PlayerAsPedComponentsFix",
+      "signature": "8B 54 24 10 52 0F B6 90 19 02 00 00",
+      "slot_name": "dword_10159D2C",
+      "kind": "match",
+      "add": 14,
+      "why": "handler publishes match+14 as the PlayerAsPedComponentsFix resume"
+    },
+    {
+      "handler": "0x100523c0",
+      "option": "PlayerAsPedComponentsFix",
+      "signature": "8B 44 24 04 89 44 24 04 66 A1 ? ? ? ? 66 85 C0 76 3E",
+      "slot_name": "dword_10159C0C",
+      "kind": "match",
+      "add": 0,
+      "why": "shared model-index lookup function the main loader resolves (used by PlayerAsPedComponentsFix/PedModelsInCutscenesFix/PopupHeadlightsFlag)"
+    },
+    {
+      "handler": "0x100523c0",
+      "option": "PedModelsInCutscenesFix",
+      "signature": "8B 44 24 04 89 44 24 04 66 A1 ? ? ? ? 66 85 C0 76 3E",
+      "slot_name": "dword_10159C0C",
+      "kind": "match",
+      "add": 0,
+      "why": "shared model-index lookup for PedModelsInCutscenesFix (same global)"
+    },
+    {
+      "handler": "0x1001afa0",
+      "option": "EmissiveLerpFix",
+      "signature": "F3 0F 58 C1 F3 0F 2A C8 F3 0F 58 C1",
+      "slot_name": "dword_10159CC4",
+      "kind": "match",
+      "add": -16,
+      "why": "handler publishes match-16 as the float constant pointer the shim multiplies by"
+    },
+    {
+      "handler": "0x1001afa0",
+      "option": "EmissiveLerpFix",
+      "signature": "F3 0F 58 C1 F3 0F 2A C8 F3 0F 58 C1",
+      "slot_name": "dword_10159CC8",
+      "kind": "match",
+      "add": -12,
+      "why": "handler publishes match-12 as the EmissiveLerpFix resume"
+    },
+    {
+      "handler": "0x10046a10",
+      "option": "SuperLODFix",
+      "signature": "",
+      "slot_name": "dword_101580AC",
+      "kind": "rva",
+      "add": 4865335,
+      "build": 8,
+      "why": "build 8: handler publishes base+4865335 (fail resume)"
+    },
+    {
+      "handler": "0x10046a10",
+      "option": "SuperLODFix",
+      "signature": "",
+      "slot_name": "dword_101580AC",
+      "kind": "rva",
+      "add": 5508711,
+      "build": 9,
+      "why": "build 9: handler publishes base+5508711 (fail resume)"
+    },
+    {
+      "handler": "0x10046a10",
+      "option": "SuperLODFix",
+      "signature": "",
+      "slot_name": "dword_101580B0",
+      "kind": "rva",
+      "add": 4865263,
+      "build": 8,
+      "why": "build 8: handler publishes base+4865263 (ok resume)"
+    },
+    {
+      "handler": "0x10046a10",
+      "option": "SuperLODFix",
+      "signature": "",
+      "slot_name": "dword_101580B0",
+      "kind": "rva",
+      "add": 5508639,
+      "build": 9,
+      "why": "build 9: handler publishes base+5508639 (ok resume)"
+    },
+    {
+      "handler": "0x10046a10",
+      "option": "SuperLODFix",
+      "signature": "",
+      "slot_name": "dword_101580B4",
+      "kind": "rva",
+      "add": 5810912,
+      "build": 8,
+      "why": "build 8: handler publishes base+5810912 (model lookup)"
+    },
+    {
+      "handler": "0x10046a10",
+      "option": "SuperLODFix",
+      "signature": "",
+      "slot_name": "dword_101580B4",
+      "kind": "rva",
+      "add": 5100240,
+      "build": 9,
+      "why": "build 9: handler publishes base+5100240 (model lookup)"
+    },
+    {
+      "handler": "0x1001b0e0",
+      "option": "EpisodeSwitchFreezeFix",
+      "signature": "89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84",
+      "slot_name": "dword_10159BBC",
+      "kind": "match",
+      "add": 5,
+      "why": "handler publishes match+5 as the store shim resume"
+    },
+    {
+      "handler": "0x1001b0e0",
+      "option": "EpisodeSwitchFreezeFix",
+      "signature": "8B 4B 10 3B 4B 14 7D 0F",
+      "slot_name": "dword_10159BB4",
+      "kind": "match",
+      "add": 6,
+      "why": "handler publishes match+6 as shim b resume"
+    },
+    {
+      "handler": "0x1001b0e0",
+      "option": "EpisodeSwitchFreezeFix",
+      "signature": "56 8B F1 83 7E 14 00 75 0B 83 7E 10 00 74 05",
+      "slot_name": "dword_10159BB8",
+      "kind": "match",
+      "add": 7,
+      "why": "handler publishes match+7 as shim c resume"
+    },
+    {
+      "handler": "0x1001efa0",
+      "option": "HighFPSBikePhysicsFix",
+      "signature": "D9 45 08 51 8B CE D9 1C 24 E8 ? ? ? ? 8A 86 90 14 00 00",
+      "slot_name": "dword_1015AD84",
+      "kind": "match",
+      "add": 9,
+      "why": "handler publishes match+9 as the bike-physics detour resume"
+    },
+    {
+      "handler": "0x10005e30",
+      "option": "CollisionDeadlockFix",
+      "signature": "55 8B EC 83 E4 F8 51 8B 45 0C 0F B7 48 66",
+      "slot_name": "dword_1015BDD4",
+      "kind": "match_field",
+      "field_offset": 91,
+      "add": 95,
+      "why": "the call target the replacement invokes per node (the walk predicate)"
+    },
+    {
+      "handler": "0x100523c0",
+      "option": "DrivebyFOVFix",
+      "signature": "F3 0F 10 46 60 F3 0F 5C CA",
+      "slot_name": "dword_1015BDF4",
+      "kind": "match",
+      "add": 5,
+      "why": "the handler publishes match+5 as the DrivebyFOVFix resume"
+    },
+    {
+      "handler": "0x100523c0",
+      "option": "DrivebyFOVFix",
+      "signature": "08 0B C2 8B F0 E8",
+      "slot_name": "dword_1015BDE0",
+      "kind": "match_field",
+      "field_offset": 6,
+      "add": 10,
+      "why": "the loader publishes match+[match+6]+0xa (the handle resolver, E8 target)"
+    },
+    {
+      "handler": "0x1003d420",
+      "option": "NoLiveryLimit",
+      "signature": "74 52 8D B5 3C 01 00 00 83 FB 04",
+      "slot_name": "dword_10159BA4",
+      "kind": "match_field",
+      "field_offset": -6,
+      "add": -2,
+      "why": "handler publishes match + *(match-6) - 2 (the per-sign lookup function)"
+    },
+    {
+      "handler": "0x1003d420",
+      "option": "NoLiveryLimit",
+      "signature": "74 52 8D B5 3C 01 00 00 83 FB 04",
+      "slot_name": "dword_10159BAC",
+      "kind": "match",
+      "add": 90,
+      "why": "handler publishes match+90 (shim d tail resume)"
+    },
+    {
+      "handler": "0x1003d420",
+      "option": "NoLiveryLimit",
+      "signature": "8B 8C 83 3C 01 00 00 0F BF 53 48",
+      "slot_name": "dword_10159B9C",
+      "kind": "match",
+      "add": 13,
+      "why": "handler publishes match+13 (shim a/b/c resume)"
+    },
+    {
+      "handler": "0x100371f0",
+      "option": "CrashMsgFix",
+      "signature": "68 6A 10 4E 31",
+      "slot_name": "dword_1015AD68",
+      "kind": "ptr_site_field",
+      "site_field_offset": -4,
+      "field_offset": 1,
+      "add": 5,
+      "why": "handler publishes *(match-4) + *(*(match-4)+1) + 5 (the original call target)"
+    },
+    {
+      "handler": "0x10051920",
+      "option": "NewFilesCompatibility",
+      "signature": "68 64 28 C8 67 E8",
+      "slot_name": "dword_10159C08",
+      "kind": "match_field",
+      "field_offset": 6,
+      "add": 10,
+      "why": "handler publishes match+[match+6]+10 (the file-registration fn)"
+    },
+    {
+      "handler": "0x0",
+      "option": "BenchmarkFix",
+      "signature": "E8 ? ? ? ? 83 C4 04 57 8B D8 FF D6 8B 77 20",
+      "slot_name": "dword_1015AD50",
+      "kind": "match",
+      "add": 13,
+      "match_index": 0,
+      "why": "handler publishes match[0]+0xd (resume a)"
+    },
+    {
+      "handler": "0x0",
+      "option": "BenchmarkFix",
+      "signature": "E8 ? ? ? ? 83 C4 04 57 8B D8 FF D6 8B 77 20",
+      "slot_name": "dword_1015AD54",
+      "kind": "match",
+      "add": 13,
+      "match_index": 1,
+      "why": "handler publishes match[1]+0xd (resume b)"
+    },
+    {
+      "handler": "0x0",
+      "option": "BuildingDynamicShadows",
+      "signature": "8B 47 28 C1 E8 06 83 E0 0F 83 C0",
+      "slot_name": "dword_10159C20",
+      "kind": "match",
+      "field_offset": 0,
+      "add": 15,
+      "match_index": 0,
+      "why": "handler publishes match+0xf (normal resume)"
+    },
+    {
+      "handler": "0x0",
+      "option": "BuildingDynamicShadows",
+      "signature": "8B 47 28 C1 E8 06 83 E0 0F 83 C0",
+      "slot_name": "dword_10159C28",
+      "kind": "match",
+      "field_offset": 0,
+      "add": 112,
+      "match_index": 0,
+      "why": "handler publishes match+0x70 (special resume)"
+    },
+    {
+      "handler": "0x0",
+      "option": "BuildingDynamicShadows",
+      "signature": "8B 46 28 83 4E 24 05 25 7F FC FF FF 83 C8 40 89 46 28 C7 06",
+      "slot_name": "dword_10159C1C",
+      "kind": "match_deref",
+      "field_offset": 20,
+      "add": 0,
+      "match_index": 0,
+      "why": "handler publishes *(match[0]+0x14) (model hash a)"
+    },
+    {
+      "handler": "0x0",
+      "option": "BuildingDynamicShadows",
+      "signature": "8B 46 28 83 4E 24 05 25 7F FC FF FF 83 C8 40 89 46 28 C7 06",
+      "slot_name": "dword_10159C24",
+      "kind": "match_deref",
+      "field_offset": 20,
+      "add": 0,
+      "match_index": 1,
+      "why": "handler publishes *(match[1]+0x14) (model hash b)"
+    },
+    {
+      "handler": "0x10006350",
+      "option": "CopSirensFlag",
+      "signature": "E8 ? ? ? ? C0 E0 ? 32 86 6F 0F 00",
+      "slot_name": "dword_1015937C",
+      "kind": "match",
+      "add": 5,
+      "why": "handler publishes match+5 (first resume)"
+    },
+    {
+      "handler": "0x10006350",
+      "option": "CopSirensFlag",
+      "signature": "0F BF 41 2E 39 05",
+      "slot_name": "dword_10159374",
+      "kind": "match",
+      "add": 28,
+      "why": "handler publishes match+28 (second resume)"
+    },
+    {
+      "handler": "0x10004110",
+      "option": "CopSirensFlag",
+      "signature": "0C 83 88 94 00 00 00 04",
+      "slot_name": "dword_1015BE10",
+      "kind": "match",
+      "add": -1,
+      "why": "IDE installer publishes match-1 (resume)"
+    },
+    {
+      "handler": "0x0",
+      "option": "SpeedupBugFix",
+      "signature": "50 64 89 25 00 00 00 00 83 EC 34",
+      "slot_name": "dword_10159350",
+      "kind": "match_deref",
+      "field_offset": 26,
+      "why": "handler publishes *(match+0x1a) (pointer to a game timing float)"
+    },
+    {
+      "handler": "0x0",
+      "option": "SpeedupBugFix",
+      "signature": "50 64 89 25 00 00 00 00 83 EC 34",
+      "slot_name": "dword_10159364",
+      "kind": "match_deref",
+      "field_offset": 165,
+      "why": "handler publishes *(match+0xa5) (pointer to a game timing float)"
+    },
+    {
+      "handler": "0x0",
+      "option": "SpeedupBugFix",
+      "signature": "50 64 89 25 00 00 00 00 83 EC 34",
+      "slot_name": "dword_10159360",
+      "kind": "match_deref",
+      "field_offset": 188,
+      "why": "handler publishes *(match+0xbc) (pointer to a game timing float)"
+    },
+    {
+      "handler": "0x0",
+      "option": "SpeedupBugFix",
+      "signature": "50 64 89 25 00 00 00 00 83 EC 34",
+      "slot_name": "dword_1015935C",
+      "kind": "match_deref",
+      "field_offset": 226,
+      "why": "handler publishes *(match+0xe2) (pointer to a game timing float)"
+    },
+    {
+      "handler": "0x0",
+      "option": "SpeedupBugFix",
+      "signature": "50 64 89 25 00 00 00 00 83 EC 34",
+      "slot_name": "dword_10159368",
+      "kind": "match_deref",
+      "field_offset": 234,
+      "why": "handler publishes *(match+0xea) (pointer to a game timing float)"
+    },
+    {
+      "handler": "0x0",
+      "option": "SpeedupBugFix",
+      "signature": "50 64 89 25 00 00 00 00 83 EC 34",
+      "slot_name": "dword_1015934C",
+      "kind": "match_deref",
+      "field_offset": 249,
+      "why": "handler publishes *(match+0xf9) (pointer to a game timing float)"
+    },
+    {
+      "handler": "0x0",
+      "option": "SpeedupBugFix",
+      "signature": "50 64 89 25 00 00 00 00 83 EC 34",
+      "slot_name": "dword_10159354",
+      "kind": "match_deref",
+      "field_offset": 264,
+      "why": "handler publishes *(match+0x108) (pointer to a game timing float)"
+    },
+    {
+      "handler": "0x0",
+      "option": "SpeedupBugFix",
+      "signature": "50 64 89 25 00 00 00 00 83 EC 34",
+      "slot_name": "dword_10159358",
+      "kind": "match_deref",
+      "field_offset": 276,
+      "why": "handler publishes *(match+0x114) (pointer to a game timing float)"
+    },
+    {
+      "handler": "0x0",
+      "option": "CarPartsShadowFix",
+      "signature": "85 DB 7E 41 55 EB 0A",
+      "slot_name": "dword_1015BDC8",
+      "kind": "match",
+      "add": 2,
+      "why": "handler publishes match+2 as the body 0x10006880 edi!=0 resume"
+    },
+    {
+      "handler": "0x0",
+      "option": "CarPartsShadowFix",
+      "signature": "85 DB 7E 41 55 EB 0A",
+      "slot_name": "dword_1015BDC0",
+      "kind": "match",
+      "add": 69,
+      "why": "handler publishes match+0x45 as the body 0x10006880 edi==0 resume"
+    },
+    {
+      "handler": "0x10044590",
+      "option": "PopupHeadlightsFlag",
+      "signature": "0F BF 46 2E 3B 05 ? ? ? ? 75 ? A1",
+      "slot_name": "dword_1015D62C",
+      "kind": "match",
+      "add": 10,
+      "why": "handler publishes match+10 (the site its EB opcode swap patches) as resume B"
+    },
+    {
+      "handler": "0x10044590",
+      "option": "PopupHeadlightsFlag",
+      "signature": "0F BF 46 2E 3B 05 ? ? ? ? 75 ? A1",
+      "slot_name": "dword_1015D628",
+      "kind": "match",
+      "add": 12,
+      "why": "handler publishes match+12 (the A1 fall-through instruction) as resume A"
+    },
+    {
+      "handler": "0x1001ADD0",
+      "option": "ForceCarHeadlightShadows",
+      "signature": "55 8B EC 83 E4 F0 81 EC D4 00 00 00 8B 45 20 8B",
+      "slot_name": "dword_1015B5BC",
+      "kind": "match",
+      "add": 12,
+      "why": "handler publishes match+12 (after the replayed 12-byte prologue) as the thunk resume"
+    },
+    {
+      "handler": "0x10004110",
+      "option": "PopupHeadlightsFlag",
+      "signature": "0C 83 88 94 00 00 00 04",
+      "slot_name": "dword_1015BE10",
+      "kind": "match",
+      "add": -1,
+      "why": "the PopupHeadlightsFlag arm's IDE collector install publishes the same resume as the CopSirensFlag one"
+    },
+    {
+      "handler": "0x10037BE0",
+      "option": "BadPlayerModelCrashFix",
+      "signature": "83 E4 F0 83 EC 54 0F 57 C0 53 8B 5D 0C",
+      "slot_name": "dword_10159CB8",
+      "kind": "match",
+      "add": 10,
+      "why": "handler publishes match+0xA (after the 10 overwritten prologue bytes) as the trampoline resume"
+    },
+    {
+      "handler": "0x10052200",
+      "option": "NewSavesCompatibility",
+      "signature": "68 ? ? ? ? E8 ? ? ? ? 8B 2D ? ? ? ? 83 C4 08",
+      "slot_name": "Src",
+      "kind": "match_deref",
+      "field_offset": 1,
+      "why": "handler captures the game's `push <imm32>` operand at match+1 (the pointer to the save-slot file-name buffer)"
+    },
+    {
+      "handler": "0x10052200",
+      "option": "NewSavesCompatibility",
+      "signature": "89 84 24 E0 01 00 00 8B 45 08 53 33 DB",
+      "slot_name": "dword_1015AD88",
+      "kind": "match",
+      "add": 13,
+      "why": "handler publishes match+13 (after the overwritten cookie store and the two replicated instructions) as the tramp resume"
+    },
+    {
+      "handler": "0x10005500",
+      "option": "Patch4RemoveModChecks",
+      "signature": "2B C1 1B D6 89 44 24 0C 89 54 24 10 DF 6C 24 0C D8 0D ? ? ? ? D9 5C 24 08",
+      "slot_name": "dword_10159C18",
+      "kind": "match",
+      "add": 12,
+      "why": "handler publishes match+12 (the game function's real continuation) as the stub's tail-jump target"
+    },
+    {
+      "handler": "0x10052200",
+      "option": "NewSavesCompatibility",
+      "signature": "89 84 24 E0 01 00 00 8B 45 08 53 33 DB",
+      "slot_name": "dword_1015AD88",
+      "kind": "match",
+      "add": 13,
+      "why": "handler publishes match+13 (after the overwritten cookie store and the two replicated instructions) as the tramp resume"
+    },
+    {
+      "handler": "0x100513a0",
+      "option": "LocalSettingsPath",
+      "signature": "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D6 5F 5E 5B C3",
+      "slot_name": "dword_10159D1C",
+      "kind": "match_deref",
+      "field_offset": -178,
+      "why": "handler publishes *(match-178) = 0x11CD8A8 (the push operand) as the wide save/settings buffer"
+    },
+    {
+      "handler": "0x100513a0",
+      "option": "LocalSettingsPath",
+      "signature": "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D6 5F 5E 5B C3",
+      "slot_name": "dword_10159D10",
+      "kind": "match_deref",
+      "field_offset": -190,
+      "why": "handler publishes *(match-190) = 0x11CDCA8"
+    },
+    {
+      "handler": "0x100513a0",
+      "option": "LocalSettingsPath",
+      "signature": "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D6 5F 5E 5B C3",
+      "slot_name": "dword_10159D14",
+      "kind": "match_deref",
+      "field_offset": -151,
+      "why": "handler publishes *(match-151) = 0x112D788, the episode selector int"
+    },
+    {
+      "handler": "0x100513a0",
+      "option": "LocalSettingsPath",
+      "signature": "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D6 5F 5E 5B C3",
+      "slot_name": "dword_10159D18",
+      "kind": "match_deref",
+      "field_offset": -444,
+      "why": "handler publishes *(match-444) = 0x11CD0A8"
+    },
+    {
+      "handler": "0x100513a0",
+      "option": "LocalSettingsPath",
+      "signature": "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D6 5F 5E 5B C3",
+      "slot_name": "dword_10159D08",
+      "kind": "match_deref",
+      "field_offset": -432,
+      "why": "handler publishes *(match-432) = 0x11CCEA8"
+    },
+    {
+      "handler": "0x100513a0",
+      "option": "LocalSettingsPath",
+      "signature": "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D7 5F C3",
+      "slot_name": "dword_10159D18",
+      "kind": "match_deref",
+      "field_offset": -160,
+      "why": "fallback build publish (0 hits on 1.0.8.0)"
+    },
+    {
+      "handler": "0x100513a0",
+      "option": "LocalSettingsPath",
+      "signature": "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D7 5F C3",
+      "slot_name": "dword_10159D1C",
+      "kind": "match_deref",
+      "field_offset": -55,
+      "why": "fallback build publish (0 hits on 1.0.8.0)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "32 DB 8B 54 24 24 52 E8 ? ? ? ? 8B F0",
+      "slot_name": "dword_10159CB0",
+      "kind": "match_field",
+      "field_offset": 8,
+      "add": 12,
+      "why": "P1 resume = match+[match+8]+12 (orig 0x8DD330)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "8B 4C 24 28 8B 54 24 24 50 51 52 E8 ? ? ? ? 5F 5E 5D 5B",
+      "slot_name": "dword_10159C98",
+      "kind": "match_field",
+      "field_offset": 12,
+      "add": 16,
+      "why": "P2 resume = match+[match+12]+16 (orig 0x6D61A0)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159C84",
+      "kind": "match_field",
+      "field_offset": 247,
+      "add": 251,
+      "why": "case +0xF6 resume (0x6CE320)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159CAC",
+      "kind": "match_field",
+      "field_offset": 181,
+      "add": 185,
+      "why": "case +0xB4 resume (0x6CDF90)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159C9C",
+      "kind": "match_field",
+      "field_offset": 62,
+      "add": 66,
+      "why": "case +0x3D resume (0x6CE050)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159CA0",
+      "kind": "match_field",
+      "field_offset": 87,
+      "add": 91,
+      "why": "case +0x56 resume (0x6CE0C0)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159C7C",
+      "kind": "match_field",
+      "field_offset": 137,
+      "add": 141,
+      "why": "case +0x88 resume (0x6CDFE0)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159C90",
+      "kind": "match_field",
+      "field_offset": 203,
+      "add": 207,
+      "why": "case +0xCA resume (0x6CE2B0)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159CA8",
+      "kind": "match_field",
+      "field_offset": 112,
+      "add": 116,
+      "why": "case +0x6F resume (0x6CDF30)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159C88",
+      "kind": "match_field",
+      "field_offset": 159,
+      "add": 163,
+      "why": "case +0x9E resume (0x6CE260)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159C94",
+      "kind": "match_field",
+      "field_offset": 225,
+      "add": 229,
+      "why": "case +0xE0 resume (0x6CE200)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159CBC",
+      "kind": "match_field",
+      "field_offset": 37,
+      "add": 41,
+      "why": "case +0x24 resume (0x6CE140)"
+    },
+    {
+      "handler": "0x0",
+      "option": "CarDynamicShadowFix",
+      "signature": "56 6A 02 53 53 57 E8 ?? ?? ?? ?? 56 6A 02 6A 04 6A 05 57 E8",
+      "slot_name": "dword_1015BDCC",
+      "kind": "match",
+      "add": 11,
+      "why": "resume pointer = match+11 (the instruction after the E8 at match+6); game 0x95ADDA"
+    },
+    {
+      "handler": "0x0",
+      "option": "CarDynamicShadowFix",
+      "signature": "56 6A 02 53 53 57 E8 ?? ?? ?? ?? 56 6A 02 6A 04 6A 05 57 E8",
+      "slot_name": "dword_1015B5B8",
+      "kind": "match_field",
+      "field_offset": 7,
+      "add": 11,
+      "why": "callee pointer = match + *(match+7) + 11 (the E8 at match+6); game 0x959FF0"
+    },
+    {
+      "handler": "0x0",
+      "option": "GarageModelFix",
+      "signature": "8B 57 20 D9 42 34 D9 5E 04 8B 47 20",
+      "slot_name": "dword_10159CD4",
+      "kind": "match",
+      "add": 6,
+      "why": "resume = match+6 (game 0xC68BB6), published just before the E9"
+    },
+    {
+      "handler": "0x0",
+      "option": "GarageModelFix",
+      "signature": "0F B7 0E 50 51 E8",
+      "slot_name": "dword_10159CD0",
+      "kind": "match",
+      "add": 5,
+      "why": "resume = match+5 (game 0x9659C8), published just before the E9"
+    },
+    {
+      "handler": "0x0",
+      "option": "MovingSteeringWheelSupport",
+      "signature": "32 DB 8B 16 8B 82 28 01 00 00 8B CE FF D0",
+      "slot_name": "dword_1015AD44",
+      "kind": "match",
+      "add": 16,
+      "why": "resume = match+16 (the jne after the replayed test al,al)"
+    },
+    {
+      "handler": "0x0",
+      "option": "MovingSteeringWheelSupport",
+      "signature": "32 DB 8B 16 8B 82 28 01 00 00 8B CE FF D0",
+      "slot_name": "dword_1015AD4C",
+      "kind": "match_field",
+      "field_offset": 423,
+      "add": 427,
+      "why": "part-animation call target = match + *(match+423) + 427 (game 0x8F65F0)"
+    },
+    {
+      "handler": "0x0",
+      "option": "MovingSteeringWheelSupport",
+      "signature": "7C E0 8B 06 8B 90 28 01 00 00 8B CE FF D2",
+      "slot_name": "dword_1015AD44",
+      "kind": "match",
+      "add": 16,
+      "why": "fallback resume = match+16"
+    },
+    {
+      "handler": "0x0",
+      "option": "MovingSteeringWheelSupport",
+      "signature": "7C E0 8B 06 8B 90 28 01 00 00 8B CE FF D2",
+      "slot_name": "dword_1015AD4C",
+      "kind": "match_field",
+      "field_offset": 140,
+      "add": 144,
+      "why": "fallback call target = match + *(match+140) + 144"
+    },
+    {
+      "handler": "0x10004110",
+      "option": "MovingSteeringWheelSupport",
+      "signature": "0C 83 88 94 00 00 00 04",
+      "slot_name": "dword_1015BE10",
+      "kind": "match",
+      "add": -1,
+      "why": "the IDE collector resume, published by every arm that calls sub_10004110"
+    },
+    {
+      "handler": "0x0",
+      "option": "ShakingEngineBlock",
+      "signature": "32 DB 8B 16 8B 82 28 01 00 00 8B CE FF D0",
+      "slot_name": "dword_1015AD44",
+      "kind": "match",
+      "add": 16,
+      "why": "resume = match+16 (the jne after the replayed test al,al)"
+    },
+    {
+      "handler": "0x0",
+      "option": "ShakingEngineBlock",
+      "signature": "32 DB 8B 16 8B 82 28 01 00 00 8B CE FF D0",
+      "slot_name": "dword_1015AD4C",
+      "kind": "match_field",
+      "field_offset": 423,
+      "add": 427,
+      "why": "part-animation call target = match + *(match+423) + 427 (game 0x8F65F0)"
+    },
+    {
+      "handler": "0x0",
+      "option": "ShakingEngineBlock",
+      "signature": "7C E0 8B 06 8B 90 28 01 00 00 8B CE FF D2",
+      "slot_name": "dword_1015AD44",
+      "kind": "match",
+      "add": 16,
+      "why": "fallback resume = match+16"
+    },
+    {
+      "handler": "0x0",
+      "option": "ShakingEngineBlock",
+      "signature": "7C E0 8B 06 8B 90 28 01 00 00 8B CE FF D2",
+      "slot_name": "dword_1015AD4C",
+      "kind": "match_field",
+      "field_offset": 140,
+      "add": 144,
+      "why": "fallback call target = match + *(match+140) + 144"
+    },
+    {
+      "handler": "0x10004110",
+      "option": "ShakingEngineBlock",
+      "signature": "0C 83 88 94 00 00 00 04",
+      "slot_name": "dword_1015BE10",
+      "kind": "match",
+      "add": -1,
+      "why": "the IDE collector resume, published by every arm that calls sub_10004110"
+    },
+    {
+      "handler": "0x0",
+      "option": "MovingPlaneParts",
+      "signature": "32 DB 8B 16 8B 82 28 01 00 00 8B CE FF D0",
+      "slot_name": "dword_1015AD44",
+      "kind": "match",
+      "add": 16,
+      "why": "resume = match+16 (the jne after the replayed test al,al)"
+    },
+    {
+      "handler": "0x0",
+      "option": "MovingPlaneParts",
+      "signature": "32 DB 8B 16 8B 82 28 01 00 00 8B CE FF D0",
+      "slot_name": "dword_1015AD4C",
+      "kind": "match_field",
+      "field_offset": 423,
+      "add": 427,
+      "why": "part-animation call target = match + *(match+423) + 427 (game 0x8F65F0)"
+    },
+    {
+      "handler": "0x0",
+      "option": "MovingPlaneParts",
+      "signature": "7C E0 8B 06 8B 90 28 01 00 00 8B CE FF D2",
+      "slot_name": "dword_1015AD44",
+      "kind": "match",
+      "add": 16,
+      "why": "fallback resume = match+16"
+    },
+    {
+      "handler": "0x0",
+      "option": "MovingPlaneParts",
+      "signature": "7C E0 8B 06 8B 90 28 01 00 00 8B CE FF D2",
+      "slot_name": "dword_1015AD4C",
+      "kind": "match_field",
+      "field_offset": 140,
+      "add": 144,
+      "why": "fallback call target = match + *(match+140) + 144"
+    },
+    {
+      "handler": "0x10004110",
+      "option": "MovingPlaneParts",
+      "signature": "0C 83 88 94 00 00 00 04",
+      "slot_name": "dword_1015BE10",
+      "kind": "match",
+      "add": -1,
+      "why": "the IDE collector resume, published by every arm that calls sub_10004110"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "51 8B 44 24 0C 85 C0 0F 57 D2 56 8B 35 ? ? ? ? 57 8B 3D ? ? ? ? F3 0F 11 54 24 08 75 0C",
+      "slot_name": "dword_10159C50",
+      "kind": "match_deref",
+      "field_offset": 13,
+      "add": 0,
+      "match_index": 0,
+      "why": "publishes *(match+0xD) = game ADDRESS_MOUSE_X (0x017945D0)"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "51 8B 44 24 0C 85 C0 0F 57 D2 56 8B 35 ? ? ? ? 57 8B 3D ? ? ? ? F3 0F 11 54 24 08 75 0C",
+      "slot_name": "dword_10159C3C",
+      "kind": "match_deref",
+      "field_offset": 20,
+      "add": 0,
+      "match_index": 0,
+      "why": "publishes *(match+0x14) = game ADDRESS_MOUSE_Y (0x017945C0)"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "8B 44 24 08 8B 4C 24 04 50 51 E8 ? ? ? ? 83 C4 08 83 3D",
+      "slot_name": "dword_10159C5C",
+      "kind": "match_deref",
+      "field_offset": 20,
+      "add": 0,
+      "match_index": 0,
+      "why": "publishes *(match+0x14) = game 0x010FC0D0 (negate flag read by 0x10024170)"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "83 EC 08 DB 05 ? ? ? ? 68",
+      "slot_name": "dword_10159C34",
+      "kind": "match",
+      "field_offset": 0,
+      "add": 0,
+      "match_index": 0,
+      "why": "cmovne publish: set to the match (game 0xB4D3A0, frame-time fn) only when found"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "53 56 8B F1 57 8B BE 40 01 00 00 85 FF F3 0F 11 46",
+      "slot_name": "dword_10159C60",
+      "kind": "match",
+      "field_offset": 0,
+      "add": 0,
+      "match_index": 0,
+      "why": "publishes match (0xA81B1F) = resume for body 0x10024560"
+    },
+    {
+      "handler": "0x0",
+      "option": "MouseFix",
+      "signature": "53 56 8B F1 57 8B BE 40 01 00 00 85 FF F3 0F 11 46",
+      "slot_name": "dword_10159C40",
+      "kind": "match",
+      "field_offset": 0,
+      "add": 1878,
+      "match_index": 0,
+      "why": "publishes match-0xF+0x765 = match+0x756 (0xA82275) = resume for body 0x100243A0"
+    },
+    {
+      "handler": "0x0",
+      "option": "OutOfCommissionFix",
+      "signature": "A9 39 44 24 18",
+      "slot_name": "dword_10158034",
+      "kind": "match",
+      "field_offset": 0,
+      "add": 17,
+      "match_index": 0,
+      "why": "publishes match+0x11 (game 0xA22EA1) = the E9 body's resume"
+    },
+    {
+      "handler": "0x0",
+      "option": "OutOfCommissionFix",
+      "signature": "E8 ? ? ? ? 8B 74 24 14 83 C4 08 6A 00 56",
+      "slot_name": "dword_10159BF8",
+      "kind": "match_field",
+      "field_offset": -50,
+      "add": -46,
+      "match_index": 0,
+      "why": "publishes the target of the E8 at match-0x33: (match-0x33) + *(match-0x32) + 5 = match + *(match-0x32) - 0x2E (game 0xA22BE0, the text logger)"
+    },
+    {
+      "handler": "0x0",
+      "option": "OutOfCommissionFix",
+      "signature": "E8 ? ? ? ? 8B 74 24 14 83 C4 08 6A 00 56",
+      "slot_name": "dword_10159C04",
+      "kind": "match_field",
+      "field_offset": 1,
+      "add": 5,
+      "match_index": 0,
+      "why": "publishes match + *(match+1) + 5 = the E8's original target (game 0xACBE60), captured before the E8 is overwritten"
+    },
+    {
+      "handler": "0x0",
+      "option": "HighQualityReflections",
+      "signature": "8B 87 38 09 00 00 6A 08 68 1D 13 00 00 50 E8",
+      "slot_name": "dword_10159CFC",
+      "kind": "match",
+      "field_offset": 0,
+      "add": 19,
+      "match_index": 0,
+      "why": "publishes match+0x13 = the resume (the instruction after the game's builder call)"
+    },
+    {
+      "handler": "0x0",
+      "option": "HighQualityReflections",
+      "signature": "8B 87 38 09 00 00 6A 08 68 1D 13 00 00 50 E8",
+      "slot_name": "dword_10159D04",
+      "kind": "match_field",
+      "field_offset": 15,
+      "add": 19,
+      "match_index": 0,
+      "why": "publishes match + *(match+0xF) + 0x13 = the game's draw-command builder (sub_B6FD70) the detour body calls 12 times"
+    },
+    {
+      "handler": "0x0",
+      "option": "CarDynamicShadowFix",
+      "signature": "56 6A 02 6A 00 6A 00 57 E8 ? ? ? ? 56 6A 02 6A 04 6A 05 57 E8",
+      "slot_name": "dword_1015BDCC",
+      "kind": "match",
+      "add": 13,
+      "why": "pattern B: resume = match+0xD (after the E8 at match+5)"
+    },
+    {
+      "handler": "0x0",
+      "option": "CarDynamicShadowFix",
+      "signature": "56 6A 02 6A 00 6A 00 57 E8 ? ? ? ? 56 6A 02 6A 04 6A 05 57 E8",
+      "slot_name": "dword_1015B5B8",
+      "kind": "match_field",
+      "field_offset": 9,
+      "add": 13,
+      "why": "pattern B: callee = (match+9) + *(match+9) + 4 = match + *(match+9) + 0xD"
+    },
+    {
+      "handler": "0x0",
+      "option": "CarDynamicShadowFix",
+      "signature": "8B 45 10 8B 16 8B 92 8C 00 00 00",
+      "slot_name": "dword_1015BDC4",
+      "kind": "match",
+      "add": 0,
+      "why": "C/D/E branch: dword_1015BDC4 = Dmatch (write-only on every build, kept 1:1)"
+    },
+    {
+      "handler": "0x10044590",
+      "option": "PopupHeadlightsFlag",
+      "signature": "0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1",
+      "slot_name": "dword_1015D62C",
+      "kind": "match",
+      "add": 10,
+      "why": "twin branch publishes match+10 as resume B"
+    },
+    {
+      "handler": "0x10044590",
+      "option": "PopupHeadlightsFlag",
+      "signature": "0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1",
+      "slot_name": "dword_1015D628",
+      "kind": "match",
+      "add": 12,
+      "why": "twin branch publishes match+12 as resume A"
+    },
+    {
+      "handler": "0x0",
+      "option": "CutsceneFixes",
+      "signature": "8B 4C 24 2C 5F 5E 5B 33 CC B0 01 E8",
+      "slot_name": "dword_1015BDE4",
+      "kind": "match_field",
+      "field_offset": -4,
+      "add": 0,
+      "why": "worker 0x1003B9C8 (scan 1): publishes the original call target *(match-4) + match (the rel32 of the E8 at match-5)"
+    },
+    {
+      "handler": "0x0",
+      "option": "CutsceneFixes",
+      "signature": "8B 4C 24 2C 5F 5E 5B 33 CC B0 01 E8",
+      "slot_name": "dword_1015BDF0",
+      "kind": "match_field",
+      "field_offset": -4,
+      "add": 79,
+      "why": "worker 0x1003B9CE (scan 1): publishes the poked byte's address (target + 0x4F; the body writes 1/0 at target+0x4E)"
+    },
+    {
+      "handler": "0x10038680",
+      "option": "NewMemorySystem",
+      "signature": "6A 01 B9 00 00 40 06",
+      "slot_name": "dword_10159CD8",
+      "kind": "match_deref",
+      "field_offset": 8,
+      "why": "the handler's second scan publishes the game's allocator singleton (the immediate of `mov esi, 0x19cf9f0` at match+8); the E8 body sub_10038670 writes the plugin vtable there"
+    },
+    {
+      "handler": "0x10006770",
+      "option": "DualVehicleHeadlights",
+      "signature": "8B 17 8B 42 64 8B CF FF D0 8B 54",
+      "slot_name": "dword_10159BCC",
+      "kind": "match_deref",
+      "field_offset": 207,
+      "add": 0,
+      "why": "handler 0x10006770 publishes the game pointer the dual-cone body calls"
+    },
+    {
+      "handler": "0x10006770",
+      "option": "DualVehicleHeadlights",
+      "signature": "8B 17 8B 42 64 8B CF FF D0 8B 54",
+      "slot_name": "dword_10159BD4",
+      "kind": "match_field",
+      "field_offset": 331,
+      "add": 335,
+      "why": "handler 0x10006770 publishes the game pointer the dual-cone body calls"
+    },
+    {
+      "handler": "0x10006770",
+      "option": "DualVehicleHeadlights",
+      "signature": "8B 17 8B 42 64 8B CF FF D0 8B 54",
+      "slot_name": "dword_10159BD0",
+      "kind": "match_field",
+      "field_offset": 140,
+      "add": 144,
+      "why": "handler 0x10006770 publishes the game pointer the dual-cone body calls"
+    },
+    {
+      "handler": "0x10006770",
+      "option": "DualVehicleHeadlights",
+      "signature": "8B 17 8B 42 64 8B CF FF D0 8B 54",
+      "slot_name": "dword_10159BE4",
+      "kind": "match_field",
+      "field_offset": 151,
+      "add": 155,
+      "why": "handler 0x10006770 publishes the game pointer the dual-cone body calls"
+    },
+    {
+      "handler": "0x10006770",
+      "option": "DualVehicleHeadlights",
+      "signature": "8B 17 8B 42 64 8B CF FF D0 8B 54",
+      "slot_name": "dword_10159BE0",
+      "kind": "match",
+      "field_offset": 0,
+      "add": 338,
+      "why": "handler 0x10006770 publishes the game pointer the dual-cone body calls"
+    },
+    {
+      "handler": "0x1003d420",
+      "option": "NoLiveryLimit",
+      "signature": "8D AF 3C 01 00 00 8D 54 24 20",
+      "slot_name": "dword_10159BA4",
+      "kind": "match_field",
+      "field_offset": -8,
+      "add": -4,
+      "why": "fallback branch publishes match + *(match-8) - 4 (1000/1040 resume)"
+    },
+    {
+      "handler": "0x1003d420",
+      "option": "NoLiveryLimit",
+      "signature": "8D AF 3C 01 00 00 8D 54 24 20",
+      "slot_name": "dword_10159BAC",
+      "kind": "match",
+      "add": 84,
+      "why": "fallback branch publishes match+0x54 (1000/1040 fn)"
+    },
+    {
+      "handler": "0x10005500",
+      "option": "RemoveGFWLUpdatePopup",
+      "signature": "2B C1 1B D6 89 44 24 0C 89 54 24 10 DF 6C 24 0C D8 0D ? ? ? ? D9 5C 24 08",
+      "slot_name": "dword_10159C18",
+      "kind": "match",
+      "add": 12,
+      "why": "handler publishes match+12 (the game function's real continuation) as the stub's tail-jump target"
+    }
+  ]
+}

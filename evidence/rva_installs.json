@@ -1,0 +1,531 @@
+[
+ {
+  "option": "EpisodicVehicleSupport",
+  "handler": "1001b580",
+  "build": 8,
+  "slot": "zpatch_episode_flag",
+  "slot_value": null,
+  "opcode": null,
+  "destination_kind": "rebased_ptr",
+  "site_rva": 136448,
+  "destination": null
+ },
+ {
+  "option": "EpisodicVehicleSupport",
+  "handler": "1001b580",
+  "build": 8,
+  "slot": "zpatch_episode_flag",
+  "slot_value": null,
+  "opcode": null,
+  "destination_kind": "rebased_ptr",
+  "site_rva": 8229294,
+  "destination": null
+ },
+ {
+  "option": "EpisodicVehicleSupport",
+  "handler": "1001b580",
+  "build": 9,
+  "slot": "zpatch_episode_flag",
+  "slot_value": null,
+  "opcode": null,
+  "destination_kind": "rebased_ptr",
+  "site_rva": 610368,
+  "destination": null
+ },
+ {
+  "option": "EpisodicVehicleSupport",
+  "handler": "1001b580",
+  "build": 9,
+  "slot": "zpatch_episode_flag",
+  "slot_value": null,
+  "opcode": null,
+  "destination_kind": "rebased_ptr",
+  "site_rva": 6834878,
+  "destination": null
+ },
+ {
+  "option": "LoadDLCs",
+  "handler": "100234e0",
+  "build": 7,
+  "slot": "dword_1015BDDC",
+  "slot_rva": 4277600,
+  "opcode": null,
+  "destination_kind": "slot",
+  "site_rva": null,
+  "destination": null
+ },
+ {
+  "option": "LoadDLCs",
+  "handler": "100234e0",
+  "build": 7,
+  "slot": "dword_1015804C",
+  "slot_value": 4273888,
+  "opcode": null,
+  "destination_kind": "slot_constant",
+  "site_rva": null,
+  "destination": null
+ },
+ {
+  "option": "LoadDLCs",
+  "handler": "100234e0",
+  "build": 7,
+  "slot": "dword_101580D0",
+  "slot_value": 4276352,
+  "opcode": null,
+  "destination_kind": "slot_constant",
+  "site_rva": null,
+  "destination": null
+ },
+ {
+  "site_rva": 4274125,
+  "opcode": 232,
+  "destination_kind": "module_va",
+  "destination": 268579968,
+  "build": 7,
+  "option": "LoadDLCs",
+  "handler": "100234e0"
+ },
+ {
+  "site_rva": 4277340,
+  "opcode": 233,
+  "destination_kind": "game_rva",
+  "destination": 4277432,
+  "build": 7,
+  "option": "LoadDLCs",
+  "handler": "100234e0"
+ },
+ {
+  "site_rva": 4277460,
+  "opcode": 233,
+  "destination_kind": "module_va",
+  "destination": 268579984,
+  "build": 7,
+  "option": "LoadDLCs",
+  "handler": "100234e0"
+ },
+ {
+  "site_rva": 4277518,
+  "opcode": 233,
+  "destination_kind": "game_rva",
+  "destination": 4277548,
+  "build": 7,
+  "option": "LoadDLCs",
+  "handler": "100234e0"
+ },
+ {
+  "site_rva": 4277562,
+  "opcode": 232,
+  "destination_kind": "game_rva",
+  "destination": 4275760,
+  "build": 7,
+  "option": "LoadDLCs",
+  "handler": "100234e0"
+ },
+ {
+  "option": "LoadDLCs",
+  "handler": "100234e0",
+  "build": 7,
+  "site_rva": 4277567,
+  "opcode": null,
+  "destination_kind": "fill",
+  "destination": null,
+  "fill_length": 12,
+  "slot": null,
+  "slot_rva": null
+ },
+ {
+  "option": "LoadDLCs",
+  "handler": "100234e0",
+  "build": 8,
+  "slot": "dword_1015BDDC",
+  "slot_rva": 4276992,
+  "opcode": null,
+  "destination_kind": "slot",
+  "site_rva": null,
+  "destination": null
+ },
+ {
+  "option": "LoadDLCs",
+  "handler": "100234e0",
+  "build": 8,
+  "slot": "dword_1015804C",
+  "slot_value": 4273280,
+  "opcode": null,
+  "destination_kind": "slot_constant",
+  "site_rva": null,
+  "destination": null
+ },
+ {
+  "option": "LoadDLCs",
+  "handler": "100234e0",
+  "build": 8,
+  "slot": "dword_101580D0",
+  "slot_value": 4275744,
+  "opcode": null,
+  "destination_kind": "slot_constant",
+  "site_rva": null,
+  "destination": null
+ },
+ {
+  "site_rva": 4273517,
+  "opcode": 232,
+  "destination_kind": "module_va",
+  "destination": 268579968,
+  "build": 8,
+  "option": "LoadDLCs",
+  "handler": "100234e0"
+ },
+ {
+  "site_rva": 4276732,
+  "opcode": 233,
+  "destination_kind": "game_rva",
+  "destination": 4276824,
+  "build": 8,
+  "option": "LoadDLCs",
+  "handler": "100234e0"
+ },
+ {
+  "site_rva": 4276852,
+  "opcode": 233,
+  "destination_kind": "module_va",
+  "destination": 268579984,
+  "build": 8,
+  "option": "LoadDLCs",
+  "handler": "100234e0"
+ },
+ {
+  "site_rva": 4276910,
+  "opcode": 233,
+  "destination_kind": "game_rva",
+  "destination": 4276940,
+  "build": 8,
+  "option": "LoadDLCs",
+  "handler": "100234e0"
+ },
+ {
+  "site_rva": 4276954,
+  "opcode": 232,
+  "destination_kind": "game_rva",
+  "destination": 4275152,
+  "build": 8,
+  "option": "LoadDLCs",
+  "handler": "100234e0"
+ },
+ {
+  "option": "LoadDLCs",
+  "handler": "100234e0",
+  "build": 8,
+  "site_rva": 4276959,
+  "opcode": null,
+  "destination_kind": "fill",
+  "destination": null,
+  "fill_length": 12,
+  "slot": null,
+  "slot_rva": null
+ },
+ {
+  "option": "LoadDLCs",
+  "handler": "100234e0",
+  "build": 9,
+  "slot": "dword_1015BDDC",
+  "slot_rva": 4785248,
+  "opcode": null,
+  "destination_kind": "slot",
+  "site_rva": null,
+  "destination": null
+ },
+ {
+  "option": "LoadDLCs",
+  "handler": "100234e0",
+  "build": 9,
+  "slot": "dword_101580D0",
+  "slot_value": 4783616,
+  "opcode": null,
+  "destination_kind": "slot_constant",
+  "site_rva": null,
+  "destination": null
+ },
+ {
+  "option": "LoadDLCs",
+  "handler": "100234e0",
+  "build": 9,
+  "slot": "dword_1015804C",
+  "slot_value": 4781120,
+  "opcode": null,
+  "destination_kind": "slot_constant",
+  "site_rva": null,
+  "destination": null
+ },
+ {
+  "site_rva": 4781400,
+  "opcode": 232,
+  "destination_kind": "module_va",
+  "destination": 268579968,
+  "build": 9,
+  "option": "LoadDLCs",
+  "handler": "100234e0"
+ },
+ {
+  "site_rva": 4784988,
+  "opcode": 233,
+  "destination_kind": "game_rva",
+  "destination": 4785080,
+  "build": 9,
+  "option": "LoadDLCs",
+  "handler": "100234e0"
+ },
+ {
+  "site_rva": 4785108,
+  "opcode": 233,
+  "destination_kind": "module_va",
+  "destination": 268579984,
+  "build": 9,
+  "option": "LoadDLCs",
+  "handler": "100234e0"
+ },
+ {
+  "site_rva": 4785166,
+  "opcode": 233,
+  "destination_kind": "game_rva",
+  "destination": 4785196,
+  "build": 9,
+  "option": "LoadDLCs",
+  "handler": "100234e0"
+ },
+ {
+  "site_rva": 4785210,
+  "opcode": 232,
+  "destination_kind": "game_rva",
+  "destination": 4783024,
+  "build": 9,
+  "option": "LoadDLCs",
+  "handler": "100234e0"
+ },
+ {
+  "option": "LoadDLCs",
+  "handler": "100234e0",
+  "build": 9,
+  "site_rva": 4785215,
+  "opcode": null,
+  "destination_kind": "fill",
+  "destination": null,
+  "fill_length": 12,
+  "slot": null,
+  "slot_rva": null
+ },
+ {
+  "site_rva": 14722,
+  "opcode": 233,
+  "destination_kind": "game_rva",
+  "destination": 14857,
+  "build": 7,
+  "option": "Patch6and7RemoveModChecks",
+  "handler": "10044710"
+ },
+ {
+  "site_rva": 14492,
+  "opcode": 233,
+  "destination_kind": "game_rva",
+  "destination": 14510,
+  "build": 8,
+  "option": "Patch6and7RemoveModChecks",
+  "handler": "10044710"
+ },
+ {
+  "site_rva": 14690,
+  "opcode": 233,
+  "destination_kind": "game_rva",
+  "destination": 14825,
+  "build": 8,
+  "option": "Patch6and7RemoveModChecks",
+  "handler": "10044710"
+ },
+ {
+  "site_rva": 14722,
+  "opcode": 233,
+  "destination_kind": "game_rva",
+  "destination": 14857,
+  "build": 7,
+  "option": "Patch7RemoveModChecks",
+  "handler": "10044710"
+ },
+ {
+  "site_rva": 14492,
+  "opcode": 233,
+  "destination_kind": "game_rva",
+  "destination": 14510,
+  "build": 8,
+  "option": "Patch7RemoveModChecks",
+  "handler": "10044710"
+ },
+ {
+  "site_rva": 14690,
+  "opcode": 233,
+  "destination_kind": "game_rva",
+  "destination": 14825,
+  "build": 8,
+  "option": "Patch7RemoveModChecks",
+  "handler": "10044710"
+ },
+ {
+  "site_rva": 4818016,
+  "opcode": 233,
+  "destination_kind": "module_va",
+  "destination": 268666192,
+  "build": 9,
+  "option": "RemoveRGSCLoginRequirement",
+  "handler": "10045490"
+ },
+ {
+  "option": "RemoveUselessChecks",
+  "handler": "10044bd0",
+  "build": 5,
+  "site_rva": 4639975,
+  "opcode": null,
+  "destination_kind": "fill",
+  "destination": null,
+  "fill_length": 38,
+  "slot": null,
+  "slot_rva": null
+ },
+ {
+  "option": "RemoveUselessChecks",
+  "handler": "10044bd0",
+  "build": 5,
+  "site_rva": 4640359,
+  "opcode": null,
+  "destination_kind": "fill",
+  "destination": null,
+  "fill_length": 38,
+  "slot": null,
+  "slot_rva": null
+ },
+ {
+  "option": "RemoveUselessChecks",
+  "handler": "10044bd0",
+  "build": 8,
+  "site_rva": 4039095,
+  "opcode": null,
+  "destination_kind": "fill",
+  "destination": null,
+  "fill_length": 38,
+  "slot": null,
+  "slot_rva": null
+ },
+ {
+  "option": "RemoveUselessChecks",
+  "handler": "10044bd0",
+  "build": 8,
+  "site_rva": 4039479,
+  "opcode": null,
+  "destination_kind": "fill",
+  "destination": null,
+  "fill_length": 38,
+  "slot": null,
+  "slot_rva": null
+ },
+ {
+  "option": "RemoveUselessChecks",
+  "handler": "10044bd0",
+  "build": 9,
+  "site_rva": 5607719,
+  "opcode": null,
+  "destination_kind": "fill",
+  "destination": null,
+  "fill_length": 38,
+  "slot": null,
+  "slot_rva": null
+ },
+ {
+  "option": "RemoveUselessChecks",
+  "handler": "10044bd0",
+  "build": 9,
+  "site_rva": 5608103,
+  "opcode": null,
+  "destination_kind": "fill",
+  "destination": null,
+  "fill_length": 38,
+  "slot": null,
+  "slot_rva": null
+ },
+ {
+  "option": "RemoveUselessChecks",
+  "handler": "10044bd0",
+  "build": 9,
+  "site_rva": 5610688,
+  "opcode": null,
+  "destination_kind": "fill",
+  "destination": null,
+  "fill_length": 9,
+  "slot": null,
+  "slot_rva": null
+ },
+ {
+  "option": "RemoveUselessChecks",
+  "handler": "10044bd0",
+  "build": 9,
+  "site_rva": 5630851,
+  "opcode": null,
+  "destination_kind": "fill",
+  "destination": null,
+  "fill_length": 13,
+  "slot": null,
+  "slot_rva": null
+ },
+ {
+  "option": "RemoveUselessChecks",
+  "handler": "10044bd0",
+  "build": 9,
+  "site_rva": 7799418,
+  "opcode": null,
+  "destination_kind": "fill",
+  "destination": null,
+  "fill_length": 9,
+  "slot": null,
+  "slot_rva": null
+ },
+ {
+  "option": "SuperLODFix",
+  "handler": "10046a10",
+  "build": 8,
+  "slot": "dword_101580AC",
+  "slot_rva": 4865335,
+  "opcode": null,
+  "destination_kind": "slot",
+  "site_rva": null,
+  "destination": null
+ },
+ {
+  "option": "SuperLODFix",
+  "handler": "10046a10",
+  "build": 8,
+  "slot": "dword_101580B0",
+  "slot_rva": 4865263,
+  "opcode": null,
+  "destination_kind": "slot",
+  "site_rva": null,
+  "destination": null
+ },
+ {
+  "option": "SuperLODFix",
+  "handler": "10046a10",
+  "build": 9,
+  "slot": "dword_101580AC",
+  "slot_rva": 5508711,
+  "opcode": null,
+  "destination_kind": "slot",
+  "site_rva": null,
+  "destination": null
+ },
+ {
+  "option": "SuperLODFix",
+  "handler": "10046a10",
+  "build": 9,
+  "slot": "dword_101580B0",
+  "slot_rva": 5508639,
+  "opcode": null,
+  "destination_kind": "slot",
+  "site_rva": null,
+  "destination": null
+ }
+]

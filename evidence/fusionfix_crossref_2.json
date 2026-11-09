@@ -1,0 +1,2583 @@
+{
+ "artifact": "ZolikaPatch v7.65 <-> GTAIV.EFLC.FusionFix cross-reference (feature set 2)",
+ "focus": "episodic content, GFWL/login (RemoveRGSCLoginRequirement), livery limit, PopupHeadlightsFlag, CopSirensFlag, VSyncFix, VRAMFix, FastLoading/loading delays, BenchmarkFix, MiscFixes",
+ "generated_utc": "2026-10-06T21:28:18.014307Z",
+ "generated_by": "Prime Agent cross-reference pass (read-only; no ZIP, extracted original, or game binary was modified)",
+ "sources": {
+  "zolikapatch": {
+   "artifact": "ZolikaPatch_extracted/ZolikaPatch.asi",
+   "sha256": "720fbcebfd563616151560020eea12168115a9183d6813b432b0367d2b702fc5",
+   "evidence_dir": "ZolikaPatch_reconstruction/evidence (read-only)",
+   "decompiled": "ZolikaPatch_decompiled/ghidra/decompiled_0000..0004.c; ZolikaPatch_decompiled/checkpoints/option_handlers/"
+  },
+  "game_binary": {
+   "path": "/Users/kreato/Downloads/GTAIV.exe",
+   "sha256": "3d90e7c516fa450ca002e5031e62c0f66b404590f33e6cc9793b0da4fffbfd0f",
+   "image_base": "0x400000",
+   "product_version": "1.0.8.0",
+   "build_ordinal": 9
+  },
+  "fusionfix": {
+   "repo": "https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix",
+   "commit": "bea25bd848cfbdd8d046bf49776ceef9cbef3a78",
+   "commit_date": "2026-10-04",
+   "working_copy": "/tmp/FusionFix/source (read-only)",
+   "native_target": "GTA IV The Complete Edition (1.2.0.x); patterns were re-resolved against the local 1.0.8.0 image for comparison only."
+  }
+ },
+ "method": [
+  "Imported tools/verify_game_signatures.py; scanned GTAIV.exe 1.0.8.0 .text with load_pe/parse_signature/find_all.",
+  "Reconstructed the ZolikaPatch operation map from evidence/patch_operations_all.json + option_handlers.json, applying the dispatcher-proven handler correction below.",
+  "Extracted quoted pattern literals and the following pattern.get_first(N) call from FusionFix sources; FusionFix patch address = signature_start + N.",
+  "Cross-referenced each ZolikaPatch patch address against FusionFix patch addresses: exact first, then delta<=7 (used when a get_first offset lands past a preceding instruction of the same site).",
+  "Validated byte-level equality at exact-match sites directly against the game image."
+ ],
+ "episodic_handler_correction": {
+  "finding": "evidence/option_handlers.json and evidence/option_signatures.json attribute all 29 Episodic patterns to EpisodicVehicleSupport (listing FUN_1001b580 and FUN_1001b380) and leave EpisodicWeaponSupport with zero signatures.",
+  "decisive_evidence": "ZolikaPatch_decompiled/ghidra/decompiled_0001.c: line 18537 reads \"EpisodicVehicleSupport\",\"1\" then calls FUN_1001b580(); line 18545 reads \"EpisodicWeaponSupport\",\"1\" then calls FUN_1001b380().",
+  "correction_applied": "FUN_1001b580 = EpisodicVehicleSupport (21 patterns); FUN_1001b380 = EpisodicWeaponSupport (8 patterns).",
+  "confidence": "high (direct dispatcher evidence; the union of the two handler signatures equals the EpisodicVehicleSupport signature list with zero overlap)."
+ },
+ "crossref": [
+  {
+   "option": "EpisodicVehicleSupport",
+   "zp_handlers": [
+    "1001b580"
+   ],
+   "build_gates": [
+    [
+     "==",
+     8
+    ],
+    [
+     "==",
+     9
+    ]
+   ],
+   "zp_operations": [
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "90909090",
+      "90909090",
+      "90"
+     ],
+     "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0xa530fd",
+     "patch_addr": "0xa530fd",
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 46,
+       "ff_pattern": "83 3D ? ? ? ? ? 0F 8C ? ? ? ? 0F BF 46 2E 3B 05 ? ? ? ? 74 0C 3B 05 ? ? ? ? 0F 85 ? ? ? ? 85 7E 28",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 6, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "90909090",
+      "90"
+     ],
+     "signature": "83 3D ? ? ? ? 02 7C 35 0F BF 43 2E",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x8fc61f",
+     "patch_addr": "0x8fc61f",
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 62,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 35",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "9090",
+      "90"
+     ],
+     "signature": "83 3D ? ? ? ? 02 8A 0D",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x4a86ee",
+     "patch_addr": "0x4a86ee",
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "90909090",
+      "90"
+     ],
+     "signature": "83 3D ? ? ? ? 02 75 21 8B 96 20 08 00 00",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x835771",
+     "patch_addr": "0x835771",
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 106,
+       "ff_pattern": "83 3D ? ? ? ? ? 75 21 8B 96",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "90909090",
+      "90909090",
+      "90"
+     ],
+     "signature": "83 3D ? ? ? ? 02 7C 4A 0F BF 46 2E",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x71c81a",
+     "patch_addr": "0x71c81a",
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "90909090"
+     ],
+     "signature": "83 3D ? ? ? ? 02 7C 4A 0F BF 46 2E",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x71c81a",
+     "patch_addr": "0x71c81a",
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "90909090"
+     ],
+     "signature": "83 3D ? ? ? ? 02 7C 4A 0F BF 46 2E",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x71c81a",
+     "patch_addr": "0x71c81a",
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "90909090",
+      "90"
+     ],
+     "signature": "83 3D ? ? ? ? 02 75 08 3B 05",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x965823",
+     "patch_addr": "0x965823",
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 83,
+       "ff_pattern": "83 3D ? ? ? ? ? 75 08 3B 05",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "90909090",
+      "90"
+     ],
+     "signature": "83 3D ? ? ? ? 02 75 1F 8B 44 24 04",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x965d30",
+     "patch_addr": "0x965d30",
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "90909090",
+      "90"
+     ],
+     "signature": "83 3D ? ? ? ? 02 75 38 8B 16",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x989974",
+     "patch_addr": "0x989974",
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "90909090",
+      "90"
+     ],
+     "signature": "83 3D ? ? ? ? 02 75 24 F6 87 6C 02 00 00 04",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x98ac20",
+     "patch_addr": "0x98ac20",
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "90909090",
+      "90"
+     ],
+     "signature": "74 17 83 3D ? ? ? ? 02 75 0E F3 0F 10 05",
+     "offset": 2,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x98c7de",
+     "patch_addr": "0x98c7e0",
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "9090",
+      "90"
+     ],
+     "signature": "8B 56 04 8B 4A 0C 89 4C 24 1C 7C 18",
+     "offset": -15,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x9f21b8",
+     "patch_addr": "0x9f21a9",
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "90909090",
+      "90"
+     ],
+     "signature": "83 3D ? ? ? ? 02 75 35 0F BF 46 2E",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0xa7a951",
+     "patch_addr": "0xa7a951",
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "90909090",
+      "90"
+     ],
+     "signature": "83 3D ? ? ? ? 02 7C 26 8B 85 40 0B 00 00",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0xaa704d",
+     "patch_addr": "0xaa704d",
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 54,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 26 8B 85",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "90909090",
+      "90"
+     ],
+     "signature": "83 3D ? ? ? ? 02 7C 26 8B 85 40 0B 00 00",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0xaa704d",
+     "patch_addr": "0xaa704d",
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 54,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 26 8B 85",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "90909090",
+      "90"
+     ],
+     "signature": "83 3D ? ? ? ? 02 7C 26 8B 85 40 0B 00 00",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0xaa704d",
+     "patch_addr": "0xaa704d",
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 54,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 26 8B 85",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "90909090",
+      "90"
+     ],
+     "signature": "83 3D ? ? ? ? 02 75 17 F3 0F 10 44 24 0C",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0xb20f3c",
+     "patch_addr": "0xb20f3c",
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "9090"
+     ],
+     "signature": "83 3D ? ? ? ? 02 F3 0F 10 05 ? ? ? ? F3 0F 11 44 24 20 75 4C",
+     "offset": 21,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x803035",
+     "patch_addr": "0x80304a",
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "episodiccontent.ixx",
+       "line": 78,
+       "ff_pattern": "83 3D ? ? ? ? ? F3 0F 10 05 ? ? ? ? F3 0F 11 44 24 ? 75 4C",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(21), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "9090"
+     ],
+     "signature": "7C 22 83 F8 28 75 1D",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x801039",
+     "patch_addr": "0x801039",
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "episodiccontent.ixx",
+       "line": 70,
+       "ff_pattern": "83 3D ? ? ? ? ? 57 7C 22",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(8), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "9090"
+     ],
+     "signature": "83 3D ? ? ? ? 02 89 44 24 38",
+     "offset": 11,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x801273",
+     "patch_addr": "0x80127e",
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "episodiccontent.ixx",
+       "line": 143,
+       "ff_pattern": "83 3D ? ? ? ? ? 89 44 24 38",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(11), 6, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "9090"
+     ],
+     "signature": "83 3D ? ? ? ? 02 7C 43",
+     "offset": 7,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x850f03",
+     "patch_addr": "0x850f0a",
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "episodiccontent.ixx",
+       "line": 114,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 43",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "9090"
+     ],
+     "signature": "83 3D ? ? ? ? 02 7C 1F 8B",
+     "offset": 7,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x9d223e",
+     "patch_addr": "0x9d2245",
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "episodiccontent.ixx",
+       "line": 122,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 1F",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "9090"
+     ],
+     "signature": "83 3D ? ? ? ? 02 7C 11 8B 4E",
+     "offset": 7,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x9d22e9",
+     "patch_addr": "0x9d22f0",
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "episodiccontent.ixx",
+       "line": 130,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 11 8B 4E 18",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "kind": "signature",
+     "write_bytes": [
+      "9090"
+     ],
+     "signature": "39 35 ? ? ? ? 75 0E 80 3D",
+     "offset": 6,
+     "signature_present_in_1080": true,
+     "signature_addr": "0xd49b09",
+     "patch_addr": "0xd49b0f",
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "episodiccontent.ixx",
+       "line": 507,
+       "ff_pattern": "39 35 ? ? ? ? 75 0E 80 3D",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(6), 2, true);"
+      }
+     ]
+    }
+   ],
+   "zp_handler_literal_patterns": [
+    {
+     "handler": "1001b580",
+     "pattern": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0xa530fd"
+     ],
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 46,
+       "ff_pattern": "83 3D ? ? ? ? ? 0F 8C ? ? ? ? 0F BF 46 2E 3B 05 ? ? ? ? 74 0C 3B 05 ? ? ? ? 0F 85 ? ? ? ? 85 7E 28",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 6, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "83 3D ? ? ? ? 02 7C 35 0F BF 43 2E",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x8fc61f"
+     ],
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 62,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 35",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "83 3D ? ? ? ? 02 8A 0D",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x4a86ee"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "83 3D ? ? ? ? 02 75 21 8B 96 20 08 00 00",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x835771"
+     ],
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 106,
+       "ff_pattern": "83 3D ? ? ? ? ? 75 21 8B 96",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "83 3D ? ? ? ? 02 7C 4A 0F BF 46 2E",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x71c81a"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "7C 18 0F BF 4E 2E",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x8fec12",
+      "0x8fec46"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "83 3D ? ? ? ? 02 75 08 3B 05",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x965823"
+     ],
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 83,
+       "ff_pattern": "83 3D ? ? ? ? ? 75 08 3B 05",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "83 3D ? ? ? ? 02 75 1F 8B 44 24 04",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x965d30"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "83 3D ? ? ? ? 02 75 38 8B 16",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x989974"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "83 3D ? ? ? ? 02 75 24 F6 87 6C 02 00 00 04",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x98ac20"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "74 17 83 3D ? ? ? ? 02 75 0E F3 0F 10 05",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x98c7de"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "8B 56 04 8B 4A 0C 89 4C 24 1C 7C 18",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x9f21b8"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "83 3D ? ? ? ? 02 75 35 0F BF 46 2E",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0xa7a951"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "83 3D ? ? ? ? 02 7C 26 8B 85 40 0B 00 00",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0xaa704d"
+     ],
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 54,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 26 8B 85",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "83 3D ? ? ? ? 02 75 17 F3 0F 10 44 24 08",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0xb1d8cb",
+      "0xb20eb7"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "83 3D ? ? ? ? 02 75 17 F3 0F 10 44 24 0C",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0xb20f3c"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "83 3D ? ? ? ? 02 F3 0F 10 05 ? ? ? ? F3 0F 11 44 24 20 75 4C",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x803035"
+     ],
+     "fusionfix": [
+      {
+       "delta": 21,
+       "file": "episodiccontent.ixx",
+       "line": 78,
+       "ff_pattern": "83 3D ? ? ? ? ? F3 0F 10 05 ? ? ? ? F3 0F 11 44 24 ? 75 4C",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(21), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "7C 22 83 F8 28 75 1D",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x801039"
+     ],
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "episodiccontent.ixx",
+       "line": 70,
+       "ff_pattern": "83 3D ? ? ? ? ? 57 7C 22",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(8), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "83 3D ? ? ? ? 02 89 44 24 38",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x801273"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "83 3D ? ? ? ? 02 7C 43",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x850f03"
+     ],
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 114,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 43",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "83 3D ? ? ? ? 02 7C 1F 8B",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x9d223e"
+     ],
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 122,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 1F",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "83 3D ? ? ? ? 02 7C 11 8B 4E",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x9d22e9"
+     ],
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 130,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 11 8B 4E 18",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b580",
+     "pattern": "39 35 ? ? ? ? 75 0E 80 3D",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0xd49b09"
+     ],
+     "fusionfix": [
+      {
+       "delta": 6,
+       "file": "episodiccontent.ixx",
+       "line": 507,
+       "ff_pattern": "39 35 ? ? ? ? 75 0E 80 3D",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(6), 2, true);"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "option": "EpisodicWeaponSupport",
+   "zp_handlers": [
+    "1001b380"
+   ],
+   "build_gates": null,
+   "zp_operations": [
+    {
+     "handler": "1001b380",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "90909090",
+      "90909090",
+      "90"
+     ],
+     "signature": "83 3D ? ? ? ? 02 0F 8C D5 00",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x9d25d5",
+     "patch_addr": "0x9d25d5",
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 237,
+       "ff_pattern": "83 3D ? ? ? ? ? 0F 8C ? ? ? ? 8B 46 18",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 6, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b380",
+     "kind": "signature",
+     "write_bytes": [
+      "9090"
+     ],
+     "signature": "83 3D ? ? ? ? 02 7C 32 8B 41",
+     "offset": 7,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x4a9d3a",
+     "patch_addr": "0x4a9d41",
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "episodiccontent.ixx",
+       "line": 253,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 32",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b380",
+     "kind": "signature",
+     "write_bytes": [
+      "9090"
+     ],
+     "signature": "75 5B 83 3D ? ? ? ? 00 75",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x4ab7c7",
+     "patch_addr": "0x4ab7c7",
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "episodiccontent.ixx",
+       "line": 261,
+       "ff_pattern": "83 3D ? ? ? ? ? 75 5B 83 3D",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b380",
+     "kind": "signature",
+     "write_bytes": [
+      "9090"
+     ],
+     "signature": "83 3D ? ? ? ? 02 7C 7D 8B 4C 24 0C",
+     "offset": 7,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x997768",
+     "patch_addr": "0x99776f",
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "episodiccontent.ixx",
+       "line": 285,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 7D",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b380",
+     "kind": "signature",
+     "write_bytes": [
+      "9090"
+     ],
+     "signature": "83 3D ? ? ? ? 02 75 50",
+     "offset": 7,
+     "signature_present_in_1080": true,
+     "signature_addr": "0xa61409",
+     "patch_addr": "0xa61410",
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "episodiccontent.ixx",
+       "line": 293,
+       "ff_pattern": "83 3D ? ? ? ? ? 75 50 8B 06",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b380",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "9090"
+     ],
+     "signature": "83 3D ? ? ? ? 02 0F 85 8C 01 00 00",
+     "offset": 7,
+     "signature_present_in_1080": true,
+     "signature_addr": "0xaae8e2",
+     "patch_addr": "0xaae8e9",
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "episodiccontent.ixx",
+       "line": 301,
+       "ff_pattern": "83 3D ? ? ? ? ? 0F 85 ? ? ? ? 8B 46 4C",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 6, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b380",
+     "kind": "signature",
+     "write_bytes": [
+      "9090"
+     ],
+     "signature": "83 3D ? ? ? ? 02 75 20 8B CD E8",
+     "offset": 7,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x4a6f1e",
+     "patch_addr": "0x4a6f25",
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "episodiccontent.ixx",
+       "line": 277,
+       "ff_pattern": "83 3D ? ? ? ? ? 75 20 8B CD",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b380",
+     "kind": "signature",
+     "write_bytes": [
+      "9090"
+     ],
+     "signature": "83 3D ? ? ? ? 02 7C 21 8B 44 24 0C",
+     "offset": 7,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x9900a6",
+     "patch_addr": "0x9900ad",
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "episodiccontent.ixx",
+       "line": 245,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 21 8B 44 24 0C",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    }
+   ],
+   "zp_handler_literal_patterns": [
+    {
+     "handler": "1001b380",
+     "pattern": "83 3D ? ? ? ? 02 0F 8C D5 00",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x9d25d5"
+     ],
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 237,
+       "ff_pattern": "83 3D ? ? ? ? ? 0F 8C ? ? ? ? 8B 46 18",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 6, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b380",
+     "pattern": "83 3D ? ? ? ? 02 7C 32 8B 41",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x4a9d3a"
+     ],
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 253,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 32",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b380",
+     "pattern": "75 5B 83 3D ? ? ? ? 00 75",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x4ab7c7"
+     ],
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "episodiccontent.ixx",
+       "line": 261,
+       "ff_pattern": "83 3D ? ? ? ? ? 75 5B 83 3D",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b380",
+     "pattern": "83 3D ? ? ? ? 02 7C 7D 8B 4C 24 0C",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x997768"
+     ],
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 285,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 7D",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b380",
+     "pattern": "83 3D ? ? ? ? 02 75 50",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0xa61409"
+     ],
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 293,
+       "ff_pattern": "83 3D ? ? ? ? ? 75 50 8B 06",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b380",
+     "pattern": "83 3D ? ? ? ? 02 0F 85 8C 01 00 00",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0xaae8e2"
+     ],
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 301,
+       "ff_pattern": "83 3D ? ? ? ? ? 0F 85 ? ? ? ? 8B 46 4C",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 6, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b380",
+     "pattern": "83 3D ? ? ? ? 02 75 20 8B CD E8",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x4a6f1e"
+     ],
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 277,
+       "ff_pattern": "83 3D ? ? ? ? ? 75 20 8B CD",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    },
+    {
+     "handler": "1001b380",
+     "pattern": "83 3D ? ? ? ? 02 7C 21 8B 44 24 0C",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x9900a6"
+     ],
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 245,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 21 8B 44 24 0C",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "option": "PoliceEpisodicWeaponSupport",
+   "zp_handlers": [
+    "1001bec0"
+   ],
+   "build_gates": null,
+   "zp_operations": [
+    {
+     "handler": "1001bec0",
+     "kind": "signature",
+     "write_bytes": [
+      "9090"
+     ],
+     "signature": "39 2D ? ? ? ? 75 3E",
+     "offset": 6,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x49f18c",
+     "patch_addr": "0x49f192",
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "episodiccontent.ixx",
+       "line": 587,
+       "ff_pattern": "39 2D ? ? ? ? 75 3E",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(6), 2, true);"
+      }
+     ]
+    }
+   ],
+   "zp_handler_literal_patterns": [
+    {
+     "handler": "1001bec0",
+     "pattern": "39 2D ? ? ? ? 75 3E",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x49f18c"
+     ],
+     "fusionfix": [
+      {
+       "delta": 6,
+       "file": "episodiccontent.ixx",
+       "line": 587,
+       "ff_pattern": "39 2D ? ? ? ? 75 3E",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(6), 2, true);"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "option": "TBoGTHeliHeightLimit",
+   "zp_handlers": [
+    "1001b310"
+   ],
+   "build_gates": null,
+   "zp_operations": [
+    {
+     "handler": "1001b310",
+     "kind": "signature",
+     "write_bytes": [
+      "9090"
+     ],
+     "signature": "83 3D ? ? ? ? 02 7C 0A F3 0F",
+     "offset": 7,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x8f0071",
+     "patch_addr": "0x8f0078",
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "episodiccontent.ixx",
+       "line": 577,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 0A F3 0F 10 05",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    }
+   ],
+   "zp_handler_literal_patterns": [
+    {
+     "handler": "1001b310",
+     "pattern": "83 3D ? ? ? ? 02 7C 0A F3 0F",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x8f0071"
+     ],
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 577,
+       "ff_pattern": "83 3D ? ? ? ? ? 7C 0A F3 0F 10 05",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "option": "PipeBombDropIconSupport",
+   "zp_handlers": [
+    "1001be40"
+   ],
+   "build_gates": null,
+   "zp_operations": [
+    {
+     "handler": "1001be40",
+     "kind": "signature",
+     "write_bytes": [
+      "90909090",
+      "90909090",
+      "90"
+     ],
+     "signature": "83 7D 18 1C 75 14",
+     "offset": -9,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x4a6f50",
+     "patch_addr": "0x4a6f47",
+     "fusionfix": [
+      {
+       "delta": 7,
+       "file": "episodiccontent.ixx",
+       "line": 269,
+       "ff_pattern": "83 3D ? ? ? ? ? 74 1A 83 7D 18 1C",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    }
+   ],
+   "zp_handler_literal_patterns": [
+    {
+     "handler": "1001be40",
+     "pattern": "83 7D 18 1C 75 14",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x4a6f50"
+     ],
+     "fusionfix": [
+      {
+       "delta": -2,
+       "file": "episodiccontent.ixx",
+       "line": 269,
+       "ff_pattern": "83 3D ? ? ? ? ? 74 1A 83 7D 18 1C",
+       "ff_statement": "injector::MakeNOP(pattern.get_first(7), 2, true);"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "option": "EpisodeSwitchFreezeFix",
+   "zp_handlers": [
+    "1001b0e0"
+   ],
+   "build_gates": null,
+   "zp_operations": [
+    {
+     "handler": "1001b0e0",
+     "kind": "signature",
+     "write_bytes": [
+      "e9"
+     ],
+     "signature": "89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x45ec46",
+     "patch_addr": "0x45ec46",
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b0e0",
+     "kind": "signature",
+     "write_bytes": [
+      "e9"
+     ],
+     "signature": "8B 4B 10 3B 4B 14 7D 0F",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x4605f6",
+     "patch_addr": "0x4605f6",
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b0e0",
+     "kind": "signature",
+     "write_bytes": [
+      "e9"
+     ],
+     "signature": "8B 41 10 03 41 0C C3",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x4604c0",
+     "patch_addr": "0x4604c0",
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b0e0",
+     "kind": "signature",
+     "write_bytes": [
+      "e9"
+     ],
+     "signature": "8B C1 8B 08 8B 11 8B 40 04 8B 52 30 50 FF D2 C3",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x460510",
+     "patch_addr": "0x460510",
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b0e0",
+     "kind": "signature",
+     "write_bytes": [
+      "e9"
+     ],
+     "signature": "56 8B F1 83 7E 14 00 75 0B 83 7E 10 00 74 05",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x4604d0",
+     "patch_addr": "0x4604d0",
+     "fusionfix": []
+    }
+   ],
+   "zp_handler_literal_patterns": [
+    {
+     "handler": "1001b0e0",
+     "pattern": "89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x45ec46"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b0e0",
+     "pattern": "8B 4B 10 3B 4B 14 7D 0F",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x4605f6"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b0e0",
+     "pattern": "8B 41 10 03 41 0C C3",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x4604c0"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b0e0",
+     "pattern": "8B C1 8B 08 8B 11 8B 40 04 8B 52 30 50 FF D2 C3",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x460510"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "1001b0e0",
+     "pattern": "56 8B F1 83 7E 14 00 75 0B 83 7E 10 00 74 05",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x4604d0"
+     ],
+     "fusionfix": []
+    }
+   ]
+  },
+  {
+   "option": "CombinedRadioFreezeFix",
+   "zp_handlers": [
+    "10005ee0"
+   ],
+   "build_gates": null,
+   "zp_operations": [
+    {
+     "handler": "10005ee0",
+     "kind": "signature",
+     "write_bytes": [
+      "e8"
+     ],
+     "signature": "E8 ? ? ? ? 8B 35 ? ? ? ? 3B F0",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x895f59",
+     "patch_addr": "0x895f59",
+     "fusionfix": []
+    }
+   ],
+   "zp_handler_literal_patterns": [
+    {
+     "handler": "10005ee0",
+     "pattern": "E8 ? ? ? ? 8B 35 ? ? ? ? 3B F0",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x895f59"
+     ],
+     "fusionfix": []
+    }
+   ]
+  },
+  {
+   "option": "RemoveRGSCLoginRequirement",
+   "zp_handlers": [
+    "10045490"
+   ],
+   "build_gates": [
+    [
+     "==",
+     9
+    ]
+   ],
+   "zp_operations": [
+    {
+     "handler": "10045490",
+     "kind": "signature",
+     "write_bytes": [
+      "e9"
+     ],
+     "signature": "83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53 8B 5C 24 4C 56 68 ? ? ? ? E8 ? ? ? ? 83 C4",
+     "offset": 0,
+     "signature_present_in_1080": false,
+     "fusionfix": []
+    },
+    {
+     "handler": "10045490",
+     "kind": "signature",
+     "write_bytes": [
+      "e9"
+     ],
+     "signature": "83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53 8B 5C 24 4C 56 68 ? ? ? ? E8 ? ? ? ? 83 C4",
+     "offset": 0,
+     "signature_present_in_1080": false,
+     "fusionfix": []
+    },
+    {
+     "handler": "10045490",
+     "kind": "rva",
+     "write_bytes": [
+      "e9"
+     ],
+     "rva": "0x498460",
+     "fusionfix": []
+    }
+   ],
+   "zp_handler_literal_patterns": [
+    {
+     "handler": "10045490",
+     "pattern": "83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53 8B 5C 24 4C 56 68 ? ? ? ? E8 ? ? ? ? 83 C4",
+     "present_in_1080": false,
+     "game_addrs": [],
+     "fusionfix": []
+    }
+   ]
+  },
+  {
+   "option": "NoLiveryLimit",
+   "zp_handlers": [
+    "1003d420"
+   ],
+   "build_gates": null,
+   "zp_operations": [
+    {
+     "handler": "1003d420",
+     "kind": "signature",
+     "write_bytes": [
+      "e9"
+     ],
+     "signature": "8D AF 3C 01 00 00 8D 54 24 20",
+     "offset": 0,
+     "signature_present_in_1080": false,
+     "fusionfix": []
+    },
+    {
+     "handler": "1003d420",
+     "kind": "signature",
+     "write_bytes": [
+      "e9"
+     ],
+     "signature": "8B 8C 83 3C 01 00 00 0F BF 53 48",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0xb97a29",
+     "patch_addr": "0xb97a29",
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "limits.ixx",
+       "line": 362,
+       "ff_pattern": "8B 8C 83 ? ? ? ? 0F BF 53",
+       "ff_statement": "}; injector::MakeInline<LiveryAccessHook3>(pattern.get_first(0), pattern.get_first(7));"
+      },
+      {
+       "delta": 7,
+       "file": "limits.ixx",
+       "line": 362,
+       "ff_pattern": "8B 8C 83 ? ? ? ? 0F BF 53",
+       "ff_statement": "}; injector::MakeInline<LiveryAccessHook3>(pattern.get_first(0), pattern.get_first(7));"
+      }
+     ]
+    }
+   ],
+   "zp_handler_literal_patterns": [
+    {
+     "handler": "1003d420",
+     "pattern": "74 52 8D B5 3C 01 00 00 83 FB 04",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0xa4a53b"
+     ],
+     "fusionfix": [
+      {
+       "delta": 2,
+       "file": "limits.ixx",
+       "line": 279,
+       "ff_pattern": "8D B5 ? ? ? ? 83 FB 04",
+       "ff_statement": "}; injector::MakeInline<CVehicleModelInfoSetVehicleDrawableHook>(pattern.get_first(0), pattern.get_first(6));"
+      }
+     ]
+    },
+    {
+     "handler": "1003d420",
+     "pattern": "8D AF 3C 01 00 00 8D 54 24 20",
+     "present_in_1080": false,
+     "game_addrs": [],
+     "fusionfix": []
+    },
+    {
+     "handler": "1003d420",
+     "pattern": "8B 8C 83 3C 01 00 00 0F BF 53 48",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0xb97a29"
+     ],
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "limits.ixx",
+       "line": 362,
+       "ff_pattern": "8B 8C 83 ? ? ? ? 0F BF 53",
+       "ff_statement": "}; injector::MakeInline<LiveryAccessHook3>(pattern.get_first(0), pattern.get_first(7));"
+      },
+      {
+       "delta": 7,
+       "file": "limits.ixx",
+       "line": 362,
+       "ff_pattern": "8B 8C 83 ? ? ? ? 0F BF 53",
+       "ff_statement": "}; injector::MakeInline<LiveryAccessHook3>(pattern.get_first(0), pattern.get_first(7));"
+      }
+     ]
+    },
+    {
+     "handler": "1003d420",
+     "pattern": "8B 8C 83 3C 01 00 00 0F BF 53 48",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0xb97a29"
+     ],
+     "fusionfix": [
+      {
+       "delta": 0,
+       "file": "limits.ixx",
+       "line": 362,
+       "ff_pattern": "8B 8C 83 ? ? ? ? 0F BF 53",
+       "ff_statement": "}; injector::MakeInline<LiveryAccessHook3>(pattern.get_first(0), pattern.get_first(7));"
+      },
+      {
+       "delta": 7,
+       "file": "limits.ixx",
+       "line": 362,
+       "ff_pattern": "8B 8C 83 ? ? ? ? 0F BF 53",
+       "ff_statement": "}; injector::MakeInline<LiveryAccessHook3>(pattern.get_first(0), pattern.get_first(7));"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "option": "PopupHeadlightsFlag",
+   "zp_handlers": [
+    "10044590"
+   ],
+   "build_gates": null,
+   "zp_operations": [
+    {
+     "handler": "10044590",
+     "kind": "signature",
+     "write_bytes": [
+      "e9"
+     ],
+     "signature": "0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1",
+     "offset": 0,
+     "signature_present_in_1080": false,
+     "fusionfix": []
+    },
+    {
+     "handler": "10044590",
+     "kind": "signature",
+     "write_bytes": [
+      "e9"
+     ],
+     "signature": "0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1",
+     "offset": 0,
+     "signature_present_in_1080": false,
+     "fusionfix": []
+    }
+   ],
+   "zp_handler_literal_patterns": [
+    {
+     "handler": "10044590",
+     "pattern": "0F BF 46 2E 3B 05 ? ? ? ? 75 ? A1",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0xa53a64"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "10044590",
+     "pattern": "0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1",
+     "present_in_1080": false,
+     "game_addrs": [],
+     "fusionfix": []
+    }
+   ]
+  },
+  {
+   "option": "CopSirensFlag",
+   "zp_handlers": [
+    "10006350"
+   ],
+   "build_gates": null,
+   "zp_operations": [
+    {
+     "handler": "10006350",
+     "kind": "signature",
+     "write_bytes": [
+      "e9"
+     ],
+     "signature": "E8 ? ? ? ? C0 E0 ? 32 86 6F 0F 00",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x8febd3",
+     "patch_addr": "0x8febd3",
+     "fusionfix": []
+    },
+    {
+     "handler": "10006350",
+     "kind": "signature",
+     "write_bytes": [
+      "e9"
+     ],
+     "signature": "0F BF 41 2E 39 05",
+     "offset": 22,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x8fabd0",
+     "patch_addr": "0x8fabe6",
+     "fusionfix": []
+    }
+   ],
+   "zp_handler_literal_patterns": [
+    {
+     "handler": "10006350",
+     "pattern": "E8 ? ? ? ? C0 E0 ? 32 86 6F 0F 00",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x8febd3"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "10006350",
+     "pattern": "0F BF 41 2E 39 05",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x8fabd0"
+     ],
+     "fusionfix": []
+    }
+   ]
+  },
+  {
+   "option": "VSyncFix",
+   "zp_handlers": [
+    "100503b0"
+   ],
+   "build_gates": [
+    [
+     "!=",
+     1
+    ],
+    [
+     "!=",
+     2
+    ],
+    [
+     "!=",
+     3
+    ],
+    [
+     "!=",
+     4
+    ],
+    [
+     "!=",
+     5
+    ],
+    [
+     "!=",
+     9
+    ],
+    [
+     "!=",
+     13
+    ]
+   ],
+   "zp_operations": [],
+   "zp_handler_literal_patterns": [
+    {
+     "handler": "100503b0",
+     "pattern": "8B 10 50 8B 82 A8 00 00 00 FF D0 83",
+     "present_in_1080": false,
+     "game_addrs": [],
+     "fusionfix": []
+    },
+    {
+     "handler": "100503b0",
+     "pattern": "8B 08 8B 51 0C 6A 01 6A 00 6A 00 6A 00 6A 00 50 FF D2 8B F0 81 FE ? ? ? ? 74",
+     "present_in_1080": false,
+     "game_addrs": [],
+     "fusionfix": []
+    }
+   ]
+  },
+  {
+   "option": "VRAMFix",
+   "zp_handlers": [
+    "1004aae0"
+   ],
+   "build_gates": null,
+   "zp_operations": [
+    {
+     "handler": "1004aae0",
+     "kind": "signature",
+     "write_bytes": [
+      "e9"
+     ],
+     "signature": "8B 44 24 10 D9 2C 24 83 C4 1C C3",
+     "offset": 0,
+     "signature_present_in_1080": false,
+     "fusionfix": []
+    }
+   ],
+   "zp_handler_literal_patterns": [
+    {
+     "handler": "1004aae0",
+     "pattern": "8B 44 24 10 D9 2C 24 83 C4 1C C3",
+     "present_in_1080": false,
+     "game_addrs": [],
+     "fusionfix": []
+    }
+   ]
+  },
+  {
+   "option": "FastLoading",
+   "zp_handlers": [
+    "1001eca0"
+   ],
+   "build_gates": null,
+   "zp_operations": [],
+   "zp_handler_literal_patterns": []
+  },
+  {
+   "option": "NoLoadingSleep",
+   "zp_handlers": [
+    "1003d670"
+   ],
+   "build_gates": null,
+   "zp_operations": [],
+   "zp_handler_literal_patterns": [
+    {
+     "handler": "1003d670",
+     "pattern": "68 88 13 00 00 FF 15",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x401854"
+     ],
+     "fusionfix": [
+      {
+       "delta": 1,
+       "file": "loadingdelays.ixx",
+       "line": 35,
+       "ff_pattern": "68 ? ? ? ? FF 15 ? ? ? ? 39 1D",
+       "ff_statement": "injector::WriteMemory(pattern.get_first(1), 0, true);"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "option": "BenchmarkFix",
+   "zp_handlers": [
+    "10005690"
+   ],
+   "build_gates": [
+    [
+     "!=",
+     9
+    ],
+    [
+     "!=",
+     13
+    ]
+   ],
+   "zp_operations": [],
+   "zp_handler_literal_patterns": [
+    {
+     "handler": "10005690",
+     "pattern": "E8 ? ? ? ? 83 C4 04 57 8B D8 FF D6 8B 77 20",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x47f600"
+     ],
+     "fusionfix": []
+    }
+   ]
+  },
+  {
+   "option": "MiscFixes",
+   "zp_handlers": [
+    "10023dd0"
+   ],
+   "build_gates": null,
+   "zp_operations": [
+    {
+     "handler": "10023dd0",
+     "kind": "signature",
+     "write_bytes": [
+      "eb"
+     ],
+     "signature": "C7 06 ? ? ? ? 74 19",
+     "offset": 6,
+     "signature_present_in_1080": false,
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "kind": "signature",
+     "write_bytes": [
+      "eb"
+     ],
+     "signature": "83 C4 ? 3B 46 20",
+     "offset": 12,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x490141",
+     "patch_addr": "0x49014d",
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "kind": "signature",
+     "write_bytes": [
+      "eb"
+     ],
+     "signature": "75 28 6A 00 6A 00 68 ? ? ? ? E8 ? ? ? ? 83 C4 0C",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x48fe63",
+     "patch_addr": "0x48fe63",
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "kind": "signature",
+     "write_bytes": [
+      "c9eb"
+     ],
+     "signature": "8B 54 24 04 52 A3",
+     "offset": 0,
+     "signature_present_in_1080": false,
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "kind": "signature",
+     "write_bytes": [
+      "b8"
+     ],
+     "signature": "83 F8 01 75 30 A3",
+     "offset": 0,
+     "signature_present_in_1080": false,
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "kind": "signature",
+     "write_bytes": [
+      "deb"
+     ],
+     "signature": "C7 05 ? ? ? ? 03 00 00 00 33 C0 5E 59 C3 C7",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x85c509",
+     "patch_addr": "0x85c509",
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "kind": "signature",
+     "write_bytes": [
+      "9090"
+     ],
+     "signature": "FF 15 ? ? ? ? 85 C0 75 18",
+     "offset": 8,
+     "signature_present_in_1080": false,
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "kind": "signature",
+     "write_bytes": [
+      "9090"
+     ],
+     "signature": "FF 15 ? ? ? ? 85 C0 75 04 32",
+     "offset": 8,
+     "signature_present_in_1080": false,
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "kind": "signature",
+     "write_bytes": [
+      "9090"
+     ],
+     "signature": "FF 15 ? ? ? ? 85 C0 75 07 A0",
+     "offset": 8,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x89842f",
+     "patch_addr": "0x898437",
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "kind": "signature",
+     "write_bytes": [
+      "c3"
+     ],
+     "signature": "81 EC ? ? ? ? A1 ? ? ? ? 33 C4 89 84 24 ? ? ? ? 53 ? 6A 3C 33 DB 8D 44 24 ? 53 50 E8",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x8972b0",
+     "patch_addr": "0x8972b0",
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "kind": "signature",
+     "write_bytes": [
+      "eb"
+     ],
+     "signature": "74 05 E8 ? ? ? ? 6A 05 E8 ? ? ? ? 83 C4 04 B9",
+     "offset": 0,
+     "signature_present_in_1080": true,
+     "signature_addr": "0x490628",
+     "patch_addr": "0x490628",
+     "fusionfix": []
+    }
+   ],
+   "zp_handler_literal_patterns": [
+    {
+     "handler": "10023dd0",
+     "pattern": "C7 06 ? ? ? ? 74 19",
+     "present_in_1080": false,
+     "game_addrs": [],
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "pattern": "83 C4 ? 3B 46 20",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x490141"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "pattern": "75 28 6A 00 6A 00 68 ? ? ? ? E8 ? ? ? ? 83 C4 0C",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x48fe63",
+      "0x48fec9"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "pattern": "8B 54 24 04 52 A3",
+     "present_in_1080": false,
+     "game_addrs": [],
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "pattern": "83 F8 01 75 30 A3",
+     "present_in_1080": false,
+     "game_addrs": [],
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "pattern": "C7 05 ? ? ? ? 03 00 00 00 33 C0 5E 59 C3 C7",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x85c509"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "pattern": "FF 15 ? ? ? ? 85 C0 75 18",
+     "present_in_1080": false,
+     "game_addrs": [],
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "pattern": "FF 15 ? ? ? ? 85 C0 75 04 32",
+     "present_in_1080": false,
+     "game_addrs": [],
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "pattern": "FF 15 ? ? ? ? 85 C0 75 07 A0",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x89842f"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "pattern": "81 EC ? ? ? ? A1 ? ? ? ? 33 C4 89 84 24 ? ? ? ? 53 ? 6A 3C 33 DB 8D 44 24 ? 53 50 E8",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x8972b0"
+     ],
+     "fusionfix": []
+    },
+    {
+     "handler": "10023dd0",
+     "pattern": "74 05 E8 ? ? ? ? 6A 05 E8 ? ? ? ? 83 C4 04 B9",
+     "present_in_1080": true,
+     "game_addrs": [
+      "0x490628"
+     ],
+     "fusionfix": []
+    }
+   ]
+  },
+  {
+   "option": "LoadDLCs",
+   "zp_handlers": [
+    "100234e0"
+   ],
+   "build_gates": [
+    [
+     "==",
+     7
+    ],
+    [
+     "==",
+     8
+    ],
+    [
+     "==",
+     9
+    ]
+   ],
+   "zp_operations": [
+    {
+     "handler": "100234e0",
+     "kind": "rva",
+     "write_bytes": [
+      "e9"
+     ],
+     "rva": "0x41450e",
+     "fusionfix": []
+    },
+    {
+     "handler": "100234e0",
+     "kind": "rva",
+     "write_bytes": [
+      "e8"
+     ],
+     "rva": "0x41453a",
+     "fusionfix": []
+    },
+    {
+     "handler": "100234e0",
+     "kind": "rva",
+     "write_bytes": [
+      "90909090",
+      "90909090",
+      "90909090"
+     ],
+     "rva": "0x41453f",
+     "fusionfix": []
+    },
+    {
+     "handler": "100234e0",
+     "kind": "rva",
+     "write_bytes": [
+      "e9"
+     ],
+     "rva": "0x41445c",
+     "fusionfix": []
+    },
+    {
+     "handler": "100234e0",
+     "kind": "rva",
+     "write_bytes": [
+      "e8"
+     ],
+     "rva": "0x4137cd",
+     "fusionfix": []
+    },
+    {
+     "handler": "100234e0",
+     "kind": "rva",
+     "write_bytes": [
+      "e9"
+     ],
+     "rva": "0x4144d4",
+     "fusionfix": []
+    },
+    {
+     "handler": "100234e0",
+     "kind": "rva",
+     "write_bytes": [
+      "e8"
+     ],
+     "rva": "0x4142da",
+     "fusionfix": []
+    },
+    {
+     "handler": "100234e0",
+     "kind": "rva",
+     "write_bytes": [
+      "90909090",
+      "90909090",
+      "90909090"
+     ],
+     "rva": "0x4142df",
+     "fusionfix": []
+    },
+    {
+     "handler": "100234e0",
+     "kind": "rva",
+     "write_bytes": [
+      "e9"
+     ],
+     "rva": "0x4141fc",
+     "fusionfix": []
+    },
+    {
+     "handler": "100234e0",
+     "kind": "rva",
+     "write_bytes": [
+      "e8"
+     ],
+     "rva": "0x41356d",
+     "fusionfix": []
+    },
+    {
+     "handler": "100234e0",
+     "kind": "rva",
+     "write_bytes": [
+      "e9"
+     ],
+     "rva": "0x414274",
+     "fusionfix": []
+    },
+    {
+     "handler": "100234e0",
+     "kind": "rva",
+     "write_bytes": [
+      "e9"
+     ],
+     "rva": "0x49040e",
+     "fusionfix": []
+    },
+    {
+     "handler": "100234e0",
+     "kind": "rva",
+     "write_bytes": [
+      "e8"
+     ],
+     "rva": "0x49043a",
+     "fusionfix": []
+    },
+    {
+     "handler": "100234e0",
+     "kind": "rva",
+     "write_bytes": [
+      "90909090",
+      "90909090",
+      "90909090"
+     ],
+     "rva": "0x49043f",
+     "fusionfix": []
+    },
+    {
+     "handler": "100234e0",
+     "kind": "rva",
+     "write_bytes": [
+      "e9"
+     ],
+     "rva": "0x49035c",
+     "fusionfix": []
+    },
+    {
+     "handler": "100234e0",
+     "kind": "rva",
+     "write_bytes": [
+      "e8"
+     ],
+     "rva": "0x48f558",
+     "fusionfix": []
+    },
+    {
+     "handler": "100234e0",
+     "kind": "rva",
+     "write_bytes": [
+      "e9"
+     ],
+     "rva": "0x4903d4",
+     "fusionfix": []
+    }
+   ],
+   "zp_handler_literal_patterns": []
+  }
+ ],
+ "per_feature_verdicts": {
+  "EpisodicVehicleSupport": {
+   "zp_operations": 25,
+   "zp_ops_signature_absent_in_1080": 0,
+   "zp_ops_with_fusionfix_site": 14,
+   "op_site_exact_address_matches": 7,
+   "op_site_near_address_matches": 7,
+   "zp_handler_patterns": 23,
+   "handler_patterns_with_fusionfix_site": 11,
+   "handler_pattern_exact_matches": 1,
+   "build_gates": [
+    [
+     "==",
+     8
+    ],
+    [
+     "==",
+     9
+    ]
+   ]
+  },
+  "EpisodicWeaponSupport": {
+   "zp_operations": 8,
+   "zp_ops_signature_absent_in_1080": 0,
+   "zp_ops_with_fusionfix_site": 8,
+   "op_site_exact_address_matches": 7,
+   "op_site_near_address_matches": 1,
+   "zp_handler_patterns": 8,
+   "handler_patterns_with_fusionfix_site": 8,
+   "handler_pattern_exact_matches": 1,
+   "build_gates": null
+  },
+  "PoliceEpisodicWeaponSupport": {
+   "zp_operations": 1,
+   "zp_ops_signature_absent_in_1080": 0,
+   "zp_ops_with_fusionfix_site": 1,
+   "op_site_exact_address_matches": 1,
+   "op_site_near_address_matches": 0,
+   "zp_handler_patterns": 1,
+   "handler_patterns_with_fusionfix_site": 1,
+   "handler_pattern_exact_matches": 0,
+   "build_gates": null
+  },
+  "TBoGTHeliHeightLimit": {
+   "zp_operations": 1,
+   "zp_ops_signature_absent_in_1080": 0,
+   "zp_ops_with_fusionfix_site": 1,
+   "op_site_exact_address_matches": 1,
+   "op_site_near_address_matches": 0,
+   "zp_handler_patterns": 1,
+   "handler_patterns_with_fusionfix_site": 1,
+   "handler_pattern_exact_matches": 0,
+   "build_gates": null
+  },
+  "PipeBombDropIconSupport": {
+   "zp_operations": 1,
+   "zp_ops_signature_absent_in_1080": 0,
+   "zp_ops_with_fusionfix_site": 1,
+   "op_site_exact_address_matches": 0,
+   "op_site_near_address_matches": 1,
+   "zp_handler_patterns": 1,
+   "handler_patterns_with_fusionfix_site": 1,
+   "handler_pattern_exact_matches": 0,
+   "build_gates": null
+  },
+  "EpisodeSwitchFreezeFix": {
+   "zp_operations": 5,
+   "zp_ops_signature_absent_in_1080": 0,
+   "zp_ops_with_fusionfix_site": 0,
+   "op_site_exact_address_matches": 0,
+   "op_site_near_address_matches": 0,
+   "zp_handler_patterns": 5,
+   "handler_patterns_with_fusionfix_site": 0,
+   "handler_pattern_exact_matches": 0,
+   "build_gates": null
+  },
+  "CombinedRadioFreezeFix": {
+   "zp_operations": 1,
+   "zp_ops_signature_absent_in_1080": 0,
+   "zp_ops_with_fusionfix_site": 0,
+   "op_site_exact_address_matches": 0,
+   "op_site_near_address_matches": 0,
+   "zp_handler_patterns": 1,
+   "handler_patterns_with_fusionfix_site": 0,
+   "handler_pattern_exact_matches": 0,
+   "build_gates": null
+  },
+  "RemoveRGSCLoginRequirement": {
+   "zp_operations": 3,
+   "zp_ops_signature_absent_in_1080": 2,
+   "zp_ops_with_fusionfix_site": 0,
+   "op_site_exact_address_matches": 0,
+   "op_site_near_address_matches": 0,
+   "zp_handler_patterns": 1,
+   "handler_patterns_with_fusionfix_site": 0,
+   "handler_pattern_exact_matches": 0,
+   "build_gates": [
+    [
+     "==",
+     9
+    ]
+   ]
+  },
+  "NoLiveryLimit": {
+   "zp_operations": 2,
+   "zp_ops_signature_absent_in_1080": 1,
+   "zp_ops_with_fusionfix_site": 1,
+   "op_site_exact_address_matches": 1,
+   "op_site_near_address_matches": 1,
+   "zp_handler_patterns": 3,
+   "handler_patterns_with_fusionfix_site": 2,
+   "handler_pattern_exact_matches": 1,
+   "build_gates": null
+  },
+  "PopupHeadlightsFlag": {
+   "zp_operations": 2,
+   "zp_ops_signature_absent_in_1080": 2,
+   "zp_ops_with_fusionfix_site": 0,
+   "op_site_exact_address_matches": 0,
+   "op_site_near_address_matches": 0,
+   "zp_handler_patterns": 2,
+   "handler_patterns_with_fusionfix_site": 0,
+   "handler_pattern_exact_matches": 0,
+   "build_gates": null
+  },
+  "CopSirensFlag": {
+   "zp_operations": 2,
+   "zp_ops_signature_absent_in_1080": 0,
+   "zp_ops_with_fusionfix_site": 0,
+   "op_site_exact_address_matches": 0,
+   "op_site_near_address_matches": 0,
+   "zp_handler_patterns": 2,
+   "handler_patterns_with_fusionfix_site": 0,
+   "handler_pattern_exact_matches": 0,
+   "build_gates": null
+  },
+  "VSyncFix": {
+   "zp_operations": 0,
+   "zp_ops_signature_absent_in_1080": 0,
+   "zp_ops_with_fusionfix_site": 0,
+   "op_site_exact_address_matches": 0,
+   "op_site_near_address_matches": 0,
+   "zp_handler_patterns": 2,
+   "handler_patterns_with_fusionfix_site": 0,
+   "handler_pattern_exact_matches": 0,
+   "build_gates": [
+    [
+     "!=",
+     1
+    ],
+    [
+     "!=",
+     2
+    ],
+    [
+     "!=",
+     3
+    ],
+    [
+     "!=",
+     4
+    ],
+    [
+     "!=",
+     5
+    ],
+    [
+     "!=",
+     9
+    ],
+    [
+     "!=",
+     13
+    ]
+   ]
+  },
+  "VRAMFix": {
+   "zp_operations": 1,
+   "zp_ops_signature_absent_in_1080": 1,
+   "zp_ops_with_fusionfix_site": 0,
+   "op_site_exact_address_matches": 0,
+   "op_site_near_address_matches": 0,
+   "zp_handler_patterns": 1,
+   "handler_patterns_with_fusionfix_site": 0,
+   "handler_pattern_exact_matches": 0,
+   "build_gates": null
+  },
+  "FastLoading": {
+   "zp_operations": 0,
+   "zp_ops_signature_absent_in_1080": 0,
+   "zp_ops_with_fusionfix_site": 0,
+   "op_site_exact_address_matches": 0,
+   "op_site_near_address_matches": 0,
+   "zp_handler_patterns": 0,
+   "handler_patterns_with_fusionfix_site": 0,
+   "handler_pattern_exact_matches": 0,
+   "build_gates": null
+  },
+  "NoLoadingSleep": {
+   "zp_operations": 0,
+   "zp_ops_signature_absent_in_1080": 0,
+   "zp_ops_with_fusionfix_site": 0,
+   "op_site_exact_address_matches": 0,
+   "op_site_near_address_matches": 0,
+   "zp_handler_patterns": 1,
+   "handler_patterns_with_fusionfix_site": 1,
+   "handler_pattern_exact_matches": 0,
+   "build_gates": null
+  },
+  "BenchmarkFix": {
+   "zp_operations": 0,
+   "zp_ops_signature_absent_in_1080": 0,
+   "zp_ops_with_fusionfix_site": 0,
+   "op_site_exact_address_matches": 0,
+   "op_site_near_address_matches": 0,
+   "zp_handler_patterns": 1,
+   "handler_patterns_with_fusionfix_site": 0,
+   "handler_pattern_exact_matches": 0,
+   "build_gates": [
+    [
+     "!=",
+     9
+    ],
+    [
+     "!=",
+     13
+    ]
+   ]
+  },
+  "MiscFixes": {
+   "zp_operations": 11,
+   "zp_ops_signature_absent_in_1080": 5,
+   "zp_ops_with_fusionfix_site": 0,
+   "op_site_exact_address_matches": 0,
+   "op_site_near_address_matches": 0,
+   "zp_handler_patterns": 11,
+   "handler_patterns_with_fusionfix_site": 0,
+   "handler_pattern_exact_matches": 0,
+   "build_gates": null
+  },
+  "LoadDLCs": {
+   "zp_operations": 17,
+   "zp_ops_signature_absent_in_1080": 0,
+   "zp_ops_with_fusionfix_site": 0,
+   "op_site_exact_address_matches": 0,
+   "op_site_near_address_matches": 0,
+   "zp_handler_patterns": 0,
+   "handler_patterns_with_fusionfix_site": 0,
+   "handler_pattern_exact_matches": 0,
+   "build_gates": [
+    [
+     "==",
+     7
+    ],
+    [
+     "==",
+     8
+    ],
+    [
+     "==",
+     9
+    ]
+   ]
+  }
+ },
+ "confidence": {
+  "EpisodicVehicleSupport": "high - 23/23 handler patterns resolve; 11 have a FusionFix site (7 exact). Same \"cmp [episode],2 / jl\" idiom and identical MakeNOP offsets.",
+  "EpisodicWeaponSupport": "high - 8/8 handler patterns resolve and all 8 have a FusionFix site (7 exact), matching FusionFix EPISODICCONTENT/EpisodicWeapons.",
+  "PoliceEpisodicWeaponSupport": "high - single pattern 39 2D ? ? ? ? 75 3E resolves at 0x49f18c; FusionFix TBoGTPoliceWeapons uses the identical fallback pattern and NOP at +6.",
+  "TBoGTHeliHeightLimit": "high - pattern 83 3D ? ? ? ? 02 7C 0A F3 0F resolves at 0x8f0071; FusionFix TBoGTHelicopterHeightLimit uses the same pattern and NOP at +7.",
+  "PipeBombDropIconSupport": "medium-high - FusionFix EpisodicWeapons \"Pipe bomb drop hud\" NOPs at +7 of 83 3D ? ? ? ? 74 1A 83 7D 18 1C; ZolikaPatch NOPs 9 bytes before 83 7D 18 1C 75 14, i.e. the same instruction pair, reached from the opposite side.",
+  "EpisodeSwitchFreezeFix": "unresolved - none of the 5 patterns or jump targets match a FusionFix patch site; FusionFix does not ship an equivalent option.",
+  "CombinedRadioFreezeFix": "unresolved - single call-site pattern has no FusionFix counterpart; the nearest FusionFix radio fix (fixes.ixx \"streamed radio stations resetting\") is at a different address (0x7f144d vs 0x895f59).",
+  "RemoveRGSCLoginRequirement": "unresolved - the signature is absent from 1.0.8.0 (build-gated to build 9, and ZolikaPatch falls back to a module-relative RVA 0x498460). No FusionFix site.",
+  "NoLiveryLimit": "medium-high - one ZolikaPatch pattern (8B 8C 83 3C 01 00 00 0F BF 53 48) matches FusionFix limits.ixx LiveryAccessHook3 exactly (same address 0xb97a29, same bytes). Other ZolikaPatch livery patterns are build-8 fallbacks not present in 1.0.8.0.",
+  "PopupHeadlightsFlag": "unresolved - the two patterns are build-specific and absent from 1.0.8.0. FusionFix has no popup-headlight vehicles.ide flag option (it reads no popuplights token).",
+  "CopSirensFlag": "unresolved - both patterns resolve in 1.0.8.0 but no FusionFix site exists; FusionFix has no +siren vehicles.ide flag option.",
+  "VSyncFix": "unresolved - ZolikaPatch carries 2 signatures but neither resolves in 1.0.8.0, consistent with the recovered build gate excluding build 9. FusionFix has no VSync option (its framelimit/refresh-rate code is different).",
+  "VRAMFix": "unresolved - the single signature is absent from 1.0.8.0 and there is no FusionFix site. FusionFix fixes VRAM detection differently (memory.ixx GetProcessPreferredGPUMemory, pattern 8B 0D ? ? ? ? 83 EC ? 33 C0 at 0x402a20) - conceptually related, mechanically unrelated.",
+  "FastLoading": "unresolved - no ZolikaPatch patch operations recovered; the FastLoading dispatcher calls FUN_1001eca0 which only forwards to FUN_1001ec90 (an indirect call through 0x1015e840). No FusionFix counterpart was found by pattern comparison; FusionFix speeds loading via frame-limiting (framelimit.ixx) instead.",
+  "NoLoadingSleep": "high - ZolikaPatch handler 0x1003d670 pattern 68 88 13 00 00 FF 15 resolves at 0x401854 and zeroes the immediate at +1; FusionFix loadingdelays.ixx:35 uses the identical pattern and WriteMemory(get_first(1),0). Byte-level identical (68 88 13 00 00 ff 15).",
+  "BenchmarkFix": "unresolved - handler 0x10005690 carries pattern E8 ? ? ? ? 83 C4 04 57 8B D8 FF D6 8B 77 20 which resolves at 0x47f600, but no FusionFix patch site matches. FusionFix ships no benchmark fix.",
+  "MiscFixes": "unresolved - 11 patterns, 5 absent from 1.0.8.0, none matched to a FusionFix site. FusionFix has no single equivalent (this is a ZolikaPatch XLivelessAddon-derived bundle).",
+  "LoadDLCs": "unresolved - 17 module-relative RVAs (build 7/8/9 branches); the build-9 set (0x48f558..0x490460) is in-image but none matches a FusionFix patch site. FusionFix loads DLC through its IMG loader, not this hook set."
+ }
+}

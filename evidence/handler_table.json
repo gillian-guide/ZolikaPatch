@@ -1,0 +1,2395 @@
+[
+  {
+    "handler": "100055c0",
+    "option": "AimProjectileCrashFix",
+    "signatures": [
+      "8B 44 24 08 89 41 20 8B 44 24 0C 89 41 24 F7 D8"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "ebx",
+        "target": "0x10005590"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x10005690",
+    "game_hits": [
+      {
+        "signature": "8B 44 24 08 89 41 20 8B 44 24 0C 89 41 24 F7 D8",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10005690",
+    "option": "BenchmarkFix",
+    "signatures": [],
+    "build_gates": [
+      [
+        "!=",
+        9
+      ],
+      [
+        "!=",
+        13
+      ]
+    ],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x10005650"
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x10005670"
+      }
+    ],
+    "op_count": 0,
+    "handler_end": "0x100057f0",
+    "game_hits": []
+  },
+  {
+    "handler": "10005800",
+    "option": "BetterMPSync",
+    "signatures": [
+      "8B 90 E8 00 00 00 55 8B CE FF"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": "0x100057f0"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x10005890",
+    "game_hits": [
+      {
+        "signature": "8B 90 E8 00 00 00 55 8B CE FF",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10005970",
+    "option": "BorderlessWindowed",
+    "signatures": [],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": "0x10005890"
+      },
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": "0x10005900"
+      }
+    ],
+    "op_count": 0,
+    "handler_end": "0x10005b20",
+    "game_hits": []
+  },
+  {
+    "handler": "10005b20",
+    "option": "BuildingDynamicShadows",
+    "signatures": [
+      "8B 47 28 C1 E8 06 83 E0 0F 83 C0",
+      "50 68 04 01 00 00 6A 02 6A 00 E8"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x10005af0"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x10005ca0",
+    "game_hits": [
+      {
+        "signature": "8B 47 28 C1 E8 06 83 E0 0F 83 C0",
+        "hits": 1
+      },
+      {
+        "signature": "50 68 04 01 00 00 6A 02 6A 00 E8",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10005ca0",
+    "option": "BuildingAlphaFix",
+    "signatures": [
+      "F7 46 24 00 00 00 40 0F 85",
+      "F7 46 24 00 00 00 40 0F 84"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": null
+      }
+    ],
+    "op_count": 2,
+    "handler_end": "0x10005e30",
+    "game_hits": [
+      {
+        "signature": "F7 46 24 00 00 00 40 0F 85",
+        "hits": 1
+      },
+      {
+        "signature": "F7 46 24 00 00 00 40 0F 84",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10005e30",
+    "option": "CollisionDeadlockFix",
+    "signatures": [
+      "55 8B EC 83 E4 F8 51 8B 45 0C 0F B7 48 66"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "ebx",
+        "target": "0x10005d80"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x10005ee0",
+    "game_hits": [
+      {
+        "signature": "55 8B EC 83 E4 F8 51 8B 45 0C 0F B7 48 66",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10005ee0",
+    "option": "CombinedRadioFreezeFix",
+    "signatures": [
+      "E8 ? ? ? ? 8B 35 ? ? ? ? 3B F0"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e8",
+        "site_reg": "ebx",
+        "target": "0x10005ed0"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x10005f70",
+    "game_hits": [
+      {
+        "signature": "E8 ? ? ? ? 8B 35 ? ? ? ? 3B F0",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10006350",
+    "option": "CopSirensFlag",
+    "signatures": [
+      "E8 ? ? ? ? C0 E0 ? 32 86 6F 0F 00",
+      "0F BF 41 2E 39 05"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x10006310"
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x10006330"
+      }
+    ],
+    "op_count": 2,
+    "handler_end": "0x10006450",
+    "game_hits": [
+      {
+        "signature": "E8 ? ? ? ? C0 E0 ? 32 86 6F 0F 00",
+        "hits": 1
+      },
+      {
+        "signature": "0F BF 41 2E 39 05",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10006770",
+    "option": "DualVehicleHeadlights",
+    "signatures": [
+      "8B 17 8B 42 64 8B CF FF D0 8B 54"
+    ],
+    "build_gates": [
+      [
+        "==",
+        1
+      ],
+      [
+        "==",
+        2
+      ],
+      [
+        "==",
+        3
+      ],
+      [
+        "==",
+        4
+      ],
+      [
+        "==",
+        5
+      ],
+      [
+        "==",
+        6
+      ]
+    ],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "esi",
+        "target": "0x100064f0"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x10006910",
+    "game_hits": [
+      {
+        "signature": "8B 17 8B 42 64 8B CF FF D0 8B 54",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10006910",
+    "option": "CarPartsShadowFix",
+    "signatures": [],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 0,
+    "handler_end": "0x10006d10",
+    "game_hits": []
+  },
+  {
+    "handler": "1001afa0",
+    "option": "EmissiveLerpFix",
+    "signatures": [
+      "F3 0F 58 C1 F3 0F 2A C8 F3 0F 58 C1"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x1001af60"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x1001b0e0",
+    "game_hits": [
+      {
+        "signature": "F3 0F 58 C1 F3 0F 2A C8 F3 0F 58 C1",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "1001b0e0",
+    "option": "EpisodeSwitchFreezeFix",
+    "signatures": [
+      "89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84",
+      "8B 4B 10 3B 4B 14 7D 0F",
+      "8B 41 10 03 41 0C C3",
+      "8B C1 8B 08 8B 11 8B 40 04 8B 52 30 50 FF D2 C3",
+      "56 8B F1 83 7E 14 00 75 0B 83 7E 10 00 74 05"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x1001b040"
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x1001b060"
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x1001b080"
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x1001b0a0"
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x1001b0c0"
+      }
+    ],
+    "op_count": 5,
+    "handler_end": "0x1001b310",
+    "game_hits": [
+      {
+        "signature": "89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84",
+        "hits": 1
+      },
+      {
+        "signature": "8B 4B 10 3B 4B 14 7D 0F",
+        "hits": 1
+      },
+      {
+        "signature": "8B 41 10 03 41 0C C3",
+        "hits": 1
+      },
+      {
+        "signature": "8B C1 8B 08 8B 11 8B 40 04 8B 52 30 50 FF D2 C3",
+        "hits": 1
+      },
+      {
+        "signature": "56 8B F1 83 7E 14 00 75 0B 83 7E 10 00 74 05",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "1001b310",
+    "option": "TBoGTHeliHeightLimit",
+    "signatures": [
+      "83 3D ? ? ? ? 02 7C 0A F3 0F"
+    ],
+    "build_gates": [
+      [
+        ">",
+        5
+      ]
+    ],
+    "installs": [],
+    "op_count": 1,
+    "handler_end": "0x1001b380",
+    "game_hits": [
+      {
+        "signature": "83 3D ? ? ? ? 02 7C 0A F3 0F",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "1001b380",
+    "option": "EpisodicWeaponSupport",
+    "signatures": [
+      "83 3D ? ? ? ? 02 0F 8C D5 00",
+      "83 3D ? ? ? ? 02 7C 32 8B 41",
+      "75 5B 83 3D ? ? ? ? 00 75",
+      "83 3D ? ? ? ? 02 7C 7D 8B 4C 24 0C",
+      "83 3D ? ? ? ? 02 75 50",
+      "83 3D ? ? ? ? 02 0F 85 8C 01 00 00",
+      "83 3D ? ? ? ? 02 75 20 8B CD E8",
+      "83 3D ? ? ? ? 02 7C 21 8B 44 24 0C"
+    ],
+    "build_gates": [
+      [
+        ">",
+        5
+      ]
+    ],
+    "installs": [],
+    "op_count": 8,
+    "handler_end": "0x1001b580",
+    "game_hits": [
+      {
+        "signature": "83 3D ? ? ? ? 02 0F 8C D5 00",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 7C 32 8B 41",
+        "hits": 1
+      },
+      {
+        "signature": "75 5B 83 3D ? ? ? ? 00 75",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 7C 7D 8B 4C 24 0C",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 75 50",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 0F 85 8C 01 00 00",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 75 20 8B CD E8",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 7C 21 8B 44 24 0C",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "option": "EpisodicVehicleSupport",
+    "signatures": [
+      "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+      "83 3D ? ? ? ? 02 7C 35 0F BF 43 2E",
+      "83 3D ? ? ? ? 02 8A 0D",
+      "83 3D ? ? ? ? 02 75 21 8B 96 20 08 00 00",
+      "83 3D ? ? ? ? 02 7C 4A 0F BF 46 2E",
+      "83 3D ? ? ? ? 02 75 08 3B 05",
+      "83 3D ? ? ? ? 02 75 1F 8B 44 24 04",
+      "83 3D ? ? ? ? 02 75 38 8B 16",
+      "83 3D ? ? ? ? 02 75 24 F6 87 6C 02 00 00 04",
+      "74 17 83 3D ? ? ? ? 02 75 0E F3 0F 10 05",
+      "8B 56 04 8B 4A 0C 89 4C 24 1C 7C 18",
+      "83 3D ? ? ? ? 02 75 35 0F BF 46 2E",
+      "83 3D ? ? ? ? 02 7C 26 8B 85 40 0B 00 00",
+      "83 3D ? ? ? ? 02 75 17 F3 0F 10 44 24 0C",
+      "83 3D ? ? ? ? 02 F3 0F 10 05 ? ? ? ? F3 0F 11 44 24 20 75 4C",
+      "7C 22 83 F8 28 75 1D",
+      "83 3D ? ? ? ? 02 89 44 24 38",
+      "83 3D ? ? ? ? 02 7C 43",
+      "83 3D ? ? ? ? 02 7C 1F 8B",
+      "83 3D ? ? ? ? 02 7C 11 8B 4E",
+      "39 35 ? ? ? ? 75 0E 80 3D"
+    ],
+    "build_gates": [
+      [
+        ">",
+        5
+      ]
+    ],
+    "installs": [],
+    "op_count": 24,
+    "handler_end": "0x1001b980",
+    "game_hits": [
+      {
+        "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 7C 35 0F BF 43 2E",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 8A 0D",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 75 21 8B 96 20 08 00 00",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 7C 4A 0F BF 46 2E",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 75 08 3B 05",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 75 1F 8B 44 24 04",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 75 38 8B 16",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 75 24 F6 87 6C 02 00 00 04",
+        "hits": 1
+      },
+      {
+        "signature": "74 17 83 3D ? ? ? ? 02 75 0E F3 0F 10 05",
+        "hits": 1
+      },
+      {
+        "signature": "8B 56 04 8B 4A 0C 89 4C 24 1C 7C 18",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 75 35 0F BF 46 2E",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 7C 26 8B 85 40 0B 00 00",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 75 17 F3 0F 10 44 24 0C",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 F3 0F 10 05 ? ? ? ? F3 0F 11 44 24 20 75 4C",
+        "hits": 1
+      },
+      {
+        "signature": "7C 22 83 F8 28 75 1D",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 89 44 24 38",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 7C 43",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 7C 1F 8B",
+        "hits": 1
+      },
+      {
+        "signature": "83 3D ? ? ? ? 02 7C 11 8B 4E",
+        "hits": 1
+      },
+      {
+        "signature": "39 35 ? ? ? ? 75 0E 80 3D",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "1001bd60",
+    "option": "BikePhoneAnimsFix",
+    "signatures": [
+      "80 BE 18 02 00 00 00 0F 85 36 01 00 00 80 BE"
+    ],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 1,
+    "handler_end": "0x1001bdd0",
+    "game_hits": [
+      {
+        "signature": "80 BE 18 02 00 00 00 0F 85 36 01 00 00 80 BE",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "1001bdd0",
+    "option": "BikeFeetFix",
+    "signatures": [
+      "39 82 54 13 00 00 0F 85 94 04 00 00"
+    ],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 1,
+    "handler_end": "0x1001be40",
+    "game_hits": [
+      {
+        "signature": "39 82 54 13 00 00 0F 85 94 04 00 00",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "1001be40",
+    "option": "PipeBombDropIconSupport",
+    "signatures": [
+      "83 7D 18 1C 75 14"
+    ],
+    "build_gates": [
+      [
+        ">",
+        5
+      ]
+    ],
+    "installs": [],
+    "op_count": 1,
+    "handler_end": "0x1001bec0",
+    "game_hits": [
+      {
+        "signature": "83 7D 18 1C 75 14",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "1001bec0",
+    "option": "PoliceEpisodicWeaponSupport",
+    "signatures": [
+      "39 2D ? ? ? ? 75 3E"
+    ],
+    "build_gates": [
+      [
+        ">",
+        5
+      ]
+    ],
+    "installs": [],
+    "op_count": 1,
+    "handler_end": "0x1001bf30",
+    "game_hits": [
+      {
+        "signature": "39 2D ? ? ? ? 75 3E",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "1001eca0",
+    "option": "FastLoading",
+    "signatures": [],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 0,
+    "handler_end": "0x1001ecb0",
+    "game_hits": []
+  },
+  {
+    "handler": "1001ee50",
+    "option": "ForceDynamicShadowsEverywhere",
+    "signatures": [
+      "F7 46 4C 00 80 00 00 74"
+    ],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 1,
+    "handler_end": "0x1001eed0",
+    "game_hits": [
+      {
+        "signature": "F7 46 4C 00 80 00 00 74",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "1001eed0",
+    "option": "ForceShadowsOnObjects",
+    "signatures": [
+      "F7 47 40 00 10 00 00 74 07 81 4E 24 00 00"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "eb",
+        "site_reg": "edi",
+        "target": null
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x1001ef30",
+    "game_hits": [
+      {
+        "signature": "F7 47 40 00 10 00 00 74 07 81 4E 24 00 00",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "1001efa0",
+    "option": "HighFPSBikePhysicsFix",
+    "signatures": [
+      "D9 45 08 51 8B CE D9 1C 24 E8 ? ? ? ? 8A 86 90 14 00 00"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "ebx",
+        "target": "0x1001ef60"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x1001f390",
+    "game_hits": [
+      {
+        "signature": "D9 45 08 51 8B CE D9 1C 24 E8 ? ? ? ? 8A 86 90 14 00 00",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10022cf0",
+    "option": "AllowHashesForIDE",
+    "signatures": [
+      "8B 4C 24 08 56 8B 74 24 08 80 3E 22"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "ebx",
+        "target": "0x10003e50"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x10022d80",
+    "game_hits": [
+      {
+        "signature": "8B 4C 24 08 56 8B 74 24 08 80 3E 22",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10022d80",
+    "option": "InfiniteCarBottomDistance",
+    "signatures": [
+      "0F 2F D0 76 25 0F 28 C2"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "eb",
+        "site_reg": "esi",
+        "target": null
+      }
+    ],
+    "op_count": 2,
+    "handler_end": "0x10022e00",
+    "game_hits": [
+      {
+        "signature": "0F 2F D0 76 25 0F 28 C2",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10022f60",
+    "option": "OverrideGTADatPath",
+    "signatures": [
+      "68 ? ? ? ? E8 ? ? ? ? 83 C4 04 E8 ? ? ? ? E8 ? ? ? ? E8"
+    ],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 0,
+    "handler_end": "0x10022fc0",
+    "game_hits": [
+      {
+        "signature": "68 ? ? ? ? E8 ? ? ? ? 83 C4 04 E8 ? ? ? ? E8 ? ? ? ? E8",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10022fc0",
+    "option": "IncreaseVehicleModelLimit",
+    "signatures": [
+      "83 C7 01 81 FF 18 79 00 00 7C D2"
+    ],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 0,
+    "handler_end": "0x10023020",
+    "game_hits": [
+      {
+        "signature": "83 C7 01 81 FF 18 79 00 00 7C D2",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10023020",
+    "option": "IncreaseVehicleStructLimit",
+    "signatures": [
+      "68 ? ? ? ? 6A 32 8B C8"
+    ],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 0,
+    "handler_end": "0x10023080",
+    "game_hits": [
+      {
+        "signature": "68 ? ? ? ? 6A 32 8B C8",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10023080",
+    "option": "IncreasePtrNodes",
+    "signatures": [
+      "6A 14 ? ? ? ? ? 68 80 3E 00 00",
+      "6A 08 ? ? ? ? ? 68 80 38 01 00",
+      "6A 10 ? ? ? ? ? 68 80 3E 00 00"
+    ],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 0,
+    "handler_end": "0x10023150",
+    "game_hits": [
+      {
+        "signature": "6A 14 ? ? ? ? ? 68 80 3E 00 00",
+        "hits": 1
+      },
+      {
+        "signature": "6A 08 ? ? ? ? ? 68 80 38 01 00",
+        "hits": 1
+      },
+      {
+        "signature": "6A 10 ? ? ? ? ? 68 80 3E 00 00",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "100234e0",
+    "option": "LoadDLCs",
+    "signatures": [],
+    "build_gates": [
+      [
+        "==",
+        7
+      ],
+      [
+        "==",
+        8
+      ],
+      [
+        "==",
+        9
+      ]
+    ],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x10023480"
+      },
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": "0x10023490"
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": null
+      },
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": null
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": null
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": null
+      },
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": null
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": null
+      },
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": null
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": null
+      }
+    ],
+    "op_count": 17,
+    "handler_end": "0x100238e0",
+    "game_hits": []
+  },
+  {
+    "handler": "10023b30",
+    "option": "HighFPSSpeedupFix",
+    "signatures": [
+      "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "eb",
+        "site_reg": "esi",
+        "target": null
+      }
+    ],
+    "op_count": 9,
+    "handler_end": "0x10023cc0",
+    "game_hits": [
+      {
+        "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10023dc0",
+    "option": "HighQualityReflections",
+    "signatures": [],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 0,
+    "handler_end": "0x10023dd0",
+    "game_hits": []
+  },
+  {
+    "handler": "10023dd0",
+    "option": "MiscFixes",
+    "signatures": [
+      "C7 06 ? ? ? ? 74 19",
+      "83 C4 ? 3B 46 20",
+      "75 28 6A 00 6A 00 68 ? ? ? ? E8 ? ? ? ? 83 C4 0C",
+      "8B 54 24 04 52 A3",
+      "83 F8 01 75 30 A3",
+      "C7 05 ? ? ? ? 03 00 00 00 33 C0 5E 59 C3 C7",
+      "FF 15 ? ? ? ? 85 C0 75 18",
+      "FF 15 ? ? ? ? 85 C0 75 04 32",
+      "FF 15 ? ? ? ? 85 C0 75 07 A0",
+      "81 EC ? ? ? ? A1 ? ? ? ? 33 C4 89 84 24 ? ? ? ? 53 ? 6A 3C 33 DB 8D 44 24 ? 53 50 E8",
+      "74 05 E8 ? ? ? ? 6A 05 E8 ? ? ? ? 83 C4 04 B9"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "eb",
+        "site_reg": "esi",
+        "target": null
+      },
+      {
+        "opcode": "eb",
+        "site_reg": "esi",
+        "target": null
+      },
+      {
+        "opcode": "eb",
+        "site_reg": "esi",
+        "target": null
+      },
+      {
+        "opcode": "eb",
+        "site_reg": "esi",
+        "target": null
+      }
+    ],
+    "op_count": 12,
+    "handler_end": "0x10024060",
+    "game_hits": [
+      {
+        "signature": "C7 06 ? ? ? ? 74 19",
+        "hits": 0
+      },
+      {
+        "signature": "83 C4 ? 3B 46 20",
+        "hits": 1
+      },
+      {
+        "signature": "75 28 6A 00 6A 00 68 ? ? ? ? E8 ? ? ? ? 83 C4 0C",
+        "hits": 2
+      },
+      {
+        "signature": "8B 54 24 04 52 A3",
+        "hits": 0
+      },
+      {
+        "signature": "83 F8 01 75 30 A3",
+        "hits": 0
+      },
+      {
+        "signature": "C7 05 ? ? ? ? 03 00 00 00 33 C0 5E 59 C3 C7",
+        "hits": 1
+      },
+      {
+        "signature": "FF 15 ? ? ? ? 85 C0 75 18",
+        "hits": 0
+      },
+      {
+        "signature": "FF 15 ? ? ? ? 85 C0 75 04 32",
+        "hits": 0
+      },
+      {
+        "signature": "FF 15 ? ? ? ? 85 C0 75 07 A0",
+        "hits": 1
+      },
+      {
+        "signature": "81 EC ? ? ? ? A1 ? ? ? ? 33 C4 89 84 24 ? ? ? ? 53 ? 6A 3C 33 DB 8D 44 24 ? 53 50 E8",
+        "hits": 1
+      },
+      {
+        "signature": "74 05 E8 ? ? ? ? 6A 05 E8 ? ? ? ? 83 C4 04 B9",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10036f30",
+    "option": "GroupHackFix",
+    "signatures": [
+      "33 C0 83 C1 04 8D 50 07 83 39 00 75 06 83 79 04"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "ebx",
+        "target": "0x10036e90"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x10036fd0",
+    "game_hits": [
+      {
+        "signature": "33 C0 83 C1 04 8D 50 07 83 39 00 75 06 83 79 04",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10036fd0",
+    "option": "BlackscreenFix",
+    "signatures": [
+      "75 54 8B 48 28 8B 40 2C"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x10036ee0"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x10037070",
+    "game_hits": [
+      {
+        "signature": "75 54 8B 48 28 8B 40 2C",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10037070",
+    "option": "FreezeGunFix",
+    "signatures": [
+      "2B C2 D1 F8 39 3C C6 7D 0D 83 CA FF"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x10036eb0"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x10037100",
+    "game_hits": [
+      {
+        "signature": "2B C2 D1 F8 39 3C C6 7D 0D 83 CA FF",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10037100",
+    "option": "RemoveAllWeaponsProtection",
+    "signatures": [
+      "E9 ? ? ? ? 57 8D 8F ? ? 00 00"
+    ],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 1,
+    "handler_end": "0x10037170",
+    "game_hits": [
+      {
+        "signature": "E9 ? ? ? ? 57 8D 8F ? ? 00 00",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10037170",
+    "option": "TeleportProtection",
+    "signatures": [
+      "55 8B EC 83 E4 F8 51 53 8B 5D 08 56 57 6A 08 8D 44 24 10 8B F1 8D 7B 04 50 8B CF C7 44 24 14 00"
+    ],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 1,
+    "handler_end": "0x100371f0",
+    "game_hits": [
+      {
+        "signature": "55 8B EC 83 E4 F8 51 53 8B 5D 08 56 57 6A 08 8D 44 24 10 8B F1 8D 7B 04 50 8B CF C7 44 24 14 00",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "100371f0",
+    "option": "CrashMsgFix",
+    "signatures": [
+      "68 6A 10 4E 31"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": "0x10036f00"
+      }
+    ],
+    "op_count": 0,
+    "handler_end": "0x10037290",
+    "game_hits": [
+      {
+        "signature": "68 6A 10 4E 31",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10037290",
+    "option": "MPNikoCrashFix",
+    "signatures": [
+      "74 2B 57 E8 ? ? ? ? 8B BE A8 0E 00 00"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "eb",
+        "site_reg": "edi",
+        "target": null
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x100372f0",
+    "game_hits": [
+      {
+        "signature": "74 2B 57 E8 ? ? ? ? 8B BE A8 0E 00 00",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10037be0",
+    "option": "BadPlayerModelCrashFix",
+    "signatures": [
+      "83 E4 F0 83 EC 54 0F 57 C0 53 8B 5D 0C"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "ebx",
+        "target": "0x10037ba0"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x10037c70",
+    "game_hits": [
+      {
+        "signature": "83 E4 F0 83 EC 54 0F 57 C0 53 8B 5D 0C",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10038680",
+    "option": "NewMemorySystem",
+    "signatures": [
+      "3D 80 99 99 59 73 05",
+      "6A 01 B9 00 00 40 06"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": "0x10038670"
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "esi",
+        "target": null
+      }
+    ],
+    "op_count": 2,
+    "handler_end": "0x10038770",
+    "game_hits": [
+      {
+        "signature": "3D 80 99 99 59 73 05",
+        "hits": 1
+      },
+      {
+        "signature": "6A 01 B9 00 00 40 06",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10038770",
+    "option": "RemoveBoundingBoxCulling",
+    "signatures": [
+      "3C 01 57 0F 85"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": null
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x10038800",
+    "game_hits": [
+      {
+        "signature": "3C 01 57 0F 85",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10038800",
+    "option": "RemoveStaticCarShadows",
+    "signatures": [
+      "F3 0F 11 4C 24 0C 76 5B D9 45 14"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "eb",
+        "site_reg": "edi",
+        "target": null
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x10038860",
+    "game_hits": [
+      {
+        "signature": "F3 0F 11 4C 24 0C 76 5B D9 45 14",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10038860",
+    "option": "RemoveStaticCutsceneCarShadows",
+    "signatures": [
+      "F3 0F 11 44 24 0C 76 5B D9 45 14"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "eb",
+        "site_reg": "edi",
+        "target": null
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x100388c0",
+    "game_hits": [
+      {
+        "signature": "F3 0F 11 44 24 0C 76 5B D9 45 14",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "1003d420",
+    "option": "NoLiveryLimit",
+    "signatures": [
+      "74 52 8D B5 3C 01 00 00 83 FB 04",
+      "8D AF 3C 01 00 00 8D 54 24 20",
+      "8B 8C 83 3C 01 00 00 0F BF 53 48"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x1003d3a0"
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x1003d3e0"
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x1003d310"
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x1003d370"
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x1003d340"
+      }
+    ],
+    "op_count": 2,
+    "handler_end": "0x1003d670",
+    "game_hits": [
+      {
+        "signature": "74 52 8D B5 3C 01 00 00 83 FB 04",
+        "hits": 1
+      },
+      {
+        "signature": "8D AF 3C 01 00 00 8D 54 24 20",
+        "hits": 0
+      },
+      {
+        "signature": "8B 8C 83 3C 01 00 00 0F BF 53 48",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "1003d670",
+    "option": "NoLoadingSleep",
+    "signatures": [
+      "68 88 13 00 00 FF 15"
+    ],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 0,
+    "handler_end": "0x1003d6d0",
+    "game_hits": [
+      {
+        "signature": "68 88 13 00 00 FF 15",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "1003d7a0",
+    "option": "MouseFix",
+    "signatures": [],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 0,
+    "handler_end": "0x1003d7d0",
+    "game_hits": []
+  },
+  {
+    "handler": "1003d7d0",
+    "option": "PathNodeCrashFix",
+    "signatures": [
+      "8B 04 B1 0F B7 D0 81 FA FF FF 00 00"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x1003d7b0"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x1003d890",
+    "game_hits": [
+      {
+        "signature": "8B 04 B1 0F B7 D0 81 FA FF FF 00 00",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "1003d890",
+    "option": "PlaneCrashFix",
+    "signatures": [
+      "83 C4 04 88 58 26 8B 16 8B 82 F4 00 00 00"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x1003d870"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x1003d930",
+    "game_hits": [
+      {
+        "signature": "83 C4 04 88 58 26 8B 16 8B 82 F4 00 00 00",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "1003d9c0",
+    "option": "PlayerAsPedComponentsFix",
+    "signatures": [
+      "8B 54 24 10 52 0F B6 90 19 02 00 00"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x1003d9a0"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x1003da50",
+    "game_hits": [
+      {
+        "signature": "8B 54 24 10 52 0F B6 90 19 02 00 00",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "100441a0",
+    "option": "CutsceneFixes",
+    "signatures": [],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 0,
+    "handler_end": "0x100441b0",
+    "game_hits": []
+  },
+  {
+    "handler": "100441b0",
+    "option": "LaunchWithPlayGTAIV",
+    "signatures": [],
+    "build_gates": [
+      [
+        "!=",
+        9
+      ],
+      [
+        "==",
+        1
+      ],
+      [
+        "==",
+        5
+      ],
+      [
+        "==",
+        7
+      ],
+      [
+        "==",
+        8
+      ]
+    ],
+    "installs": [],
+    "op_count": 0,
+    "handler_end": "0x10044310",
+    "game_hits": []
+  },
+  {
+    "handler": "10044590",
+    "option": "PopupHeadlightsFlag",
+    "signatures": [
+      "0F BF 46 2E 3B 05 ? ? ? ? 75 ? A1",
+      "0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "eb",
+        "site_reg": "esi",
+        "target": "0x10044560"
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "ebx",
+        "target": null
+      },
+      {
+        "opcode": "eb",
+        "site_reg": "esi",
+        "target": null
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "ebx",
+        "target": null
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x10044710",
+    "game_hits": [
+      {
+        "signature": "0F BF 46 2E 3B 05 ? ? ? ? 75 ? A1",
+        "hits": 1
+      },
+      {
+        "signature": "0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1",
+        "hits": 0
+      }
+    ]
+  },
+  {
+    "handler": "10044710",
+    "option": "Patch6and7RemoveModChecks",
+    "signatures": [],
+    "build_gates": [
+      [
+        "==",
+        7
+      ],
+      [
+        "==",
+        8
+      ]
+    ],
+    "installs": [
+      {
+        "opcode": "eb",
+        "site_reg": "esi",
+        "target": null
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": null
+      },
+      {
+        "opcode": "eb",
+        "site_reg": "esi",
+        "target": null
+      },
+      {
+        "opcode": "eb",
+        "site_reg": "esi",
+        "target": null
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": null
+      },
+      {
+        "opcode": "eb",
+        "site_reg": "esi",
+        "target": null
+      }
+    ],
+    "op_count": 25,
+    "handler_end": "0x10044b10",
+    "game_hits": []
+  },
+  {
+    "handler": "10044bd0",
+    "option": "RemoveUselessChecks",
+    "signatures": [],
+    "build_gates": [
+      [
+        "==",
+        5
+      ],
+      [
+        "==",
+        8
+      ],
+      [
+        "==",
+        9
+      ]
+    ],
+    "installs": [
+      {
+        "opcode": "eb",
+        "site_reg": "edi",
+        "target": null
+      },
+      {
+        "opcode": "eb",
+        "site_reg": "edi",
+        "target": null
+      }
+    ],
+    "op_count": 23,
+    "handler_end": "0x10044fd0",
+    "game_hits": []
+  },
+  {
+    "handler": "10045430",
+    "option": "ReversingLightFix",
+    "signatures": [
+      "11 01 00 00 8B 16 8B 42 64 8B CE FF D0 F3 0F 10"
+    ],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 1,
+    "handler_end": "0x10045490",
+    "game_hits": [
+      {
+        "signature": "11 01 00 00 8B 16 8B 42 64 8B CE FF D0 F3 0F 10",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10045490",
+    "option": "RemoveRGSCLoginRequirement",
+    "signatures": [
+      "83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53 8B 5C 24 4C 56 68 ? ? ? ? E8 ? ? ? ? 83 C4"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "ebx",
+        "target": "0x10038550"
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": null
+      }
+    ],
+    "op_count": 2,
+    "handler_end": "0x10045580",
+    "game_hits": [
+      {
+        "signature": "83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53 8B 5C 24 4C 56 68 ? ? ? ? E8 ? ? ? ? 83 C4",
+        "hits": 0
+      }
+    ]
+  },
+  {
+    "handler": "10045610",
+    "option": "SavegameFix",
+    "signatures": [
+      "75 ? 83 C1 01 83 C0 01 83 F9 04",
+      "8D 4C 24 18 51 6A 00 6A 0C 57"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": "0x10045580"
+      },
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": "0x100455e0"
+      },
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": "0x10038570"
+      },
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": null
+      },
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": null
+      },
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": null
+      },
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": null
+      },
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": null
+      },
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": null
+      },
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": null
+      }
+    ],
+    "op_count": 2,
+    "handler_end": "0x10045980",
+    "game_hits": [
+      {
+        "signature": "75 ? 83 C1 01 83 C0 01 83 F9 04",
+        "hits": 1
+      },
+      {
+        "signature": "8D 4C 24 18 51 6A 00 6A 0C 57",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10045980",
+    "option": "SCOSignatureFix",
+    "signatures": [
+      "8B 6C 24 1C 66 89 6E 14 64 8B 0D 2C 00 00 00 8B"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "eb",
+        "site_reg": "edi",
+        "target": null
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x100459e0",
+    "game_hits": [
+      {
+        "signature": "8B 6C 24 1C 66 89 6E 14 64 8B 0D 2C 00 00 00 8B",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10045ad0",
+    "option": "ImprovedShaderStreaming",
+    "signatures": [
+      "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": "0x10045a30"
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "esi",
+        "target": "0x10045a80"
+      },
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": null
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "esi",
+        "target": null
+      }
+    ],
+    "op_count": 4,
+    "handler_end": "0x10045c50",
+    "game_hits": [
+      {
+        "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10045c50",
+    "option": "SkipIntro",
+    "signatures": [
+      "89 91 ? ? ? ? 8D 44 24 ? 68 ? ? ? ? 50"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x10045c30"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x10045ce0",
+    "game_hits": [
+      {
+        "signature": "89 91 ? ? ? ? 8D 44 24 ? 68 ? ? ? ? 50",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10045ce0",
+    "option": "SkipLauncher",
+    "signatures": [
+      "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+      "68 ? ? ? ? 89 35 ? ? ? ? E8 ? ? ? ? 83 C4 04 84 C0 0F 84",
+      "74 EC 38 5E 06 74 E7 68",
+      "74 C4 8B 07 3B 46 18 75 BD 68",
+      "3B 56 18 0F 85",
+      "3B 4E 18 0F 85",
+      "0F 85 ? ? ? ? 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC C6",
+      "3B 46 18 75 BD",
+      "57 51 C7 44 24 ? ? ? ? ? C7 44 24 ? ? ? ? ? C7 44 24",
+      "8B 56 1C 3B 56 20 ? ? 6A 00 6A 00",
+      "89 35 ? ? ? ? E8 ? ? ? ? 83 C4 04 84 C0",
+      "8B 50 2C 3B 50 30",
+      "8B 48 2C 83 EC 78",
+      "8B 48 2C 83 EC 74",
+      "8B 48 2C 3B 48 30 74 03",
+      "8B 48 2C 3B 48 30 53",
+      "8B 48 2C 3B 48 30 74 11",
+      "8B 48 2C 3B 48 30 75 DC 8D 54 24 18",
+      "8B 48 2C 3B 48 30 75 DC 8D 54 24 1C",
+      "8B 0D ? ? ? ? 8B 51 2C",
+      "51 53 55 56 57 8B 3D ? ? ? ? 8B 47 2C",
+      "3B C7 0F 85 ? ? ? ? 85 C0",
+      "0F 85 ? ? ? ? 85 C0 0F 84 ? ? ? ? E8 ? ? ? ? 85 D2",
+      "83 EC 24 A1 ? ? ? ? 8B 48 14 53 55 56 57",
+      "83 EC 08 8B 0D ? ? ? ? 8B 51 14 8D 04 24 50 6A 00 52"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "eb",
+        "site_reg": "esi",
+        "target": null
+      },
+      {
+        "opcode": "eb",
+        "site_reg": "esi",
+        "target": null
+      }
+    ],
+    "op_count": 7,
+    "handler_end": "0x100460e0",
+    "game_hits": [
+      {
+        "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+        "hits": 0
+      },
+      {
+        "signature": "68 ? ? ? ? 89 35 ? ? ? ? E8 ? ? ? ? 83 C4 04 84 C0 0F 84",
+        "hits": 1
+      },
+      {
+        "signature": "74 EC 38 5E 06 74 E7 68",
+        "hits": 0
+      },
+      {
+        "signature": "74 C4 8B 07 3B 46 18 75 BD 68",
+        "hits": 0
+      },
+      {
+        "signature": "3B 56 18 0F 85",
+        "hits": 0
+      },
+      {
+        "signature": "3B 4E 18 0F 85",
+        "hits": 0
+      },
+      {
+        "signature": "0F 85 ? ? ? ? 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC C6",
+        "hits": 1
+      },
+      {
+        "signature": "3B 46 18 75 BD",
+        "hits": 0
+      },
+      {
+        "signature": "57 51 C7 44 24 ? ? ? ? ? C7 44 24 ? ? ? ? ? C7 44 24",
+        "hits": 0
+      },
+      {
+        "signature": "8B 56 1C 3B 56 20 ? ? 6A 00 6A 00",
+        "hits": 1
+      },
+      {
+        "signature": "89 35 ? ? ? ? E8 ? ? ? ? 83 C4 04 84 C0",
+        "hits": 1
+      },
+      {
+        "signature": "8B 50 2C 3B 50 30",
+        "hits": 0
+      },
+      {
+        "signature": "8B 48 2C 83 EC 78",
+        "hits": 0
+      },
+      {
+        "signature": "8B 48 2C 83 EC 74",
+        "hits": 0
+      },
+      {
+        "signature": "8B 48 2C 3B 48 30 74 03",
+        "hits": 0
+      },
+      {
+        "signature": "8B 48 2C 3B 48 30 53",
+        "hits": 0
+      },
+      {
+        "signature": "8B 48 2C 3B 48 30 74 11",
+        "hits": 0
+      },
+      {
+        "signature": "8B 48 2C 3B 48 30 75 DC 8D 54 24 18",
+        "hits": 0
+      },
+      {
+        "signature": "8B 48 2C 3B 48 30 75 DC 8D 54 24 1C",
+        "hits": 0
+      },
+      {
+        "signature": "8B 0D ? ? ? ? 8B 51 2C",
+        "hits": 0
+      },
+      {
+        "signature": "51 53 55 56 57 8B 3D ? ? ? ? 8B 47 2C",
+        "hits": 0
+      },
+      {
+        "signature": "3B C7 0F 85 ? ? ? ? 85 C0",
+        "hits": 1
+      },
+      {
+        "signature": "0F 85 ? ? ? ? 85 C0 0F 84 ? ? ? ? E8 ? ? ? ? 85 D2",
+        "hits": 1
+      },
+      {
+        "signature": "83 EC 24 A1 ? ? ? ? 8B 48 14 53 55 56 57",
+        "hits": 0
+      },
+      {
+        "signature": "83 EC 08 8B 0D ? ? ? ? 8B 51 14 8D 04 24 50 6A 00 52",
+        "hits": 0
+      }
+    ]
+  },
+  {
+    "handler": "10046640",
+    "option": "SkipMenu",
+    "signatures": [
+      "83 F8 03 75 ? A1 ? ? ? ? 80 88 ? ? ? ? ? 84 DB 74 0A 6A 00 E8 ? ? ? ? 83 C4 04 5F 5E",
+      "6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5D 5B 33 CC E8 ? ? ? ? 81 C4 ? ? ? ? C3",
+      "6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC E8 ? ? ? ? 8B E5 5D C3"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": "0x10046610"
+      },
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": null
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x100467a0",
+    "game_hits": [
+      {
+        "signature": "83 F8 03 75 ? A1 ? ? ? ? 80 88 ? ? ? ? ? 84 DB 74 0A 6A 00 E8 ? ? ? ? 83 C4 04 5F 5E",
+        "hits": 1
+      },
+      {
+        "signature": "6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5D 5B 33 CC E8 ? ? ? ? 81 C4 ? ? ? ? C3",
+        "hits": 0
+      },
+      {
+        "signature": "6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC E8 ? ? ? ? 8B E5 5D C3",
+        "hits": 0
+      }
+    ]
+  },
+  {
+    "handler": "100467a0",
+    "option": "SMPA60Fix",
+    "signatures": [
+      "01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C",
+      "8B 48 70 83 C0 40 50 51 8D 51 10"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x10046780"
+      },
+      {
+        "opcode": "eb",
+        "site_reg": "esi",
+        "target": "0x10046750"
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": null
+      }
+    ],
+    "op_count": 3,
+    "handler_end": "0x100468d0",
+    "game_hits": [
+      {
+        "signature": "01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C",
+        "hits": 1
+      },
+      {
+        "signature": "8B 48 70 83 C0 40 50 51 8D 51 10",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "100468d0",
+    "option": "StartupTimeFix",
+    "signatures": [],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 0,
+    "handler_end": "0x100469a0",
+    "game_hits": []
+  },
+  {
+    "handler": "10046a10",
+    "option": "SuperLODFix",
+    "signatures": [],
+    "build_gates": [
+      [
+        "==",
+        8
+      ],
+      [
+        "==",
+        9
+      ]
+    ],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x100469e0"
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": null
+      }
+    ],
+    "op_count": 0,
+    "handler_end": "0x10046b30",
+    "game_hits": []
+  },
+  {
+    "handler": "10046b30",
+    "option": "TryToSkipAllErrors",
+    "signatures": [
+      "81 EC 40 08 00 00 53 55 8B AC 24 4C 08 00 00"
+    ],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 1,
+    "handler_end": "0x10046b90",
+    "game_hits": [
+      {
+        "signature": "81 EC 40 08 00 00 53 55 8B AC 24 4C 08 00 00",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "1004aae0",
+    "option": "VRAMFix",
+    "signatures": [
+      "8B 44 24 10 D9 2C 24 83 C4 1C C3"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "ebx",
+        "target": "0x1004aab0"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x1004ab70",
+    "game_hits": [
+      {
+        "signature": "8B 44 24 10 D9 2C 24 83 C4 1C C3",
+        "hits": 0
+      }
+    ]
+  },
+  {
+    "handler": "100503b0",
+    "option": "VSyncFix",
+    "signatures": [
+      "8B 10 50 8B 82 A8 00 00 00 FF D0 83",
+      "8B 08 8B 51 0C 6A 01 6A 00 6A 00 6A 00 6A 00 50 FF D2 8B F0 81 FE ? ? ? ? 74"
+    ],
+    "build_gates": [
+      [
+        "!=",
+        1
+      ],
+      [
+        "!=",
+        2
+      ],
+      [
+        "!=",
+        3
+      ],
+      [
+        "!=",
+        4
+      ],
+      [
+        "!=",
+        5
+      ],
+      [
+        "!=",
+        9
+      ],
+      [
+        "!=",
+        13
+      ]
+    ],
+    "installs": [],
+    "op_count": 0,
+    "handler_end": "0x100504b0",
+    "game_hits": [
+      {
+        "signature": "8B 10 50 8B 82 A8 00 00 00 FF D0 83",
+        "hits": 0
+      },
+      {
+        "signature": "8B 08 8B 51 0C 6A 01 6A 00 6A 00 6A 00 6A 00 50 FF D2 8B F0 81 FE ? ? ? ? 74",
+        "hits": 0
+      }
+    ]
+  },
+  {
+    "handler": "100504b0",
+    "option": "WantedLevelCrashFix",
+    "signatures": [
+      "8B 01 8B 90 28 01 00 00 FF D2 84 C0 0F 84 88 00 00 00"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "ebx",
+        "target": "0x10050490"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x10050540",
+    "game_hits": [
+      {
+        "signature": "8B 01 8B 90 28 01 00 00 FF D2 84 C0 0F 84 88 00 00 00",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "100506b0",
+    "option": "SpeedupBugFix",
+    "signatures": [
+      "50 64 89 25 00 00 00 00 83 EC 34"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "ebx",
+        "target": "0x10050540"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x10050790",
+    "game_hits": [
+      {
+        "signature": "50 64 89 25 00 00 00 00 83 EC 34",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10050860",
+    "option": "GarageModelFix",
+    "signatures": [],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 0,
+    "handler_end": "0x10050870",
+    "game_hits": []
+  },
+  {
+    "handler": "100508c0",
+    "option": "PedModelsInCutscenesFix",
+    "signatures": [
+      "56 8B F1 E8 ? ? ? ? 85 C0 74 0E 66 8B 40 2E"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "ebx",
+        "target": "0x10050870"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x10050950",
+    "game_hits": [
+      {
+        "signature": "56 8B F1 E8 ? ? ? ? 85 C0 74 0E 66 8B 40 2E",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10050a20",
+    "option": "OutOfCommissionFix",
+    "signatures": [],
+    "build_gates": [],
+    "installs": [],
+    "op_count": 0,
+    "handler_end": "0x10050a40",
+    "game_hits": []
+  },
+  {
+    "handler": "100513a0",
+    "option": "LocalSettingsPath",
+    "signatures": [
+      "53 8B 5C 24 08 56 6A 00 6A 00",
+      "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D6 5F 5E 5B C3",
+      "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D7 5F C3"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x10051300"
+      },
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": null
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x100515d0",
+    "game_hits": [
+      {
+        "signature": "53 8B 5C 24 08 56 6A 00 6A 00",
+        "hits": 1
+      },
+      {
+        "signature": "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D6 5F 5E 5B C3",
+        "hits": 1
+      },
+      {
+        "signature": "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D7 5F C3",
+        "hits": 0
+      }
+    ]
+  },
+  {
+    "handler": "10051920",
+    "option": "NewFilesCompatibility",
+    "signatures": [
+      "68 64 28 C8 67 E8",
+      "E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 7B FF FF FF",
+      "E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 6C FF FF FF"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "edi",
+        "target": "0x10051600"
+      },
+      {
+        "opcode": "e8",
+        "site_reg": "esi",
+        "target": "0x10051890"
+      },
+      {
+        "opcode": "e8",
+        "site_reg": "edi",
+        "target": "0x100518d0"
+      }
+    ],
+    "op_count": 3,
+    "handler_end": "0x10051a90",
+    "game_hits": [
+      {
+        "signature": "68 64 28 C8 67 E8",
+        "hits": 1
+      },
+      {
+        "signature": "E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 7B FF FF FF",
+        "hits": 1
+      },
+      {
+        "signature": "E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 6C FF FF FF",
+        "hits": 1
+      }
+    ]
+  },
+  {
+    "handler": "10052200",
+    "option": "NewSavesCompatibility",
+    "signatures": [
+      "68 ? ? ? ? E8 ? ? ? ? 8B 2D ? ? ? ? 83 C4 08",
+      "89 84 24 E0 01 00 00 8B 45 08 53 33 DB"
+    ],
+    "build_gates": [],
+    "installs": [
+      {
+        "opcode": "e9",
+        "site_reg": "ebx",
+        "target": "0x100521e0"
+      }
+    ],
+    "op_count": 1,
+    "handler_end": "0x100522b0",
+    "game_hits": [
+      {
+        "signature": "68 ? ? ? ? E8 ? ? ? ? 8B 2D ? ? ? ? 83 C4 08",
+        "hits": 1
+      },
+      {
+        "signature": "89 84 24 E0 01 00 00 8B 45 08 53 33 DB",
+        "hits": 1
+      }
+    ]
+  }
+]

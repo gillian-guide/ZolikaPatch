@@ -1,0 +1,797 @@
+// ============================================================================
+// DebugPrintSpawns + FreezeCarFix -- ready-to-paste artifact (offline RE)
+//   handler:  0x10037C70 (installer)   loader arm: nested under "FreezeCarFix"
+//   bodies:   0x10037510 (394-insn transcription, below), 0x100372F0,
+//             0x10037330/360/390/3C0/3F0/420/450/480/4B0/4E0 (case thunks)
+// All module-window addresses were rebased to zpatch_* symbols; verify with
+// tools/verify_hook_bodies.py (addresses in [0x10000000,0x10200000) normalise
+// to '?', everything else must match instruction-for-instruction).
+// ============================================================================
+
+// ---------------------------------------------------------------------------
+// 1. rebased_values.cpp definitions (add inside the extern "C" { } block)
+// ---------------------------------------------------------------------------
+// FreezeCarFix/DebugPrintSpawns: dword_10158058 (selector; on-disk init -1),
+// dword_10159C80 (captured arg2 byte), dword_10159CB4 (suppress flag) and the
+// twelve resume slots the installer publishes.
+// dword_10159CB0 = 0x8DD330, dword_10159C98 = 0x6D61A0 (game function res).
+std::uint32_t zpatch_spawns_kind = 0xFFFFFFFFu;   // dword_10158058
+std::uint32_t zpatch_spawns_class = 0;            // dword_10159C80
+std::uint32_t zpatch_spawns_skip = 0;             // dword_10159CB4
+std::uint32_t zpatch_spawns_orig_a = 0;           // dword_10159CB0 (P1 resume)
+std::uint32_t zpatch_spawns_orig_b = 0;           // dword_10159C98 (P2 resume)
+std::uint32_t zpatch_spawns_case0_resume = 0;     // dword_10159CBC (site +0x24)
+std::uint32_t zpatch_spawns_case1_resume = 0;     // dword_10159C9C (site +0x3D)
+std::uint32_t zpatch_spawns_case2_resume = 0;     // dword_10159CA0 (site +0x56)
+std::uint32_t zpatch_spawns_case3_resume = 0;     // dword_10159CA8 (site +0x6F)
+std::uint32_t zpatch_spawns_case4_resume = 0;     // dword_10159C7C (site +0x88)
+std::uint32_t zpatch_spawns_case5_resume = 0;     // dword_10159C88 (site +0x9E)
+std::uint32_t zpatch_spawns_case6_resume = 0;     // dword_10159CAC (site +0xB4)
+std::uint32_t zpatch_spawns_case7_resume = 0;     // dword_10159C90 (site +0xCA)
+std::uint32_t zpatch_spawns_case8_resume = 0;     // dword_10159C94 (site +0xE0)
+std::uint32_t zpatch_spawns_case9_resume = 0;     // dword_10159C84 (site +0xF6)
+// Function-pointer slots for the helper shims (fill at load, before installing).
+std::uint32_t zpatch_spawns_name_fn = 0;      // -> zpatch_spawns_name_ecx
+std::uint32_t zpatch_spawns_who_fn = 0;       // -> zpatch_spawns_who_edx
+std::uint32_t zpatch_spawns_print_fn = 0;     // -> zpatch_spawns_print_edx
+std::uint32_t zpatch_spawns_sprintf_fn = 0;   // -> zpatch_spawns_sprintf
+std::uint32_t zpatch_spawns_cookie_fn = 0;    // -> zpatch_spawns_cookie_check_ecx
+
+// ---------------------------------------------------------------------------
+// 2. rebased_values.hpp declarations (extern "C" section)
+// ---------------------------------------------------------------------------
+// (same names as above)
+
+// ---------------------------------------------------------------------------
+// 3. rebased_slot_for() additions
+// ---------------------------------------------------------------------------
+//   if (slot_name == "dword_10159CB0") return (uintptr_t)&zpatch_spawns_orig_a;
+//   if (slot_name == "dword_10159C98") return (uintptr_t)&zpatch_spawns_orig_b;
+//   if (slot_name == "dword_10159CBC") return (uintptr_t)&zpatch_spawns_case0_resume;
+//   if (slot_name == "dword_10159C9C") return (uintptr_t)&zpatch_spawns_case1_resume;
+//   if (slot_name == "dword_10159CA0") return (uintptr_t)&zpatch_spawns_case2_resume;
+//   if (slot_name == "dword_10159CA8") return (uintptr_t)&zpatch_spawns_case3_resume;
+//   if (slot_name == "dword_10159C7C") return (uintptr_t)&zpatch_spawns_case4_resume;
+//   if (slot_name == "dword_10159C88") return (uintptr_t)&zpatch_spawns_case5_resume;
+//   if (slot_name == "dword_10159CAC") return (uintptr_t)&zpatch_spawns_case6_resume;
+//   if (slot_name == "dword_10159C90") return (uintptr_t)&zpatch_spawns_case7_resume;
+//   if (slot_name == "dword_10159C94") return (uintptr_t)&zpatch_spawns_case8_resume;
+//   if (slot_name == "dword_10159C84") return (uintptr_t)&zpatch_spawns_case9_resume;
+
+// ---------------------------------------------------------------------------
+// 4. strings (exact text matters; addresses are rebased away by the verifier)
+// ---------------------------------------------------------------------------
+char zpatch_fmt_spawned_car[] = "%s spawned a car (%s)";
+char zpatch_fmt_nonspawned_car[] = "%s spawned a non-car car (%s)";
+char zpatch_fmt_spawned_heli[] = "%s spawned a heli (%s)";
+char zpatch_fmt_nonspawned_heli[] = "%s spawned a non-heli heli (%s)";
+char zpatch_fmt_spawned_boat[] = "%s spawned a boat (%s)";
+char zpatch_fmt_nonspawned_boat[] = "%s spawned a non-boat boat (%s)";
+char zpatch_fmt_spawned_bike[] = "%s spawned a bike (%s)";
+char zpatch_fmt_nonspawned_bike[] = "%s spawned a non-bike bike (%s)";
+char zpatch_fmt_spawned_train[] = "%s spawned a train (%s)";
+char zpatch_fmt_nonspawned_train[] = "%s spawned a non-train train (%s)";
+char zpatch_fmt_spawned_plane[] = "%s spawned a plane (%s)";
+char zpatch_fmt_nonspawned_plane[] = "%s spawned a non-plane plane (%s)";
+char zpatch_fmt_spawned_ped[] = "%s spawned a ped (%s)";
+char zpatch_fmt_nonspawned_ped[] = "%s spawned a non-ped ped (%s)";
+char zpatch_fmt_spawned_vehicle_object[] = "%s spawned a vehicle object (%s)";
+char zpatch_fmt_spawned_object[] = "%s spawned an object (%s)";
+char zpatch_fmt_spawned_generic[] = "%s spawned (%s)";
+char zpatch_fmt_used_nonped[] = "%s used a non-ped model (%s)";
+wchar_t zpatch_str_gtac[] = L"GTAC.dll";
+
+// ---------------------------------------------------------------------------
+// 5. helper shims (custom register conventions of the original ASI's helpers)
+// ---------------------------------------------------------------------------
+extern "C" const char* zpatch_bpm_model_name(std::uint32_t) noexcept;  // already exists
+extern "C" std::uint32_t zpatch_script_call(std::uint32_t hash, std::uint32_t nargs,
+                                            const std::uint32_t* args) noexcept;
+
+// sub_10003F00: model-name lookup, arg in ECX (matches the body's `mov ecx, edi`).
+extern "C" __declspec(naked) const char* zpatch_spawns_name_ecx() {
+  __asm {
+    push ecx
+    call zpatch_bpm_model_name
+    add  esp, 4
+    ret
+  }
+}
+
+// sub_1005B290: who-spawned script call, arg in EDX (salt 0x570F5725 = salt_c8).
+static const char* zpatch_spawns_who_c(std::uint32_t id) noexcept {
+  return reinterpret_cast<const char*>(
+      reinterpret_cast<std::uintptr_t>(zpatch_script_call(0x570F5725u, 1, &id)));
+}
+extern "C" __declspec(naked) const char* zpatch_spawns_who_edx() {
+  __asm {
+    push edx
+    call zpatch_spawns_who_c
+    add  esp, 4
+    ret
+  }
+}
+
+// sub_1005B530: chat print, buffer pointer in EDX (script call 0x79023CFC).
+static void zpatch_spawns_print_c(const char* text) noexcept {
+  const std::uint32_t arg = static_cast<std::uint32_t>(
+      reinterpret_cast<std::uintptr_t>(text));
+  zpatch_script_call(0x79023CFCu, 1, &arg);
+}
+extern "C" __declspec(naked) void zpatch_spawns_print_edx() {
+  __asm {
+    push edx
+    call zpatch_spawns_print_c
+    add  esp, 4
+    ret
+  }
+}
+
+// sub_10001280: vsnprintf-style formatter (buf, size, fmt, ...).
+extern "C" int zpatch_spawns_sprintf(char* buffer, std::size_t size,
+                                     const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+  const int result = _vsnprintf_s(buffer, size, _TRUNCATE, format, args);
+  va_end(args);
+  return result;
+}
+
+// sub_1005FE7B: the original's __security_check_cookie twin (cookie in ECX).
+extern "C" std::uintptr_t __security_cookie;
+extern "C" std::uint32_t zpatch_spawns_cookie_check_c(std::uint32_t value) noexcept {
+  if (value != static_cast<std::uint32_t>(__security_cookie)) __fastfail(2);
+  return value;
+}
+extern "C" __declspec(naked) void zpatch_spawns_cookie_check_ecx() {
+  __asm {
+    push ecx
+    call zpatch_spawns_cookie_check_c
+    add  esp, 4
+    ret
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 6. sub_100372F0 - guard body (P2 / 0x6D61A0 hook); @exact transcription
+// ---------------------------------------------------------------------------
+// @exact 0x100372F0
+[[maybe_unused]] __declspec(naked) void abi_spawns_guard() {
+  __asm {
+    push ebp
+    mov ebp, esp
+    cmp dword ptr [zpatch_spawns_skip], 0
+    jne spawns_guard_taken
+    push dword ptr [ebp + 10h]
+    mov eax, dword ptr [zpatch_spawns_orig_b]
+    push dword ptr [ebp + 0Ch]
+    push dword ptr [ebp + 8]
+    call eax
+    mov dword ptr [zpatch_spawns_skip], 0
+    pop ebp
+    ret 0Ch
+  spawns_guard_taken:
+    xor eax, eax
+    mov dword ptr [zpatch_spawns_skip], eax
+    pop ebp
+    ret 0Ch
+    __emit 0CCh
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 7. the ten factory-dispatch thunks (P3 sites; selector + captured byte)
+//    NOTE case 1 (+0x3D) and case 2 (+0x56) both set selector 3 in the
+//    original bytes - kept 1:1.
+// ---------------------------------------------------------------------------
+
+// @exact 0x10037330
+[[maybe_unused]] __declspec(naked) void abi_spawns_case_0x24() {
+  __asm {
+    push ebp
+    mov ebp, esp
+    mov ecx, dword ptr [ebp + 0Ch]
+    movsx eax, cl
+    mov dword ptr [zpatch_spawns_kind], 5
+    mov dword ptr [zpatch_spawns_class], eax
+    mov dword ptr [ebp + 0Ch], ecx
+    pop ebp
+    jmp dword ptr [zpatch_spawns_case0_resume]
+    __emit 0CCh
+  }
+}
+
+// @exact 0x100373F0
+[[maybe_unused]] __declspec(naked) void abi_spawns_case_0x3D() {
+  __asm {
+    push ebp
+    mov ebp, esp
+    mov ecx, dword ptr [ebp + 0Ch]
+    movsx eax, cl
+    mov dword ptr [zpatch_spawns_kind], 3
+    mov dword ptr [zpatch_spawns_class], eax
+    mov dword ptr [ebp + 0Ch], ecx
+    pop ebp
+    jmp dword ptr [zpatch_spawns_case1_resume]
+    __emit 0CCh
+  }
+}
+
+// @exact 0x10037420
+[[maybe_unused]] __declspec(naked) void abi_spawns_case_0x56() {
+  __asm {
+    push ebp
+    mov ebp, esp
+    mov ecx, dword ptr [ebp + 0Ch]
+    movsx eax, cl
+    mov dword ptr [zpatch_spawns_kind], 3
+    mov dword ptr [zpatch_spawns_class], eax
+    mov dword ptr [ebp + 0Ch], ecx
+    pop ebp
+    jmp dword ptr [zpatch_spawns_case2_resume]
+    __emit 0CCh
+  }
+}
+
+// @exact 0x10037390
+[[maybe_unused]] __declspec(naked) void abi_spawns_case_0x6F() {
+  __asm {
+    push ebp
+    mov ebp, esp
+    mov ecx, dword ptr [ebp + 0Ch]
+    movsx eax, cl
+    mov dword ptr [zpatch_spawns_kind], 0
+    mov dword ptr [zpatch_spawns_class], eax
+    mov dword ptr [ebp + 0Ch], ecx
+    pop ebp
+    jmp dword ptr [zpatch_spawns_case3_resume]
+    __emit 0CCh
+  }
+}
+
+// @exact 0x10037450
+[[maybe_unused]] __declspec(naked) void abi_spawns_case_0x88() {
+  __asm {
+    push ebp
+    mov ebp, esp
+    mov ecx, dword ptr [ebp + 0Ch]
+    movsx eax, cl
+    mov dword ptr [zpatch_spawns_kind], 4
+    mov dword ptr [zpatch_spawns_class], eax
+    mov dword ptr [ebp + 0Ch], ecx
+    pop ebp
+    jmp dword ptr [zpatch_spawns_case4_resume]
+    __emit 0CCh
+  }
+}
+
+// @exact 0x10037480
+[[maybe_unused]] __declspec(naked) void abi_spawns_case_0x9E() {
+  __asm {
+    push ebp
+    mov ebp, esp
+    mov ecx, dword ptr [ebp + 0Ch]
+    movsx eax, cl
+    mov dword ptr [zpatch_spawns_kind], 6
+    mov dword ptr [zpatch_spawns_class], eax
+    mov dword ptr [ebp + 0Ch], ecx
+    pop ebp
+    jmp dword ptr [zpatch_spawns_case5_resume]
+    __emit 0CCh
+  }
+}
+
+// @exact 0x100374E0
+[[maybe_unused]] __declspec(naked) void abi_spawns_case_0xB4() {
+  __asm {
+    push ebp
+    mov ebp, esp
+    mov ecx, dword ptr [ebp + 0Ch]
+    movsx eax, cl
+    mov dword ptr [zpatch_spawns_kind], 7
+    mov dword ptr [zpatch_spawns_class], eax
+    mov dword ptr [ebp + 0Ch], ecx
+    pop ebp
+    jmp dword ptr [zpatch_spawns_case6_resume]
+    __emit 0CCh
+  }
+}
+
+// @exact 0x10037360
+[[maybe_unused]] __declspec(naked) void abi_spawns_case_0xCA() {
+  __asm {
+    push ebp
+    mov ebp, esp
+    mov ecx, dword ptr [ebp + 0Ch]
+    movsx eax, cl
+    mov dword ptr [zpatch_spawns_kind], 1
+    mov dword ptr [zpatch_spawns_class], eax
+    mov dword ptr [ebp + 0Ch], ecx
+    pop ebp
+    jmp dword ptr [zpatch_spawns_case7_resume]
+    __emit 0CCh
+  }
+}
+
+// @exact 0x100373C0
+[[maybe_unused]] __declspec(naked) void abi_spawns_case_0xE0() {
+  __asm {
+    push ebp
+    mov ebp, esp
+    mov ecx, dword ptr [ebp + 0Ch]
+    movsx eax, cl
+    mov dword ptr [zpatch_spawns_kind], 2
+    mov dword ptr [zpatch_spawns_class], eax
+    mov dword ptr [ebp + 0Ch], ecx
+    pop ebp
+    jmp dword ptr [zpatch_spawns_case8_resume]
+    __emit 0CCh
+  }
+}
+
+// @exact 0x100374B0
+[[maybe_unused]] __declspec(naked) void abi_spawns_case_0xF6() {
+  __asm {
+    push ebp
+    mov ebp, esp
+    mov ecx, dword ptr [ebp + 0Ch]
+    movsx eax, cl
+    mov dword ptr [zpatch_spawns_kind], 8
+    mov dword ptr [zpatch_spawns_class], eax
+    mov dword ptr [ebp + 0Ch], ecx
+    pop ebp
+    jmp dword ptr [zpatch_spawns_case9_resume]
+    __emit 0CCh
+  }
+}
+
+
+// ---------------------------------------------------------------------------
+// 8. sub_10037510 - the probe (P1/P4/P5/P6/P7 sites); byte-exact naked body
+//    394 instructions, 0x10037510..0x10037ABC. ecx at the [vtable+0xC] call
+//    is the selector, exactly like the original - do not "fix" it.
+// ---------------------------------------------------------------------------
+// @exact 0x10037510
+[[maybe_unused]] __declspec(naked) void abi_spawns_probe() {
+  __asm {
+
+    push ebp
+    mov ebp, esp
+    sub esp, 4Ch
+    mov eax, dword ptr [__security_cookie]
+    xor eax, ebp
+    mov dword ptr [ebp - 8], eax
+    push esi
+    mov esi, dword ptr [zpatch_pre_ped_array]
+    xor eax, eax
+    push edi
+    mov edi, dword ptr [ebp + 8]
+    nop dword ptr [eax]
+L_10037530:
+    mov ecx, dword ptr [esi + eax*4]
+    test ecx, ecx
+    je L_10037540
+    cmp dword ptr [ecx + 3Ch], edi
+    je L_100375FA
+L_10037540:
+    inc eax
+    cmp eax, 7918h
+    jl L_10037530
+    or eax, 0FFFFFFFFh
+L_1003754B:
+    mov ecx, dword ptr [zpatch_spawns_kind]
+    cwde
+    mov dword ptr [zpatch_spawns_kind], 0FFFFFFFFh
+    mov esi, dword ptr [esi + eax*4]
+    cmp eax, -1
+    je L_10037AA2
+    test esi, esi
+    je L_10037AA2
+    cmp esi, 0Ch
+    je L_10037AA2
+    cmp esi, 0CDCDCDCDh
+    je L_10037AA2
+    mov eax, dword ptr [esi]
+    test eax, eax
+    je L_10037AA2
+    cmp eax, 0Ch
+    je L_10037AA2
+    cmp eax, 0CDCDCDCDh
+    je L_10037AA2
+    test ecx, ecx
+    jne L_10037635
+    mov eax, dword ptr [eax + 0Ch]
+    call eax
+    cmp al, 5
+    jne L_10037602
+    cmp dword ptr [esi + 6Ch], 0
+    jne L_10037602
+    cmp byte ptr [zpatch_flag_debug_spawns], 0
+    je L_10037AA2
+    push OFFSET zpatch_str_gtac
+    call dword ptr [__imp__GetModuleHandleW@4]
+    test eax, eax
+    je L_10037AA2
+    mov ecx, edi
+    call zpatch_spawns_name_ecx
+    mov edx, dword ptr [zpatch_spawns_class]
+    mov esi, eax
+    call zpatch_spawns_who_edx
+    push esi
+    push eax
+    push OFFSET zpatch_fmt_spawned_car
+    jmp L_10037A8C
+L_100375FA:
+    movzx eax, ax
+    jmp L_1003754B
+L_10037602:
+    push OFFSET zpatch_str_gtac
+    call dword ptr [__imp__GetModuleHandleW@4]
+    test eax, eax
+    je L_10037A3D
+    mov ecx, edi
+    call zpatch_spawns_name_ecx
+    mov edx, dword ptr [zpatch_spawns_class]
+    mov esi, eax
+    call zpatch_spawns_who_edx
+    push esi
+    push eax
+    push OFFSET zpatch_fmt_nonspawned_car
+    jmp L_10037A27
+L_10037635:
+    cmp ecx, 1
+    jne L_100376C0
+    mov eax, dword ptr [eax + 0Ch]
+    call eax
+    cmp al, 5
+    jne L_1003768D
+    cmp dword ptr [esi + 6Ch], 4
+    jne L_1003768D
+    cmp byte ptr [zpatch_flag_debug_spawns], 0
+    je L_10037AA2
+    push OFFSET zpatch_str_gtac
+    call dword ptr [__imp__GetModuleHandleW@4]
+    test eax, eax
+    je L_10037AA2
+    mov ecx, edi
+    call zpatch_spawns_name_ecx
+    mov edx, dword ptr [zpatch_spawns_class]
+    mov esi, eax
+    call zpatch_spawns_who_edx
+    push esi
+    push eax
+    push OFFSET zpatch_fmt_spawned_heli
+    jmp L_10037A8C
+L_1003768D:
+    push OFFSET zpatch_str_gtac
+    call dword ptr [__imp__GetModuleHandleW@4]
+    test eax, eax
+    je L_10037A3D
+    mov ecx, edi
+    call zpatch_spawns_name_ecx
+    mov edx, dword ptr [zpatch_spawns_class]
+    mov esi, eax
+    call zpatch_spawns_who_edx
+    push esi
+    push eax
+    push OFFSET zpatch_fmt_nonspawned_heli
+    jmp L_10037A27
+L_100376C0:
+    cmp ecx, 2
+    jne L_1003774B
+    mov eax, dword ptr [eax + 0Ch]
+    call eax
+    cmp al, 5
+    jne L_10037718
+    cmp dword ptr [esi + 6Ch], 2
+    jne L_10037718
+    cmp byte ptr [zpatch_flag_debug_spawns], 0
+    je L_10037AA2
+    push OFFSET zpatch_str_gtac
+    call dword ptr [__imp__GetModuleHandleW@4]
+    test eax, eax
+    je L_10037AA2
+    mov ecx, edi
+    call zpatch_spawns_name_ecx
+    mov edx, dword ptr [zpatch_spawns_class]
+    mov esi, eax
+    call zpatch_spawns_who_edx
+    push esi
+    push eax
+    push OFFSET zpatch_fmt_spawned_boat
+    jmp L_10037A8C
+L_10037718:
+    push OFFSET zpatch_str_gtac
+    call dword ptr [__imp__GetModuleHandleW@4]
+    test eax, eax
+    je L_10037A3D
+    mov ecx, edi
+    call zpatch_spawns_name_ecx
+    mov edx, dword ptr [zpatch_spawns_class]
+    mov esi, eax
+    call zpatch_spawns_who_edx
+    push esi
+    push eax
+    push OFFSET zpatch_fmt_nonspawned_boat
+    jmp L_10037A27
+L_1003774B:
+    cmp ecx, 6
+    jne L_100377D6
+    mov eax, dword ptr [eax + 0Ch]
+    call eax
+    cmp al, 5
+    jne L_100377A3
+    cmp dword ptr [esi + 6Ch], 1
+    jne L_100377A3
+    cmp byte ptr [zpatch_flag_debug_spawns], 0
+    je L_10037AA2
+    push OFFSET zpatch_str_gtac
+    call dword ptr [__imp__GetModuleHandleW@4]
+    test eax, eax
+    je L_10037AA2
+    mov ecx, edi
+    call zpatch_spawns_name_ecx
+    mov edx, dword ptr [zpatch_spawns_class]
+    mov esi, eax
+    call zpatch_spawns_who_edx
+    push esi
+    push eax
+    push OFFSET zpatch_fmt_spawned_bike
+    jmp L_10037A8C
+L_100377A3:
+    push OFFSET zpatch_str_gtac
+    call dword ptr [__imp__GetModuleHandleW@4]
+    test eax, eax
+    je L_10037A3D
+    mov ecx, edi
+    call zpatch_spawns_name_ecx
+    mov edx, dword ptr [zpatch_spawns_class]
+    mov esi, eax
+    call zpatch_spawns_who_edx
+    push esi
+    push eax
+    push OFFSET zpatch_fmt_nonspawned_bike
+    jmp L_10037A27
+L_100377D6:
+    cmp ecx, 7
+    jne L_10037861
+    mov eax, dword ptr [eax + 0Ch]
+    call eax
+    cmp al, 5
+    jne L_1003782E
+    cmp dword ptr [esi + 6Ch], 3
+    jne L_1003782E
+    cmp byte ptr [zpatch_flag_debug_spawns], 0
+    je L_10037AA2
+    push OFFSET zpatch_str_gtac
+    call dword ptr [__imp__GetModuleHandleW@4]
+    test eax, eax
+    je L_10037AA2
+    mov ecx, edi
+    call zpatch_spawns_name_ecx
+    mov edx, dword ptr [zpatch_spawns_class]
+    mov esi, eax
+    call zpatch_spawns_who_edx
+    push esi
+    push eax
+    push OFFSET zpatch_fmt_spawned_train
+    jmp L_10037A8C
+L_1003782E:
+    push OFFSET zpatch_str_gtac
+    call dword ptr [__imp__GetModuleHandleW@4]
+    test eax, eax
+    je L_10037A3D
+    mov ecx, edi
+    call zpatch_spawns_name_ecx
+    mov edx, dword ptr [zpatch_spawns_class]
+    mov esi, eax
+    call zpatch_spawns_who_edx
+    push esi
+    push eax
+    push OFFSET zpatch_fmt_nonspawned_train
+    jmp L_10037A27
+L_10037861:
+    cmp ecx, 8
+    jne L_100378EC
+    mov eax, dword ptr [eax + 0Ch]
+    call eax
+    cmp al, 5
+    jne L_100378B9
+    cmp dword ptr [esi + 6Ch], 5
+    jne L_100378B9
+    cmp byte ptr [zpatch_flag_debug_spawns], 0
+    je L_10037AA2
+    push OFFSET zpatch_str_gtac
+    call dword ptr [__imp__GetModuleHandleW@4]
+    test eax, eax
+    je L_10037AA2
+    mov ecx, edi
+    call zpatch_spawns_name_ecx
+    mov edx, dword ptr [zpatch_spawns_class]
+    mov esi, eax
+    call zpatch_spawns_who_edx
+    push esi
+    push eax
+    push OFFSET zpatch_fmt_spawned_plane
+    jmp L_10037A8C
+L_100378B9:
+    push OFFSET zpatch_str_gtac
+    call dword ptr [__imp__GetModuleHandleW@4]
+    test eax, eax
+    je L_10037A3D
+    mov ecx, edi
+    call zpatch_spawns_name_ecx
+    mov edx, dword ptr [zpatch_spawns_class]
+    mov esi, eax
+    call zpatch_spawns_who_edx
+    push esi
+    push eax
+    push OFFSET zpatch_fmt_nonspawned_plane
+    jmp L_10037A27
+L_100378EC:
+    cmp ecx, 3
+    jne L_1003796D
+    mov eax, dword ptr [eax + 0Ch]
+    call eax
+    cmp al, 6
+    je L_1003792D
+    push OFFSET zpatch_str_gtac
+    call dword ptr [__imp__GetModuleHandleW@4]
+    test eax, eax
+    je L_10037A3D
+    mov ecx, edi
+    call zpatch_spawns_name_ecx
+    mov edx, dword ptr [zpatch_spawns_class]
+    mov esi, eax
+    call zpatch_spawns_who_edx
+    push esi
+    push eax
+    push OFFSET zpatch_fmt_nonspawned_ped
+    jmp L_10037A27
+L_1003792D:
+    cmp byte ptr [zpatch_flag_debug_spawns], 0
+    je L_10037AA2
+    push OFFSET zpatch_str_gtac
+    call dword ptr [__imp__GetModuleHandleW@4]
+    test eax, eax
+    je L_10037AA2
+    mov ecx, edi
+    call zpatch_spawns_name_ecx
+    mov edx, dword ptr [zpatch_spawns_class]
+    mov esi, eax
+    call zpatch_spawns_who_edx
+    push esi
+    push eax
+    push OFFSET zpatch_fmt_spawned_ped
+    jmp L_10037A8C
+L_1003796D:
+    cmp ecx, 4
+    jne L_100379EB
+    mov eax, dword ptr [eax + 0Ch]
+    call eax
+    cmp al, 5
+    jne L_100379AB
+    push OFFSET zpatch_str_gtac
+    call dword ptr [__imp__GetModuleHandleW@4]
+    test eax, eax
+    je L_10037A3D
+    mov ecx, edi
+    call zpatch_spawns_name_ecx
+    mov edx, dword ptr [zpatch_spawns_class]
+    mov esi, eax
+    call zpatch_spawns_who_edx
+    push esi
+    push eax
+    push OFFSET zpatch_fmt_spawned_vehicle_object
+    jmp L_10037A27
+L_100379AB:
+    cmp byte ptr [zpatch_flag_debug_spawns], 0
+    je L_10037AA2
+    push OFFSET zpatch_str_gtac
+    call dword ptr [__imp__GetModuleHandleW@4]
+    test eax, eax
+    je L_10037AA2
+    mov ecx, edi
+    call zpatch_spawns_name_ecx
+    mov edx, dword ptr [zpatch_spawns_class]
+    mov esi, eax
+    call zpatch_spawns_who_edx
+    push esi
+    push eax
+    push OFFSET zpatch_fmt_spawned_object
+    jmp L_10037A8C
+L_100379EB:
+    cmp ecx, 5
+    jne L_10037AA2
+    mov eax, dword ptr [eax + 0Ch]
+    call eax
+    cmp al, 6
+    je L_10037A59
+    push OFFSET zpatch_str_gtac
+    call dword ptr [__imp__GetModuleHandleW@4]
+    test eax, eax
+    je L_10037A3D
+    mov ecx, edi
+    call zpatch_spawns_name_ecx
+    mov edx, dword ptr [zpatch_spawns_class]
+    mov esi, eax
+    call zpatch_spawns_who_edx
+    push esi
+    push eax
+    push OFFSET zpatch_fmt_used_nonped
+L_10037A27:
+    lea eax, [ebp - 4Ch]
+    push 40h
+    push eax
+    call zpatch_spawns_sprintf
+    add esp, 14h
+    lea edx, [ebp - 4Ch]
+    call zpatch_spawns_print_edx
+L_10037A3D:
+    mov dword ptr [zpatch_spawns_skip], 1
+    xor eax, eax
+    pop edi
+    pop esi
+    mov ecx, dword ptr [ebp - 8]
+    xor ecx, ebp
+    call zpatch_spawns_cookie_check_ecx
+    mov esp, ebp
+    pop ebp
+    ret
+L_10037A59:
+    cmp byte ptr [zpatch_flag_debug_spawns], 0
+    je L_10037AA2
+    push OFFSET zpatch_str_gtac
+    call dword ptr [__imp__GetModuleHandleW@4]
+    test eax, eax
+    je L_10037AA2
+    mov ecx, edi
+    call zpatch_spawns_name_ecx
+    mov edx, dword ptr [zpatch_spawns_class]
+    mov esi, eax
+    call zpatch_spawns_who_edx
+    push esi
+    push eax
+    push OFFSET zpatch_fmt_spawned_generic
+L_10037A8C:
+    lea eax, [ebp - 4Ch]
+    push 40h
+    push eax
+    call zpatch_spawns_sprintf
+    add esp, 14h
+    lea edx, [ebp - 4Ch]
+    call zpatch_spawns_print_edx
+L_10037AA2:
+    mov eax, dword ptr [zpatch_spawns_orig_a]
+    push edi
+    call eax
+    mov ecx, dword ptr [ebp - 8]
+    add esp, 4
+    xor ecx, ebp
+    pop edi
+    pop esi
+    call zpatch_spawns_cookie_check_ecx
+    mov esp, ebp
+    pop ebp
+    ret
+    __emit 0CCh
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 9. kAbiBodies entries (hook_bodies_win.cpp)
+// ---------------------------------------------------------------------------
+//    {0x10037510u, []() -> std::uintptr_t { return reinterpret_cast<std::uintptr_t>(&abi_spawns_probe); }},
+//    {0x100372F0u, []() -> std::uintptr_t { return reinterpret_cast<std::uintptr_t>(&abi_spawns_guard); }},
+//    {0x10037330u, ...&abi_spawns_case_0x24}, {0x100373F0u, ...abi_spawns_case_0x3D},
+//    {0x10037420u, ...abi_spawns_case_0x56}, {0x10037390u, ...abi_spawns_case_0x6F},
+//    {0x10037450u, ...abi_spawns_case_0x88}, {0x10037480u, ...abi_spawns_case_0x9E},
+//    {0x100374E0u, ...abi_spawns_case_0xB4}, {0x10037360u, ...abi_spawns_case_0xCA},
+//    {0x100373C0u, ...abi_spawns_case_0xE0}, {0x100374B0u, ...abi_spawns_case_0xF6},
+
+// ---------------------------------------------------------------------------
+// 10. evidence/hook_reimplementation_map.json additions (kind "replacement")
+// ---------------------------------------------------------------------------
+//  {"target":"0x10037510","options":["FreezeCarFix"],"kind":"replacement","body":"abi_spawns_probe"}
+//  {"target":"0x100372F0","options":["FreezeCarFix"],"kind":"replacement","body":"abi_spawns_guard"}
+//  ... plus the ten 0x100373xx/100374xx targets -> their case bodies.

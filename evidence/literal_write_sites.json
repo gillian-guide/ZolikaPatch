@@ -1,0 +1,1288 @@
+[
+  {
+    "handler": "100055c0",
+    "signature": "8B 44 24 08 89 41 20 8B 44 24 0C 89 41 24 F7 D8",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10005800",
+    "signature": "8B 90 E8 00 00 00 55 8B CE FF",
+    "length": 1,
+    "bytes": [
+      "e8"
+    ]
+  },
+  {
+    "handler": "10005b20",
+    "signature": "8B 47 28 C1 E8 06 83 E0 0F 83 C0",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10005ca0",
+    "signature": "F7 46 24 00 00 00 40 0F 85",
+    "length": 13,
+    "bytes": [
+      "90909090",
+      "90909090",
+      "90909090",
+      "90"
+    ]
+  },
+  {
+    "handler": "10005ca0",
+    "signature": "F7 46 24 00 00 00 40 0F 85",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10005e30",
+    "signature": "55 8B EC 83 E4 F8 51 8B 45 0C 0F B7 48 66",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10005ee0",
+    "signature": "E8 ? ? ? ? 8B 35 ? ? ? ? 3B F0",
+    "length": 1,
+    "bytes": [
+      "e8"
+    ]
+  },
+  {
+    "handler": "10006350",
+    "signature": "E8 ? ? ? ? C0 E0 ? 32 86 6F 0F 00",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10006350",
+    "signature": "E8 ? ? ? ? C0 E0 ? 32 86 6F 0F 00",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10006770",
+    "signature": "8B 17 8B 42 64 8B CF FF D0 8B 54",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "1001afa0",
+    "signature": "F3 0F 58 C1 F3 0F 2A C8 F3 0F 58 C1",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "1001b0e0",
+    "signature": "89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "1001b0e0",
+    "signature": "89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "1001b0e0",
+    "signature": "89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "1001b0e0",
+    "signature": "89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "1001b0e0",
+    "signature": "89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "1001b310",
+    "signature": "83 3D ? ? ? ? 02 7C 0A F3 0F",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "1001b380",
+    "signature": "83 3D ? ? ? ? 02 0F 8C D5 00",
+    "length": 13,
+    "bytes": [
+      "90909090",
+      "90909090",
+      "90909090",
+      "90"
+    ]
+  },
+  {
+    "handler": "1001b380",
+    "signature": "83 3D ? ? ? ? 02 0F 8C D5 00",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "1001b380",
+    "signature": "83 3D ? ? ? ? 02 0F 8C D5 00",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "1001b380",
+    "signature": "83 3D ? ? ? ? 02 0F 8C D5 00",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "1001b380",
+    "signature": "83 3D ? ? ? ? 02 0F 8C D5 00",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "1001b380",
+    "signature": "83 3D ? ? ? ? 02 0F 8C D5 00",
+    "length": 6,
+    "bytes": [
+      "90909090",
+      "9090"
+    ]
+  },
+  {
+    "handler": "1001b380",
+    "signature": "83 3D ? ? ? ? 02 0F 8C D5 00",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "1001b380",
+    "signature": "83 3D ? ? ? ? 02 0F 8C D5 00",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 13,
+    "bytes": [
+      "90909090",
+      "90909090",
+      "90909090",
+      "90"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 9,
+    "bytes": [
+      "90909090",
+      "90909090",
+      "90"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 7,
+    "bytes": [
+      "90909090",
+      "9090",
+      "90"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 9,
+    "bytes": [
+      "90909090",
+      "90909090",
+      "90"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 13,
+    "bytes": [
+      "90909090",
+      "90909090",
+      "90909090",
+      "90"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 8,
+    "bytes": [
+      "90909090",
+      "90909090"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 8,
+    "bytes": [
+      "90909090",
+      "90909090"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 9,
+    "bytes": [
+      "90909090",
+      "90909090",
+      "90"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 9,
+    "bytes": [
+      "90909090",
+      "90909090",
+      "90"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 9,
+    "bytes": [
+      "90909090",
+      "90909090",
+      "90"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 9,
+    "bytes": [
+      "90909090",
+      "90909090",
+      "90"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 9,
+    "bytes": [
+      "90909090",
+      "90909090",
+      "90"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 7,
+    "bytes": [
+      "90909090",
+      "9090",
+      "90"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 9,
+    "bytes": [
+      "90909090",
+      "90909090",
+      "90"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 9,
+    "bytes": [
+      "90909090",
+      "90909090",
+      "90"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 9,
+    "bytes": [
+      "90909090",
+      "90909090",
+      "90"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 9,
+    "bytes": [
+      "90909090",
+      "90909090",
+      "90"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 9,
+    "bytes": [
+      "90909090",
+      "90909090",
+      "90"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 6,
+    "bytes": [
+      "90909090",
+      "9090"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "1001b580",
+    "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "1001bd60",
+    "signature": "80 BE 18 02 00 00 00 0F 85 36 01 00 00 80 BE",
+    "length": 6,
+    "bytes": [
+      "90909090",
+      "9090"
+    ]
+  },
+  {
+    "handler": "1001bdd0",
+    "signature": "39 82 54 13 00 00 0F 85 94 04 00 00",
+    "length": 12,
+    "bytes": [
+      "90909090",
+      "90909090",
+      "90909090"
+    ]
+  },
+  {
+    "handler": "1001be40",
+    "signature": "83 7D 18 1C 75 14",
+    "length": 9,
+    "bytes": [
+      "90909090",
+      "90909090",
+      "90"
+    ]
+  },
+  {
+    "handler": "1001bec0",
+    "signature": "39 2D ? ? ? ? 75 3E",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "1001ee50",
+    "signature": "F7 46 4C 00 80 00 00 74",
+    "length": 1,
+    "bytes": [
+      "90"
+    ]
+  },
+  {
+    "handler": "1001ee50",
+    "signature": "F7 46 4C 00 80 00 00 74",
+    "length": 1,
+    "bytes": [
+      "90"
+    ]
+  },
+  {
+    "handler": "1001eed0",
+    "signature": "F7 47 40 00 10 00 00 74 07 81 4E 24 00 00",
+    "length": 1,
+    "bytes": [
+      "eb"
+    ]
+  },
+  {
+    "handler": "1001efa0",
+    "signature": "D9 45 08 51 8B CE D9 1C 24 E8 ? ? ? ? 8A 86 90 14 00 00",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10022cf0",
+    "signature": "8B 4C 24 08 56 8B 74 24 08 80 3E 22",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10022d80",
+    "signature": "0F 2F D0 76 25 0F 28 C2",
+    "length": 1,
+    "bytes": [
+      "eb"
+    ]
+  },
+  {
+    "handler": "10022d80",
+    "signature": "0F 2F D0 76 25 0F 28 C2",
+    "length": 1,
+    "bytes": [
+      "2a"
+    ]
+  },
+  {
+    "handler": "10022fc0",
+    "signature": "83 C7 01 81 FF 18 79 00 00 7C D2",
+    "length": 4,
+    "bytes": [
+      "400"
+    ]
+  },
+  {
+    "handler": "10023b30",
+    "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "10023b30",
+    "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "10023b30",
+    "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+    "length": 1,
+    "bytes": [
+      "eb"
+    ]
+  },
+  {
+    "handler": "10023b30",
+    "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "10023b30",
+    "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "10023b30",
+    "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "10023b30",
+    "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "10023b30",
+    "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "10023b30",
+    "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "10023dd0",
+    "signature": "C7 06 ? ? ? ? 74 19",
+    "length": 1,
+    "bytes": [
+      "eb"
+    ]
+  },
+  {
+    "handler": "10023dd0",
+    "signature": "C7 06 ? ? ? ? 74 19",
+    "length": 1,
+    "bytes": [
+      "eb"
+    ]
+  },
+  {
+    "handler": "10023dd0",
+    "signature": "C7 06 ? ? ? ? 74 19",
+    "length": 1,
+    "bytes": [
+      "eb"
+    ]
+  },
+  {
+    "handler": "10023dd0",
+    "signature": "C7 06 ? ? ? ? 74 19",
+    "length": 2,
+    "bytes": [
+      "c9eb"
+    ]
+  },
+  {
+    "handler": "10023dd0",
+    "signature": "C7 06 ? ? ? ? 74 19",
+    "length": 1,
+    "bytes": [
+      "b8"
+    ]
+  },
+  {
+    "handler": "10023dd0",
+    "signature": "C7 06 ? ? ? ? 74 19",
+    "length": 2,
+    "bytes": [
+      "deb"
+    ]
+  },
+  {
+    "handler": "10023dd0",
+    "signature": "C7 06 ? ? ? ? 74 19",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "10023dd0",
+    "signature": "C7 06 ? ? ? ? 74 19",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "10023dd0",
+    "signature": "C7 06 ? ? ? ? 74 19",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "10023dd0",
+    "signature": "C7 06 ? ? ? ? 74 19",
+    "length": 1,
+    "bytes": [
+      "c3"
+    ]
+  },
+  {
+    "handler": "10023dd0",
+    "signature": "C7 06 ? ? ? ? 74 19",
+    "length": 1,
+    "bytes": [
+      "eb"
+    ]
+  },
+  {
+    "handler": "10036f30",
+    "signature": "33 C0 83 C1 04 8D 50 07 83 39 00 75 06 83 79 04",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10036fd0",
+    "signature": "75 54 8B 48 28 8B 40 2C",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10037070",
+    "signature": "2B C2 D1 F8 39 3C C6 7D 0D 83 CA FF",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10037100",
+    "signature": "E9 ? ? ? ? 57 8D 8F ? ? 00 00",
+    "length": 12,
+    "bytes": [
+      "90909090",
+      "90909090",
+      "90909090"
+    ]
+  },
+  {
+    "handler": "10037170",
+    "signature": "55 8B EC 83 E4 F8 51 53 8B 5D 08 56 57 6A 08 8D 44 24 10 8B F1 8D 7B 04 50 8B CF C7 44 24 14 00",
+    "length": 1,
+    "bytes": [
+      "c2"
+    ]
+  },
+  {
+    "handler": "100371f0",
+    "signature": "68 6A 10 4E 31",
+    "length": 1,
+    "bytes": [
+      "e8"
+    ]
+  },
+  {
+    "handler": "10037290",
+    "signature": "74 2B 57 E8 ? ? ? ? 8B BE A8 0E 00 00",
+    "length": 1,
+    "bytes": [
+      "eb"
+    ]
+  },
+  {
+    "handler": "10037be0",
+    "signature": "83 E4 F0 83 EC 54 0F 57 C0 53 8B 5D 0C",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10038680",
+    "signature": "3D 80 99 99 59 73 05",
+    "length": 1,
+    "bytes": [
+      "e8"
+    ]
+  },
+  {
+    "handler": "10038680",
+    "signature": "3D 80 99 99 59 73 05",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10038770",
+    "signature": "3C 01 57 0F 85",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10038800",
+    "signature": "F3 0F 11 4C 24 0C 76 5B D9 45 14",
+    "length": 1,
+    "bytes": [
+      "eb"
+    ]
+  },
+  {
+    "handler": "10038860",
+    "signature": "F3 0F 11 44 24 0C 76 5B D9 45 14",
+    "length": 1,
+    "bytes": [
+      "eb"
+    ]
+  },
+  {
+    "handler": "1003d420",
+    "signature": "74 52 8D B5 3C 01 00 00 83 FB 04",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "1003d420",
+    "signature": "74 52 8D B5 3C 01 00 00 83 FB 04",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "1003d7d0",
+    "signature": "8B 04 B1 0F B7 D0 81 FA FF FF 00 00",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "1003d890",
+    "signature": "83 C4 04 88 58 26 8B 16 8B 82 F4 00 00 00",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "1003d9c0",
+    "signature": "8B 54 24 10 52 0F B6 90 19 02 00 00",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10044590",
+    "signature": "0F BF 46 2E 3B 05 ? ? ? ? 75 ? A1",
+    "length": 1,
+    "bytes": [
+      "eb"
+    ]
+  },
+  {
+    "handler": "10044590",
+    "signature": "0F BF 46 2E 3B 05 ? ? ? ? 75 ? A1",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10044590",
+    "signature": "0F BF 46 2E 3B 05 ? ? ? ? 75 ? A1",
+    "length": 1,
+    "bytes": [
+      "eb"
+    ]
+  },
+  {
+    "handler": "10044590",
+    "signature": "0F BF 46 2E 3B 05 ? ? ? ? 75 ? A1",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10045430",
+    "signature": "11 01 00 00 8B 16 8B 42 64 8B CE FF D0 F3 0F 10",
+    "length": 1,
+    "bytes": [
+      "60"
+    ]
+  },
+  {
+    "handler": "10045490",
+    "signature": "83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53 8B 5C 24 4C 56 68 ? ? ? ? E8 ? ? ? ? 83 C4",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10045490",
+    "signature": "83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53 8B 5C 24 4C 56 68 ? ? ? ? E8 ? ? ? ? 83 C4",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10045610",
+    "signature": "75 ? 83 C1 01 83 C0 01 83 F9 04",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "10045610",
+    "signature": "75 ? 83 C1 01 83 C0 01 83 F9 04",
+    "length": 1,
+    "bytes": [
+      "e8"
+    ]
+  },
+  {
+    "handler": "10045610",
+    "signature": "75 ? 83 C1 01 83 C0 01 83 F9 04",
+    "length": 1,
+    "bytes": [
+      "e8"
+    ]
+  },
+  {
+    "handler": "10045610",
+    "signature": "75 ? 83 C1 01 83 C0 01 83 F9 04",
+    "length": 1,
+    "bytes": [
+      "e8"
+    ]
+  },
+  {
+    "handler": "10045610",
+    "signature": "75 ? 83 C1 01 83 C0 01 83 F9 04",
+    "length": 1,
+    "bytes": [
+      "e8"
+    ]
+  },
+  {
+    "handler": "10045610",
+    "signature": "75 ? 83 C1 01 83 C0 01 83 F9 04",
+    "length": 1,
+    "bytes": [
+      "e8"
+    ]
+  },
+  {
+    "handler": "10045610",
+    "signature": "75 ? 83 C1 01 83 C0 01 83 F9 04",
+    "length": 1,
+    "bytes": [
+      "e8"
+    ]
+  },
+  {
+    "handler": "10045610",
+    "signature": "75 ? 83 C1 01 83 C0 01 83 F9 04",
+    "length": 1,
+    "bytes": [
+      "e8"
+    ]
+  },
+  {
+    "handler": "10045980",
+    "signature": "8B 6C 24 1C 66 89 6E 14 64 8B 0D 2C 00 00 00 8B",
+    "length": 1,
+    "bytes": [
+      "eb"
+    ]
+  },
+  {
+    "handler": "10045ad0",
+    "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+    "length": 1,
+    "bytes": [
+      "e8"
+    ]
+  },
+  {
+    "handler": "10045ad0",
+    "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10045ad0",
+    "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+    "length": 4,
+    "bytes": [
+      "8e"
+    ]
+  },
+  {
+    "handler": "10045ad0",
+    "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+    "length": 1,
+    "bytes": [
+      "e8"
+    ]
+  },
+  {
+    "handler": "10045ad0",
+    "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10045ad0",
+    "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+    "length": 4,
+    "bytes": [
+      "377"
+    ]
+  },
+  {
+    "handler": "10045ce0",
+    "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+    "length": 1,
+    "bytes": [
+      "eb"
+    ]
+  },
+  {
+    "handler": "10045ce0",
+    "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+    "length": 1,
+    "bytes": [
+      "eb"
+    ]
+  },
+  {
+    "handler": "10045ce0",
+    "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "10045ce0",
+    "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "10045ce0",
+    "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+    "length": 2,
+    "bytes": [
+      "9090"
+    ]
+  },
+  {
+    "handler": "10045ce0",
+    "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+    "length": 6,
+    "bytes": [
+      "90909090",
+      "9090"
+    ]
+  },
+  {
+    "handler": "10045ce0",
+    "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+    "length": 6,
+    "bytes": [
+      "90909090",
+      "9090"
+    ]
+  },
+  {
+    "handler": "10045ce0",
+    "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+    "length": 6,
+    "bytes": [
+      "90909090",
+      "9090"
+    ]
+  },
+  {
+    "handler": "10045ce0",
+    "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+    "length": 2,
+    "bytes": [
+      "c033"
+    ]
+  },
+  {
+    "handler": "10045ce0",
+    "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+    "length": 2,
+    "bytes": [
+      "a390"
+    ]
+  },
+  {
+    "handler": "10045ce0",
+    "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+    "length": 4,
+    "bytes": [
+      "90c301b0"
+    ]
+  },
+  {
+    "handler": "10045ce0",
+    "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+    "length": 4,
+    "bytes": [
+      "90c301b0"
+    ]
+  },
+  {
+    "handler": "10045ce0",
+    "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+    "length": 4,
+    "bytes": [
+      "90c301b0"
+    ]
+  },
+  {
+    "handler": "10045ce0",
+    "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+    "length": 4,
+    "bytes": [
+      "90c301b0"
+    ]
+  },
+  {
+    "handler": "10045ce0",
+    "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+    "length": 2,
+    "bytes": [
+      "c033"
+    ]
+  },
+  {
+    "handler": "10045ce0",
+    "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "100467a0",
+    "signature": "01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "100467a0",
+    "signature": "01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C",
+    "length": 1,
+    "bytes": [
+      "eb"
+    ]
+  },
+  {
+    "handler": "100467a0",
+    "signature": "01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10046b30",
+    "signature": "81 EC 40 08 00 00 53 55 8B AC 24 4C 08 00 00",
+    "length": 1,
+    "bytes": [
+      "c3"
+    ]
+  },
+  {
+    "handler": "1004aae0",
+    "signature": "8B 44 24 10 D9 2C 24 83 C4 1C C3",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "100504b0",
+    "signature": "8B 01 8B 90 28 01 00 00 FF D2 84 C0 0F 84 88 00 00 00",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "100506b0",
+    "signature": "50 64 89 25 00 00 00 00 83 EC 34",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "100508c0",
+    "signature": "56 8B F1 E8 ? ? ? ? 85 C0 74 0E 66 8B 40 2E",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "100513a0",
+    "signature": "53 8B 5C 24 08 56 6A 00 6A 00",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "100513a0",
+    "signature": "53 8B 5C 24 08 56 6A 00 6A 00",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10051920",
+    "signature": "68 64 28 C8 67 E8",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  },
+  {
+    "handler": "10051920",
+    "signature": "68 64 28 C8 67 E8",
+    "length": 1,
+    "bytes": [
+      "e8"
+    ]
+  },
+  {
+    "handler": "10051920",
+    "signature": "68 64 28 C8 67 E8",
+    "length": 1,
+    "bytes": [
+      "e8"
+    ]
+  },
+  {
+    "handler": "10052200",
+    "signature": "68 ? ? ? ? E8 ? ? ? ? 8B 2D ? ? ? ? 83 C4 08",
+    "length": 1,
+    "bytes": [
+      "e9"
+    ]
+  }
+]

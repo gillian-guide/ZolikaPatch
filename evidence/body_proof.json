@@ -1,0 +1,1194 @@
+{
+ "bodies": [
+  {
+   "reference_va": 268457360,
+   "symbol": "abi_aim_projectile_crash_fix",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268457968,
+   "symbol": "abi_better_mp_sync",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268459728,
+   "symbol": "abi_combined_radio_freeze_fix",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268462208,
+   "symbol": "abi_carparts_shadow",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268715312,
+   "symbol": "abi_popup_headlights",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268715360,
+   "symbol": "abi_popup_headlights_edx",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268545456,
+   "symbol": "abi_fchs_shim",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268461296,
+   "symbol": "abi_dual_headlights_new",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268461616,
+   "symbol": "abi_dual_headlights_old",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268546784,
+   "symbol": "abi_car_decals_fix",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268663712,
+   "symbol": "abi_bad_player_model",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268765904,
+   "symbol": "abi_death_music_install",
+   "class": "DIFFERENTIAL",
+   "reason": "compiled C++ body; proved by tools/parity/body_equiv.py"
+  },
+  {
+   "reference_va": 268765776,
+   "symbol": "abi_death_music_enabled",
+   "class": "DIFFERENTIAL",
+   "reason": "compiled C++ body; proved by tools/parity/body_equiv.py"
+  },
+  {
+   "reference_va": 268771808,
+   "symbol": "abi_new_saves_compat",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268457184,
+   "symbol": "abi_gfwl_stub",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268686304,
+   "symbol": "abi_nolivery_e",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268462240,
+   "symbol": "abi_carparts_shadow_2",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268462288,
+   "symbol": "abi_carparts_shadow_2b",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268725376,
+   "symbol": "abi_garage_body_a",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268725408,
+   "symbol": "abi_garage_body_b",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268456368,
+   "symbol": "abi_steer_detour_eax",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268456416,
+   "symbol": "abi_steer_detour_edx",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268767984,
+   "symbol": "abi_local_settings_detour",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268768000,
+   "symbol": "abi_local_settings_fallback_detour",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268662032,
+   "symbol": "abi_spawns_probe",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268661488,
+   "symbol": "abi_spawns_guard",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268661552,
+   "symbol": "abi_spawns_case_0x24",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268661744,
+   "symbol": "abi_spawns_case_0x3D",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268661792,
+   "symbol": "abi_spawns_case_0x56",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268661648,
+   "symbol": "abi_spawns_case_0x6F",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268661840,
+   "symbol": "abi_spawns_case_0x88",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268661888,
+   "symbol": "abi_spawns_case_0x9E",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268661984,
+   "symbol": "abi_spawns_case_0xB4",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268661600,
+   "symbol": "abi_spawns_case_0xCA",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268661696,
+   "symbol": "abi_spawns_case_0xE0",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268661936,
+   "symbol": "abi_spawns_case_0xF6",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268451408,
+   "symbol": "abi_game_hash",
+   "class": "DIFFERENTIAL",
+   "reason": "compiled C++ body; proved by tools/parity/body_equiv.py"
+  },
+  {
+   "reference_va": 268765296,
+   "symbol": "abi_ped_models_in_cutscenes_check",
+   "class": "DIFFERENTIAL",
+   "reason": "compiled C++ body; proved by tools/parity/body_equiv.py"
+  },
+  {
+   "reference_va": 268720688,
+   "symbol": "abi_improved_shader_streaming_find_hpe",
+   "class": "DIFFERENTIAL",
+   "reason": "compiled C++ body; proved by tools/parity/body_equiv.py"
+  },
+  {
+   "reference_va": 268720768,
+   "symbol": "abi_improved_shader_streaming_find_v",
+   "class": "DIFFERENTIAL",
+   "reason": "compiled C++ body; proved by tools/parity/body_equiv.py"
+  },
+  {
+   "reference_va": 268741296,
+   "symbol": "abi_vram_fix_shim",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268686096,
+   "symbol": "abi_nolivery_a",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268686144,
+   "symbol": "abi_nolivery_b",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268686192,
+   "symbol": "abi_nolivery_c",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268686240,
+   "symbol": "abi_nolivery_d",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268660480,
+   "symbol": "abi_crash_msg_shim",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268768768,
+   "symbol": "abi_newfiles_register_body",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268769424,
+   "symbol": "abi_newfiles_update_a",
+   "class": "DIFFERENTIAL",
+   "reason": "compiled C++ body; proved by tools/parity/body_equiv.py"
+  },
+  {
+   "reference_va": 268769488,
+   "symbol": "abi_newfiles_update_b",
+   "class": "DIFFERENTIAL",
+   "reason": "compiled C++ body; proved by tools/parity/body_equiv.py"
+  },
+  {
+   "reference_va": 268457552,
+   "symbol": "abi_benchmark_a",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268457584,
+   "symbol": "abi_benchmark_b",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268458736,
+   "symbol": "abi_building_dynamic_shadows",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268460816,
+   "symbol": "abi_copsirens_a",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268460848,
+   "symbol": "abi_copsirens_b",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268452064,
+   "symbol": "abi_copsirens_ide",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268458128,
+   "symbol": "abi_borderless_w",
+   "class": "DIFFERENTIAL",
+   "reason": "compiled C++ body; proved by tools/parity/body_equiv.py"
+  },
+  {
+   "reference_va": 268458240,
+   "symbol": "abi_borderless_a",
+   "class": "DIFFERENTIAL",
+   "reason": "compiled C++ body; proved by tools/parity/body_equiv.py"
+  },
+  {
+   "reference_va": 268764480,
+   "symbol": "abi_speedup_body",
+   "class": "DIFFERENTIAL",
+   "reason": "compiled C++ body; proved by tools/parity/body_equiv.py"
+  },
+  {
+   "reference_va": 268546176,
+   "symbol": "abi_episode_switch_sum",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268579968,
+   "symbol": "abi_load_dlcs_dummy",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268579984,
+   "symbol": "abi_load_dlcs_struct_fixup",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268721200,
+   "symbol": "abi_skip_intro_body",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268723728,
+   "symbol": "abi_skip_menu_body",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268666192,
+   "symbol": "abi_rgsc_login_removed",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268666224,
+   "symbol": "abi_savegame_fix_null",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268666432,
+   "symbol": "abi_nms_ctor",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268665680,
+   "symbol": "abi_nms_reject_ptr",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268666176,
+   "symbol": "abi_nms_self",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268441936,
+   "symbol": "abi_nms_zero_ptr",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268666208,
+   "symbol": "abi_nms_noop_ret0",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268666240,
+   "symbol": "abi_nms_noop_pair",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268666256,
+   "symbol": "abi_nms_reject",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268666400,
+   "symbol": "abi_nms_thunk18",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268666416,
+   "symbol": "abi_nms_noop_arg",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268666480,
+   "symbol": "abi_nms_apply",
+   "class": "EXACT",
+   "insns_bound": 5
+  },
+  {
+   "reference_va": 268719488,
+   "symbol": "abi_savegame_fix_close",
+   "class": "DIFFERENTIAL",
+   "reason": "compiled C++ body; proved by tools/parity/body_equiv.py"
+  },
+  {
+   "reference_va": 268719520,
+   "symbol": "abi_savegame_fix_copy",
+   "class": "DIFFERENTIAL",
+   "reason": "compiled C++ body; proved by tools/parity/body_equiv.py"
+  },
+  {
+   "reference_va": 268719584,
+   "symbol": "abi_savegame_fix_mutex",
+   "class": "DIFFERENTIAL",
+   "reason": "compiled C++ body; proved by tools/parity/body_equiv.py"
+  },
+  {
+   "reference_va": 268660448,
+   "symbol": "abi_blackscreen_shim",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268687280,
+   "symbol": "abi_path_node_shim",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268687472,
+   "symbol": "abi_plane_crash_shim",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268764304,
+   "symbol": "abi_wanted_level_shim",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268660368,
+   "symbol": "abi_group_hack_shim",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268724048,
+   "symbol": "abi_smpa60_shim",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268724096,
+   "symbol": "abi_smpa60_tail_shim",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268660400,
+   "symbol": "abi_freeze_gun_shim",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268687776,
+   "symbol": "abi_player_ped_components_shim",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268545888,
+   "symbol": "abi_emissive_lerp_shim",
+   "class": "DIFFERENTIAL",
+   "reason": "compiled C++ body; proved by tools/parity/body_equiv.py"
+  },
+  {
+   "reference_va": 268724704,
+   "symbol": "abi_super_lod_fix_shim",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268546112,
+   "symbol": "abi_episode_switch_store_shim",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268546144,
+   "symbol": "abi_episode_switch_shim_b",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268546208,
+   "symbol": "abi_episode_switch_vcall",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268546240,
+   "symbol": "abi_episode_switch_shim_c",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268562272,
+   "symbol": "abi_bike_physics_detour",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268459392,
+   "symbol": "abi_collision_deadlock_walk",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268583008,
+   "symbol": "abi_mouse_axis_float",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268583104,
+   "symbol": "abi_mouse_axis_neg",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268583200,
+   "symbol": "abi_mouse_axis_int",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268583280,
+   "symbol": "abi_mouse_axis_flag",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268584000,
+   "symbol": "abi_mf_angle_step",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268584288,
+   "symbol": "abi_mouse_angle",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268583840,
+   "symbol": "abi_mouse_advance",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268747712,
+   "symbol": "abi_ooc_branch",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268747600,
+   "symbol": "abi_ooc_wrap",
+   "class": "DIFFERENTIAL",
+   "reason": "compiled C++ body; proved by tools/parity/body_equiv.py"
+  },
+  {
+   "reference_va": 268562480,
+   "symbol": "abi_hqr_body",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268667072,
+   "symbol": "abi_cutscene_chain_b",
+   "class": "EXACT",
+   "insns_bound": null
+  },
+  {
+   "reference_va": 268461232,
+   "symbol": "abi_driveby_fov_shim",
+   "class": "DIFFERENTIAL",
+   "reason": "compiled C++ body; proved by tools/parity/body_equiv.py"
+  }
+ ],
+ "counts": {
+  "total": 107,
+  "exact": 90,
+  "differential": 17,
+  "unreproducible": 0
+ },
+ "per_body": [
+  {
+   "symbol": "abi_aim_projectile_crash_fix",
+   "reference_va": 268457360,
+   "instructions": 11,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_better_mp_sync",
+   "reference_va": 268457968,
+   "instructions": 2,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_combined_radio_freeze_fix",
+   "reference_va": 268459728,
+   "instructions": 2,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_carparts_shadow",
+   "reference_va": 268462208,
+   "instructions": 13,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_popup_headlights",
+   "reference_va": 268715312,
+   "instructions": 10,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_popup_headlights_edx",
+   "reference_va": 268715360,
+   "instructions": 10,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_fchs_shim",
+   "reference_va": 268545456,
+   "instructions": 9,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_dual_headlights_new",
+   "reference_va": 268461296,
+   "instructions": 78,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_dual_headlights_old",
+   "reference_va": 268461616,
+   "instructions": 78,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_car_decals_fix",
+   "reference_va": 268546784,
+   "instructions": 13,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_bad_player_model",
+   "reference_va": 268663712,
+   "instructions": 16,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_new_saves_compat",
+   "reference_va": 268771808,
+   "instructions": 8,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_gfwl_stub",
+   "reference_va": 268457184,
+   "instructions": 8,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_nolivery_e",
+   "reference_va": 268686304,
+   "instructions": 14,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_carparts_shadow_2",
+   "reference_va": 268462240,
+   "instructions": 26,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_carparts_shadow_2b",
+   "reference_va": 268462288,
+   "instructions": 27,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_garage_body_a",
+   "reference_va": 268725376,
+   "instructions": 8,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_garage_body_b",
+   "reference_va": 268725408,
+   "instructions": 7,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_steer_detour_eax",
+   "reference_va": 268456368,
+   "instructions": 10,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_steer_detour_edx",
+   "reference_va": 268456416,
+   "instructions": 10,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_local_settings_detour",
+   "reference_va": 268767984,
+   "instructions": 7,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_local_settings_fallback_detour",
+   "reference_va": 268768000,
+   "instructions": 11,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_spawns_probe",
+   "reference_va": 268662032,
+   "instructions": 394,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_spawns_guard",
+   "reference_va": 268661488,
+   "instructions": 16,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_spawns_case_0x24",
+   "reference_va": 268661552,
+   "instructions": 9,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_spawns_case_0x3D",
+   "reference_va": 268661744,
+   "instructions": 9,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_spawns_case_0x56",
+   "reference_va": 268661792,
+   "instructions": 9,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_spawns_case_0x6F",
+   "reference_va": 268661648,
+   "instructions": 9,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_spawns_case_0x88",
+   "reference_va": 268661840,
+   "instructions": 9,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_spawns_case_0x9E",
+   "reference_va": 268661888,
+   "instructions": 9,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_spawns_case_0xB4",
+   "reference_va": 268661984,
+   "instructions": 9,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_spawns_case_0xCA",
+   "reference_va": 268661600,
+   "instructions": 9,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_spawns_case_0xE0",
+   "reference_va": 268661696,
+   "instructions": 9,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_spawns_case_0xF6",
+   "reference_va": 268661936,
+   "instructions": 9,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_vram_fix_shim",
+   "reference_va": 268741296,
+   "instructions": 13,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_nolivery_a",
+   "reference_va": 268686096,
+   "instructions": 11,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_nolivery_b",
+   "reference_va": 268686144,
+   "instructions": 11,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_nolivery_c",
+   "reference_va": 268686192,
+   "instructions": 12,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_nolivery_d",
+   "reference_va": 268686240,
+   "instructions": 14,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_crash_msg_shim",
+   "reference_va": 268660480,
+   "instructions": 14,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_newfiles_register_body",
+   "reference_va": 268768768,
+   "instructions": 4,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_benchmark_a",
+   "reference_va": 268457552,
+   "instructions": 12,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_benchmark_b",
+   "reference_va": 268457584,
+   "instructions": 12,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_building_dynamic_shadows",
+   "reference_va": 268458736,
+   "instructions": 11,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_copsirens_a",
+   "reference_va": 268460816,
+   "instructions": 8,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_copsirens_b",
+   "reference_va": 268460848,
+   "instructions": 8,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_copsirens_ide",
+   "reference_va": 268452064,
+   "instructions": 9,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_episode_switch_sum",
+   "reference_va": 268546176,
+   "instructions": 7,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_load_dlcs_dummy",
+   "reference_va": 268579968,
+   "instructions": 2,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_load_dlcs_struct_fixup",
+   "reference_va": 268579984,
+   "instructions": 19,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_skip_intro_body",
+   "reference_va": 268721200,
+   "instructions": 5,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_skip_menu_body",
+   "reference_va": 268723728,
+   "instructions": 12,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_rgsc_login_removed",
+   "reference_va": 268666192,
+   "instructions": 2,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_savegame_fix_null",
+   "reference_va": 268666224,
+   "instructions": 2,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_nms_ctor",
+   "reference_va": 268666432,
+   "instructions": 17,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_nms_reject_ptr",
+   "reference_va": 268665680,
+   "instructions": 2,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_nms_self",
+   "reference_va": 268666176,
+   "instructions": 2,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_nms_zero_ptr",
+   "reference_va": 268441936,
+   "instructions": 2,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_nms_noop_ret0",
+   "reference_va": 268666208,
+   "instructions": 1,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_nms_noop_pair",
+   "reference_va": 268666240,
+   "instructions": 1,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_nms_reject",
+   "reference_va": 268666256,
+   "instructions": 2,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_nms_thunk18",
+   "reference_va": 268666400,
+   "instructions": 5,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_nms_noop_arg",
+   "reference_va": 268666416,
+   "instructions": 1,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_nms_apply",
+   "reference_va": 268666480,
+   "instructions": 5,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_blackscreen_shim",
+   "reference_va": 268660448,
+   "instructions": 8,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_path_node_shim",
+   "reference_va": 268687280,
+   "instructions": 6,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_plane_crash_shim",
+   "reference_va": 268687472,
+   "instructions": 7,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_wanted_level_shim",
+   "reference_va": 268764304,
+   "instructions": 9,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_group_hack_shim",
+   "reference_va": 268660368,
+   "instructions": 8,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_smpa60_shim",
+   "reference_va": 268724048,
+   "instructions": 12,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_smpa60_tail_shim",
+   "reference_va": 268724096,
+   "instructions": 8,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_freeze_gun_shim",
+   "reference_va": 268660400,
+   "instructions": 14,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_player_ped_components_shim",
+   "reference_va": 268687776,
+   "instructions": 7,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_super_lod_fix_shim",
+   "reference_va": 268724704,
+   "instructions": 14,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_episode_switch_store_shim",
+   "reference_va": 268546112,
+   "instructions": 12,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_episode_switch_shim_b",
+   "reference_va": 268546144,
+   "instructions": 13,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_episode_switch_vcall",
+   "reference_va": 268546208,
+   "instructions": 12,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_episode_switch_shim_c",
+   "reference_va": 268546240,
+   "instructions": 8,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_bike_physics_detour",
+   "reference_va": 268562272,
+   "instructions": 14,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_collision_deadlock_walk",
+   "reference_va": 268459392,
+   "instructions": 56,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_mouse_axis_float",
+   "reference_va": 268583008,
+   "instructions": 30,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_mouse_axis_neg",
+   "reference_va": 268583104,
+   "instructions": 23,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_mouse_axis_int",
+   "reference_va": 268583200,
+   "instructions": 22,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_mouse_axis_flag",
+   "reference_va": 268583280,
+   "instructions": 28,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_mf_angle_step",
+   "reference_va": 268584000,
+   "instructions": 62,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_mouse_angle",
+   "reference_va": 268584288,
+   "instructions": 25,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_mouse_advance",
+   "reference_va": 268583840,
+   "instructions": 23,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_ooc_branch",
+   "reference_va": 268747712,
+   "instructions": 7,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_hqr_body",
+   "reference_va": 268562480,
+   "instructions": 157,
+   "diffs": 0
+  },
+  {
+   "symbol": "abi_cutscene_chain_b",
+   "reference_va": 268667072,
+   "instructions": 160,
+   "diffs": 0
+  }
+ ]
+}

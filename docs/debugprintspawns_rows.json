@@ -1,0 +1,330 @@
+{
+  "sig_installs": [
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "32 DB 8B 54 24 24 52 E8 ? ? ? ? 8B F0",
+      "site_offset": 7,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10037510",
+      "dest_symbol": "sub_10037510",
+      "site_deref": 0,
+      "why": "E8 at +7 -> probe body (orig dest match+[match+8]+12 = 0x8DD330)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "8B 4C 24 28 8B 54 24 24 50 51 52 E8 ? ? ? ? 5F 5E 5D 5B",
+      "site_offset": 11,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x100372F0",
+      "dest_symbol": "sub_100372F0",
+      "site_deref": 0,
+      "why": "E8 at +11 -> guard body (orig dest match+[match+12]+16 = 0x6D61A0)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 36,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10037330",
+      "dest_symbol": "sub_10037330",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0x24 -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 61,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x100373F0",
+      "dest_symbol": "sub_100373F0",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0x3d -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 86,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10037420",
+      "dest_symbol": "sub_10037420",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0x56 -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 111,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10037390",
+      "dest_symbol": "sub_10037390",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0x6f -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 136,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10037450",
+      "dest_symbol": "sub_10037450",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0x88 -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 158,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10037480",
+      "dest_symbol": "sub_10037480",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0x9e -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 180,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x100374E0",
+      "dest_symbol": "sub_100374E0",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0xb4 -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 202,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10037360",
+      "dest_symbol": "sub_10037360",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0xca -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 224,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x100373C0",
+      "dest_symbol": "sub_100373C0",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0xe0 -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "site_offset": 246,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x100374B0",
+      "dest_symbol": "sub_100374B0",
+      "site_deref": 0,
+      "why": "factory switch case call at match+0xf6 -> select thunk (orig dest = published slot)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "88 87 40 01 00 00 E8",
+      "site_offset": 6,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10037510",
+      "dest_symbol": "sub_10037510",
+      "site_deref": 0,
+      "why": "E8 at +6 -> probe body"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "88 5C 24 1F 8B 54 24 28 52 E8",
+      "site_offset": 9,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10037510",
+      "dest_symbol": "sub_10037510",
+      "site_deref": 0,
+      "why": "E8 at +9 -> probe body"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "88 5C 24 1F 8B 54 24 28 52 E8",
+      "site_offset": 254,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10037510",
+      "dest_symbol": "sub_10037510",
+      "site_deref": 0,
+      "why": "E8 at +0xFE -> probe body"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "38 98 8C 00 00 00 75 2D 57 E8",
+      "site_offset": 9,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10037510",
+      "dest_symbol": "sub_10037510",
+      "site_deref": 0,
+      "why": "E8 at +9 -> probe body"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "32 DB 8B 54 24 24 52 E8",
+      "site_offset": 7,
+      "opcode": "e8",
+      "dest_kind": "module_va",
+      "dest": "0x10037510",
+      "dest_symbol": "sub_10037510",
+      "site_deref": 0,
+      "why": "E8 at +7 -> probe body (same game site as P1 on 1.0.8.0; duplicate no-op write)"
+    }
+  ],
+  "slot_installs": [
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "32 DB 8B 54 24 24 52 E8 ? ? ? ? 8B F0",
+      "slot_name": "dword_10159CB0",
+      "kind": "match_field",
+      "field_offset": 8,
+      "add": 12,
+      "why": "P1 resume = match+[match+8]+12 (orig 0x8DD330)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "8B 4C 24 28 8B 54 24 24 50 51 52 E8 ? ? ? ? 5F 5E 5D 5B",
+      "slot_name": "dword_10159C98",
+      "kind": "match_field",
+      "field_offset": 12,
+      "add": 16,
+      "why": "P2 resume = match+[match+12]+16 (orig 0x6D61A0)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159C84",
+      "kind": "match_field",
+      "field_offset": 247,
+      "add": 251,
+      "why": "case +0xF6 resume (0x6CE320)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159CAC",
+      "kind": "match_field",
+      "field_offset": 181,
+      "add": 185,
+      "why": "case +0xB4 resume (0x6CDF90)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159C9C",
+      "kind": "match_field",
+      "field_offset": 62,
+      "add": 66,
+      "why": "case +0x3D resume (0x6CE050)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159CA0",
+      "kind": "match_field",
+      "field_offset": 87,
+      "add": 91,
+      "why": "case +0x56 resume (0x6CE0C0)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159C7C",
+      "kind": "match_field",
+      "field_offset": 137,
+      "add": 141,
+      "why": "case +0x88 resume (0x6CDFE0)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159C90",
+      "kind": "match_field",
+      "field_offset": 203,
+      "add": 207,
+      "why": "case +0xCA resume (0x6CE2B0)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159CA8",
+      "kind": "match_field",
+      "field_offset": 112,
+      "add": 116,
+      "why": "case +0x6F resume (0x6CDF30)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159C88",
+      "kind": "match_field",
+      "field_offset": 159,
+      "add": 163,
+      "why": "case +0x9E resume (0x6CE260)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159C94",
+      "kind": "match_field",
+      "field_offset": 225,
+      "add": 229,
+      "why": "case +0xE0 resume (0x6CE200)"
+    },
+    {
+      "handler": "0x10037C70",
+      "option": "FreezeCarFix",
+      "signature": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+      "slot_name": "dword_10159CBC",
+      "kind": "match_field",
+      "field_offset": 37,
+      "add": 41,
+      "why": "case +0x24 resume (0x6CE140)"
+    }
+  ]
+}

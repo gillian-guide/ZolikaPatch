@@ -1,0 +1,212 @@
+{
+  "BenchmarkFix": {
+    "handler": "10005690",
+    "build_gates": [
+      [
+        "!=",
+        9
+      ],
+      [
+        "!=",
+        13
+      ]
+    ]
+  },
+  "DualVehicleHeadlights": {
+    "handler": "10006770",
+    "build_gates": [
+      [
+        "==",
+        1
+      ],
+      [
+        "==",
+        2
+      ],
+      [
+        "==",
+        3
+      ],
+      [
+        "==",
+        4
+      ],
+      [
+        "==",
+        5
+      ],
+      [
+        "==",
+        6
+      ]
+    ]
+  },
+  "TBoGTHeliHeightLimit": {
+    "handler": "1001b310",
+    "build_gates": [
+      [
+        ">",
+        5
+      ]
+    ]
+  },
+  "EpisodicWeaponSupport": {
+    "handler": "1001b380",
+    "build_gates": [
+      [
+        ">",
+        5
+      ]
+    ]
+  },
+  "EpisodicVehicleSupport": {
+    "handler": "1001b580",
+    "build_gates": [
+      [
+        ">",
+        5
+      ]
+    ]
+  },
+  "PipeBombDropIconSupport": {
+    "handler": "1001be40",
+    "build_gates": [
+      [
+        ">",
+        5
+      ]
+    ]
+  },
+  "PoliceEpisodicWeaponSupport": {
+    "handler": "1001bec0",
+    "build_gates": [
+      [
+        ">",
+        5
+      ]
+    ]
+  },
+  "LoadDLCs": {
+    "handler": "100234e0",
+    "build_gates": [
+      [
+        "==",
+        7
+      ],
+      [
+        "==",
+        8
+      ],
+      [
+        "==",
+        9
+      ]
+    ]
+  },
+  "LaunchWithPlayGTAIV": {
+    "handler": "100441b0",
+    "build_gates": [],
+    "build_switch": [
+      1,
+      5,
+      7,
+      8,
+      9
+    ],
+    "note": "0x100441B0 switches on the build id (cases 1,5,7,8,9). The earlier !=9 extraction was wrong: 1080 has its own RVA pair."
+  },
+  "Patch6and7RemoveModChecks": {
+    "handler": "10044710",
+    "build_gates": [
+      [
+        "==",
+        7
+      ],
+      [
+        "==",
+        8
+      ]
+    ]
+  },
+  "Patch7RemoveModChecks": {
+    "handler": "10044710",
+    "build_gates": [
+      [
+        "==",
+        7
+      ],
+      [
+        "==",
+        8
+      ]
+    ]
+  },
+  "RemoveUselessChecks": {
+    "handler": "10044bd0",
+    "build_gates": [
+      [
+        "==",
+        5
+      ],
+      [
+        "==",
+        8
+      ],
+      [
+        "==",
+        9
+      ]
+    ]
+  },
+  "SuperLODFix": {
+    "handler": "10046a10",
+    "build_gates": [
+      [
+        "==",
+        8
+      ],
+      [
+        "==",
+        9
+      ]
+    ]
+  },
+  "VSyncFix": {
+    "handler": "100503b0",
+    "build_gates": [
+      [
+        "!=",
+        1
+      ],
+      [
+        "!=",
+        2
+      ],
+      [
+        "!=",
+        3
+      ],
+      [
+        "!=",
+        4
+      ],
+      [
+        "!=",
+        5
+      ],
+      [
+        "!=",
+        9
+      ],
+      [
+        "!=",
+        13
+      ]
+    ]
+  },
+  "RemoveRGSCLoginRequirement": {
+    "handler": "10045490",
+    "build_gates": [],
+    "note": "No option gate. The build==9 equality is the missing-signature fallback used on 1.0.8.0, not an applicability gate."
+  }
+}

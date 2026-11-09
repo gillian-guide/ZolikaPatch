@@ -1,0 +1,80 @@
+{
+  "functions": {
+    "categories": {
+      "anonymous_candidate": 595,
+      "exception_or_generated": 327,
+      "import_thunk": 35,
+      "named_library_or_candidate": 38
+    },
+    "chunks": {
+      "0": 200,
+      "1": 200,
+      "2": 200,
+      "3": 200,
+      "4": 195
+    },
+    "count": 995,
+    "failed": [
+      {
+        "address": "10024600",
+        "status": "failed: Exception while decompiling 10024600: process: timeout"
+      }
+    ],
+    "ok": 994
+  },
+  "hashes": [
+    {
+      "path": "ZolikaPatch_extracted/GFWLProtectionDisabler2019.asi",
+      "sha256": "88b718faf2552572d20f9fffc54418f0ff29ba4720af7ee7de0e776424d783d3",
+      "size": 72704
+    },
+    {
+      "path": "ZolikaPatch_extracted/PlayGTAIV.exe",
+      "sha256": "32c4e55115ac8e8d7ca0b1f5e0dd86fc4382dc455cc21cd4d92ffea0b78c5e03",
+      "size": 14938624
+    },
+    {
+      "path": "ZolikaPatch_extracted/ZolikaPatch.asi",
+      "sha256": "720fbcebfd563616151560020eea12168115a9183d6813b432b0367d2b702fc5",
+      "size": 1502208
+    },
+    {
+      "path": "ZolikaPatch_extracted/ZolikaPatch.ini",
+      "sha256": "9639b59c24303f11db5e4fcdc044d64302441a7210591b28b68b14b3756ebcb9",
+      "size": 39180
+    },
+    {
+      "path": "ZolikaPatch_extracted/for extra menu options (1.0.7.0 and 1.0.8.0 only)/IVMenuAPI.asi",
+      "sha256": "17ec9c4c2a9053ae02ed3cf3a97826d00a36f4c3b3212fd1f0a2a03f34d94d83",
+      "size": 184320
+    },
+    {
+      "path": "ZolikaPatch_extracted/readme.txt",
+      "sha256": "0e653bca507264623a29c8b6fbfe5247985d9f175ad48a820e57dfe658b1d2e7",
+      "size": 223
+    }
+  ],
+  "ini": {
+    "assignment_count": 2146,
+    "section_counts": {
+      "HeadlightConeOffsets": 1024,
+      "Options": 98,
+      "PopupLightAngles": 1024
+    }
+  },
+  "inputs": {
+    "decompiled": "ZolikaPatch_decompiled/ghidra",
+    "extracted": "ZolikaPatch_extracted"
+  },
+  "pe": [
+    "architecture: i386",
+    "address_of_entry_point: 0006075d",
+    "image_base: 10000000",
+    "major_subsystem_version: 6",
+    "minor_subsystem_version: 0",
+    "size_of_image: 001c1000",
+    "subsystem: 2",
+    "time_date: Sat Sep 16 03:08:54 2023 UTC"
+  ],
+  "schema": 1
+}

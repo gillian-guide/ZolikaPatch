@@ -1,0 +1,40 @@
+[
+  {
+    "option": "CarDecalsFix",
+    "install_site": "0x10053184",
+    "jump_target": "0x1001b2e0",
+    "signature": null,
+    "kind": "jump"
+  },
+  {
+    "option": "DrivebyFOVFix",
+    "install_site": "0x10053ab4",
+    "jump_target": "0x100064b0",
+    "signature": "F3 0F 10 46 60 F3 0F 5C CA",
+    "kind": "jump"
+  },
+  {
+    "option": "NoPhysicsSleep",
+    "install_site": "0x10053506",
+    "jump_target": null,
+    "signature": "0F 00 00 00 C7 41 14 14 00 00 00 C7 41 1C 00 00",
+    "kind": "literal",
+    "value": "00 00 00 00"
+  },
+  {
+    "option": "NoImpostorHeightCutoff",
+    "install_site": "0x100536e5",
+    "jump_target": null,
+    "signature": "76 0B F3 0F 11 8C 24 88 00 00 00 EB 09",
+    "kind": "literal",
+    "value": "90 90"
+  },
+  {
+    "option": "NoImpostorHeightCutoff",
+    "install_site": "0x1005370b",
+    "jump_target": null,
+    "signature": "76 0B F3 0F 11 8C 24 88 00 00 00 EB 09",
+    "kind": "literal",
+    "value": "90 90"
+  }
+]

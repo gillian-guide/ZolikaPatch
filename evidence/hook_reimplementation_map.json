@@ -1,0 +1,477 @@
+[
+  {
+    "target": "0x10003e50",
+    "options": [
+      "AllowHashesForIDE"
+    ],
+    "kind": "replacement",
+    "body": "game_hash"
+  },
+  {
+    "target": "0x100051b0",
+    "options": [
+      "MovingSteeringWheelSupport",
+      "ShakingEngineBlock",
+      "MovingPlaneParts"
+    ],
+    "kind": "context_detour",
+    "body": "vehicle_anim_detour"
+  },
+  {
+    "target": "0x10005590",
+    "options": [
+      "AimProjectileCrashFix"
+    ],
+    "kind": "replacement",
+    "body": "aim_projectile_crash_fix"
+  },
+  {
+    "target": "0x10005650",
+    "options": [
+      "BenchmarkFix"
+    ],
+    "kind": "shim",
+    "body": "benchmark_fix_shim"
+  },
+  {
+    "target": "0x10005670",
+    "options": [
+      "BenchmarkFix"
+    ],
+    "kind": "shim",
+    "body": "benchmark_fix_shim"
+  },
+  {
+    "target": "0x100057f0",
+    "options": [
+      "BetterMPSync"
+    ],
+    "kind": "replacement",
+    "body": "better_mp_sync"
+  },
+  {
+    "target": "0x10005890",
+    "options": [
+      "BorderlessWindowed"
+    ],
+    "kind": "replacement",
+    "body": "borderless_style_fixup"
+  },
+  {
+    "target": "0x10005900",
+    "options": [
+      "BorderlessWindowed"
+    ],
+    "kind": "replacement",
+    "body": "borderless_style_fixup"
+  },
+  {
+    "target": "0x10005af0",
+    "options": [
+      "BuildingDynamicShadows"
+    ],
+    "kind": "shim",
+    "body": "building_shadow_dispatch"
+  },
+  {
+    "target": "0x10005ed0",
+    "options": [
+      "CombinedRadioFreezeFix"
+    ],
+    "kind": "replacement",
+    "body": "combined_radio_freeze_fix"
+  },
+  {
+    "target": "0x10006310",
+    "options": [
+      "CopSirensFlag"
+    ],
+    "kind": "context_detour",
+    "body": "cop_sirens_detour"
+  },
+  {
+    "target": "0x10006330",
+    "options": [
+      "CopSirensFlag"
+    ],
+    "kind": "shim",
+    "body": "cop_sirens_flag_shim"
+  },
+  {
+    "target": "0x100064b0",
+    "options": [
+      "DrivebyFOVFix"
+    ],
+    "kind": "shim",
+    "body": "driveby_fov_shim"
+  },
+  {
+    "target": "0x10006880",
+    "options": [
+      "CarPartsShadowFix"
+    ],
+    "kind": "shim",
+    "body": "car_parts_shadow_dispatch"
+  },
+  {
+    "target": "0x100068a0",
+    "options": [
+      "CarPartsShadowFix",
+      "CarDynamicShadowFix"
+    ],
+    "kind": "shim",
+    "body": "detour_100068a0_body"
+  },
+  {
+    "target": "0x1001af60",
+    "options": [
+      "EmissiveLerpFix"
+    ],
+    "kind": "context_detour",
+    "body": "emissive_lerp_detour"
+  },
+  {
+    "target": "0x1001b040",
+    "options": [
+      "EpisodeSwitchFreezeFix"
+    ],
+    "kind": "shim",
+    "body": "episode_switch_store_and_resume"
+  },
+  {
+    "target": "0x1001b060",
+    "options": [
+      "EpisodeSwitchFreezeFix"
+    ],
+    "kind": "shim",
+    "body": "episode_switch_shim_b"
+  },
+  {
+    "target": "0x1001b080",
+    "options": [
+      "EpisodeSwitchFreezeFix"
+    ],
+    "kind": "replacement",
+    "body": "episode_switch_sum"
+  },
+  {
+    "target": "0x1001b0a0",
+    "options": [
+      "EpisodeSwitchFreezeFix"
+    ],
+    "kind": "shim",
+    "body": "episode_switch_vcall"
+  },
+  {
+    "target": "0x1001b0c0",
+    "options": [
+      "EpisodeSwitchFreezeFix"
+    ],
+    "kind": "shim",
+    "body": "episode_switch_shim_c"
+  },
+  {
+    "target": "0x1001ec30",
+    "options": [
+      "FastLoading"
+    ],
+    "kind": "reset_stub",
+    "body": "reset_stub_1001ec30"
+  },
+  {
+    "target": "0x1001ef60",
+    "options": [
+      "HighFPSBikePhysicsFix"
+    ],
+    "kind": "context_detour",
+    "body": "bike_physics_detour"
+  },
+  {
+    "target": "0x10022ed0",
+    "options": [
+      "CarDynamicShadowFix"
+    ],
+    "kind": "reset_stub",
+    "body": "reset_stub_10022ed0"
+  },
+  {
+    "target": "0x10023480",
+    "options": [
+      "LoadDLCs"
+    ],
+    "kind": "replacement",
+    "body": "load_dlcs_dummy"
+  },
+  {
+    "target": "0x10023490",
+    "options": [
+      "LoadDLCs"
+    ],
+    "kind": "replacement",
+    "body": "load_dlcs_struct_fixup"
+  },
+  {
+    "target": "0x10023d70",
+    "options": [
+      "HighQualityReflections"
+    ],
+    "kind": "reset_stub",
+    "body": "reset_stub_10023d70"
+  },
+  {
+    "target": "0x10036eb0",
+    "options": [
+      "FreezeGunFix"
+    ],
+    "kind": "shim",
+    "body": "freeze_gun_shim"
+  },
+  {
+    "target": "0x10036f00",
+    "options": [
+      "CrashMsgFix"
+    ],
+    "kind": "shim",
+    "body": "crash_msg_sanitize"
+  },
+  {
+    "target": "0x10037ba0",
+    "options": [
+      "BadPlayerModelCrashFix"
+    ],
+    "kind": "context_detour",
+    "body": "bad_player_model_detour"
+  },
+  {
+    "target": "0x10038550",
+    "options": [
+      "RemoveRGSCLoginRequirement"
+    ],
+    "kind": "replacement",
+    "body": "rgsc_login_removed"
+  },
+  {
+    "target": "0x10038570",
+    "options": [
+      "SavegameFix"
+    ],
+    "kind": "replacement",
+    "body": "savegame_fix_null"
+  },
+  {
+    "target": "0x10038670",
+    "options": [
+      "NewMemorySystem"
+    ],
+    "kind": "replacement",
+    "body": "new_memory_system_apply"
+  },
+  {
+    "target": "0x1003d310",
+    "options": [
+      "NoLiveryLimit"
+    ],
+    "kind": "context_detour",
+    "body": "no_livery_detour"
+  },
+  {
+    "target": "0x1003d340",
+    "options": [
+      "NoLiveryLimit"
+    ],
+    "kind": "context_detour",
+    "body": "no_livery_detour"
+  },
+  {
+    "target": "0x1003d370",
+    "options": [
+      "NoLiveryLimit"
+    ],
+    "kind": "context_detour",
+    "body": "no_livery_detour"
+  },
+  {
+    "target": "0x1003d3a0",
+    "options": [
+      "NoLiveryLimit"
+    ],
+    "kind": "context_detour",
+    "body": "no_livery_detour"
+  },
+  {
+    "target": "0x1003d3e0",
+    "options": [
+      "NoLiveryLimit"
+    ],
+    "kind": "context_detour",
+    "body": "no_livery_tail"
+  },
+  {
+    "target": "0x1003d760",
+    "options": [
+      "MouseFix"
+    ],
+    "kind": "reset_stub",
+    "body": "reset_stub_1003d760"
+  },
+  {
+    "target": "0x1003d9a0",
+    "options": [
+      "PlayerAsPedComponentsFix"
+    ],
+    "kind": "shim",
+    "body": "player_ped_components_shim"
+  },
+  {
+    "target": "0x10044130",
+    "options": [
+      "CutsceneFixes"
+    ],
+    "kind": "reset_stub",
+    "body": "reset_stub_10044130"
+  },
+  {
+    "target": "0x10044560",
+    "options": [
+      "PopupHeadlightsFlag"
+    ],
+    "kind": "shim",
+    "body": "popup_headlights_shim"
+  },
+  {
+    "target": "0x100453e0",
+    "options": [
+      "ReversingLightFix"
+    ],
+    "kind": "reset_stub",
+    "body": "reset_stub_100453e0"
+  },
+  {
+    "target": "0x10045580",
+    "options": [
+      "SavegameFix"
+    ],
+    "kind": "replacement",
+    "body": "savegame_fix_close"
+  },
+  {
+    "target": "0x100455e0",
+    "options": [
+      "SavegameFix"
+    ],
+    "kind": "replacement",
+    "body": "savegame_fix_mutex"
+  },
+  {
+    "target": "0x10045a30",
+    "options": [
+      "ImprovedShaderStreaming"
+    ],
+    "kind": "replacement",
+    "body": "improved_shader_streaming_find"
+  },
+  {
+    "target": "0x10045a80",
+    "options": [
+      "ImprovedShaderStreaming"
+    ],
+    "kind": "replacement",
+    "body": "improved_shader_streaming_find"
+  },
+  {
+    "target": "0x10046780",
+    "options": [
+      "SMPA60Fix"
+    ],
+    "kind": "shim",
+    "body": "smpa60_tail_shim"
+  },
+  {
+    "target": "0x100469e0",
+    "options": [
+      "SuperLODFix"
+    ],
+    "kind": "shim",
+    "body": "super_lod_fix_shim"
+  },
+  {
+    "target": "0x1004aab0",
+    "options": [
+      "VRAMFix"
+    ],
+    "kind": "shim",
+    "body": "vram_fix_shim"
+  },
+  {
+    "target": "0x10050540",
+    "options": [
+      "SpeedupBugFix"
+    ],
+    "kind": "replacement",
+    "body": "speedup_timing_constants"
+  },
+  {
+    "target": "0x10050820",
+    "options": [
+      "GarageModelFix"
+    ],
+    "kind": "reset_stub",
+    "body": "reset_stub_10050820"
+  },
+  {
+    "target": "0x10050870",
+    "options": [
+      "PedModelsInCutscenesFix"
+    ],
+    "kind": "replacement",
+    "body": "ped_models_in_cutscenes_check"
+  },
+  {
+    "target": "0x100509e0",
+    "options": [
+      "OutOfCommissionFix"
+    ],
+    "kind": "reset_stub",
+    "body": "reset_stub_100509e0"
+  },
+  {
+    "target": "0x100512f0",
+    "options": [
+      "LaunchWithPlayGTAIV"
+    ],
+    "kind": "shim",
+    "body": "detour_100512f0_body"
+  },
+  {
+    "target": "0x10051600",
+    "options": [
+      "NewFilesCompatibility"
+    ],
+    "kind": "shim",
+    "body": "new_files_compat_shim"
+  },
+  {
+    "target": "0x10051890",
+    "options": [
+      "NewFilesCompatibility"
+    ],
+    "kind": "replacement",
+    "body": "new_files_compat_update"
+  },
+  {
+    "target": "0x100518d0",
+    "options": [
+      "NewFilesCompatibility"
+    ],
+    "kind": "replacement",
+    "body": "new_files_compat_update"
+  },
+  {
+    "target": "0x100521e0",
+    "options": [
+      "NewSavesCompatibility"
+    ],
+    "kind": "shim",
+    "body": "new_saves_compat_shim"
+  }
+]

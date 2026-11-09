@@ -1,0 +1,568 @@
+[
+  {
+    "option": [
+      "AimProjectileCrashFix"
+    ],
+    "handler": "100055c0",
+    "signatures": [
+      "8B 44 24 08 89 41 20 8B 44 24 0C 89 41 24 F7 D8"
+    ],
+    "targets": [
+      "0x10005590"
+    ],
+    "site_offsets": {
+      "lpAddress": "1"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10005690"
+  },
+  {
+    "option": [
+      "BetterMPSync"
+    ],
+    "handler": "10005800",
+    "signatures": [
+      "8B 90 E8 00 00 00 55 8B CE FF"
+    ],
+    "targets": [
+      "0x100057f0"
+    ],
+    "site_offsets": {
+      "lpAddress": "6",
+      "lpAddress_00": "7"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10005890"
+  },
+  {
+    "option": [
+      "BuildingDynamicShadows"
+    ],
+    "handler": "10005b20",
+    "signatures": [
+      "8B 47 28 C1 E8 06 83 E0 0F 83 C0",
+      "50 68 04 01 00 00 6A 02 6A 00 E8"
+    ],
+    "targets": [
+      "0x10005af0"
+    ],
+    "site_offsets": {
+      "lpAddress": "1",
+      "puVar2": "2",
+      "_DAT_10159c20": "0xf",
+      "_DAT_10159c28": "0x70"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10005ca0"
+  },
+  {
+    "option": [
+      "CollisionDeadlockFix"
+    ],
+    "handler": "10005e30",
+    "signatures": [
+      "55 8B EC 83 E4 F8 51 8B 45 0C 0F B7 48 66"
+    ],
+    "targets": [
+      "0x10005d80"
+    ],
+    "site_offsets": {
+      "lpAddress": "1"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10005ee0"
+  },
+  {
+    "option": [
+      "CombinedRadioFreezeFix"
+    ],
+    "handler": "10005ee0",
+    "signatures": [
+      "E8 ? ? ? ? 8B 35 ? ? ? ? 3B F0"
+    ],
+    "targets": [
+      "0x10005ed0"
+    ],
+    "site_offsets": {
+      "lpAddress": "1"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10005f70"
+  },
+  {
+    "option": [
+      "CopSirensFlag"
+    ],
+    "handler": "10006350",
+    "signatures": [
+      "E8 ? ? ? ? C0 E0 ? 32 86 6F 0F 00",
+      "0F BF 41 2E 39 05"
+    ],
+    "targets": [
+      "0x10006310",
+      "0x10006330"
+    ],
+    "site_offsets": {
+      "piVar1": "0x17",
+      "puVar3": "0x16",
+      "_DAT_1015937c": "5",
+      "_DAT_10159374": "0x1c"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10006450"
+  },
+  {
+    "option": [
+      "EmissiveLerpFix"
+    ],
+    "handler": "1001afa0",
+    "signatures": [
+      "F3 0F 58 C1 F3 0F 2A C8 F3 0F 58 C1"
+    ],
+    "targets": [
+      "0x1001af60"
+    ],
+    "site_offsets": {},
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x1001b0e0"
+  },
+  {
+    "option": [
+      "EpisodeSwitchFreezeFix"
+    ],
+    "handler": "1001b0e0",
+    "signatures": [
+      "89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84",
+      "8B 4B 10 3B 4B 14 7D 0F",
+      "8B 41 10 03 41 0C C3",
+      "8B C1 8B 08 8B 11 8B 40 04 8B 52 30 50 FF D2 C3",
+      "56 8B F1 83 7E 14 00 75 0B 83 7E 10 00 74 05"
+    ],
+    "targets": [
+      "0x1001b040",
+      "0x1001b060",
+      "0x1001b080",
+      "0x1001b0a0",
+      "0x1001b0c0"
+    ],
+    "site_offsets": {
+      "piVar1": "1",
+      "_DAT_10159bbc": "5",
+      "_DAT_10159bb4": "6",
+      "_DAT_10159bb8": "7"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x1001b310"
+  },
+  {
+    "option": [
+      "HighFPSBikePhysicsFix"
+    ],
+    "handler": "1001efa0",
+    "signatures": [
+      "D9 45 08 51 8B CE D9 1C 24 E8 ? ? ? ? 8A 86 90 14 00 00"
+    ],
+    "targets": [
+      "0x1001ef60"
+    ],
+    "site_offsets": {
+      "lpAddress": "1",
+      "_DAT_1015ad84": "9"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x1001f390"
+  },
+  {
+    "option": [
+      "AllowHashesForIDE"
+    ],
+    "handler": "10022cf0",
+    "signatures": [
+      "8B 4C 24 08 56 8B 74 24 08 80 3E 22"
+    ],
+    "targets": [
+      "0x10003e50"
+    ],
+    "site_offsets": {
+      "lpAddress": "1"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10022d80"
+  },
+  {
+    "option": [
+      "GroupHackFix"
+    ],
+    "handler": "10036f30",
+    "signatures": [
+      "33 C0 83 C1 04 8D 50 07 83 39 00 75 06 83 79 04"
+    ],
+    "targets": [
+      "0x10036e90"
+    ],
+    "site_offsets": {
+      "lpAddress": "1",
+      "_DAT_1015ad60": "0xb"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10036fd0"
+  },
+  {
+    "option": [
+      "BlackscreenFix"
+    ],
+    "handler": "10036fd0",
+    "signatures": [
+      "75 54 8B 48 28 8B 40 2C"
+    ],
+    "targets": [
+      "0x10036ee0"
+    ],
+    "site_offsets": {
+      "lpAddress_00": "0x51",
+      "lpAddress": "0x52"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10037070"
+  },
+  {
+    "option": [
+      "FreezeGunFix"
+    ],
+    "handler": "10037070",
+    "signatures": [
+      "2B C2 D1 F8 39 3C C6 7D 0D 83 CA FF"
+    ],
+    "targets": [
+      "0x10036eb0"
+    ],
+    "site_offsets": {},
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10037100"
+  },
+  {
+    "option": [
+      "CrashMsgFix"
+    ],
+    "handler": "100371f0",
+    "signatures": [
+      "68 6A 10 4E 31"
+    ],
+    "targets": [
+      "0x10036f00"
+    ],
+    "site_offsets": {
+      "lpAddress": "1"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10037290"
+  },
+  {
+    "option": [
+      "BadPlayerModelCrashFix"
+    ],
+    "handler": "10037be0",
+    "signatures": [
+      "83 E4 F0 83 EC 54 0F 57 C0 53 8B 5D 0C"
+    ],
+    "targets": [
+      "0x10037ba0"
+    ],
+    "site_offsets": {
+      "lpAddress": "1",
+      "_DAT_10159cb8": "10"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10037c70"
+  },
+  {
+    "option": [
+      "NewMemorySystem"
+    ],
+    "handler": "10038680",
+    "signatures": [
+      "3D 80 99 99 59 73 05",
+      "6A 01 B9 00 00 40 06"
+    ],
+    "targets": [
+      "0x10038670"
+    ],
+    "site_offsets": {},
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10038770"
+  },
+  {
+    "option": [
+      "NoLiveryLimit"
+    ],
+    "handler": "1003d420",
+    "signatures": [
+      "74 52 8D B5 3C 01 00 00 83 FB 04",
+      "8D AF 3C 01 00 00 8D 54 24 20",
+      "8B 8C 83 3C 01 00 00 0F BF 53 48",
+      "8B 8C 83 3C 01 00 00 0F BF 53 48"
+    ],
+    "targets": [
+      "0x1003d3a0",
+      "0x1003d3e0",
+      "0x1003d310",
+      "0x1003d370",
+      "0x1003d340"
+    ],
+    "site_offsets": {
+      "piVar1": "1",
+      "puVar5": "2",
+      "_DAT_10159bac": "0x5a",
+      "_DAT_10159b9c": "0xd"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x1003d670"
+  },
+  {
+    "option": [
+      "PathNodeCrashFix"
+    ],
+    "handler": "1003d7d0",
+    "signatures": [
+      "8B 04 B1 0F B7 D0 81 FA FF FF 00 00"
+    ],
+    "targets": [
+      "0x1003d7b0"
+    ],
+    "site_offsets": {
+      "lpAddress": "0x35",
+      "lpAddress_00": "0x36",
+      "_DAT_1015be00": "0x3b"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x1003d890"
+  },
+  {
+    "option": [
+      "PlaneCrashFix"
+    ],
+    "handler": "1003d890",
+    "signatures": [
+      "83 C4 04 88 58 26 8B 16 8B 82 F4 00 00 00"
+    ],
+    "targets": [
+      "0x1003d870"
+    ],
+    "site_offsets": {
+      "lpAddress": "3",
+      "lpAddress_00": "4",
+      "_DAT_1015be14": "0xe"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x1003d930"
+  },
+  {
+    "option": [
+      "PlayerAsPedComponentsFix"
+    ],
+    "handler": "1003d9c0",
+    "signatures": [
+      "8B 54 24 10 52 0F B6 90 19 02 00 00"
+    ],
+    "targets": [
+      "0x1003d9a0"
+    ],
+    "site_offsets": {
+      "lpAddress": "5",
+      "lpAddress_00": "6",
+      "_DAT_10159d2c": "0xe"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x1003da50"
+  },
+  {
+    "option": [
+      "RemoveRGSCLoginRequirement"
+    ],
+    "handler": "10045490",
+    "signatures": [
+      "83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53 8B 5C 24 4C 56 68 ? ? ? ? E8 ? ? ? ? 83 C4"
+    ],
+    "targets": [
+      "0x10038550"
+    ],
+    "site_offsets": {
+      "piVar1": "0x498461",
+      "puVar4": "0x498460"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10045580"
+  },
+  {
+    "option": [
+      "SavegameFix"
+    ],
+    "handler": "10045610",
+    "signatures": [
+      "75 ? 83 C1 01 83 C0 01 83 F9 04",
+      "8D 4C 24 18 51 6A 00 6A 0C 57"
+    ],
+    "targets": [
+      "0x10045580",
+      "0x100455e0",
+      "0x10038570"
+    ],
+    "site_offsets": {
+      "puVar5": "0x80",
+      "piVar1": "0x81"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10045980"
+  },
+  {
+    "option": [
+      "ImprovedShaderStreaming"
+    ],
+    "handler": "10045ad0",
+    "signatures": [
+      "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24"
+    ],
+    "targets": [
+      "0x10045a30",
+      "0x10045a80"
+    ],
+    "site_offsets": {
+      "puVar5": "0x10a",
+      "piVar1": "0xfe",
+      "puVar4": "0x10b"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10045c50"
+  },
+  {
+    "option": [
+      "SMPA60Fix"
+    ],
+    "handler": "100467a0",
+    "signatures": [
+      "01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C",
+      "8B 48 70 83 C0 40 50 51 8D 51 10"
+    ],
+    "targets": [
+      "0x10046780",
+      "0x10046750"
+    ],
+    "site_offsets": {
+      "puVar4": "0x7b",
+      "piVar1": "1",
+      "_DAT_10159c6c": "0x88",
+      "_DAT_10159c70": "0x1c",
+      "_DAT_10159c68": "0xe"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x100468d0"
+  },
+  {
+    "option": [
+      "VRAMFix"
+    ],
+    "handler": "1004aae0",
+    "signatures": [
+      "8B 44 24 10 D9 2C 24 83 C4 1C C3"
+    ],
+    "targets": [
+      "0x1004aab0"
+    ],
+    "site_offsets": {
+      "lpAddress": "1"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x1004ab70"
+  },
+  {
+    "option": [
+      "WantedLevelCrashFix"
+    ],
+    "handler": "100504b0",
+    "signatures": [
+      "8B 01 8B 90 28 01 00 00 FF D2 84 C0 0F 84 88 00 00 00"
+    ],
+    "targets": [
+      "0x10050490"
+    ],
+    "site_offsets": {
+      "lpAddress": "1",
+      "_DAT_1015ad6c": "0xc"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10050540"
+  },
+  {
+    "option": [
+      "SpeedupBugFix"
+    ],
+    "handler": "100506b0",
+    "signatures": [
+      "50 64 89 25 00 00 00 00 83 EC 34"
+    ],
+    "targets": [
+      "0x10050540"
+    ],
+    "site_offsets": {},
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10050790"
+  },
+  {
+    "option": [
+      "PedModelsInCutscenesFix"
+    ],
+    "handler": "100508c0",
+    "signatures": [
+      "56 8B F1 E8 ? ? ? ? 85 C0 74 0E 66 8B 40 2E"
+    ],
+    "targets": [
+      "0x10050870"
+    ],
+    "site_offsets": {
+      "lpAddress": "1"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10050950"
+  },
+  {
+    "option": [
+      "NewFilesCompatibility"
+    ],
+    "handler": "10051920",
+    "signatures": [
+      "68 64 28 C8 67 E8",
+      "E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 7B FF FF FF",
+      "E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 6C FF FF FF"
+    ],
+    "targets": [
+      "0x10051600",
+      "0x10051890",
+      "0x100518d0"
+    ],
+    "site_offsets": {
+      "puVar4": "0x1c",
+      "piVar5": "1"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x10051a90"
+  },
+  {
+    "option": [
+      "NewSavesCompatibility"
+    ],
+    "handler": "10052200",
+    "signatures": [
+      "68 ? ? ? ? E8 ? ? ? ? 8B 2D ? ? ? ? 83 C4 08",
+      "89 84 24 E0 01 00 00 8B 45 08 53 33 DB"
+    ],
+    "targets": [
+      "0x100521e0"
+    ],
+    "site_offsets": {
+      "lpAddress": "1",
+      "_DAT_1015ad88": "0xd"
+    },
+    "target_source": "disassembly (mov eax,TARGET ; sub eax,5)",
+    "handler_end": "0x100522b0"
+  }
+]

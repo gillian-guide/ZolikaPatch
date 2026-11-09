@@ -1,0 +1,242 @@
+{
+  "NewMemorySystem": [
+    "0x10038680"
+  ],
+  "PoliceEpisodicWeaponSupport": [
+    "0x1001bec0"
+  ],
+  "PipeBombDropIconSupport": [
+    "0x1001be40"
+  ],
+  "EpisodeSwitchFreezeFix": [
+    "0x1001b0e0"
+  ],
+  "CombinedRadioFreezeFix": [
+    "0x10005ee0"
+  ],
+  "AllowHashesForIDE": [
+    "0x10022cf0"
+  ],
+  "PathNodeCrashFix": [
+    "0x1003d7d0"
+  ],
+  "FastLoading": [
+    "0x1001eca0"
+  ],
+  "LoadDLCs": [
+    "0x100234e0"
+  ],
+  "BenchmarkFix": [
+    "0x10005690"
+  ],
+  "CollisionDeadlockFix": [
+    "0x10005e30"
+  ],
+  "AimProjectileCrashFix": [
+    "0x100055c0"
+  ],
+  "BadPlayerModelCrashFix": [
+    "0x10037be0"
+  ],
+  "HighFPSBikePhysicsFix": [
+    "0x1001efa0"
+  ],
+  "HighFPSSpeedupFix": [
+    "0x10023b30"
+  ],
+  "BuildingAlphaFix": [
+    "0x10005ca0"
+  ],
+  "BetterMPSync": [
+    "0x10005800"
+  ],
+  "MPNikoCrashFix": [
+    "0x10037290"
+  ],
+  "BuildingDynamicShadows": [
+    "0x10005b20"
+  ],
+  "RemoveUselessChecks": [
+    "0x10044bd0"
+  ],
+  "DualVehicleHeadlights": [
+    "0x10006770"
+  ],
+  "ForceDynamicShadowsEverywhere": [
+    "0x1001ee50"
+  ],
+  "InfiniteCarBottomDistance": [
+    "0x10022d80"
+  ],
+  "RemoveStaticCarShadows": [
+    "0x10038800"
+  ],
+  "RemoveStaticCutsceneCarShadows": [
+    "0x10038860"
+  ],
+  "ReversingLightFix": [
+    "0x10045430"
+  ],
+  "CarPartsShadowFix": [
+    "0x10006910"
+  ],
+  "CrashMsgFix": [
+    "0x100371f0"
+  ],
+  "OverrideGTADatPath": [
+    "0x10022f60"
+  ],
+  "IncreaseVehicleModelLimit": [
+    "0x10022fc0"
+  ],
+  "IncreaseVehicleStructLimit": [
+    "0x10023020"
+  ],
+  "SMPA60Fix": [
+    "0x100467a0"
+  ],
+  "TryToSkipAllErrors": [
+    "0x10046b30"
+  ],
+  "PlaneCrashFix": [
+    "0x1003d890"
+  ],
+  "CopSirensFlag": [
+    "0x10006350"
+  ],
+  "PopupHeadlightsFlag": [
+    "0x10044590"
+  ],
+  "EmissiveLerpFix": [
+    "0x1001afa0"
+  ],
+  "BikeFeetFix": [
+    "0x1001bdd0"
+  ],
+  "ForceShadowsOnObjects": [
+    "0x1001eed0"
+  ],
+  "BikePhoneAnimsFix": [
+    "0x1001bd60"
+  ],
+  "HighQualityReflections": [
+    "0x10023dc0"
+  ],
+  "RemoveBoundingBoxCulling": [
+    "0x10038770"
+  ],
+  "EpisodicVehicleSupport": [
+    "0x1001b580"
+  ],
+  "TBoGTHeliHeightLimit": [
+    "0x1001b310"
+  ],
+  "WantedLevelCrashFix": [
+    "0x100504b0"
+  ],
+  "NoLiveryLimit": [
+    "0x1003d420"
+  ],
+  "RemoveRGSCLoginRequirement": [
+    "0x10045490"
+  ],
+  "BlackscreenFix": [
+    "0x10036fd0"
+  ],
+  "FreezeGunFix": [
+    "0x10037070"
+  ],
+  "GroupHackFix": [
+    "0x10036f30"
+  ],
+  "CutsceneFixes": [
+    "0x100441a0"
+  ],
+  "TeleportProtection": [
+    "0x10037170"
+  ],
+  "RemoveAllWeaponsProtection": [
+    "0x10037100"
+  ],
+  "IncreasePtrNodes": [
+    "0x10023080"
+  ],
+  "SCOSignatureFix": [
+    "0x10045980"
+  ],
+  "PlayerAsPedComponentsFix": [
+    "0x1003d9c0"
+  ],
+  "SuperLODFix": [
+    "0x10046a10"
+  ],
+  "VSyncFix": [
+    "0x100503b0"
+  ],
+  "ImprovedShaderStreaming": [
+    "0x10045ad0"
+  ],
+  "LaunchWithPlayGTAIV": [
+    "0x100441b0"
+  ],
+  "SkipLauncher": [
+    "0x10045ce0"
+  ],
+  "GarageModelFix": [
+    "0x10050860"
+  ],
+  "NoLoadingSleep": [
+    "0x1003d670"
+  ],
+  "MouseFix": [
+    "0x1003d7a0"
+  ],
+  "VRAMFix": [
+    "0x1004aae0"
+  ],
+  "SavegameFix": [
+    "0x10045610"
+  ],
+  "OutOfCommissionFix": [
+    "0x10050a20"
+  ],
+  "StartupTimeFix": [
+    "0x100468d0"
+  ],
+  "MiscFixes": [
+    "0x10023dd0"
+  ],
+  "SpeedupBugFix": [
+    "0x100506b0"
+  ],
+  "NewFilesCompatibility": [
+    "0x10051920"
+  ],
+  "NewSavesCompatibility": [
+    "0x10052200"
+  ],
+  "PedModelsInCutscenesFix": [
+    "0x100508c0"
+  ],
+  "LocalSettingsPath": [
+    "0x100513a0"
+  ],
+  "Patch6and7RemoveModChecks": [
+    "0x10044710"
+  ],
+  "SkipIntro": [
+    "0x10045c50"
+  ],
+  "SkipMenu": [
+    "0x10046640"
+  ],
+  "BorderlessWindowed": [
+    "0x10005970"
+  ],
+  "EpisodicWeaponSupport": [
+    "0x1001b380"
+  ],
+  "Patch7RemoveModChecks": [
+    "0x10044710"
+  ]
+}

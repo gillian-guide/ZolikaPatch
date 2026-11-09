@@ -1,0 +1,3784 @@
+{
+  "schema": 1,
+  "task": "Verify every recovered ZolikaPatch option signature against the real game, per option",
+  "method": "For every option in evidence/option_signatures.json each signature is parsed with the exact semantics of tools/verify_game_signatures.py (whitespace-split tokens; '?'/'??' wildcards; otherwise strtoul-hex low byte) and matched with find_all over the raw .text bytes of the read-only GTAIV.exe. The image is never modified. An option RESOLVES if ANY of its signatures has >=1 hit. Per-signature hit_count and first RVA are recorded. The recovered build gate (evidence/option_build_gates.json) is then cross-referenced for build v1080 (ordinal 9) with the same gate semantics as evidence/verify_ops_vs_game.json: gated-in for ordinal 9 iff no '!=' gate names 9 and (no '==' gate exists or some '==' gate names 9).",
+  "game": {
+    "path": "/Users/kreato/Downloads/GTAIV.exe",
+    "sha256": "3d90e7c516fa450ca002e5031e62c0f66b404590f33e6cc9793b0da4fffbfd0f",
+    "size": 15628696,
+    "image_base": "0x400000",
+    "text_va": "0x1000",
+    "text_raw_size": 9871360,
+    "product_version": "1, 0, 8, 0",
+    "build": "v1080 (ordinal 9)"
+  },
+  "inputs": {
+    "option_signatures.json": "556c988f123b90dbb1b199a98063ff24d24b922943186af8338fdb46b6be1480",
+    "option_build_gates.json": "abc78cb448b64553ce4c75496651cd5d2e12dc9e3563c62c06c5cdb0c541ad80",
+    "option_handlers.json": "dce3ea016aa91a0f3fda8d24278ea83a20ee584e8c9fc857a4b90932ef051ccb",
+    "patch_operations_all.json": "83dab699484eb669312eeacce6d47dee6c69d9cd4fbdb1d5f2b5213d03f99ccc",
+    "verify_ops_vs_game.json": "ef299f0911b6f920e0897927bf09bcdef2bc33d9dd7c43847b37c5a1e9b50007",
+    "handler_table.json": "b67be691a4f28d00e7ab032a2d172c7493e446bd0c5569e92f57ee61d7101d1c",
+    "tool": "tools/verify_game_signatures.py::verify (re-run; per-signature hits and RVAs agree 100%)"
+  },
+  "summary": {
+    "options_in_option_signatures": 64,
+    "options_resolved": 61,
+    "options_unresolved": 3,
+    "options_unresolved_list": [
+      "RemoveRGSCLoginRequirement",
+      "VRAMFix",
+      "VSyncFix"
+    ],
+    "signatures_total": 148,
+    "signatures_resolved": 115,
+    "signatures_absent": 33,
+    "signatures_unique_hit": 114,
+    "signatures_multi_hit": 1,
+    "options_with_partial_signature_coverage": [
+      "LocalSettingsPath",
+      "MiscFixes",
+      "NoLiveryLimit",
+      "PopupHeadlightsFlag",
+      "SkipLauncher",
+      "SkipMenu"
+    ],
+    "agreement_with_verify_game_signatures_tool": true,
+    "agreement_with_game_verification_json": "same three unresolved options (RemoveRGSCLoginRequirement, VRAMFix, VSyncFix)"
+  },
+  "gate_cross_check": {
+    "semantics": "gated-in for ordinal 9 iff no '!=' gate names 9 and (no '==' gate or some '==' gate names 9)",
+    "options_in_option_build_gates": 10,
+    "rows": [
+      {
+        "option": "BenchmarkFix",
+        "handler": "10005690",
+        "handlers": [
+          "10005690"
+        ],
+        "recovered_build_gate": [
+          [
+            "!=",
+            9
+          ],
+          [
+            "!=",
+            13
+          ]
+        ],
+        "gated_in_for_build_1080": false,
+        "present_in_option_signatures_json": false,
+        "signature_resolution": null,
+        "resolved": null,
+        "recovered_ops": {
+          "signature_ops": 0,
+          "signature_ops_present_in_game": 0,
+          "rva_ops": 0,
+          "rva_ops_applicable_to_build_1080": 0
+        },
+        "gated_in_but_unresolved": false,
+        "gated_out_but_resolved": false
+      },
+      {
+        "option": "DualVehicleHeadlights",
+        "handler": "10006770",
+        "handlers": [
+          "10006770"
+        ],
+        "recovered_build_gate": [
+          [
+            "==",
+            1
+          ],
+          [
+            "==",
+            2
+          ],
+          [
+            "==",
+            3
+          ],
+          [
+            "==",
+            4
+          ],
+          [
+            "==",
+            5
+          ],
+          [
+            "==",
+            6
+          ]
+        ],
+        "gated_in_for_build_1080": false,
+        "present_in_option_signatures_json": true,
+        "signature_resolution": "resolved",
+        "resolved": true,
+        "recovered_ops": {
+          "signature_ops": 1,
+          "signature_ops_present_in_game": 1,
+          "rva_ops": 0,
+          "rva_ops_applicable_to_build_1080": 0
+        },
+        "gated_in_but_unresolved": false,
+        "gated_out_but_resolved": true
+      },
+      {
+        "option": "EpisodicVehicleSupport",
+        "handler": "1001b580",
+        "handlers": [
+          "1001b580"
+        ],
+        "recovered_build_gate": [
+          [
+            "==",
+            8
+          ],
+          [
+            "==",
+            9
+          ]
+        ],
+        "gated_in_for_build_1080": true,
+        "present_in_option_signatures_json": true,
+        "signature_resolution": "resolved",
+        "resolved": true,
+        "recovered_ops": {
+          "signature_ops": 33,
+          "signature_ops_present_in_game": 33,
+          "rva_ops": 0,
+          "rva_ops_applicable_to_build_1080": 0
+        },
+        "gated_in_but_unresolved": false,
+        "gated_out_but_resolved": false
+      },
+      {
+        "option": "LaunchWithPlayGTAIV",
+        "handler": "100441b0",
+        "handlers": [
+          "100441b0"
+        ],
+        "recovered_build_gate": [
+          [
+            "!=",
+            9
+          ],
+          [
+            "==",
+            1
+          ],
+          [
+            "==",
+            5
+          ],
+          [
+            "==",
+            7
+          ],
+          [
+            "==",
+            8
+          ]
+        ],
+        "gated_in_for_build_1080": false,
+        "present_in_option_signatures_json": false,
+        "signature_resolution": null,
+        "resolved": null,
+        "recovered_ops": {
+          "signature_ops": 0,
+          "signature_ops_present_in_game": 0,
+          "rva_ops": 0,
+          "rva_ops_applicable_to_build_1080": 0
+        },
+        "gated_in_but_unresolved": false,
+        "gated_out_but_resolved": false
+      },
+      {
+        "option": "LoadDLCs",
+        "handler": "100234e0",
+        "handlers": [
+          "100234e0"
+        ],
+        "recovered_build_gate": [
+          [
+            "==",
+            7
+          ],
+          [
+            "==",
+            8
+          ],
+          [
+            "==",
+            9
+          ]
+        ],
+        "gated_in_for_build_1080": true,
+        "present_in_option_signatures_json": false,
+        "signature_resolution": null,
+        "resolved": null,
+        "recovered_ops": {
+          "signature_ops": 0,
+          "signature_ops_present_in_game": 0,
+          "rva_ops": 17,
+          "rva_ops_applicable_to_build_1080": 17
+        },
+        "gated_in_but_unresolved": false,
+        "gated_out_but_resolved": false
+      },
+      {
+        "option": "Patch6and7RemoveModChecks",
+        "handler": "10044710",
+        "handlers": [
+          "10044710"
+        ],
+        "recovered_build_gate": [
+          [
+            "==",
+            7
+          ],
+          [
+            "==",
+            8
+          ]
+        ],
+        "gated_in_for_build_1080": false,
+        "present_in_option_signatures_json": false,
+        "signature_resolution": null,
+        "resolved": null,
+        "recovered_ops": {
+          "signature_ops": 0,
+          "signature_ops_present_in_game": 0,
+          "rva_ops": 13,
+          "rva_ops_applicable_to_build_1080": 0
+        },
+        "gated_in_but_unresolved": false,
+        "gated_out_but_resolved": false
+      },
+      {
+        "option": "RemoveRGSCLoginRequirement",
+        "handler": "10045490",
+        "handlers": [
+          "10045490"
+        ],
+        "recovered_build_gate": [
+          [
+            "==",
+            9
+          ]
+        ],
+        "gated_in_for_build_1080": true,
+        "present_in_option_signatures_json": true,
+        "signature_resolution": "unresolved",
+        "resolved": false,
+        "recovered_ops": {
+          "signature_ops": 2,
+          "signature_ops_present_in_game": 0,
+          "rva_ops": 1,
+          "rva_ops_applicable_to_build_1080": 1
+        },
+        "gated_in_but_unresolved": true,
+        "gated_out_but_resolved": false
+      },
+      {
+        "option": "RemoveUselessChecks",
+        "handler": "10044bd0",
+        "handlers": [
+          "10044bd0"
+        ],
+        "recovered_build_gate": [
+          [
+            "==",
+            5
+          ],
+          [
+            "==",
+            8
+          ],
+          [
+            "==",
+            9
+          ]
+        ],
+        "gated_in_for_build_1080": true,
+        "present_in_option_signatures_json": false,
+        "signature_resolution": null,
+        "resolved": null,
+        "recovered_ops": {
+          "signature_ops": 0,
+          "signature_ops_present_in_game": 0,
+          "rva_ops": 23,
+          "rva_ops_applicable_to_build_1080": 23
+        },
+        "gated_in_but_unresolved": false,
+        "gated_out_but_resolved": false
+      },
+      {
+        "option": "SuperLODFix",
+        "handler": "10046a10",
+        "handlers": [
+          "10046a10"
+        ],
+        "recovered_build_gate": [
+          [
+            "==",
+            8
+          ],
+          [
+            "==",
+            9
+          ]
+        ],
+        "gated_in_for_build_1080": true,
+        "present_in_option_signatures_json": false,
+        "signature_resolution": null,
+        "resolved": null,
+        "recovered_ops": {
+          "signature_ops": 0,
+          "signature_ops_present_in_game": 0,
+          "rva_ops": 0,
+          "rva_ops_applicable_to_build_1080": 0
+        },
+        "gated_in_but_unresolved": false,
+        "gated_out_but_resolved": false
+      },
+      {
+        "option": "VSyncFix",
+        "handler": "100503b0",
+        "handlers": [
+          "100503b0"
+        ],
+        "recovered_build_gate": [
+          [
+            "!=",
+            1
+          ],
+          [
+            "!=",
+            2
+          ],
+          [
+            "!=",
+            3
+          ],
+          [
+            "!=",
+            4
+          ],
+          [
+            "!=",
+            5
+          ],
+          [
+            "!=",
+            9
+          ],
+          [
+            "!=",
+            13
+          ]
+        ],
+        "gated_in_for_build_1080": false,
+        "present_in_option_signatures_json": true,
+        "signature_resolution": "unresolved",
+        "resolved": false,
+        "recovered_ops": {
+          "signature_ops": 0,
+          "signature_ops_present_in_game": 0,
+          "rva_ops": 0,
+          "rva_ops_applicable_to_build_1080": 0
+        },
+        "gated_in_but_unresolved": false,
+        "gated_out_but_resolved": false
+      }
+    ],
+    "gated_in_but_unresolved": [
+      "RemoveRGSCLoginRequirement"
+    ],
+    "gated_out_but_resolved": [
+      "DualVehicleHeadlights"
+    ],
+    "gate_options_absent_from_option_signatures": [
+      "BenchmarkFix",
+      "LaunchWithPlayGTAIV",
+      "LoadDLCs",
+      "Patch6and7RemoveModChecks",
+      "RemoveUselessChecks",
+      "SuperLODFix"
+    ]
+  },
+  "exceptions": [
+    {
+      "option": "RemoveRGSCLoginRequirement",
+      "type": "gated-in-for-build-1080 but unresolved",
+      "gated_in_for_build_1080": true,
+      "recovered_build_gate": [
+        [
+          "==",
+          9
+        ]
+      ],
+      "resolved": false,
+      "severity": "high",
+      "explained": true,
+      "explanation": "Handler FUN_10045490 first pattern-scans the single recovered signature. In GTAIV.exe 1.0.8.0 the scan fails (hit_count 0) because the matched routine's prologue differs from the signature's first ~15 tokens. The decompiled handler explicitly handles this case: when the scan returns null AND DAT_1015be04 == 9, it patches the module-relative RVA 0x498460 instead (VirtualProtect @ image_base+RVA 0x498460, writes 0xE9). That RVA is inside .text (VA 0x898460) and the bytes there (8B 44 24 04 85 C0 74 17 F3 0F 7E 05 30 A4 D8 00) are a plausible function entry preceded by CC padding, so the leading byte 0x8B is the byte that would be overwritten. The option therefore still applies on build 9 through the recovered RVA fallback op (verify_ops_vs_game.json rva op #58, gate_applicable_to_1080=true), not through a signature. This is a designed per-build fallback, not an extraction defect.",
+      "cross_reference": "evidence/fallback_patch_sites.json (same finding, same bytes); evidence/verify_ops_vs_game.json anomalies.flagged type signature_absent_gate_includes_1080 (handler 10045490)."
+    },
+    {
+      "option": "VRAMFix",
+      "type": "unresolved signature with no recovered build gate",
+      "gated_in_for_build_1080": null,
+      "recovered_build_gate": null,
+      "resolved": false,
+      "severity": "low",
+      "explained": true,
+      "explanation": "Handler FUN_1004aae0 has no DAT_1015be04 comparison, so no build gate was recovered and the signature is expected to hold for every build. The single signature '8B 44 24 10 D9 2C 24 83 C4 1C C3' is absent from the 1.0.8.0 .text. Near-miss diagnostic: the longest matching prefix is only 5 tokens ('8B 44 24 10 D9'), with 54 prefix hits scattered across the image and no full-length match, i.e. the trailing epilogue '83 C4 1C C3' is not anchored by the recovered prefix in this build. FusionFix resolves VRAM detection through a different mechanism (memory.ixx GetProcessPreferredGPUMemory, pattern 8B 0D ? ? ? ? 83 EC ? 33 C0), so no independent confirmation exists. Recorded UNRESOLVED: treated as a build-variant signature (the exact routine text differs in 1.0.8.0); no positive build gate and no RVA fallback was recovered, so resolution cannot be asserted.",
+      "cross_reference": "evidence/game_verification.json unresolved_explanations.VRAMFix; evidence/fusionfix_crossref_2.json VRAMFix."
+    },
+    {
+      "option": "VSyncFix",
+      "type": "unresolved signature, resolved (absent) by recovered build gate",
+      "gated_in_for_build_1080": false,
+      "recovered_build_gate": [
+        [
+          "!=",
+          1
+        ],
+        [
+          "!=",
+          2
+        ],
+        [
+          "!=",
+          3
+        ],
+        [
+          "!=",
+          4
+        ],
+        [
+          "!=",
+          5
+        ],
+        [
+          "!=",
+          9
+        ],
+        [
+          "!=",
+          13
+        ]
+      ],
+      "resolved": false,
+      "severity": "none",
+      "explained": true,
+      "explanation": "Gate semantics: '!=' 9 is present, so the handler body (FUN_100503b0, which pattern-scans and rewrites an indirect call target per build) is skipped entirely for build ordinal 9. The two signatures are therefore expected to be absent on 1.0.8.0 and their non-resolution is consistent, not an extraction defect. Both signatures have 0 hits; longest matching prefixes are 11/12 and 18/27 tokens respectively, i.e. the neighbouring code is present but the exact per-build variant differs. No RVA fallback op exists for this option.",
+      "cross_reference": "evidence/game_verification.json unresolved_explanations.VSyncFix."
+    },
+    {
+      "option": "DualVehicleHeadlights",
+      "type": "gated-out-for-build-1080 but resolved",
+      "gated_in_for_build_1080": false,
+      "recovered_build_gate": [
+        [
+          "==",
+          1
+        ],
+        [
+          "==",
+          2
+        ],
+        [
+          "==",
+          3
+        ],
+        [
+          "==",
+          4
+        ],
+        [
+          "==",
+          5
+        ],
+        [
+          "==",
+          6
+        ]
+      ],
+      "resolved": true,
+      "severity": "info",
+      "explained": true,
+      "explanation": "Gate-semantics false positive. FUN_10006770 pattern-scans '8B 17 8B 42 64 8B CF FF D0 8B 54' UNCONDITIONALLY (the FUN_10003830 call is outside any DAT_1015be04 branch) and only the injected trampoline target is chosen per build: BuildSlot in {1..6} -> LAB_10006630, else -> LAB_100064F0. The ==1..==6 gate therefore encodes trampoline-target selection, not option applicability. Presence in 1.0.8.0 .text is expected; the signature resolves uniquely at RVA 0x4f7ce5 (VA 0x8f7ce5), matching docs/handlers_batch_1.md. The hook is still installed on build 9 with the else-branch target.",
+      "cross_reference": "evidence/verify_ops_vs_game.json anomalies.flagged type signature_present_gate_excludes_1080 (handler 10006770); docs/handlers_batch_1.md."
+    }
+  ],
+  "per_option": [
+    {
+      "option": "AimProjectileCrashFix",
+      "handlers": [
+        "100055c0"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x632620",
+      "signatures": [
+        {
+          "signature": "8B 44 24 08 89 41 20 8B 44 24 0C 89 41 24 F7 D8",
+          "hit_count": 1,
+          "first_rva": "0x632620",
+          "first_va": "0xa32620",
+          "all_rvas": [
+            "0x632620"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "AllowHashesForIDE",
+      "handlers": [
+        "10022cf0"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x5cf50",
+      "signatures": [
+        {
+          "signature": "8B 4C 24 08 56 8B 74 24 08 80 3E 22",
+          "hit_count": 1,
+          "first_rva": "0x5cf50",
+          "first_va": "0x45cf50",
+          "all_rvas": [
+            "0x5cf50"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "BadPlayerModelCrashFix",
+      "handlers": [
+        "10037be0"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x3cf803",
+      "signatures": [
+        {
+          "signature": "83 E4 F0 83 EC 54 0F 57 C0 53 8B 5D 0C",
+          "hit_count": 1,
+          "first_rva": "0x3cf803",
+          "first_va": "0x7cf803",
+          "all_rvas": [
+            "0x3cf803"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "BetterMPSync",
+      "handlers": [
+        "10005800"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x2d9356",
+      "signatures": [
+        {
+          "signature": "8B 90 E8 00 00 00 55 8B CE FF",
+          "hit_count": 1,
+          "first_rva": "0x2d9356",
+          "first_va": "0x6d9356",
+          "all_rvas": [
+            "0x2d9356"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "BikeFeetFix",
+      "handlers": [
+        "1001bdd0"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x7cb919",
+      "signatures": [
+        {
+          "signature": "39 82 54 13 00 00 0F 85 94 04 00 00",
+          "hit_count": 1,
+          "first_rva": "0x7cb919",
+          "first_va": "0xbcb919",
+          "all_rvas": [
+            "0x7cb919"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "BikePhoneAnimsFix",
+      "handlers": [
+        "1001bd60"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x767f01",
+      "signatures": [
+        {
+          "signature": "80 BE 18 02 00 00 00 0F 85 36 01 00 00 80 BE",
+          "hit_count": 1,
+          "first_rva": "0x767f01",
+          "first_va": "0xb67f01",
+          "all_rvas": [
+            "0x767f01"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "BlackscreenFix",
+      "handlers": [
+        "10036fd0"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x2c6ef8",
+      "signatures": [
+        {
+          "signature": "75 54 8B 48 28 8B 40 2C",
+          "hit_count": 1,
+          "first_rva": "0x2c6ef8",
+          "first_va": "0x6c6ef8",
+          "all_rvas": [
+            "0x2c6ef8"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "BuildingAlphaFix",
+      "handlers": [
+        "10005ca0"
+      ],
+      "signature_count": 2,
+      "signature_count_resolved": 2,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x559cd3",
+      "signatures": [
+        {
+          "signature": "F7 46 24 00 00 00 40 0F 85",
+          "hit_count": 1,
+          "first_rva": "0x559cd3",
+          "first_va": "0x959cd3",
+          "all_rvas": [
+            "0x559cd3"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "F7 46 24 00 00 00 40 0F 84",
+          "hit_count": 1,
+          "first_rva": "0x5594bd",
+          "first_va": "0x9594bd",
+          "all_rvas": [
+            "0x5594bd"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 2,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "BuildingDynamicShadows",
+      "handlers": [
+        "10005b20"
+      ],
+      "signature_count": 2,
+      "signature_count_resolved": 2,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x558955",
+      "signatures": [
+        {
+          "signature": "8B 47 28 C1 E8 06 83 E0 0F 83 C0",
+          "hit_count": 1,
+          "first_rva": "0x558955",
+          "first_va": "0x958955",
+          "all_rvas": [
+            "0x558955"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "50 68 04 01 00 00 6A 02 6A 00 E8",
+          "hit_count": 1,
+          "first_rva": "0x4f7420",
+          "first_va": "0x8f7420",
+          "all_rvas": [
+            "0x4f7420"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "CollisionDeadlockFix",
+      "handlers": [
+        "10005e30"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0xe6250",
+      "signatures": [
+        {
+          "signature": "55 8B EC 83 E4 F8 51 8B 45 0C 0F B7 48 66",
+          "hit_count": 1,
+          "first_rva": "0xe6250",
+          "first_va": "0x4e6250",
+          "all_rvas": [
+            "0xe6250"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "CombinedRadioFreezeFix",
+      "handlers": [
+        "10005ee0"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x495f59",
+      "signatures": [
+        {
+          "signature": "E8 ? ? ? ? 8B 35 ? ? ? ? 3B F0",
+          "hit_count": 1,
+          "first_rva": "0x495f59",
+          "first_va": "0x895f59",
+          "all_rvas": [
+            "0x495f59"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "CopSirensFlag",
+      "handlers": [
+        "10006350"
+      ],
+      "signature_count": 2,
+      "signature_count_resolved": 2,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x4febd3",
+      "signatures": [
+        {
+          "signature": "E8 ? ? ? ? C0 E0 ? 32 86 6F 0F 00",
+          "hit_count": 1,
+          "first_rva": "0x4febd3",
+          "first_va": "0x8febd3",
+          "all_rvas": [
+            "0x4febd3"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "0F BF 41 2E 39 05",
+          "hit_count": 1,
+          "first_rva": "0x4fabd0",
+          "first_va": "0x8fabd0",
+          "all_rvas": [
+            "0x4fabd0"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 2,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "CrashMsgFix",
+      "handlers": [
+        "100371f0"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x711bae",
+      "signatures": [
+        {
+          "signature": "68 6A 10 4E 31",
+          "hit_count": 1,
+          "first_rva": "0x711bae",
+          "first_va": "0xb11bae",
+          "all_rvas": [
+            "0x711bae"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 0,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "DualVehicleHeadlights",
+      "handlers": [
+        "10006770"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x4f7ce5",
+      "signatures": [
+        {
+          "signature": "8B 17 8B 42 64 8B CF FF D0 8B 54",
+          "hit_count": 1,
+          "first_rva": "0x4f7ce5",
+          "first_va": "0x8f7ce5",
+          "all_rvas": [
+            "0x4f7ce5"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": [
+        [
+          "==",
+          1
+        ],
+        [
+          "==",
+          2
+        ],
+        [
+          "==",
+          3
+        ],
+        [
+          "==",
+          4
+        ],
+        [
+          "==",
+          5
+        ],
+        [
+          "==",
+          6
+        ]
+      ],
+      "gated_in_for_build_1080": false,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "EmissiveLerpFix",
+      "handlers": [
+        "1001afa0"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x3f8bb9",
+      "signatures": [
+        {
+          "signature": "F3 0F 58 C1 F3 0F 2A C8 F3 0F 58 C1",
+          "hit_count": 1,
+          "first_rva": "0x3f8bb9",
+          "first_va": "0x7f8bb9",
+          "all_rvas": [
+            "0x3f8bb9"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "EpisodeSwitchFreezeFix",
+      "handlers": [
+        "1001b0e0"
+      ],
+      "signature_count": 5,
+      "signature_count_resolved": 5,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x5ec46",
+      "signatures": [
+        {
+          "signature": "89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84",
+          "hit_count": 1,
+          "first_rva": "0x5ec46",
+          "first_va": "0x45ec46",
+          "all_rvas": [
+            "0x5ec46"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8B 4B 10 3B 4B 14 7D 0F",
+          "hit_count": 1,
+          "first_rva": "0x605f6",
+          "first_va": "0x4605f6",
+          "all_rvas": [
+            "0x605f6"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8B 41 10 03 41 0C C3",
+          "hit_count": 1,
+          "first_rva": "0x604c0",
+          "first_va": "0x4604c0",
+          "all_rvas": [
+            "0x604c0"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8B C1 8B 08 8B 11 8B 40 04 8B 52 30 50 FF D2 C3",
+          "hit_count": 1,
+          "first_rva": "0x60510",
+          "first_va": "0x460510",
+          "all_rvas": [
+            "0x60510"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "56 8B F1 83 7E 14 00 75 0B 83 7E 10 00 74 05",
+          "hit_count": 1,
+          "first_rva": "0x604d0",
+          "first_va": "0x4604d0",
+          "all_rvas": [
+            "0x604d0"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 5,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "EpisodicVehicleSupport",
+      "handlers": [
+        "1001b580"
+      ],
+      "signature_count": 21,
+      "signature_count_resolved": 21,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x6530fd",
+      "signatures": [
+        {
+          "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+          "hit_count": 1,
+          "first_rva": "0x6530fd",
+          "first_va": "0xa530fd",
+          "all_rvas": [
+            "0x6530fd"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 35 0F BF 43 2E",
+          "hit_count": 1,
+          "first_rva": "0x4fc61f",
+          "first_va": "0x8fc61f",
+          "all_rvas": [
+            "0x4fc61f"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 8A 0D",
+          "hit_count": 1,
+          "first_rva": "0xa86ee",
+          "first_va": "0x4a86ee",
+          "all_rvas": [
+            "0xa86ee"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 75 21 8B 96 20 08 00 00",
+          "hit_count": 1,
+          "first_rva": "0x435771",
+          "first_va": "0x835771",
+          "all_rvas": [
+            "0x435771"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 4A 0F BF 46 2E",
+          "hit_count": 1,
+          "first_rva": "0x31c81a",
+          "first_va": "0x71c81a",
+          "all_rvas": [
+            "0x31c81a"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 75 08 3B 05",
+          "hit_count": 1,
+          "first_rva": "0x565823",
+          "first_va": "0x965823",
+          "all_rvas": [
+            "0x565823"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 75 1F 8B 44 24 04",
+          "hit_count": 1,
+          "first_rva": "0x565d30",
+          "first_va": "0x965d30",
+          "all_rvas": [
+            "0x565d30"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 75 38 8B 16",
+          "hit_count": 1,
+          "first_rva": "0x589974",
+          "first_va": "0x989974",
+          "all_rvas": [
+            "0x589974"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 75 24 F6 87 6C 02 00 00 04",
+          "hit_count": 1,
+          "first_rva": "0x58ac20",
+          "first_va": "0x98ac20",
+          "all_rvas": [
+            "0x58ac20"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "74 17 83 3D ? ? ? ? 02 75 0E F3 0F 10 05",
+          "hit_count": 1,
+          "first_rva": "0x58c7de",
+          "first_va": "0x98c7de",
+          "all_rvas": [
+            "0x58c7de"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8B 56 04 8B 4A 0C 89 4C 24 1C 7C 18",
+          "hit_count": 1,
+          "first_rva": "0x5f21b8",
+          "first_va": "0x9f21b8",
+          "all_rvas": [
+            "0x5f21b8"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 75 35 0F BF 46 2E",
+          "hit_count": 1,
+          "first_rva": "0x67a951",
+          "first_va": "0xa7a951",
+          "all_rvas": [
+            "0x67a951"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 26 8B 85 40 0B 00 00",
+          "hit_count": 1,
+          "first_rva": "0x6a704d",
+          "first_va": "0xaa704d",
+          "all_rvas": [
+            "0x6a704d"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 75 17 F3 0F 10 44 24 0C",
+          "hit_count": 1,
+          "first_rva": "0x720f3c",
+          "first_va": "0xb20f3c",
+          "all_rvas": [
+            "0x720f3c"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 F3 0F 10 05 ? ? ? ? F3 0F 11 44 24 20 75 4C",
+          "hit_count": 1,
+          "first_rva": "0x403035",
+          "first_va": "0x803035",
+          "all_rvas": [
+            "0x403035"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "7C 22 83 F8 28 75 1D",
+          "hit_count": 1,
+          "first_rva": "0x401039",
+          "first_va": "0x801039",
+          "all_rvas": [
+            "0x401039"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 89 44 24 38",
+          "hit_count": 1,
+          "first_rva": "0x401273",
+          "first_va": "0x801273",
+          "all_rvas": [
+            "0x401273"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 43",
+          "hit_count": 1,
+          "first_rva": "0x450f03",
+          "first_va": "0x850f03",
+          "all_rvas": [
+            "0x450f03"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 1F 8B",
+          "hit_count": 1,
+          "first_rva": "0x5d223e",
+          "first_va": "0x9d223e",
+          "all_rvas": [
+            "0x5d223e"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 11 8B 4E",
+          "hit_count": 1,
+          "first_rva": "0x5d22e9",
+          "first_va": "0x9d22e9",
+          "all_rvas": [
+            "0x5d22e9"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "39 35 ? ? ? ? 75 0E 80 3D",
+          "hit_count": 1,
+          "first_rva": "0x949b09",
+          "first_va": "0xd49b09",
+          "all_rvas": [
+            "0x949b09"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": [
+        [
+          "==",
+          8
+        ],
+        [
+          "==",
+          9
+        ]
+      ],
+      "gated_in_for_build_1080": true,
+      "recovered_ops": {
+        "signature_ops": 25,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "EpisodicWeaponSupport",
+      "handlers": [
+        "1001b380"
+      ],
+      "signature_count": 8,
+      "signature_count_resolved": 8,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x5d25d5",
+      "signatures": [
+        {
+          "signature": "83 3D ? ? ? ? 02 0F 8C D5 00",
+          "hit_count": 1,
+          "first_rva": "0x5d25d5",
+          "first_va": "0x9d25d5",
+          "all_rvas": [
+            "0x5d25d5"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 32 8B 41",
+          "hit_count": 1,
+          "first_rva": "0xa9d3a",
+          "first_va": "0x4a9d3a",
+          "all_rvas": [
+            "0xa9d3a"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "75 5B 83 3D ? ? ? ? 00 75",
+          "hit_count": 1,
+          "first_rva": "0xab7c7",
+          "first_va": "0x4ab7c7",
+          "all_rvas": [
+            "0xab7c7"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 7D 8B 4C 24 0C",
+          "hit_count": 1,
+          "first_rva": "0x597768",
+          "first_va": "0x997768",
+          "all_rvas": [
+            "0x597768"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 75 50",
+          "hit_count": 1,
+          "first_rva": "0x661409",
+          "first_va": "0xa61409",
+          "all_rvas": [
+            "0x661409"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 0F 85 8C 01 00 00",
+          "hit_count": 1,
+          "first_rva": "0x6ae8e2",
+          "first_va": "0xaae8e2",
+          "all_rvas": [
+            "0x6ae8e2"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 75 20 8B CD E8",
+          "hit_count": 1,
+          "first_rva": "0xa6f1e",
+          "first_va": "0x4a6f1e",
+          "all_rvas": [
+            "0xa6f1e"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 21 8B 44 24 0C",
+          "hit_count": 1,
+          "first_rva": "0x5900a6",
+          "first_va": "0x9900a6",
+          "all_rvas": [
+            "0x5900a6"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 8,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "ForceDynamicShadowsEverywhere",
+      "handlers": [
+        "1001ee50"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x6700ca",
+      "signatures": [
+        {
+          "signature": "F7 46 4C 00 80 00 00 74",
+          "hit_count": 1,
+          "first_rva": "0x6700ca",
+          "first_va": "0xa700ca",
+          "all_rvas": [
+            "0x6700ca"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 2,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "ForceShadowsOnObjects",
+      "handlers": [
+        "1001eed0"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x505e12",
+      "signatures": [
+        {
+          "signature": "F7 47 40 00 10 00 00 74 07 81 4E 24 00 00",
+          "hit_count": 1,
+          "first_rva": "0x505e12",
+          "first_va": "0x905e12",
+          "all_rvas": [
+            "0x505e12"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "FreezeGunFix",
+      "handlers": [
+        "10037070"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x78c463",
+      "signatures": [
+        {
+          "signature": "2B C2 D1 F8 39 3C C6 7D 0D 83 CA FF",
+          "hit_count": 1,
+          "first_rva": "0x78c463",
+          "first_va": "0xb8c463",
+          "all_rvas": [
+            "0x78c463"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "GroupHackFix",
+      "handlers": [
+        "10036f30"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x568ad0",
+      "signatures": [
+        {
+          "signature": "33 C0 83 C1 04 8D 50 07 83 39 00 75 06 83 79 04",
+          "hit_count": 1,
+          "first_rva": "0x568ad0",
+          "first_va": "0x968ad0",
+          "all_rvas": [
+            "0x568ad0"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "HighFPSBikePhysicsFix",
+      "handlers": [
+        "1001efa0"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x79c05b",
+      "signatures": [
+        {
+          "signature": "D9 45 08 51 8B CE D9 1C 24 E8 ? ? ? ? 8A 86 90 14 00 00",
+          "hit_count": 1,
+          "first_rva": "0x79c05b",
+          "first_va": "0xb9c05b",
+          "all_rvas": [
+            "0x79c05b"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "HighFPSSpeedupFix",
+      "handlers": [
+        "10023b30"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x3cbfe9",
+      "signatures": [
+        {
+          "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+          "hit_count": 1,
+          "first_rva": "0x3cbfe9",
+          "first_va": "0x7cbfe9",
+          "all_rvas": [
+            "0x3cbfe9"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 9,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "ImprovedShaderStreaming",
+      "handlers": [
+        "10045ad0"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x8b21f1",
+      "signatures": [
+        {
+          "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+          "hit_count": 1,
+          "first_rva": "0x8b21f1",
+          "first_va": "0xcb21f1",
+          "all_rvas": [
+            "0x8b21f1"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 6,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "IncreasePtrNodes",
+      "handlers": [
+        "10023080"
+      ],
+      "signature_count": 3,
+      "signature_count_resolved": 3,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x7a47be",
+      "signatures": [
+        {
+          "signature": "6A 14 ? ? ? ? ? 68 80 3E 00 00",
+          "hit_count": 1,
+          "first_rva": "0x7a47be",
+          "first_va": "0xba47be",
+          "all_rvas": [
+            "0x7a47be"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "6A 08 ? ? ? ? ? 68 80 38 01 00",
+          "hit_count": 1,
+          "first_rva": "0x4ddade",
+          "first_va": "0x8ddade",
+          "all_rvas": [
+            "0x4ddade"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "6A 10 ? ? ? ? ? 68 80 3E 00 00",
+          "hit_count": 1,
+          "first_rva": "0x4ddb1e",
+          "first_va": "0x8ddb1e",
+          "all_rvas": [
+            "0x4ddb1e"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 0,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "IncreaseVehicleModelLimit",
+      "handlers": [
+        "10022fc0"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x4dd143",
+      "signatures": [
+        {
+          "signature": "83 C7 01 81 FF 18 79 00 00 7C D2",
+          "hit_count": 1,
+          "first_rva": "0x4dd143",
+          "first_va": "0x8dd143",
+          "all_rvas": [
+            "0x4dd143"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 0,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "IncreaseVehicleStructLimit",
+      "handlers": [
+        "10023020"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x64a2ab",
+      "signatures": [
+        {
+          "signature": "68 ? ? ? ? 6A 32 8B C8",
+          "hit_count": 1,
+          "first_rva": "0x64a2ab",
+          "first_va": "0xa4a2ab",
+          "all_rvas": [
+            "0x64a2ab"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 0,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "InfiniteCarBottomDistance",
+      "handlers": [
+        "10022d80"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x4fb180",
+      "signatures": [
+        {
+          "signature": "0F 2F D0 76 25 0F 28 C2",
+          "hit_count": 1,
+          "first_rva": "0x4fb180",
+          "first_va": "0x8fb180",
+          "all_rvas": [
+            "0x4fb180"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 2,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "LocalSettingsPath",
+      "handlers": [
+        "100513a0"
+      ],
+      "signature_count": 3,
+      "signature_count_resolved": 2,
+      "signature_count_absent": 1,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": false,
+      "first_resolving_rva": "0x21e770",
+      "signatures": [
+        {
+          "signature": "53 8B 5C 24 08 56 6A 00 6A 00",
+          "hit_count": 1,
+          "first_rva": "0x21e770",
+          "first_va": "0x61e770",
+          "all_rvas": [
+            "0x21e770"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D6 5F 5E 5B C3",
+          "hit_count": 1,
+          "first_rva": "0x456ed8",
+          "first_va": "0x856ed8",
+          "all_rvas": [
+            "0x456ed8"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D7 5F C3",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 2,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": [
+        {
+          "matched_prefix_tokens": 13,
+          "total_tokens": 16,
+          "prefix": "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF",
+          "prefix_hits": 2,
+          "first_prefix_rva": "0x456dd7",
+          "next_token_expected": "D7",
+          "next_byte_present_at_first_hit": "0xd6"
+        }
+      ]
+    },
+    {
+      "option": "MPNikoCrashFix",
+      "handlers": [
+        "10037290"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x59a7f1",
+      "signatures": [
+        {
+          "signature": "74 2B 57 E8 ? ? ? ? 8B BE A8 0E 00 00",
+          "hit_count": 1,
+          "first_rva": "0x59a7f1",
+          "first_va": "0x99a7f1",
+          "all_rvas": [
+            "0x59a7f1"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "MiscFixes",
+      "handlers": [
+        "10023dd0"
+      ],
+      "signature_count": 11,
+      "signature_count_resolved": 6,
+      "signature_count_absent": 5,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": false,
+      "first_resolving_rva": "0x90141",
+      "signatures": [
+        {
+          "signature": "C7 06 ? ? ? ? 74 19",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 C4 ? 3B 46 20",
+          "hit_count": 1,
+          "first_rva": "0x90141",
+          "first_va": "0x490141",
+          "all_rvas": [
+            "0x90141"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "75 28 6A 00 6A 00 68 ? ? ? ? E8 ? ? ? ? 83 C4 0C",
+          "hit_count": 2,
+          "first_rva": "0x8fe63",
+          "first_va": "0x48fe63",
+          "all_rvas": [
+            "0x8fe63",
+            "0x8fec9"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8B 54 24 04 52 A3",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 F8 01 75 30 A3",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "C7 05 ? ? ? ? 03 00 00 00 33 C0 5E 59 C3 C7",
+          "hit_count": 1,
+          "first_rva": "0x45c509",
+          "first_va": "0x85c509",
+          "all_rvas": [
+            "0x45c509"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "FF 15 ? ? ? ? 85 C0 75 18",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "FF 15 ? ? ? ? 85 C0 75 04 32",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "FF 15 ? ? ? ? 85 C0 75 07 A0",
+          "hit_count": 1,
+          "first_rva": "0x49842f",
+          "first_va": "0x89842f",
+          "all_rvas": [
+            "0x49842f"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "81 EC ? ? ? ? A1 ? ? ? ? 33 C4 89 84 24 ? ? ? ? 53 ? 6A 3C 33 DB 8D 44 24 ? 53 50 E8",
+          "hit_count": 1,
+          "first_rva": "0x4972b0",
+          "first_va": "0x8972b0",
+          "all_rvas": [
+            "0x4972b0"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "74 05 E8 ? ? ? ? 6A 05 E8 ? ? ? ? 83 C4 04 B9",
+          "hit_count": 1,
+          "first_rva": "0x90628",
+          "first_va": "0x490628",
+          "all_rvas": [
+            "0x90628"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 11,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": [
+        {
+          "matched_prefix_tokens": 7,
+          "total_tokens": 8,
+          "prefix": "C7 06 ? ? ? ? 74",
+          "prefix_hits": 524,
+          "first_prefix_rva": "0xc108",
+          "next_token_expected": "19",
+          "next_byte_present_at_first_hit": "0x14"
+        },
+        {
+          "matched_prefix_tokens": 5,
+          "total_tokens": 6,
+          "prefix": "8B 54 24 04 52",
+          "prefix_hits": 21,
+          "first_prefix_rva": "0x704d6",
+          "next_token_expected": "A3",
+          "next_byte_present_at_first_hit": "0xff"
+        },
+        {
+          "matched_prefix_tokens": 4,
+          "total_tokens": 6,
+          "prefix": "83 F8 01 75",
+          "prefix_hits": 428,
+          "first_prefix_rva": "0x2d16",
+          "next_token_expected": "30",
+          "next_byte_present_at_first_hit": "0x23"
+        },
+        {
+          "matched_prefix_tokens": 9,
+          "total_tokens": 10,
+          "prefix": "FF 15 ? ? ? ? 85 C0 75",
+          "prefix_hits": 74,
+          "first_prefix_rva": "0x3393",
+          "next_token_expected": "18",
+          "next_byte_present_at_first_hit": "0xf"
+        },
+        {
+          "matched_prefix_tokens": 10,
+          "total_tokens": 11,
+          "prefix": "FF 15 ? ? ? ? 85 C0 75 04",
+          "prefix_hits": 3,
+          "first_prefix_rva": "0x4984b6",
+          "next_token_expected": "32",
+          "next_byte_present_at_first_hit": "0x83"
+        }
+      ]
+    },
+    {
+      "option": "NewFilesCompatibility",
+      "handlers": [
+        "10051920"
+      ],
+      "signature_count": 3,
+      "signature_count_resolved": 3,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x70a954",
+      "signatures": [
+        {
+          "signature": "68 64 28 C8 67 E8",
+          "hit_count": 1,
+          "first_rva": "0x70a954",
+          "first_va": "0xb0a954",
+          "all_rvas": [
+            "0x70a954"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 7B FF FF FF",
+          "hit_count": 1,
+          "first_rva": "0x496149",
+          "first_va": "0x896149",
+          "all_rvas": [
+            "0x496149"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 6C FF FF FF",
+          "hit_count": 1,
+          "first_rva": "0x496228",
+          "first_va": "0x896228",
+          "all_rvas": [
+            "0x496228"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 3,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "NewMemorySystem",
+      "handlers": [
+        "10038680"
+      ],
+      "signature_count": 2,
+      "signature_count_resolved": 2,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x109c",
+      "signatures": [
+        {
+          "signature": "3D 80 99 99 59 73 05",
+          "hit_count": 1,
+          "first_rva": "0x109c",
+          "first_va": "0x40109c",
+          "all_rvas": [
+            "0x109c"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "6A 01 B9 00 00 40 06",
+          "hit_count": 1,
+          "first_rva": "0x54811",
+          "first_va": "0x454811",
+          "all_rvas": [
+            "0x54811"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 2,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "NewSavesCompatibility",
+      "handlers": [
+        "10052200"
+      ],
+      "signature_count": 2,
+      "signature_count_resolved": 2,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x457caf",
+      "signatures": [
+        {
+          "signature": "68 ? ? ? ? E8 ? ? ? ? 8B 2D ? ? ? ? 83 C4 08",
+          "hit_count": 1,
+          "first_rva": "0x457caf",
+          "first_va": "0x857caf",
+          "all_rvas": [
+            "0x457caf"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "89 84 24 E0 01 00 00 8B 45 08 53 33 DB",
+          "hit_count": 1,
+          "first_rva": "0x45b093",
+          "first_va": "0x85b093",
+          "all_rvas": [
+            "0x45b093"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "NoLiveryLimit",
+      "handlers": [
+        "1003d420"
+      ],
+      "signature_count": 3,
+      "signature_count_resolved": 2,
+      "signature_count_absent": 1,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": false,
+      "first_resolving_rva": "0x64a53b",
+      "signatures": [
+        {
+          "signature": "74 52 8D B5 3C 01 00 00 83 FB 04",
+          "hit_count": 1,
+          "first_rva": "0x64a53b",
+          "first_va": "0xa4a53b",
+          "all_rvas": [
+            "0x64a53b"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8D AF 3C 01 00 00 8D 54 24 20",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8B 8C 83 3C 01 00 00 0F BF 53 48",
+          "hit_count": 1,
+          "first_rva": "0x797a29",
+          "first_va": "0xb97a29",
+          "all_rvas": [
+            "0x797a29"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 2,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": [
+        {
+          "matched_prefix_tokens": 2,
+          "total_tokens": 10,
+          "prefix": "8D AF",
+          "prefix_hits": 57,
+          "first_prefix_rva": "0x75e86",
+          "next_token_expected": "3C",
+          "next_byte_present_at_first_hit": "0xd0"
+        }
+      ]
+    },
+    {
+      "option": "NoLoadingSleep",
+      "handlers": [
+        "1003d670"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x1854",
+      "signatures": [
+        {
+          "signature": "68 88 13 00 00 FF 15",
+          "hit_count": 1,
+          "first_rva": "0x1854",
+          "first_va": "0x401854",
+          "all_rvas": [
+            "0x1854"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 0,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "OverrideGTADatPath",
+      "handlers": [
+        "10022f60"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x93948",
+      "signatures": [
+        {
+          "signature": "68 ? ? ? ? E8 ? ? ? ? 83 C4 04 E8 ? ? ? ? E8 ? ? ? ? E8",
+          "hit_count": 1,
+          "first_rva": "0x93948",
+          "first_va": "0x493948",
+          "all_rvas": [
+            "0x93948"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 0,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "PathNodeCrashFix",
+      "handlers": [
+        "1003d7d0"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x66d270",
+      "signatures": [
+        {
+          "signature": "8B 04 B1 0F B7 D0 81 FA FF FF 00 00",
+          "hit_count": 1,
+          "first_rva": "0x66d270",
+          "first_va": "0xa6d270",
+          "all_rvas": [
+            "0x66d270"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "PedModelsInCutscenesFix",
+      "handlers": [
+        "100508c0"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x623820",
+      "signatures": [
+        {
+          "signature": "56 8B F1 E8 ? ? ? ? 85 C0 74 0E 66 8B 40 2E",
+          "hit_count": 1,
+          "first_rva": "0x623820",
+          "first_va": "0xa23820",
+          "all_rvas": [
+            "0x623820"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "PipeBombDropIconSupport",
+      "handlers": [
+        "1001be40"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0xa6f50",
+      "signatures": [
+        {
+          "signature": "83 7D 18 1C 75 14",
+          "hit_count": 1,
+          "first_rva": "0xa6f50",
+          "first_va": "0x4a6f50",
+          "all_rvas": [
+            "0xa6f50"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "PlaneCrashFix",
+      "handlers": [
+        "1003d890"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x5e0d08",
+      "signatures": [
+        {
+          "signature": "83 C4 04 88 58 26 8B 16 8B 82 F4 00 00 00",
+          "hit_count": 1,
+          "first_rva": "0x5e0d08",
+          "first_va": "0x9e0d08",
+          "all_rvas": [
+            "0x5e0d08"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "PlayerAsPedComponentsFix",
+      "handlers": [
+        "1003d9c0"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x740804",
+      "signatures": [
+        {
+          "signature": "8B 54 24 10 52 0F B6 90 19 02 00 00",
+          "hit_count": 1,
+          "first_rva": "0x740804",
+          "first_va": "0xb40804",
+          "all_rvas": [
+            "0x740804"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "PoliceEpisodicWeaponSupport",
+      "handlers": [
+        "1001bec0"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x9f18c",
+      "signatures": [
+        {
+          "signature": "39 2D ? ? ? ? 75 3E",
+          "hit_count": 1,
+          "first_rva": "0x9f18c",
+          "first_va": "0x49f18c",
+          "all_rvas": [
+            "0x9f18c"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "PopupHeadlightsFlag",
+      "handlers": [
+        "10044590"
+      ],
+      "signature_count": 2,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 1,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": false,
+      "first_resolving_rva": "0x653a64",
+      "signatures": [
+        {
+          "signature": "0F BF 46 2E 3B 05 ? ? ? ? 75 ? A1",
+          "hit_count": 1,
+          "first_rva": "0x653a64",
+          "first_va": "0xa53a64",
+          "all_rvas": [
+            "0x653a64"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 2,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": [
+        {
+          "matched_prefix_tokens": 12,
+          "total_tokens": 13,
+          "prefix": "0F BF 56 2E 3B 15 ? ? ? ? 75 ?",
+          "prefix_hits": 5,
+          "first_prefix_rva": "0x53cdee",
+          "next_token_expected": "A1",
+          "next_byte_present_at_first_hit": "0x84"
+        }
+      ]
+    },
+    {
+      "option": "RemoveAllWeaponsProtection",
+      "handlers": [
+        "10037100"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x2e8622",
+      "signatures": [
+        {
+          "signature": "E9 ? ? ? ? 57 8D 8F ? ? 00 00",
+          "hit_count": 1,
+          "first_rva": "0x2e8622",
+          "first_va": "0x6e8622",
+          "all_rvas": [
+            "0x2e8622"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "RemoveBoundingBoxCulling",
+      "handlers": [
+        "10038770"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x557460",
+      "signatures": [
+        {
+          "signature": "3C 01 57 0F 85",
+          "hit_count": 1,
+          "first_rva": "0x557460",
+          "first_va": "0x957460",
+          "all_rvas": [
+            "0x557460"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "RemoveRGSCLoginRequirement",
+      "handlers": [
+        "10045490"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 0,
+      "signature_count_absent": 1,
+      "resolved": false,
+      "resolution": "unresolved",
+      "all_signatures_resolved": false,
+      "first_resolving_rva": null,
+      "signatures": [
+        {
+          "signature": "83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53 8B 5C 24 4C 56 68 ? ? ? ? E8 ? ? ? ? 83 C4",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": [
+        [
+          "==",
+          9
+        ]
+      ],
+      "gated_in_for_build_1080": true,
+      "recovered_ops": {
+        "signature_ops": 2,
+        "rva_ops": 1,
+        "rva_ops_applicable_to_build_1080": 1
+      },
+      "near_miss_diagnostic": [
+        {
+          "matched_prefix_tokens": 15,
+          "total_tokens": 32,
+          "prefix": "83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53",
+          "prefix_hits": 4,
+          "first_prefix_rva": "0x3e7ff0",
+          "next_token_expected": "8B",
+          "next_byte_present_at_first_hit": "0x56"
+        }
+      ]
+    },
+    {
+      "option": "RemoveStaticCarShadows",
+      "handlers": [
+        "10038800"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x4f7011",
+      "signatures": [
+        {
+          "signature": "F3 0F 11 4C 24 0C 76 5B D9 45 14",
+          "hit_count": 1,
+          "first_rva": "0x4f7011",
+          "first_va": "0x8f7011",
+          "all_rvas": [
+            "0x4f7011"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "RemoveStaticCutsceneCarShadows",
+      "handlers": [
+        "10038860"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x624a63",
+      "signatures": [
+        {
+          "signature": "F3 0F 11 44 24 0C 76 5B D9 45 14",
+          "hit_count": 1,
+          "first_rva": "0x624a63",
+          "first_va": "0xa24a63",
+          "all_rvas": [
+            "0x624a63"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "ReversingLightFix",
+      "handlers": [
+        "10045430"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x4f8840",
+      "signatures": [
+        {
+          "signature": "11 01 00 00 8B 16 8B 42 64 8B CE FF D0 F3 0F 10",
+          "hit_count": 1,
+          "first_rva": "0x4f8840",
+          "first_va": "0x8f8840",
+          "all_rvas": [
+            "0x4f8840"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "SCOSignatureFix",
+      "handlers": [
+        "10045980"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x226dc0",
+      "signatures": [
+        {
+          "signature": "8B 6C 24 1C 66 89 6E 14 64 8B 0D 2C 00 00 00 8B",
+          "hit_count": 1,
+          "first_rva": "0x226dc0",
+          "first_va": "0x626dc0",
+          "all_rvas": [
+            "0x226dc0"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "SMPA60Fix",
+      "handlers": [
+        "100467a0"
+      ],
+      "signature_count": 2,
+      "signature_count_resolved": 2,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x54d71",
+      "signatures": [
+        {
+          "signature": "01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C",
+          "hit_count": 1,
+          "first_rva": "0x54d71",
+          "first_va": "0x454d71",
+          "all_rvas": [
+            "0x54d71"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8B 48 70 83 C0 40 50 51 8D 51 10",
+          "hit_count": 1,
+          "first_rva": "0x66973d",
+          "first_va": "0xa6973d",
+          "all_rvas": [
+            "0x66973d"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 3,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "SavegameFix",
+      "handlers": [
+        "10045610"
+      ],
+      "signature_count": 2,
+      "signature_count_resolved": 2,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x21edb5",
+      "signatures": [
+        {
+          "signature": "75 ? 83 C1 01 83 C0 01 83 F9 04",
+          "hit_count": 1,
+          "first_rva": "0x21edb5",
+          "first_va": "0x61edb5",
+          "all_rvas": [
+            "0x21edb5"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8D 4C 24 18 51 6A 00 6A 0C 57",
+          "hit_count": 1,
+          "first_rva": "0x21eba1",
+          "first_va": "0x61eba1",
+          "all_rvas": [
+            "0x21eba1"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 3,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "SkipIntro",
+      "handlers": [
+        "10045c50"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0xa347e",
+      "signatures": [
+        {
+          "signature": "89 91 ? ? ? ? 8D 44 24 ? 68 ? ? ? ? 50",
+          "hit_count": 1,
+          "first_rva": "0xa347e",
+          "first_va": "0x4a347e",
+          "all_rvas": [
+            "0xa347e"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "SkipLauncher",
+      "handlers": [
+        "10045ce0"
+      ],
+      "signature_count": 25,
+      "signature_count_resolved": 6,
+      "signature_count_absent": 19,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": false,
+      "first_resolving_rva": "0x900de",
+      "signatures": [
+        {
+          "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "68 ? ? ? ? 89 35 ? ? ? ? E8 ? ? ? ? 83 C4 04 84 C0 0F 84",
+          "hit_count": 1,
+          "first_rva": "0x900de",
+          "first_va": "0x4900de",
+          "all_rvas": [
+            "0x900de"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "74 EC 38 5E 06 74 E7 68",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "74 C4 8B 07 3B 46 18 75 BD 68",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "3B 56 18 0F 85",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "3B 4E 18 0F 85",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "0F 85 ? ? ? ? 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC C6",
+          "hit_count": 1,
+          "first_rva": "0x9017d",
+          "first_va": "0x49017d",
+          "all_rvas": [
+            "0x9017d"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "3B 46 18 75 BD",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "57 51 C7 44 24 ? ? ? ? ? C7 44 24 ? ? ? ? ? C7 44 24",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8B 56 1C 3B 56 20 ? ? 6A 00 6A 00",
+          "hit_count": 1,
+          "first_rva": "0x8fe8d",
+          "first_va": "0x48fe8d",
+          "all_rvas": [
+            "0x8fe8d"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "89 35 ? ? ? ? E8 ? ? ? ? 83 C4 04 84 C0",
+          "hit_count": 1,
+          "first_rva": "0x900e3",
+          "first_va": "0x4900e3",
+          "all_rvas": [
+            "0x900e3"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8B 50 2C 3B 50 30",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8B 48 2C 83 EC 78",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8B 48 2C 83 EC 74",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8B 48 2C 3B 48 30 74 03",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8B 48 2C 3B 48 30 53",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8B 48 2C 3B 48 30 74 11",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8B 48 2C 3B 48 30 75 DC 8D 54 24 18",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8B 48 2C 3B 48 30 75 DC 8D 54 24 1C",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8B 0D ? ? ? ? 8B 51 2C",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "51 53 55 56 57 8B 3D ? ? ? ? 8B 47 2C",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "3B C7 0F 85 ? ? ? ? 85 C0",
+          "hit_count": 1,
+          "first_rva": "0x905c5",
+          "first_va": "0x4905c5",
+          "all_rvas": [
+            "0x905c5"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "0F 85 ? ? ? ? 85 C0 0F 84 ? ? ? ? E8 ? ? ? ? 85 D2",
+          "hit_count": 1,
+          "first_rva": "0x903c2",
+          "first_va": "0x4903c2",
+          "all_rvas": [
+            "0x903c2"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 EC 24 A1 ? ? ? ? 8B 48 14 53 55 56 57",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "83 EC 08 8B 0D ? ? ? ? 8B 51 14 8D 04 24 50 6A 00 52",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 8,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": [
+        {
+          "matched_prefix_tokens": 8,
+          "total_tokens": 14,
+          "prefix": "84 DB 0F 85 43 01 00 00",
+          "prefix_hits": 1,
+          "first_prefix_rva": "0xf5098",
+          "next_token_expected": "8D",
+          "next_byte_present_at_first_hit": "0x83"
+        },
+        {
+          "matched_prefix_tokens": 2,
+          "total_tokens": 8,
+          "prefix": "74 EC",
+          "prefix_hits": 47,
+          "first_prefix_rva": "0x18fd8",
+          "next_token_expected": "38",
+          "next_byte_present_at_first_hit": "0x8d"
+        },
+        {
+          "matched_prefix_tokens": 3,
+          "total_tokens": 10,
+          "prefix": "74 C4 8B",
+          "prefix_hits": 3,
+          "first_prefix_rva": "0x3a0d5f",
+          "next_token_expected": "07",
+          "next_byte_present_at_first_hit": "0x44"
+        },
+        {
+          "matched_prefix_tokens": 4,
+          "total_tokens": 5,
+          "prefix": "3B 56 18 0F",
+          "prefix_hits": 3,
+          "first_prefix_rva": "0x550eff",
+          "next_token_expected": "85",
+          "next_byte_present_at_first_hit": "0x8c"
+        },
+        {
+          "matched_prefix_tokens": 4,
+          "total_tokens": 5,
+          "prefix": "3B 4E 18 0F",
+          "prefix_hits": 2,
+          "first_prefix_rva": "0x817ae4",
+          "next_token_expected": "85",
+          "next_byte_present_at_first_hit": "0x82"
+        },
+        {
+          "matched_prefix_tokens": 3,
+          "total_tokens": 5,
+          "prefix": "3B 46 18",
+          "prefix_hits": 32,
+          "first_prefix_rva": "0x6bf13",
+          "next_token_expected": "75",
+          "next_byte_present_at_first_hit": "0x7d"
+        },
+        {
+          "matched_prefix_tokens": 18,
+          "total_tokens": 21,
+          "prefix": "57 51 C7 44 24 ? ? ? ? ? C7 44 24 ? ? ? ? ?",
+          "prefix_hits": 2,
+          "first_prefix_rva": "0x5ffe13",
+          "next_token_expected": "C7",
+          "next_byte_present_at_first_hit": "0xc6"
+        },
+        {
+          "matched_prefix_tokens": 4,
+          "total_tokens": 6,
+          "prefix": "8B 50 2C 3B",
+          "prefix_hits": 4,
+          "first_prefix_rva": "0x2a779c",
+          "next_token_expected": "50",
+          "next_byte_present_at_first_hit": "0x57"
+        },
+        {
+          "matched_prefix_tokens": 4,
+          "total_tokens": 6,
+          "prefix": "8B 48 2C 83",
+          "prefix_hits": 1,
+          "first_prefix_rva": "0x2c0f98",
+          "next_token_expected": "EC",
+          "next_byte_present_at_first_hit": "0xc4"
+        },
+        {
+          "matched_prefix_tokens": 4,
+          "total_tokens": 6,
+          "prefix": "8B 48 2C 83",
+          "prefix_hits": 1,
+          "first_prefix_rva": "0x2c0f98",
+          "next_token_expected": "EC",
+          "next_byte_present_at_first_hit": "0xc4"
+        },
+        {
+          "matched_prefix_tokens": 4,
+          "total_tokens": 8,
+          "prefix": "8B 48 2C 3B",
+          "prefix_hits": 1,
+          "first_prefix_rva": "0x3274a3",
+          "next_token_expected": "48",
+          "next_byte_present_at_first_hit": "0xd1"
+        },
+        {
+          "matched_prefix_tokens": 4,
+          "total_tokens": 7,
+          "prefix": "8B 48 2C 3B",
+          "prefix_hits": 1,
+          "first_prefix_rva": "0x3274a3",
+          "next_token_expected": "48",
+          "next_byte_present_at_first_hit": "0xd1"
+        },
+        {
+          "matched_prefix_tokens": 4,
+          "total_tokens": 8,
+          "prefix": "8B 48 2C 3B",
+          "prefix_hits": 1,
+          "first_prefix_rva": "0x3274a3",
+          "next_token_expected": "48",
+          "next_byte_present_at_first_hit": "0xd1"
+        },
+        {
+          "matched_prefix_tokens": 4,
+          "total_tokens": 12,
+          "prefix": "8B 48 2C 3B",
+          "prefix_hits": 1,
+          "first_prefix_rva": "0x3274a3",
+          "next_token_expected": "48",
+          "next_byte_present_at_first_hit": "0xd1"
+        },
+        {
+          "matched_prefix_tokens": 4,
+          "total_tokens": 12,
+          "prefix": "8B 48 2C 3B",
+          "prefix_hits": 1,
+          "first_prefix_rva": "0x3274a3",
+          "next_token_expected": "48",
+          "next_byte_present_at_first_hit": "0xd1"
+        },
+        {
+          "matched_prefix_tokens": 8,
+          "total_tokens": 9,
+          "prefix": "8B 0D ? ? ? ? 8B 51",
+          "prefix_hits": 134,
+          "first_prefix_rva": "0x6a10",
+          "next_token_expected": "2C",
+          "next_byte_present_at_first_hit": "0x38"
+        },
+        {
+          "matched_prefix_tokens": 11,
+          "total_tokens": 14,
+          "prefix": "51 53 55 56 57 8B 3D ? ? ? ?",
+          "prefix_hits": 3,
+          "first_prefix_rva": "0x2cc7e0",
+          "next_token_expected": "8B",
+          "next_byte_present_at_first_hit": "0x85"
+        },
+        {
+          "matched_prefix_tokens": 8,
+          "total_tokens": 15,
+          "prefix": "83 EC 24 A1 ? ? ? ?",
+          "prefix_hits": 37,
+          "first_prefix_rva": "0x216e6",
+          "next_token_expected": "8B",
+          "next_byte_present_at_first_hit": "0x56"
+        },
+        {
+          "matched_prefix_tokens": 10,
+          "total_tokens": 19,
+          "prefix": "83 EC 08 8B 0D ? ? ? ? 8B",
+          "prefix_hits": 2,
+          "first_prefix_rva": "0x2d8e20",
+          "next_token_expected": "51",
+          "next_byte_present_at_first_hit": "0x17"
+        }
+      ]
+    },
+    {
+      "option": "SkipMenu",
+      "handlers": [
+        "10046640"
+      ],
+      "signature_count": 3,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 2,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": false,
+      "first_resolving_rva": "0x7d240",
+      "signatures": [
+        {
+          "signature": "83 F8 03 75 ? A1 ? ? ? ? 80 88 ? ? ? ? ? 84 DB 74 0A 6A 00 E8 ? ? ? ? 83 C4 04 5F 5E",
+          "hit_count": 1,
+          "first_rva": "0x7d240",
+          "first_va": "0x47d240",
+          "all_rvas": [
+            "0x7d240"
+          ],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5D 5B 33 CC E8 ? ? ? ? 81 C4 ? ? ? ? C3",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC E8 ? ? ? ? 8B E5 5D C3",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 2,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": [
+        {
+          "matched_prefix_tokens": 17,
+          "total_tokens": 35,
+          "prefix": "6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ?",
+          "prefix_hits": 2,
+          "first_prefix_rva": "0x46e7ff",
+          "next_token_expected": "5F",
+          "next_byte_present_at_first_hit": "0x5e"
+        },
+        {
+          "matched_prefix_tokens": 17,
+          "total_tokens": 31,
+          "prefix": "6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ?",
+          "prefix_hits": 2,
+          "first_prefix_rva": "0x46e7ff",
+          "next_token_expected": "5F",
+          "next_byte_present_at_first_hit": "0x5e"
+        }
+      ]
+    },
+    {
+      "option": "SpeedupBugFix",
+      "handlers": [
+        "100506b0"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x571c5",
+      "signatures": [
+        {
+          "signature": "50 64 89 25 00 00 00 00 83 EC 34",
+          "hit_count": 1,
+          "first_rva": "0x571c5",
+          "first_va": "0x4571c5",
+          "all_rvas": [
+            "0x571c5"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "TBoGTHeliHeightLimit",
+      "handlers": [
+        "1001b310"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x4f0071",
+      "signatures": [
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 0A F3 0F",
+          "hit_count": 1,
+          "first_rva": "0x4f0071",
+          "first_va": "0x8f0071",
+          "all_rvas": [
+            "0x4f0071"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "TeleportProtection",
+      "handlers": [
+        "10037170"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x2e7be0",
+      "signatures": [
+        {
+          "signature": "55 8B EC 83 E4 F8 51 53 8B 5D 08 56 57 6A 08 8D 44 24 10 8B F1 8D 7B 04 50 8B CF C7 44 24 14 00",
+          "hit_count": 1,
+          "first_rva": "0x2e7be0",
+          "first_va": "0x6e7be0",
+          "all_rvas": [
+            "0x2e7be0"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "TryToSkipAllErrors",
+      "handlers": [
+        "10046b30"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x56680",
+      "signatures": [
+        {
+          "signature": "81 EC 40 08 00 00 53 55 8B AC 24 4C 08 00 00",
+          "hit_count": 1,
+          "first_rva": "0x56680",
+          "first_va": "0x456680",
+          "all_rvas": [
+            "0x56680"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    },
+    {
+      "option": "VRAMFix",
+      "handlers": [
+        "1004aae0"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 0,
+      "signature_count_absent": 1,
+      "resolved": false,
+      "resolution": "unresolved",
+      "all_signatures_resolved": false,
+      "first_resolving_rva": null,
+      "signatures": [
+        {
+          "signature": "8B 44 24 10 D9 2C 24 83 C4 1C C3",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": [
+        {
+          "matched_prefix_tokens": 5,
+          "total_tokens": 11,
+          "prefix": "8B 44 24 10 D9",
+          "prefix_hits": 54,
+          "first_prefix_rva": "0x1a04b",
+          "next_token_expected": "2C",
+          "next_byte_present_at_first_hit": "0x59"
+        }
+      ]
+    },
+    {
+      "option": "VSyncFix",
+      "handlers": [
+        "100503b0"
+      ],
+      "signature_count": 2,
+      "signature_count_resolved": 0,
+      "signature_count_absent": 2,
+      "resolved": false,
+      "resolution": "unresolved",
+      "all_signatures_resolved": false,
+      "first_resolving_rva": null,
+      "signatures": [
+        {
+          "signature": "8B 10 50 8B 82 A8 00 00 00 FF D0 83",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        },
+        {
+          "signature": "8B 08 8B 51 0C 6A 01 6A 00 6A 00 6A 00 6A 00 50 FF D2 8B F0 81 FE ? ? ? ? 74",
+          "hit_count": 0,
+          "first_rva": null,
+          "first_va": null,
+          "all_rvas": [],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": [
+        [
+          "!=",
+          1
+        ],
+        [
+          "!=",
+          2
+        ],
+        [
+          "!=",
+          3
+        ],
+        [
+          "!=",
+          4
+        ],
+        [
+          "!=",
+          5
+        ],
+        [
+          "!=",
+          9
+        ],
+        [
+          "!=",
+          13
+        ]
+      ],
+      "gated_in_for_build_1080": false,
+      "recovered_ops": {
+        "signature_ops": 0,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": [
+        {
+          "matched_prefix_tokens": 11,
+          "total_tokens": 12,
+          "prefix": "8B 10 50 8B 82 A8 00 00 00 FF D0",
+          "prefix_hits": 1,
+          "first_prefix_rva": "0x7e94",
+          "next_token_expected": "83",
+          "next_byte_present_at_first_hit": "0xa1"
+        },
+        {
+          "matched_prefix_tokens": 18,
+          "total_tokens": 27,
+          "prefix": "8B 08 8B 51 0C 6A 01 6A 00 6A 00 6A 00 6A 00 50 FF D2",
+          "prefix_hits": 2,
+          "first_prefix_rva": "0x7ef4",
+          "next_token_expected": "8B",
+          "next_byte_present_at_first_hit": "0x3d"
+        }
+      ]
+    },
+    {
+      "option": "WantedLevelCrashFix",
+      "handlers": [
+        "100504b0"
+      ],
+      "signature_count": 1,
+      "signature_count_resolved": 1,
+      "signature_count_absent": 0,
+      "resolved": true,
+      "resolution": "resolved",
+      "all_signatures_resolved": true,
+      "first_resolving_rva": "0x5b26c9",
+      "signatures": [
+        {
+          "signature": "8B 01 8B 90 28 01 00 00 FF D2 84 C0 0F 84 88 00 00 00",
+          "hit_count": 1,
+          "first_rva": "0x5b26c9",
+          "first_va": "0x9b26c9",
+          "all_rvas": [
+            "0x5b26c9"
+          ],
+          "verify_game_signatures_agrees": true
+        }
+      ],
+      "recovered_build_gate": null,
+      "gated_in_for_build_1080": null,
+      "recovered_ops": {
+        "signature_ops": 1,
+        "rva_ops": 0,
+        "rva_ops_applicable_to_build_1080": 0
+      },
+      "near_miss_diagnostic": []
+    }
+  ],
+  "uncertainties": [
+    "Build gates are a heuristic extraction; positive '==' gates are reliable but negative '!=' gates can encode branch/target selection rather than applicability (demonstrated by DualVehicleHeadlights).",
+    "VRAMFix remains genuinely unresolved: no positive gate, no RVA fallback, no independent FusionFix site. It is recorded as unresolved rather than as a defect.",
+    "RemoveRGSCLoginRequirement's signature absence is explained by a recovered RVA fallback, but the fallback target (RVA 0x498460) was not proven to be the same routine the signature describes: the leading 0x8B at that RVA is consistent with a function entry preceded by CC padding, and the surrounding bytes are plausible, yet no byte-level identity proof was produced."
+  ]
+}

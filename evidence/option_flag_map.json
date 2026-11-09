@@ -1,0 +1,748 @@
+{
+  "CarDecalsFix": {
+    "kind": "call",
+    "calls": [
+      "0x100603e",
+      "0x1005862"
+    ],
+    "bitmask": []
+  },
+  "AddOptionsInMenu": {
+    "kind": "global_flag",
+    "store": "0x10053337",
+    "global": "10158038"
+  },
+  "NoPhysicsSleep": {
+    "kind": "call",
+    "calls": [
+      "0x1000383",
+      "0x1005862"
+    ],
+    "bitmask": []
+  },
+  "NoImpostorHeightCutoff": {
+    "kind": "call",
+    "calls": [
+      "0x100603e",
+      "0x1005862"
+    ],
+    "bitmask": []
+  },
+  "NoLODLightHeightCutoff": {
+    "kind": "call",
+    "calls": [
+      "0x1000383",
+      "0x1005862"
+    ],
+    "bitmask": []
+  },
+  "DrivebyFOVFix": {
+    "kind": "global_flag",
+    "store": "0x10053aa9",
+    "global": "1015bdf4"
+  },
+  "NewMemorySystem": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1003868"
+    ],
+    "bitmask": []
+  },
+  "PoliceEpisodicWeaponSupport": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1001bec"
+    ],
+    "bitmask": []
+  },
+  "PipeBombDropIconSupport": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1001be4"
+    ],
+    "bitmask": []
+  },
+  "EpisodeSwitchFreezeFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1001b0e"
+    ],
+    "bitmask": []
+  },
+  "CombinedRadioFreezeFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x10005ee"
+    ],
+    "bitmask": []
+  },
+  "AllowHashesForIDE": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x10022cf"
+    ],
+    "bitmask": []
+  },
+  "PathNodeCrashFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1003d7d"
+    ],
+    "bitmask": []
+  },
+  "FastLoading": {
+    "kind": "call",
+    "calls": [
+      "0x1001eca",
+      "0x1004ac9"
+    ],
+    "bitmask": []
+  },
+  "LoadDLCs": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x100234e"
+    ],
+    "bitmask": []
+  },
+  "BenchmarkFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1000569"
+    ],
+    "bitmask": []
+  },
+  "CollisionDeadlockFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x10005e3"
+    ],
+    "bitmask": []
+  },
+  "AimProjectileCrashFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x100055c"
+    ],
+    "bitmask": []
+  },
+  "FreezeCarFix": {
+    "kind": "call",
+    "calls": [
+      "0x100014b",
+      "0x1004ac9"
+    ],
+    "bitmask": []
+  },
+  "DebugPrintSpawns": {
+    "kind": "global_flag",
+    "store": "0x10053fd0",
+    "global": "10159c15"
+  },
+  "BadPlayerModelCrashFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x10037be"
+    ],
+    "bitmask": []
+  },
+  "HighFPSBikePhysicsFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1001efa"
+    ],
+    "bitmask": []
+  },
+  "HighFPSSpeedupFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x10023b3"
+    ],
+    "bitmask": []
+  },
+  "BuildingAlphaFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x10005ca"
+    ],
+    "bitmask": []
+  },
+  "BetterMPSync": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1000580"
+    ],
+    "bitmask": []
+  },
+  "MPNikoCrashFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1003729"
+    ],
+    "bitmask": []
+  },
+  "BuildingDynamicShadows": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x10005b2"
+    ],
+    "bitmask": []
+  },
+  "RemoveUselessChecks": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x10044bd"
+    ],
+    "bitmask": []
+  },
+  "DualVehicleHeadlights": {
+    "kind": "call",
+    "calls": [
+      "0x1000677",
+      "0x1004ac9"
+    ],
+    "bitmask": []
+  },
+  "ForceDynamicShadowsEverywhere": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1001ee5"
+    ],
+    "bitmask": []
+  },
+  "InfiniteCarBottomDistance": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x10022d8"
+    ],
+    "bitmask": []
+  },
+  "RemoveStaticCarShadows": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1003880"
+    ],
+    "bitmask": []
+  },
+  "RemoveStaticCutsceneCarShadows": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1003886"
+    ],
+    "bitmask": []
+  },
+  "ReversingLightFix": {
+    "kind": "call",
+    "calls": [
+      "0x100014b",
+      "0x1004ac9"
+    ],
+    "bitmask": []
+  },
+  "CarPartsShadowFix": {
+    "kind": "call",
+    "calls": [
+      "0x10007e4",
+      "0x1004ac9"
+    ],
+    "bitmask": []
+  },
+  "ForceCarHeadlightShadows": {
+    "kind": "call",
+    "calls": [
+      "0x1001add",
+      "0x1004ac9"
+    ],
+    "bitmask": []
+  },
+  "CrashMsgFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x100371f"
+    ],
+    "bitmask": []
+  },
+  "OverrideGTADatPath": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x10022f6"
+    ],
+    "bitmask": []
+  },
+  "OverrideGTADatPathTo": {
+    "kind": "call",
+    "calls": [
+      "0x1005b73",
+      "0x1004ac9"
+    ],
+    "bitmask": []
+  },
+  "IncreaseVehicleModelLimit": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x10022fc"
+    ],
+    "bitmask": []
+  },
+  "IncreaseVehicleStructLimit": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1002302"
+    ],
+    "bitmask": []
+  },
+  "SMPA60Fix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x100467a"
+    ],
+    "bitmask": []
+  },
+  "TryToSkipAllErrors": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x10046b3"
+    ],
+    "bitmask": []
+  },
+  "PlaneCrashFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1003d89"
+    ],
+    "bitmask": []
+  },
+  "CopSirensFlag": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1000635"
+    ],
+    "bitmask": []
+  },
+  "PopupHeadlightsFlag": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1004459"
+    ],
+    "bitmask": []
+  },
+  "MovingSteeringWheelSupport": {
+    "kind": "global_flag",
+    "store": "0x10054a7a",
+    "global": "1015ad40"
+  },
+  "MovingPlaneParts": {
+    "kind": "global_flag",
+    "store": "0x10054ae8",
+    "global": "10159c17"
+  },
+  "ShakingEngineBlock": {
+    "kind": "global_flag",
+    "store": "0x10054b56",
+    "global": "1015ad41"
+  },
+  "EmissiveLerpFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1001afa"
+    ],
+    "bitmask": []
+  },
+  "BikeFeetFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1001bdd"
+    ],
+    "bitmask": []
+  },
+  "ForceShadowsOnObjects": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1001eed"
+    ],
+    "bitmask": []
+  },
+  "BikePhoneAnimsFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1001bd6"
+    ],
+    "bitmask": []
+  },
+  "HighQualityReflections": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x10023dc"
+    ],
+    "bitmask": []
+  },
+  "RemoveBoundingBoxCulling": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1003877"
+    ],
+    "bitmask": []
+  },
+  "EpisodicVehicleSupport": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1001b38"
+    ],
+    "bitmask": []
+  },
+  "TBoGTHeliHeightLimit": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1001b31"
+    ],
+    "bitmask": []
+  },
+  "WantedLevelCrashFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x100504b"
+    ],
+    "bitmask": []
+  },
+  "NoLiveryLimit": {
+    "kind": "call",
+    "calls": [
+      "0x1003d42",
+      "0x1004ac9"
+    ],
+    "bitmask": []
+  },
+  "RemoveRGSCLoginRequirement": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1004549"
+    ],
+    "bitmask": []
+  },
+  "BlackscreenFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x10036fd"
+    ],
+    "bitmask": []
+  },
+  "FreezeGunFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1003707"
+    ],
+    "bitmask": []
+  },
+  "GroupHackFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x10036f3"
+    ],
+    "bitmask": []
+  },
+  "FixPCIDKickbug": {
+    "kind": "call",
+    "calls": [
+      "0x100014b",
+      "0x1004ac9"
+    ],
+    "bitmask": []
+  },
+  "CutsceneFixes": {
+    "kind": "call",
+    "calls": [
+      "0x1004542",
+      "0x1004ac9"
+    ],
+    "bitmask": []
+  },
+  "TeleportProtection": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1003717"
+    ],
+    "bitmask": []
+  },
+  "RemoveAllWeaponsProtection": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1003710"
+    ],
+    "bitmask": []
+  },
+  "IncreasePtrNodes": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1002308"
+    ],
+    "bitmask": []
+  },
+  "SCOSignatureFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1004598"
+    ],
+    "bitmask": []
+  },
+  "PlayerAsPedComponentsFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1003d9c"
+    ],
+    "bitmask": []
+  },
+  "SuperLODFix": {
+    "kind": "call",
+    "calls": [
+      "0x10046a1",
+      "0x1005230"
+    ],
+    "bitmask": []
+  },
+  "VSyncFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x100503b"
+    ],
+    "bitmask": []
+  },
+  "ImprovedShaderStreaming": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x10045ad"
+    ],
+    "bitmask": []
+  },
+  "LaunchWithPlayGTAIV": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x100441b"
+    ],
+    "bitmask": []
+  },
+  "Patch6and7RemoveModChecks": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1004471"
+    ],
+    "bitmask": [
+      "1"
+    ]
+  },
+  "Patch4RemoveModChecks": {
+    "kind": "global_flag",
+    "store": "0x10055491",
+    "global": "10159c14"
+  },
+  "RemoveGFWLUpdatePopup": {
+    "kind": "global_flag",
+    "store": "0x100554e1",
+    "global": "10159b87"
+  },
+  "SkipLauncher": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x10045ce"
+    ],
+    "bitmask": []
+  },
+  "GarageModelFix": {
+    "kind": "call",
+    "calls": [
+      "0x1005086",
+      "0x1004ac9"
+    ],
+    "bitmask": []
+  },
+  "NoLoadingSleep": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1003d67"
+    ],
+    "bitmask": []
+  },
+  "SkipIntro": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x10045c5"
+    ],
+    "bitmask": [
+      "4"
+    ]
+  },
+  "SkipMenu": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1004664"
+    ],
+    "bitmask": [
+      "8"
+    ]
+  },
+  "MouseFix": {
+    "kind": "call",
+    "calls": [
+      "0x1003d7a",
+      "0x1004ac9"
+    ],
+    "bitmask": []
+  },
+  "DoNotPauseOnMinimize": {
+    "kind": "global_flag",
+    "store": "0x100557d7",
+    "global": "1015ad43"
+  },
+  "BorderlessWindowed": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1000597"
+    ],
+    "bitmask": [
+      "10"
+    ]
+  },
+  "VRAMFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1004aae"
+    ],
+    "bitmask": []
+  },
+  "SavegameFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1004561"
+    ],
+    "bitmask": []
+  },
+  "OutOfCommissionFix": {
+    "kind": "call",
+    "calls": [
+      "0x10050a2",
+      "0x1004ac9"
+    ],
+    "bitmask": []
+  },
+  "StartupTimeFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x100468d"
+    ],
+    "bitmask": []
+  },
+  "MiscFixes": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x10023dd"
+    ],
+    "bitmask": []
+  },
+  "SpeedupBugFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x100506b"
+    ],
+    "bitmask": []
+  },
+  "NewFilesCompatibility": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1005192"
+    ],
+    "bitmask": []
+  },
+  "NewSavesCompatibility": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x1005220"
+    ],
+    "bitmask": []
+  },
+  "PedModelsInCutscenesFix": {
+    "kind": "call",
+    "calls": [
+      "0x1004ac9",
+      "0x100508c"
+    ],
+    "bitmask": []
+  },
+  "RestoreDeathMusic": {
+    "kind": "global_flag",
+    "store": "0x10055b86",
+    "global": "10159b86"
+  },
+  "LocalSettingsPath": {
+    "kind": "call",
+    "calls": [
+      "0x10055fd",
+      "0x1005fe7"
+    ],
+    "bitmask": []
+  }
+}

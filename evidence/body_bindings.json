@@ -1,0 +1,3447 @@
+{
+ "original": "game_refs\\ZolikaPatch_original.asi.off",
+ "candidate": "build\\msvc-x86\\ZolikaPatch.asi",
+ "bindings": [
+  {
+   "orig_va": 268440192,
+   "orig_name": null,
+   "port_symbol": "_zpatch_spawns_sprintf",
+   "port_va": 268497456,
+   "port_aliases": [
+    268497456
+   ],
+   "port_symbols": [
+    "zpatch_spawns_sprintf"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268450176,
+   "orig_name": null,
+   "port_symbol": "_zpatch_cutscene_scene",
+   "port_va": 268495872,
+   "port_aliases": [
+    268495872
+   ],
+   "port_symbols": [
+    "zpatch_cutscene_scene"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268451584,
+   "orig_name": null,
+   "port_symbol": "_zpatch_spawns_name_ecx",
+   "port_va": 268497392,
+   "port_aliases": [
+    268497392
+   ],
+   "port_symbols": [
+    "zpatch_spawns_name_ecx"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268451744,
+   "orig_name": null,
+   "port_symbol": "_abi_ide_parse",
+   "port_va": 268489872,
+   "port_aliases": [
+    268489872
+   ],
+   "port_symbols": [
+    "abi_ide_parse"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268455024,
+   "orig_name": null,
+   "port_symbol": "_abi_steer_body",
+   "port_va": 268494032,
+   "port_aliases": [
+    268494032
+   ],
+   "port_symbols": [
+    "abi_steer_body"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268456768,
+   "orig_name": null,
+   "port_symbol": "_abi_gfwl_patch",
+   "port_va": 268489456,
+   "port_aliases": [
+    268489456
+   ],
+   "port_symbols": [
+    "abi_gfwl_patch"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268459888,
+   "orig_name": null,
+   "port_symbol": "_abi_copsirens_check_a",
+   "port_va": 268487536,
+   "port_aliases": [
+    268487536
+   ],
+   "port_symbols": [
+    "abi_copsirens_check_a"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268460640,
+   "orig_name": null,
+   "port_symbol": "_abi_copsirens_check_b",
+   "port_va": 268487776,
+   "port_aliases": [
+    268487776
+   ],
+   "port_symbols": [
+    "abi_copsirens_check_b"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268461264,
+   "orig_name": null,
+   "port_symbol": "_abi_dual_headlights_init",
+   "port_va": 268488544,
+   "port_aliases": [
+    268488544
+   ],
+   "port_symbols": [
+    "abi_dual_headlights_init"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268545312,
+   "orig_name": null,
+   "port_symbol": "_abi_fchs_check",
+   "port_va": 268489216,
+   "port_aliases": [
+    268489216
+   ],
+   "port_symbols": [
+    "abi_fchs_check"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268562224,
+   "orig_name": null,
+   "port_symbol": "_abi_bike_physics_helper",
+   "port_va": 268486832,
+   "port_aliases": [
+    268486832
+   ],
+   "port_symbols": [
+    "abi_bike_physics_helper"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268579152,
+   "orig_name": null,
+   "port_symbol": "?dlc_discovery_post@?A0x49f4979c@zpatch@@YAPAXPAX@Z",
+   "port_va": 268481968,
+   "port_aliases": [
+    268481968
+   ],
+   "port_symbols": [
+    "dlc_discovery_post"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268583392,
+   "orig_name": null,
+   "port_symbol": "?zpatch_mf_advance_c@?A0x49f4979c@1zpatch@@YAXXZ",
+   "port_va": 268484416,
+   "port_aliases": [
+    268484416
+   ],
+   "port_symbols": [
+    "zpatch_mf_advance_c"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268584000,
+   "orig_name": null,
+   "port_symbol": "_abi_mf_angle_step",
+   "port_va": 268490400,
+   "port_aliases": [
+    268490400
+   ],
+   "port_symbols": [
+    "abi_mf_angle_step"
+   ],
+   "c_type": "body",
+   "source": "header+empirical",
+   "header_symbols": [
+    "abi_mf_angle_step"
+   ]
+  },
+  {
+   "orig_va": 268663488,
+   "orig_name": null,
+   "port_symbol": "_abi_bpm_check",
+   "port_va": 268487104,
+   "port_aliases": [
+    268487104
+   ],
+   "port_symbols": [
+    "abi_bpm_check"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268666208,
+   "orig_name": null,
+   "port_symbol": "?abi_nms_noop_ret0@?A0x49f4979c@zpatch@@YAXXZ",
+   "port_va": 268470480,
+   "port_aliases": [
+    268470480
+   ],
+   "port_symbols": [
+    "abi_nms_noop_ret0"
+   ],
+   "c_type": "body",
+   "source": "header+empirical",
+   "header_symbols": [
+    "abi_nms_noop_ret0"
+   ]
+  },
+  {
+   "orig_va": 268685856,
+   "orig_name": null,
+   "port_symbol": "_abi_nolivery_hash_sign",
+   "port_va": 268493136,
+   "port_aliases": [
+    268493136
+   ],
+   "port_symbols": [
+    "abi_nolivery_hash_sign"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268685936,
+   "orig_name": null,
+   "port_symbol": "_abi_nolivery_count_loop",
+   "port_va": 268492656,
+   "port_aliases": [
+    268492656
+   ],
+   "port_symbols": [
+    "abi_nolivery_count_loop"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268686064,
+   "orig_name": null,
+   "port_symbol": "_abi_nolivery_copy_name",
+   "port_va": 268492624,
+   "port_aliases": [
+    268492624
+   ],
+   "port_symbols": [
+    "abi_nolivery_copy_name"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268687664,
+   "orig_name": null,
+   "port_symbol": "_abi_player_ped_helper",
+   "port_va": 268493440,
+   "port_aliases": [
+    268493440
+   ],
+   "port_symbols": [
+    "abi_player_ped_helper"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268714768,
+   "orig_name": null,
+   "port_symbol": "_abi_popup_check",
+   "port_va": 268493632,
+   "port_aliases": [
+    268493632
+   ],
+   "port_symbols": [
+    "abi_popup_check"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268724640,
+   "orig_name": null,
+   "port_symbol": "_abi_super_lod_helper",
+   "port_va": 268495424,
+   "port_aliases": [
+    268495424
+   ],
+   "port_symbols": [
+    "abi_super_lod_helper"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268725136,
+   "orig_name": null,
+   "port_symbol": "_zpatch_garage_store_model",
+   "port_va": 268496192,
+   "port_aliases": [
+    268496192
+   ],
+   "port_symbols": [
+    "zpatch_garage_store_model"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268725200,
+   "orig_name": null,
+   "port_symbol": "_zpatch_garage_lookup_model",
+   "port_va": 268496160,
+   "port_aliases": [
+    268496160
+   ],
+   "port_symbols": [
+    "zpatch_garage_lookup_model"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268741248,
+   "orig_name": null,
+   "port_symbol": "_abi_vram_fix_helper",
+   "port_va": 268495552,
+   "port_aliases": [
+    268495552
+   ],
+   "port_symbols": [
+    "abi_vram_fix_helper"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268766480,
+   "orig_name": null,
+   "port_symbol": "_zpatch_local_settings_step",
+   "port_va": 268496352,
+   "port_aliases": [
+    268496352
+   ],
+   "port_symbols": [
+    "zpatch_local_settings_step"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268768736,
+   "orig_name": null,
+   "port_symbol": "_abi_newfiles_register",
+   "port_va": 268492432,
+   "port_aliases": [
+    268492432
+   ],
+   "port_symbols": [
+    "abi_newfiles_register"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268771280,
+   "orig_name": null,
+   "port_symbol": "_abi_new_saves_prepare",
+   "port_va": 268491760,
+   "port_aliases": [
+    268491760
+   ],
+   "port_symbols": [
+    "abi_new_saves_prepare"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268808848,
+   "orig_name": null,
+   "port_symbol": "_zpatch_spawns_who_edx",
+   "port_va": 268497536,
+   "port_aliases": [
+    268497536
+   ],
+   "port_symbols": [
+    "zpatch_spawns_who_edx"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268809520,
+   "orig_name": null,
+   "port_symbol": "_zpatch_spawns_print_edx",
+   "port_va": 268497440,
+   "port_aliases": [
+    268497440
+   ],
+   "port_symbols": [
+    "zpatch_spawns_print_edx"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268828283,
+   "orig_name": null,
+   "port_symbol": "?zpatch_cutscene_cookie_check@?A0x49f4979c@zpatch@@YAXXZ",
+   "port_va": 268484400,
+   "port_aliases": [
+    268484400,
+    268497376
+   ],
+   "port_symbols": [
+    "zpatch_cutscene_cookie_check",
+    "zpatch_spawns_cookie_check_ecx"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268840976,
+   "orig_name": null,
+   "port_symbol": "?zpatch_cutscene_virtualprotect@?A0x49f4979c@zpatch@@3IA",
+   "port_va": 269893700,
+   "port_aliases": [
+    269893700
+   ],
+   "port_symbols": [
+    "zpatch_cutscene_virtualprotect"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 268841076,
+   "orig_name": null,
+   "port_symbol": "_zpatch_spawns_getmodulehandlew",
+   "port_va": 269911584,
+   "port_aliases": [
+    269911584
+   ],
+   "port_symbols": [
+    "zpatch_spawns_getmodulehandlew"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269176888,
+   "orig_name": null,
+   "port_symbol": "_zpatch_nms_vtable",
+   "port_va": 269885448,
+   "port_aliases": [
+    269885448
+   ],
+   "port_symbols": [
+    "zpatch_nms_vtable"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269666076,
+   "orig_name": null,
+   "port_symbol": "_zpatch_str_gtac",
+   "port_va": 269888176,
+   "port_aliases": [
+    269888176
+   ],
+   "port_symbols": [
+    "zpatch_str_gtac"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269666164,
+   "orig_name": null,
+   "port_symbol": "_zpatch_fmt_nonspawned_car",
+   "port_va": 269887688,
+   "port_aliases": [
+    269887688
+   ],
+   "port_symbols": [
+    "zpatch_fmt_nonspawned_car"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269666268,
+   "orig_name": null,
+   "port_symbol": "_zpatch_fmt_spawned_car",
+   "port_va": 269887664,
+   "port_aliases": [
+    269887664
+   ],
+   "port_symbols": [
+    "zpatch_fmt_spawned_car"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269666360,
+   "orig_name": null,
+   "port_symbol": "_zpatch_fmt_nonspawned_heli",
+   "port_va": 269887744,
+   "port_aliases": [
+    269887744
+   ],
+   "port_symbols": [
+    "zpatch_fmt_nonspawned_heli"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269666464,
+   "orig_name": null,
+   "port_symbol": "_zpatch_fmt_spawned_heli",
+   "port_va": 269887720,
+   "port_aliases": [
+    269887720
+   ],
+   "port_symbols": [
+    "zpatch_fmt_spawned_heli"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269666560,
+   "orig_name": null,
+   "port_symbol": "_zpatch_fmt_nonspawned_boat",
+   "port_va": 269887800,
+   "port_aliases": [
+    269887800
+   ],
+   "port_symbols": [
+    "zpatch_fmt_nonspawned_boat"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269666672,
+   "orig_name": null,
+   "port_symbol": "_zpatch_fmt_spawned_boat",
+   "port_va": 269887776,
+   "port_aliases": [
+    269887776
+   ],
+   "port_symbols": [
+    "zpatch_fmt_spawned_boat"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269666780,
+   "orig_name": null,
+   "port_symbol": "_zpatch_fmt_nonspawned_bike",
+   "port_va": 269887856,
+   "port_aliases": [
+    269887856
+   ],
+   "port_symbols": [
+    "zpatch_fmt_nonspawned_bike"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269666884,
+   "orig_name": null,
+   "port_symbol": "_zpatch_fmt_spawned_bike",
+   "port_va": 269887832,
+   "port_aliases": [
+    269887832
+   ],
+   "port_symbols": [
+    "zpatch_fmt_spawned_bike"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269666984,
+   "orig_name": null,
+   "port_symbol": "_zpatch_fmt_nonspawned_train",
+   "port_va": 269887912,
+   "port_aliases": [
+    269887912
+   ],
+   "port_symbols": [
+    "zpatch_fmt_nonspawned_train"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269667092,
+   "orig_name": null,
+   "port_symbol": "_zpatch_fmt_spawned_train",
+   "port_va": 269887888,
+   "port_aliases": [
+    269887888
+   ],
+   "port_symbols": [
+    "zpatch_fmt_spawned_train"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269667184,
+   "orig_name": null,
+   "port_symbol": "_zpatch_fmt_nonspawned_plane",
+   "port_va": 269887972,
+   "port_aliases": [
+    269887972
+   ],
+   "port_symbols": [
+    "zpatch_fmt_nonspawned_plane"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269667292,
+   "orig_name": null,
+   "port_symbol": "_zpatch_fmt_spawned_plane",
+   "port_va": 269887948,
+   "port_aliases": [
+    269887948
+   ],
+   "port_symbols": [
+    "zpatch_fmt_spawned_plane"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269667388,
+   "orig_name": null,
+   "port_symbol": "_zpatch_fmt_nonspawned_ped",
+   "port_va": 269888032,
+   "port_aliases": [
+    269888032
+   ],
+   "port_symbols": [
+    "zpatch_fmt_nonspawned_ped"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269667488,
+   "orig_name": null,
+   "port_symbol": "_zpatch_fmt_spawned_ped",
+   "port_va": 269888008,
+   "port_aliases": [
+    269888008
+   ],
+   "port_symbols": [
+    "zpatch_fmt_spawned_ped"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269667584,
+   "orig_name": null,
+   "port_symbol": "_zpatch_fmt_spawned_vehicle_object",
+   "port_va": 269888064,
+   "port_aliases": [
+    269888064
+   ],
+   "port_symbols": [
+    "zpatch_fmt_spawned_vehicle_object"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269667696,
+   "orig_name": null,
+   "port_symbol": "_zpatch_fmt_spawned_object",
+   "port_va": 269888100,
+   "port_aliases": [
+    269888100
+   ],
+   "port_symbols": [
+    "zpatch_fmt_spawned_object"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269667800,
+   "orig_name": null,
+   "port_symbol": "_zpatch_fmt_used_nonped",
+   "port_va": 269888144,
+   "port_aliases": [
+    269888144
+   ],
+   "port_symbols": [
+    "zpatch_fmt_used_nonped"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269667908,
+   "orig_name": null,
+   "port_symbol": "_zpatch_fmt_spawned_generic",
+   "port_va": 269888128,
+   "port_aliases": [
+    269888128
+   ],
+   "port_symbols": [
+    "zpatch_fmt_spawned_generic"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269820656,
+   "orig_name": null,
+   "port_symbol": "_zpatch_cutscene_zero",
+   "port_va": 269911784,
+   "port_aliases": [
+    269911784
+   ],
+   "port_symbols": [
+    "zpatch_cutscene_zero"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269820664,
+   "orig_name": null,
+   "port_symbol": "_zpatch_cutscene_eps_a",
+   "port_va": 269888364,
+   "port_aliases": [
+    269888364
+   ],
+   "port_symbols": [
+    "zpatch_cutscene_eps_a"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269820668,
+   "orig_name": null,
+   "port_symbol": "_zpatch_cutscene_eps_b",
+   "port_va": 269888368,
+   "port_aliases": [
+    269888368
+   ],
+   "port_symbols": [
+    "zpatch_cutscene_eps_b"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269820696,
+   "orig_name": null,
+   "port_symbol": "_zpatch_mf_scale",
+   "port_va": 269888200,
+   "port_aliases": [
+    269888200
+   ],
+   "port_symbols": [
+    "zpatch_mf_scale"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269820712,
+   "orig_name": null,
+   "port_symbol": "_zpatch_mf_time_add",
+   "port_va": 269888248,
+   "port_aliases": [
+    269888248
+   ],
+   "port_symbols": [
+    "zpatch_mf_time_add"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269820720,
+   "orig_name": null,
+   "port_symbol": "_zpatch_mf_time_mul",
+   "port_va": 269888240,
+   "port_aliases": [
+    269888240
+   ],
+   "port_symbols": [
+    "zpatch_mf_time_mul"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269820736,
+   "orig_name": null,
+   "port_symbol": "_zpatch_cutscene_limit",
+   "port_va": 269888352,
+   "port_aliases": [
+    269888352
+   ],
+   "port_symbols": [
+    "zpatch_cutscene_limit"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269820768,
+   "orig_name": null,
+   "port_symbol": "_zpatch_mf_pi",
+   "port_va": 269888256,
+   "port_aliases": [
+    269888256
+   ],
+   "port_symbols": [
+    "zpatch_mf_pi"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269820776,
+   "orig_name": null,
+   "port_symbol": "_zpatch_mf_two_pi",
+   "port_va": 269888264,
+   "port_aliases": [
+    269888264
+   ],
+   "port_symbols": [
+    "zpatch_mf_two_pi"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269820792,
+   "orig_name": null,
+   "port_symbol": "_zpatch_mf_scale_255",
+   "port_va": 269888208,
+   "port_aliases": [
+    269888208
+   ],
+   "port_symbols": [
+    "zpatch_mf_scale_255"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269820812,
+   "orig_name": null,
+   "port_symbol": "_zpatch_mf_mul_neg1",
+   "port_va": 269888220,
+   "port_aliases": [
+    269888220
+   ],
+   "port_symbols": [
+    "zpatch_mf_mul_neg1"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269820832,
+   "orig_name": null,
+   "port_symbol": "_zpatch_mf_mul_neg1_d",
+   "port_va": 269888232,
+   "port_aliases": [
+    269888232
+   ],
+   "port_symbols": [
+    "zpatch_mf_mul_neg1_d"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269820848,
+   "orig_name": null,
+   "port_symbol": "_zpatch_mf_neg_pi",
+   "port_va": 269888272,
+   "port_aliases": [
+    269888272
+   ],
+   "port_symbols": [
+    "zpatch_mf_neg_pi"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269820880,
+   "orig_name": null,
+   "port_symbol": "_zpatch_cutscene_abs_mask",
+   "port_va": 269888360,
+   "port_aliases": [
+    269888360
+   ],
+   "port_symbols": [
+    "zpatch_cutscene_abs_mask"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269820896,
+   "orig_name": null,
+   "port_symbol": "_zpatch_mf_double_sign",
+   "port_va": 269888304,
+   "port_aliases": [
+    269888304
+   ],
+   "port_symbols": [
+    "zpatch_mf_double_sign"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269820912,
+   "orig_name": null,
+   "port_symbol": "_zpatch_mf_neg_mask",
+   "port_va": 269888288,
+   "port_aliases": [
+    269888288
+   ],
+   "port_symbols": [
+    "zpatch_mf_neg_mask"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269844492,
+   "orig_name": null,
+   "port_symbol": "___security_cookie",
+   "port_va": 269888576,
+   "port_aliases": [
+    269888576
+   ],
+   "port_symbols": [
+    "__security_cookie"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269844524,
+   "orig_name": "dword_1015802C",
+   "port_symbol": "_zpatch_dual_light_a",
+   "port_va": 269887644,
+   "port_aliases": [
+    269887644
+   ],
+   "port_symbols": [
+    "zpatch_dual_light_a"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_dual_light_a"
+   ]
+  },
+  {
+   "orig_va": 269844528,
+   "orig_name": "dword_10158030",
+   "port_symbol": "_zpatch_dual_light_b",
+   "port_va": 269887648,
+   "port_aliases": [
+    269887648
+   ],
+   "port_symbols": [
+    "zpatch_dual_light_b"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_dual_light_b"
+   ]
+  },
+  {
+   "orig_va": 269844532,
+   "orig_name": "dword_10158034",
+   "port_symbol": "_zpatch_ooc_resume",
+   "port_va": 269911672,
+   "port_aliases": [
+    269911672
+   ],
+   "port_symbols": [
+    "zpatch_ooc_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_ooc_resume"
+   ]
+  },
+  {
+   "orig_va": 269844540,
+   "orig_name": "dword_1015803C",
+   "port_symbol": "_zpatch_salt_3c",
+   "port_va": 269887608,
+   "port_aliases": [
+    269887608
+   ],
+   "port_symbols": [
+    "zpatch_salt_3c"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_salt_3c"
+   ]
+  },
+  {
+   "orig_va": 269844548,
+   "orig_name": null,
+   "port_symbol": "_zpatch_mf_sign",
+   "port_va": 269888216,
+   "port_aliases": [
+    269888216
+   ],
+   "port_symbols": [
+    "zpatch_mf_sign"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269844552,
+   "orig_name": null,
+   "port_symbol": "_zpatch_mf_step_scale",
+   "port_va": 269888224,
+   "port_aliases": [
+    269888224
+   ],
+   "port_symbols": [
+    "zpatch_mf_step_scale"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269844568,
+   "orig_name": "dword_10158058",
+   "port_symbol": "_zpatch_spawns_kind",
+   "port_va": 269887660,
+   "port_aliases": [
+    269887660
+   ],
+   "port_symbols": [
+    "zpatch_spawns_kind"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_spawns_kind"
+   ]
+  },
+  {
+   "orig_va": 269844576,
+   "orig_name": "dword_10158060",
+   "port_symbol": "_zpatch_hqr_flags",
+   "port_va": 269888344,
+   "port_aliases": [
+    269888344
+   ],
+   "port_symbols": [
+    "zpatch_hqr_flags"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_hqr_flags"
+   ]
+  },
+  {
+   "orig_va": 269844652,
+   "orig_name": "dword_101580AC",
+   "port_symbol": "_zpatch_super_lod_fail",
+   "port_va": 269893936,
+   "port_aliases": [
+    269893936
+   ],
+   "port_symbols": [
+    "zpatch_super_lod_fail"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_super_lod_fail"
+   ]
+  },
+  {
+   "orig_va": 269844656,
+   "orig_name": "dword_101580B0",
+   "port_symbol": "_zpatch_super_lod_ok",
+   "port_va": 269893940,
+   "port_aliases": [
+    269893940
+   ],
+   "port_symbols": [
+    "zpatch_super_lod_ok"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_super_lod_ok"
+   ]
+  },
+  {
+   "orig_va": 269849416,
+   "orig_name": null,
+   "port_symbol": "_zpatch_skip_menu_resume",
+   "port_va": 269893840,
+   "port_aliases": [
+    269893840
+   ],
+   "port_symbols": [
+    "zpatch_skip_menu_resume"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269849452,
+   "orig_name": "dword_1015936C",
+   "port_symbol": "_zpatch_copsirens_index_b",
+   "port_va": 269894088,
+   "port_aliases": [
+    269894088
+   ],
+   "port_symbols": [
+    "zpatch_copsirens_index_b"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_copsirens_index_b"
+   ]
+  },
+  {
+   "orig_va": 269849456,
+   "orig_name": "dword_10159370",
+   "port_symbol": "_zpatch_copsirens_index",
+   "port_va": 269894084,
+   "port_aliases": [
+    269894084
+   ],
+   "port_symbols": [
+    "zpatch_copsirens_index"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_copsirens_index"
+   ]
+  },
+  {
+   "orig_va": 269849460,
+   "orig_name": "dword_10159374",
+   "port_symbol": "_zpatch_copsirens_resume_b",
+   "port_va": 269894080,
+   "port_aliases": [
+    269894080
+   ],
+   "port_symbols": [
+    "zpatch_copsirens_resume_b"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_copsirens_resume_b"
+   ]
+  },
+  {
+   "orig_va": 269849464,
+   "orig_name": "dword_10159378",
+   "port_symbol": "_zpatch_copsirens_flag_b",
+   "port_va": 269894096,
+   "port_aliases": [
+    269894096
+   ],
+   "port_symbols": [
+    "zpatch_copsirens_flag_b"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_copsirens_flag_b"
+   ]
+  },
+  {
+   "orig_va": 269849468,
+   "orig_name": "dword_1015937C",
+   "port_symbol": "_zpatch_copsirens_resume",
+   "port_va": 269894076,
+   "port_aliases": [
+    269894076
+   ],
+   "port_symbols": [
+    "zpatch_copsirens_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_copsirens_resume"
+   ]
+  },
+  {
+   "orig_va": 269851520,
+   "orig_name": "dword_10159B80",
+   "port_symbol": "_zpatch_copsirens_flag",
+   "port_va": 269894092,
+   "port_aliases": [
+    269894092
+   ],
+   "port_symbols": [
+    "zpatch_copsirens_flag"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_copsirens_flag"
+   ]
+  },
+  {
+   "orig_va": 269851532,
+   "orig_name": "dword_10159B8C",
+   "port_symbol": "_zpatch_nolivery_dest",
+   "port_va": 269894040,
+   "port_aliases": [
+    269894040
+   ],
+   "port_symbols": [
+    "zpatch_nolivery_dest"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_nolivery_dest"
+   ]
+  },
+  {
+   "orig_va": 269851536,
+   "orig_name": "dword_10159B90",
+   "port_symbol": "_zpatch_nolivery_count",
+   "port_va": 269894032,
+   "port_aliases": [
+    269894032
+   ],
+   "port_symbols": [
+    "zpatch_nolivery_count"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_nolivery_count"
+   ]
+  },
+  {
+   "orig_va": 269851540,
+   "orig_name": "dword_10159B94",
+   "port_symbol": "_zpatch_nolivery_arg",
+   "port_va": 269894028,
+   "port_aliases": [
+    269894028
+   ],
+   "port_symbols": [
+    "zpatch_nolivery_arg"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_nolivery_arg"
+   ]
+  },
+  {
+   "orig_va": 269851544,
+   "orig_name": "dword_10159B98",
+   "port_symbol": "_zpatch_nolivery_hash",
+   "port_va": 269894012,
+   "port_aliases": [
+    269894012
+   ],
+   "port_symbols": [
+    "zpatch_nolivery_hash"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_nolivery_hash"
+   ]
+  },
+  {
+   "orig_va": 269851548,
+   "orig_name": "dword_10159B9C",
+   "port_symbol": "_zpatch_nolivery_resume",
+   "port_va": 269894016,
+   "port_aliases": [
+    269894016
+   ],
+   "port_symbols": [
+    "zpatch_nolivery_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_nolivery_resume"
+   ]
+  },
+  {
+   "orig_va": 269851552,
+   "orig_name": "dword_10159BA0",
+   "port_symbol": "_zpatch_nolivery_bufptr",
+   "port_va": 269894036,
+   "port_aliases": [
+    269894036
+   ],
+   "port_symbols": [
+    "zpatch_nolivery_bufptr"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_nolivery_bufptr"
+   ]
+  },
+  {
+   "orig_va": 269851560,
+   "orig_name": "dword_10159BA8",
+   "port_symbol": "_zpatch_nolivery_name",
+   "port_va": 269894004,
+   "port_aliases": [
+    269894004
+   ],
+   "port_symbols": [
+    "zpatch_nolivery_name"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_nolivery_name"
+   ]
+  },
+  {
+   "orig_va": 269851564,
+   "orig_name": "dword_10159BAC",
+   "port_symbol": "_zpatch_nolivery_resume_d",
+   "port_va": 269894024,
+   "port_aliases": [
+    269894024
+   ],
+   "port_symbols": [
+    "zpatch_nolivery_resume_d"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_nolivery_resume_d"
+   ]
+  },
+  {
+   "orig_va": 269851568,
+   "orig_name": "dword_10159BB0",
+   "port_symbol": "_zpatch_nolivery_index",
+   "port_va": 269894008,
+   "port_aliases": [
+    269894008
+   ],
+   "port_symbols": [
+    "zpatch_nolivery_index"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_nolivery_index"
+   ]
+  },
+  {
+   "orig_va": 269851572,
+   "orig_name": "dword_10159BB4",
+   "port_symbol": "_zpatch_episode_switch_resume_b",
+   "port_va": 269893952,
+   "port_aliases": [
+    269893952
+   ],
+   "port_symbols": [
+    "zpatch_episode_switch_resume_b"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_episode_switch_resume_b"
+   ]
+  },
+  {
+   "orig_va": 269851576,
+   "orig_name": "dword_10159BB8",
+   "port_symbol": "_zpatch_episode_switch_resume_c",
+   "port_va": 269893956,
+   "port_aliases": [
+    269893956
+   ],
+   "port_symbols": [
+    "zpatch_episode_switch_resume_c"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_episode_switch_resume_c"
+   ]
+  },
+  {
+   "orig_va": 269851580,
+   "orig_name": "dword_10159BBC",
+   "port_symbol": "_zpatch_episode_switch_resume_a",
+   "port_va": 269893948,
+   "port_aliases": [
+    269893948
+   ],
+   "port_symbols": [
+    "zpatch_episode_switch_resume_a"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_episode_switch_resume_a"
+   ]
+  },
+  {
+   "orig_va": 269851588,
+   "orig_name": "dword_10159BC4",
+   "port_symbol": "_zpatch_dual_r_eax",
+   "port_va": 269910688,
+   "port_aliases": [
+    269910688
+   ],
+   "port_symbols": [
+    "zpatch_dual_r_eax"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_dual_r_eax"
+   ]
+  },
+  {
+   "orig_va": 269851592,
+   "orig_name": "dword_10159BC8",
+   "port_symbol": "_zpatch_dual_r_esi",
+   "port_va": 269910704,
+   "port_aliases": [
+    269910704
+   ],
+   "port_symbols": [
+    "zpatch_dual_r_esi"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_dual_r_esi"
+   ]
+  },
+  {
+   "orig_va": 269851596,
+   "orig_name": "dword_10159BCC",
+   "port_symbol": "_zpatch_dual_bcc",
+   "port_va": 269910668,
+   "port_aliases": [
+    269910668
+   ],
+   "port_symbols": [
+    "zpatch_dual_bcc"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_dual_bcc"
+   ]
+  },
+  {
+   "orig_va": 269851600,
+   "orig_name": "dword_10159BD0",
+   "port_symbol": "_zpatch_dual_bd0",
+   "port_va": 269910672,
+   "port_aliases": [
+    269910672
+   ],
+   "port_symbols": [
+    "zpatch_dual_bd0"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_dual_bd0"
+   ]
+  },
+  {
+   "orig_va": 269851604,
+   "orig_name": "dword_10159BD4",
+   "port_symbol": "_zpatch_dual_bd4",
+   "port_va": 269910676,
+   "port_aliases": [
+    269910676
+   ],
+   "port_symbols": [
+    "zpatch_dual_bd4"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_dual_bd4"
+   ]
+  },
+  {
+   "orig_va": 269851608,
+   "orig_name": "dword_10159BD8",
+   "port_symbol": "_zpatch_dual_r_ecx",
+   "port_va": 269910696,
+   "port_aliases": [
+    269910696
+   ],
+   "port_symbols": [
+    "zpatch_dual_r_ecx"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_dual_r_ecx"
+   ]
+  },
+  {
+   "orig_va": 269851612,
+   "orig_name": "dword_10159BDC",
+   "port_symbol": "_zpatch_dual_r_ebp",
+   "port_va": 269910712,
+   "port_aliases": [
+    269910712
+   ],
+   "port_symbols": [
+    "zpatch_dual_r_ebp"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_dual_r_ebp"
+   ]
+  },
+  {
+   "orig_va": 269851616,
+   "orig_name": "dword_10159BE0",
+   "port_symbol": "_zpatch_dual_be0",
+   "port_va": 269910680,
+   "port_aliases": [
+    269910680
+   ],
+   "port_symbols": [
+    "zpatch_dual_be0"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_dual_be0"
+   ]
+  },
+  {
+   "orig_va": 269851620,
+   "orig_name": "dword_10159BE4",
+   "port_symbol": "_zpatch_dual_be4",
+   "port_va": 269910684,
+   "port_aliases": [
+    269910684
+   ],
+   "port_symbols": [
+    "zpatch_dual_be4"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_dual_be4"
+   ]
+  },
+  {
+   "orig_va": 269851624,
+   "orig_name": "dword_10159BE8",
+   "port_symbol": "_zpatch_dual_r_edi",
+   "port_va": 269910708,
+   "port_aliases": [
+    269910708
+   ],
+   "port_symbols": [
+    "zpatch_dual_r_edi"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_dual_r_edi"
+   ]
+  },
+  {
+   "orig_va": 269851628,
+   "orig_name": "dword_10159BEC",
+   "port_symbol": "_zpatch_dual_r_ebx",
+   "port_va": 269910692,
+   "port_aliases": [
+    269910692
+   ],
+   "port_symbols": [
+    "zpatch_dual_r_ebx"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_dual_r_ebx"
+   ]
+  },
+  {
+   "orig_va": 269851632,
+   "orig_name": "dword_10159BF0",
+   "port_symbol": "_zpatch_dual_r_edx",
+   "port_va": 269910700,
+   "port_aliases": [
+    269910700
+   ],
+   "port_symbols": [
+    "zpatch_dual_r_edx"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_dual_r_edx"
+   ]
+  },
+  {
+   "orig_va": 269851636,
+   "orig_name": "dword_10159BF4",
+   "port_symbol": "_zpatch_dual_r_esp",
+   "port_va": 269910716,
+   "port_aliases": [
+    269910716
+   ],
+   "port_symbols": [
+    "zpatch_dual_r_esp"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_dual_r_esp"
+   ]
+  },
+  {
+   "orig_va": 269851669,
+   "orig_name": "byte_10159C15",
+   "port_symbol": "_zpatch_flag_debug_spawns",
+   "port_va": 269910633,
+   "port_aliases": [
+    269910633
+   ],
+   "port_symbols": [
+    "zpatch_flag_debug_spawns"
+   ],
+   "c_type": "std::uint8_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_flag_debug_spawns"
+   ]
+  },
+  {
+   "orig_va": 269851672,
+   "orig_name": "dword_10159C18",
+   "port_symbol": "_zpatch_gfwl_resume",
+   "port_va": 269910652,
+   "port_aliases": [
+    269910652
+   ],
+   "port_symbols": [
+    "zpatch_gfwl_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_gfwl_resume"
+   ]
+  },
+  {
+   "orig_va": 269851676,
+   "orig_name": "dword_10159C1C",
+   "port_symbol": "_zpatch_bds_hash_a",
+   "port_va": 269894060,
+   "port_aliases": [
+    269894060
+   ],
+   "port_symbols": [
+    "zpatch_bds_hash_a"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_bds_hash_a"
+   ]
+  },
+  {
+   "orig_va": 269851680,
+   "orig_name": "dword_10159C20",
+   "port_symbol": "_zpatch_bds_resume_a",
+   "port_va": 269894068,
+   "port_aliases": [
+    269894068
+   ],
+   "port_symbols": [
+    "zpatch_bds_resume_a"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_bds_resume_a"
+   ]
+  },
+  {
+   "orig_va": 269851684,
+   "orig_name": "dword_10159C24",
+   "port_symbol": "_zpatch_bds_hash_b",
+   "port_va": 269894064,
+   "port_aliases": [
+    269894064
+   ],
+   "port_symbols": [
+    "zpatch_bds_hash_b"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_bds_hash_b"
+   ]
+  },
+  {
+   "orig_va": 269851688,
+   "orig_name": "dword_10159C28",
+   "port_symbol": "_zpatch_bds_resume_b",
+   "port_va": 269894072,
+   "port_aliases": [
+    269894072
+   ],
+   "port_symbols": [
+    "zpatch_bds_resume_b"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_bds_resume_b"
+   ]
+  },
+  {
+   "orig_va": 269851696,
+   "orig_name": null,
+   "port_symbol": null,
+   "port_va": 269911652,
+   "port_aliases": [
+    269911652
+   ],
+   "port_symbols": [
+    "@0x10168664"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269851700,
+   "orig_name": "dword_10159C34",
+   "port_symbol": "_zpatch_mf_time",
+   "port_va": 269911628,
+   "port_aliases": [
+    269911628
+   ],
+   "port_symbols": [
+    "zpatch_mf_time"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_mf_time"
+   ]
+  },
+  {
+   "orig_va": 269851704,
+   "orig_name": null,
+   "port_symbol": null,
+   "port_va": 269911656,
+   "port_aliases": [
+    269911656
+   ],
+   "port_symbols": [
+    "@0x10168668"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269851708,
+   "orig_name": "dword_10159C3C",
+   "port_symbol": "_zpatch_mf_y",
+   "port_va": 269911620,
+   "port_aliases": [
+    269911620
+   ],
+   "port_symbols": [
+    "zpatch_mf_y"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_mf_y"
+   ]
+  },
+  {
+   "orig_va": 269851712,
+   "orig_name": "dword_10159C40",
+   "port_symbol": "_zpatch_mf_resume_b",
+   "port_va": 269911636,
+   "port_aliases": [
+    269911636
+   ],
+   "port_symbols": [
+    "zpatch_mf_resume_b"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_mf_resume_b"
+   ]
+  },
+  {
+   "orig_va": 269851716,
+   "orig_name": null,
+   "port_symbol": null,
+   "port_va": 269911668,
+   "port_aliases": [
+    269911668
+   ],
+   "port_symbols": [
+    "@0x10168674"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269851720,
+   "orig_name": null,
+   "port_symbol": null,
+   "port_va": 269911648,
+   "port_aliases": [
+    269911648
+   ],
+   "port_symbols": [
+    "@0x10168660"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269851724,
+   "orig_name": null,
+   "port_symbol": "_zpatch_mf_xmm_save",
+   "port_va": 269911640,
+   "port_aliases": [
+    269911640
+   ],
+   "port_symbols": [
+    "zpatch_mf_xmm_save"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269851728,
+   "orig_name": "dword_10159C50",
+   "port_symbol": "_zpatch_mf_x",
+   "port_va": 269911616,
+   "port_aliases": [
+    269911616
+   ],
+   "port_symbols": [
+    "zpatch_mf_x"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_mf_x"
+   ]
+  },
+  {
+   "orig_va": 269851732,
+   "orig_name": null,
+   "port_symbol": null,
+   "port_va": 269911660,
+   "port_aliases": [
+    269911660
+   ],
+   "port_symbols": [
+    "@0x1016866c"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269851736,
+   "orig_name": null,
+   "port_symbol": null,
+   "port_va": 269911664,
+   "port_aliases": [
+    269911664
+   ],
+   "port_symbols": [
+    "@0x10168670"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269851740,
+   "orig_name": "dword_10159C5C",
+   "port_symbol": "_zpatch_mf_flag",
+   "port_va": 269911624,
+   "port_aliases": [
+    269911624
+   ],
+   "port_symbols": [
+    "zpatch_mf_flag"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_mf_flag"
+   ]
+  },
+  {
+   "orig_va": 269851744,
+   "orig_name": "dword_10159C60",
+   "port_symbol": "_zpatch_mf_resume_a",
+   "port_va": 269911632,
+   "port_aliases": [
+    269911632
+   ],
+   "port_symbols": [
+    "zpatch_mf_resume_a"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_mf_resume_a"
+   ]
+  },
+  {
+   "orig_va": 269851748,
+   "orig_name": null,
+   "port_symbol": null,
+   "port_va": 269911644,
+   "port_aliases": [
+    269911644
+   ],
+   "port_symbols": [
+    "@0x1016865c"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269851752,
+   "orig_name": "dword_10159C68",
+   "port_symbol": "_zpatch_smpa60_resume_b",
+   "port_va": 269893884,
+   "port_aliases": [
+    269893884
+   ],
+   "port_symbols": [
+    "zpatch_smpa60_resume_b"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_smpa60_resume_b"
+   ]
+  },
+  {
+   "orig_va": 269851756,
+   "orig_name": "dword_10159C6C",
+   "port_symbol": "_zpatch_smpa60_resume_c",
+   "port_va": 269893888,
+   "port_aliases": [
+    269893888
+   ],
+   "port_symbols": [
+    "zpatch_smpa60_resume_c"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_smpa60_resume_c"
+   ]
+  },
+  {
+   "orig_va": 269851760,
+   "orig_name": "dword_10159C70",
+   "port_symbol": "_zpatch_smpa60_resume_a",
+   "port_va": 269893880,
+   "port_aliases": [
+    269893880
+   ],
+   "port_symbols": [
+    "zpatch_smpa60_resume_a"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_smpa60_resume_a"
+   ]
+  },
+  {
+   "orig_va": 269851772,
+   "orig_name": "dword_10159C7C",
+   "port_symbol": "_zpatch_spawns_case4_resume",
+   "port_va": 269911560,
+   "port_aliases": [
+    269911560
+   ],
+   "port_symbols": [
+    "zpatch_spawns_case4_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_spawns_case4_resume"
+   ]
+  },
+  {
+   "orig_va": 269851776,
+   "orig_name": "dword_10159C80",
+   "port_symbol": "_zpatch_spawns_class",
+   "port_va": 269911528,
+   "port_aliases": [
+    269911528
+   ],
+   "port_symbols": [
+    "zpatch_spawns_class"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_spawns_class"
+   ]
+  },
+  {
+   "orig_va": 269851780,
+   "orig_name": "dword_10159C84",
+   "port_symbol": "_zpatch_spawns_case9_resume",
+   "port_va": 269911580,
+   "port_aliases": [
+    269911580
+   ],
+   "port_symbols": [
+    "zpatch_spawns_case9_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_spawns_case9_resume"
+   ]
+  },
+  {
+   "orig_va": 269851784,
+   "orig_name": "dword_10159C88",
+   "port_symbol": "_zpatch_spawns_case5_resume",
+   "port_va": 269911564,
+   "port_aliases": [
+    269911564
+   ],
+   "port_symbols": [
+    "zpatch_spawns_case5_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_spawns_case5_resume"
+   ]
+  },
+  {
+   "orig_va": 269851788,
+   "orig_name": "dword_10159C8C",
+   "port_symbol": "_zpatch_bpm_obj",
+   "port_va": 269910560,
+   "port_aliases": [
+    269910560
+   ],
+   "port_symbols": [
+    "zpatch_bpm_obj"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_bpm_obj"
+   ]
+  },
+  {
+   "orig_va": 269851792,
+   "orig_name": "dword_10159C90",
+   "port_symbol": "_zpatch_spawns_case7_resume",
+   "port_va": 269911572,
+   "port_aliases": [
+    269911572
+   ],
+   "port_symbols": [
+    "zpatch_spawns_case7_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_spawns_case7_resume"
+   ]
+  },
+  {
+   "orig_va": 269851796,
+   "orig_name": "dword_10159C94",
+   "port_symbol": "_zpatch_spawns_case8_resume",
+   "port_va": 269911576,
+   "port_aliases": [
+    269911576
+   ],
+   "port_symbols": [
+    "zpatch_spawns_case8_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_spawns_case8_resume"
+   ]
+  },
+  {
+   "orig_va": 269851800,
+   "orig_name": "dword_10159C98",
+   "port_symbol": "_zpatch_spawns_orig_b",
+   "port_va": 269911540,
+   "port_aliases": [
+    269911540
+   ],
+   "port_symbols": [
+    "zpatch_spawns_orig_b"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_spawns_orig_b"
+   ]
+  },
+  {
+   "orig_va": 269851804,
+   "orig_name": "dword_10159C9C",
+   "port_symbol": "_zpatch_spawns_case1_resume",
+   "port_va": 269911548,
+   "port_aliases": [
+    269911548
+   ],
+   "port_symbols": [
+    "zpatch_spawns_case1_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_spawns_case1_resume"
+   ]
+  },
+  {
+   "orig_va": 269851808,
+   "orig_name": "dword_10159CA0",
+   "port_symbol": "_zpatch_spawns_case2_resume",
+   "port_va": 269911552,
+   "port_aliases": [
+    269911552
+   ],
+   "port_symbols": [
+    "zpatch_spawns_case2_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_spawns_case2_resume"
+   ]
+  },
+  {
+   "orig_va": 269851812,
+   "orig_name": "dword_10159CA4",
+   "port_symbol": "_zpatch_bpm_model_index",
+   "port_va": 269910564,
+   "port_aliases": [
+    269910564
+   ],
+   "port_symbols": [
+    "zpatch_bpm_model_index"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_bpm_model_index"
+   ]
+  },
+  {
+   "orig_va": 269851816,
+   "orig_name": "dword_10159CA8",
+   "port_symbol": "_zpatch_spawns_case3_resume",
+   "port_va": 269911556,
+   "port_aliases": [
+    269911556
+   ],
+   "port_symbols": [
+    "zpatch_spawns_case3_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_spawns_case3_resume"
+   ]
+  },
+  {
+   "orig_va": 269851820,
+   "orig_name": "dword_10159CAC",
+   "port_symbol": "_zpatch_spawns_case6_resume",
+   "port_va": 269911568,
+   "port_aliases": [
+    269911568
+   ],
+   "port_symbols": [
+    "zpatch_spawns_case6_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_spawns_case6_resume"
+   ]
+  },
+  {
+   "orig_va": 269851824,
+   "orig_name": "dword_10159CB0",
+   "port_symbol": "_zpatch_spawns_orig_a",
+   "port_va": 269911536,
+   "port_aliases": [
+    269911536
+   ],
+   "port_symbols": [
+    "zpatch_spawns_orig_a"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_spawns_orig_a"
+   ]
+  },
+  {
+   "orig_va": 269851828,
+   "orig_name": "dword_10159CB4",
+   "port_symbol": "_zpatch_spawns_skip",
+   "port_va": 269911532,
+   "port_aliases": [
+    269911532
+   ],
+   "port_symbols": [
+    "zpatch_spawns_skip"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_spawns_skip"
+   ]
+  },
+  {
+   "orig_va": 269851832,
+   "orig_name": "dword_10159CB8",
+   "port_symbol": "_zpatch_bpm_resume",
+   "port_va": 269910568,
+   "port_aliases": [
+    269910568
+   ],
+   "port_symbols": [
+    "zpatch_bpm_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_bpm_resume"
+   ]
+  },
+  {
+   "orig_va": 269851836,
+   "orig_name": "dword_10159CBC",
+   "port_symbol": "_zpatch_spawns_case0_resume",
+   "port_va": 269911544,
+   "port_aliases": [
+    269911544
+   ],
+   "port_symbols": [
+    "zpatch_spawns_case0_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_spawns_case0_resume"
+   ]
+  },
+  {
+   "orig_va": 269851856,
+   "orig_name": "dword_10159CD0",
+   "port_symbol": "_zpatch_garage_resume_b",
+   "port_va": 269911592,
+   "port_aliases": [
+    269911592
+   ],
+   "port_symbols": [
+    "zpatch_garage_resume_b"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_garage_resume_b"
+   ]
+  },
+  {
+   "orig_va": 269851860,
+   "orig_name": "dword_10159CD4",
+   "port_symbol": "_zpatch_garage_resume_a",
+   "port_va": 269911588,
+   "port_aliases": [
+    269911588
+   ],
+   "port_symbols": [
+    "zpatch_garage_resume_a"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_garage_resume_a"
+   ]
+  },
+  {
+   "orig_va": 269851864,
+   "orig_name": "dword_10159CD8",
+   "port_symbol": "_zpatch_nms_object",
+   "port_va": 269911792,
+   "port_aliases": [
+    269911792
+   ],
+   "port_symbols": [
+    "zpatch_nms_object"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_nms_object"
+   ]
+  },
+  {
+   "orig_va": 269851872,
+   "orig_name": "dword_10159CE0",
+   "port_symbol": "_zpatch_hqr_mode",
+   "port_va": 269911764,
+   "port_aliases": [
+    269911764
+   ],
+   "port_symbols": [
+    "zpatch_hqr_mode"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_hqr_mode"
+   ]
+  },
+  {
+   "orig_va": 269851876,
+   "orig_name": null,
+   "port_symbol": null,
+   "port_va": 269911756,
+   "port_aliases": [
+    269911756
+   ],
+   "port_symbols": [
+    "@0x101686cc"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269851880,
+   "orig_name": "dword_10159CE8",
+   "port_symbol": "_zpatch_hqr_dump",
+   "port_va": 269911732,
+   "port_aliases": [
+    269911732
+   ],
+   "port_symbols": [
+    "zpatch_hqr_dump"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_hqr_dump"
+   ]
+  },
+  {
+   "orig_va": 269851884,
+   "orig_name": null,
+   "port_symbol": null,
+   "port_va": 269911748,
+   "port_aliases": [
+    269911748
+   ],
+   "port_symbols": [
+    "@0x101686c4"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269851888,
+   "orig_name": null,
+   "port_symbol": null,
+   "port_va": 269911760,
+   "port_aliases": [
+    269911760
+   ],
+   "port_symbols": [
+    "@0x101686d0"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269851892,
+   "orig_name": null,
+   "port_symbol": null,
+   "port_va": 269911744,
+   "port_aliases": [
+    269911744
+   ],
+   "port_symbols": [
+    "@0x101686c0"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269851896,
+   "orig_name": null,
+   "port_symbol": null,
+   "port_va": 269911736,
+   "port_aliases": [
+    269911736
+   ],
+   "port_symbols": [
+    "@0x101686b8"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269851900,
+   "orig_name": "dword_10159CFC",
+   "port_symbol": "_zpatch_hqr_resume",
+   "port_va": 269911724,
+   "port_aliases": [
+    269911724
+   ],
+   "port_symbols": [
+    "zpatch_hqr_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_hqr_resume"
+   ]
+  },
+  {
+   "orig_va": 269851904,
+   "orig_name": null,
+   "port_symbol": null,
+   "port_va": 269911740,
+   "port_aliases": [
+    269911740
+   ],
+   "port_symbols": [
+    "@0x101686bc"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269851908,
+   "orig_name": "dword_10159D04",
+   "port_symbol": "_zpatch_hqr_builder",
+   "port_va": 269911728,
+   "port_aliases": [
+    269911728
+   ],
+   "port_symbols": [
+    "zpatch_hqr_builder"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_hqr_builder"
+   ]
+  },
+  {
+   "orig_va": 269851916,
+   "orig_name": null,
+   "port_symbol": null,
+   "port_va": 269911752,
+   "port_aliases": [
+    269911752
+   ],
+   "port_symbols": [
+    "@0x101686c8"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269851936,
+   "orig_name": "dword_10159D20",
+   "port_symbol": "_zpatch_player_ped_computed",
+   "port_va": 269893900,
+   "port_aliases": [
+    269893900
+   ],
+   "port_symbols": [
+    "zpatch_player_ped_computed"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_player_ped_computed"
+   ]
+  },
+  {
+   "orig_va": 269851944,
+   "orig_name": "dword_10159D28",
+   "port_symbol": "_zpatch_player_ped_object",
+   "port_va": 269893896,
+   "port_aliases": [
+    269893896
+   ],
+   "port_symbols": [
+    "zpatch_player_ped_object"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_player_ped_object"
+   ]
+  },
+  {
+   "orig_va": 269851948,
+   "orig_name": "dword_10159D2C",
+   "port_symbol": "_zpatch_player_ped_resume",
+   "port_va": 269893904,
+   "port_aliases": [
+    269893904
+   ],
+   "port_symbols": [
+    "zpatch_player_ped_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_player_ped_resume"
+   ]
+  },
+  {
+   "orig_va": 269856056,
+   "orig_name": "dword_1015AD38",
+   "port_symbol": "_zpatch_steer_vehicle",
+   "port_va": 269911596,
+   "port_aliases": [
+    269911596
+   ],
+   "port_symbols": [
+    "zpatch_steer_vehicle"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_steer_vehicle"
+   ]
+  },
+  {
+   "orig_va": 269856068,
+   "orig_name": "dword_1015AD44",
+   "port_symbol": "_zpatch_steer_resume",
+   "port_va": 269911600,
+   "port_aliases": [
+    269911600
+   ],
+   "port_symbols": [
+    "zpatch_steer_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_steer_resume"
+   ]
+  },
+  {
+   "orig_va": 269856080,
+   "orig_name": "dword_1015AD50",
+   "port_symbol": "_zpatch_benchmark_resume_a",
+   "port_va": 269894052,
+   "port_aliases": [
+    269894052
+   ],
+   "port_symbols": [
+    "zpatch_benchmark_resume_a"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_benchmark_resume_a"
+   ]
+  },
+  {
+   "orig_va": 269856084,
+   "orig_name": "dword_1015AD54",
+   "port_symbol": "_zpatch_benchmark_resume_b",
+   "port_va": 269894056,
+   "port_aliases": [
+    269894056
+   ],
+   "port_symbols": [
+    "zpatch_benchmark_resume_b"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_benchmark_resume_b"
+   ]
+  },
+  {
+   "orig_va": 269856088,
+   "orig_name": null,
+   "port_symbol": "_zpatch_blackscreen_resume",
+   "port_va": 269893848,
+   "port_aliases": [
+    269893848
+   ],
+   "port_symbols": [
+    "zpatch_blackscreen_resume"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269856092,
+   "orig_name": null,
+   "port_symbol": "_zpatch_blackscreen_value_ptr",
+   "port_va": 269893852,
+   "port_aliases": [
+    269893852
+   ],
+   "port_symbols": [
+    "zpatch_blackscreen_value_ptr"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269856096,
+   "orig_name": "dword_1015AD60",
+   "port_symbol": "_zpatch_group_hack_resume",
+   "port_va": 269893876,
+   "port_aliases": [
+    269893876
+   ],
+   "port_symbols": [
+    "zpatch_group_hack_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_group_hack_resume"
+   ]
+  },
+  {
+   "orig_va": 269856100,
+   "orig_name": null,
+   "port_symbol": "_zpatch_freeze_gun_resume",
+   "port_va": 269893892,
+   "port_aliases": [
+    269893892
+   ],
+   "port_symbols": [
+    "zpatch_freeze_gun_resume"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269856104,
+   "orig_name": "dword_1015AD68",
+   "port_symbol": "_zpatch_crash_msg_getter",
+   "port_va": 269894044,
+   "port_aliases": [
+    269894044
+   ],
+   "port_symbols": [
+    "zpatch_crash_msg_getter"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_crash_msg_getter"
+   ]
+  },
+  {
+   "orig_va": 269856108,
+   "orig_name": "dword_1015AD6C",
+   "port_symbol": "_zpatch_wanted_level_resume",
+   "port_va": 269893872,
+   "port_aliases": [
+    269893872
+   ],
+   "port_symbols": [
+    "zpatch_wanted_level_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_wanted_level_resume"
+   ]
+  },
+  {
+   "orig_va": 269856116,
+   "orig_name": null,
+   "port_symbol": "_zpatch_skip_intro_match",
+   "port_va": 269893836,
+   "port_aliases": [
+    269893836
+   ],
+   "port_symbols": [
+    "zpatch_skip_intro_match"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269856120,
+   "orig_name": "dword_1015AD78",
+   "port_symbol": "_zpatch_pre_ped_array",
+   "port_va": 269910584,
+   "port_aliases": [
+    269910584
+   ],
+   "port_symbols": [
+    "zpatch_pre_ped_array"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_pre_ped_array"
+   ]
+  },
+  {
+   "orig_va": 269856124,
+   "orig_name": "dword_1015AD7C",
+   "port_symbol": "_zpatch_bike_value",
+   "port_va": 269893960,
+   "port_aliases": [
+    269893960
+   ],
+   "port_symbols": [
+    "zpatch_bike_value"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_bike_value"
+   ]
+  },
+  {
+   "orig_va": 269856128,
+   "orig_name": "dword_1015AD80",
+   "port_symbol": "_zpatch_bike_saved",
+   "port_va": 269893964,
+   "port_aliases": [
+    269893964
+   ],
+   "port_symbols": [
+    "zpatch_bike_saved"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_bike_saved"
+   ]
+  },
+  {
+   "orig_va": 269856132,
+   "orig_name": "dword_1015AD84",
+   "port_symbol": "_zpatch_bike_resume",
+   "port_va": 269893968,
+   "port_aliases": [
+    269893968
+   ],
+   "port_symbols": [
+    "zpatch_bike_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_bike_resume"
+   ]
+  },
+  {
+   "orig_va": 269856136,
+   "orig_name": "dword_1015AD88",
+   "port_symbol": "_zpatch_new_saves_resume",
+   "port_va": 269910576,
+   "port_aliases": [
+    269910576
+   ],
+   "port_symbols": [
+    "zpatch_new_saves_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_new_saves_resume"
+   ]
+  },
+  {
+   "orig_va": 269858232,
+   "orig_name": "dword_1015B5B8",
+   "port_symbol": "_zpatch_carparts_shadow_fn",
+   "port_va": 269910656,
+   "port_aliases": [
+    269910656
+   ],
+   "port_symbols": [
+    "zpatch_carparts_shadow_fn"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_carparts_shadow_fn"
+   ]
+  },
+  {
+   "orig_va": 269858236,
+   "orig_name": "dword_1015B5BC",
+   "port_symbol": "_zpatch_fchs_resume",
+   "port_va": 269906460,
+   "port_aliases": [
+    269906460
+   ],
+   "port_symbols": [
+    "zpatch_fchs_resume"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_fchs_resume"
+   ]
+  },
+  {
+   "orig_va": 269860288,
+   "orig_name": "dword_1015BDC0",
+   "port_symbol": "_zpatch_carparts_resume_else",
+   "port_va": 269893932,
+   "port_aliases": [
+    269893932
+   ],
+   "port_symbols": [
+    "zpatch_carparts_resume_else"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_carparts_resume_else"
+   ]
+  },
+  {
+   "orig_va": 269860296,
+   "orig_name": "dword_1015BDC8",
+   "port_symbol": "_zpatch_carparts_resume_if",
+   "port_va": 269893928,
+   "port_aliases": [
+    269893928
+   ],
+   "port_symbols": [
+    "zpatch_carparts_resume_if"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_carparts_resume_if"
+   ]
+  },
+  {
+   "orig_va": 269860300,
+   "orig_name": "dword_1015BDCC",
+   "port_symbol": "_zpatch_carparts_resume_2",
+   "port_va": 269910660,
+   "port_aliases": [
+    269910660
+   ],
+   "port_symbols": [
+    "zpatch_carparts_resume_2"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_carparts_resume_2"
+   ]
+  },
+  {
+   "orig_va": 269860304,
+   "orig_name": "dword_1015BDD0",
+   "port_symbol": "_zpatch_fchs_param",
+   "port_va": 269906456,
+   "port_aliases": [
+    269906456
+   ],
+   "port_symbols": [
+    "zpatch_fchs_param"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_fchs_param"
+   ]
+  },
+  {
+   "orig_va": 269860308,
+   "orig_name": "dword_1015BDD4",
+   "port_symbol": "_zpatch_collision_deadlock_should_walk",
+   "port_va": 269893972,
+   "port_aliases": [
+    269893972
+   ],
+   "port_symbols": [
+    "zpatch_collision_deadlock_should_walk"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_collision_deadlock_should_walk"
+   ]
+  },
+  {
+   "orig_va": 269860312,
+   "orig_name": "dword_1015BDD8",
+   "port_symbol": "_zpatch_collision_deadlock_iterations",
+   "port_va": 269893976,
+   "port_aliases": [
+    269893976
+   ],
+   "port_symbols": [
+    "zpatch_collision_deadlock_iterations"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_collision_deadlock_iterations"
+   ]
+  },
+  {
+   "orig_va": 269860316,
+   "orig_name": null,
+   "port_symbol": "_zpatch_dlc_load_callback",
+   "port_va": 269893832,
+   "port_aliases": [
+    269893832
+   ],
+   "port_symbols": [
+    "zpatch_dlc_load_callback"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  },
+  {
+   "orig_va": 269860324,
+   "orig_name": "dword_1015BDE4",
+   "port_symbol": "_zpatch_cutscene_target",
+   "port_va": 269911768,
+   "port_aliases": [
+    269911768
+   ],
+   "port_symbols": [
+    "zpatch_cutscene_target"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_cutscene_target"
+   ]
+  },
+  {
+   "orig_va": 269860328,
+   "orig_name": "dword_1015BDE8",
+   "port_symbol": "_zpatch_cutscene_accum",
+   "port_va": 269911776,
+   "port_aliases": [
+    269911776
+   ],
+   "port_symbols": [
+    "zpatch_cutscene_accum"
+   ],
+   "c_type": "std::uint64_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_cutscene_accum"
+   ]
+  },
+  {
+   "orig_va": 269860336,
+   "orig_name": "dword_1015BDF0",
+   "port_symbol": "_zpatch_cutscene_poke",
+   "port_va": 269911772,
+   "port_aliases": [
+    269911772
+   ],
+   "port_symbols": [
+    "zpatch_cutscene_poke"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_cutscene_poke"
+   ]
+  },
+  {
+   "orig_va": 269860348,
+   "orig_name": "dword_1015BDFC",
+   "port_symbol": "_zpatch_path_node_resume_ok",
+   "port_va": 269893856,
+   "port_aliases": [
+    269893856
+   ],
+   "port_symbols": [
+    "zpatch_path_node_resume_ok"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_path_node_resume_ok"
+   ]
+  },
+  {
+   "orig_va": 269860352,
+   "orig_name": "dword_1015BE00",
+   "port_symbol": "_zpatch_path_node_resume_fail",
+   "port_va": 269893860,
+   "port_aliases": [
+    269893860
+   ],
+   "port_symbols": [
+    "zpatch_path_node_resume_fail"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_path_node_resume_fail"
+   ]
+  },
+  {
+   "orig_va": 269860360,
+   "orig_name": "dword_1015BE08",
+   "port_symbol": "_zpatch_ide_string",
+   "port_va": 269894100,
+   "port_aliases": [
+    269894100
+   ],
+   "port_symbols": [
+    "zpatch_ide_string"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_ide_string"
+   ]
+  },
+  {
+   "orig_va": 269860364,
+   "orig_name": "dword_1015BE0C",
+   "port_symbol": "_zpatch_ide_model",
+   "port_va": 269894104,
+   "port_aliases": [
+    269894104
+   ],
+   "port_symbols": [
+    "zpatch_ide_model"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_ide_model"
+   ]
+  },
+  {
+   "orig_va": 269860368,
+   "orig_name": "dword_1015BE10",
+   "port_symbol": "_zpatch_ide_hook_slot",
+   "port_va": 269894108,
+   "port_aliases": [
+    269894108
+   ],
+   "port_symbols": [
+    "zpatch_ide_hook_slot"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_ide_hook_slot"
+   ]
+  },
+  {
+   "orig_va": 269860372,
+   "orig_name": "dword_1015BE14",
+   "port_symbol": "_zpatch_plane_crash_resume_b",
+   "port_va": 269893868,
+   "port_aliases": [
+    269893868
+   ],
+   "port_symbols": [
+    "zpatch_plane_crash_resume_b"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_plane_crash_resume_b"
+   ]
+  },
+  {
+   "orig_va": 269860376,
+   "orig_name": "dword_1015BE18",
+   "port_symbol": "_zpatch_plane_crash_resume_a",
+   "port_va": 269893864,
+   "port_aliases": [
+    269893864
+   ],
+   "port_symbols": [
+    "zpatch_plane_crash_resume_a"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_plane_crash_resume_a"
+   ]
+  },
+  {
+   "orig_va": 269860380,
+   "orig_name": "dword_1015BE1C",
+   "port_symbol": "_zpatch_popup_index",
+   "port_va": 269902348,
+   "port_aliases": [
+    269902348
+   ],
+   "port_symbols": [
+    "zpatch_popup_index"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_popup_index"
+   ]
+  },
+  {
+   "orig_va": 269860384,
+   "orig_name": "dword_1015BE20",
+   "port_symbol": "_zpatch_popup_model",
+   "port_va": 269902340,
+   "port_aliases": [
+    269902340
+   ],
+   "port_symbols": [
+    "zpatch_popup_model"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_popup_model"
+   ]
+  },
+  {
+   "orig_va": 269860388,
+   "orig_name": "dword_1015BE24",
+   "port_symbol": "_zpatch_popup_flag",
+   "port_va": 269902344,
+   "port_aliases": [
+    269902344
+   ],
+   "port_symbols": [
+    "zpatch_popup_flag"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_popup_flag"
+   ]
+  },
+  {
+   "orig_va": 269866536,
+   "orig_name": "dword_1015D628",
+   "port_symbol": "_zpatch_popup_resume_a",
+   "port_va": 269902352,
+   "port_aliases": [
+    269902352
+   ],
+   "port_symbols": [
+    "zpatch_popup_resume_a"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_popup_resume_a"
+   ]
+  },
+  {
+   "orig_va": 269866540,
+   "orig_name": "dword_1015D62C",
+   "port_symbol": "_zpatch_popup_resume_b",
+   "port_va": 269902356,
+   "port_aliases": [
+    269902356
+   ],
+   "port_symbols": [
+    "zpatch_popup_resume_b"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_popup_resume_b"
+   ]
+  },
+  {
+   "orig_va": 269866544,
+   "orig_name": "dword_1015D630",
+   "port_symbol": "_zpatch_vram_arg_a",
+   "port_va": 269893980,
+   "port_aliases": [
+    269893980
+   ],
+   "port_symbols": [
+    "zpatch_vram_arg_a"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_vram_arg_a"
+   ]
+  },
+  {
+   "orig_va": 269866548,
+   "orig_name": "dword_1015D634",
+   "port_symbol": "_zpatch_vram_arg_b",
+   "port_va": 269893984,
+   "port_aliases": [
+    269893984
+   ],
+   "port_symbols": [
+    "zpatch_vram_arg_b"
+   ],
+   "c_type": "std::uint32_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_vram_arg_b"
+   ]
+  },
+  {
+   "orig_va": 269866552,
+   "orig_name": "byte_1015D638",
+   "port_symbol": "_zpatch_vram_flag",
+   "port_va": 269893845,
+   "port_aliases": [
+    269893845
+   ],
+   "port_symbols": [
+    "zpatch_vram_flag"
+   ],
+   "c_type": "std::uint8_t",
+   "source": "header+empirical",
+   "header_symbols": [
+    "zpatch_vram_flag"
+   ]
+  },
+  {
+   "orig_va": 270173264,
+   "orig_name": null,
+   "port_symbol": "_zpatch_skip_menu_flag",
+   "port_va": 269893844,
+   "port_aliases": [
+    269893844
+   ],
+   "port_symbols": [
+    "zpatch_skip_menu_flag"
+   ],
+   "c_type": null,
+   "source": "empirical",
+   "header_symbols": []
+  }
+ ],
+ "count": 213,
+ "unmapped": []
+}

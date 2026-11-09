@@ -1,0 +1,30 @@
+{
+  "executable": {
+    "name": "GTAIV.exe",
+    "sha256": "3d90e7c516fa450ca002e5031e62c0f66b404590f33e6cc9793b0da4fffbfd0f",
+    "size": 15628696,
+    "product_version": "1, 0, 8, 0",
+    "game_build": "v1080 (ordinal 9)",
+    "image_base": "0x400000"
+  },
+  "verification": {
+    "preamble": "6/7 unique, 0 absent",
+    "patch_operations": "116/138 unique, 21 absent",
+    "options_any_signature": "60/63 resolved",
+    "options_unresolved": [
+      "RemoveRGSCLoginRequirement",
+      "VRAMFix",
+      "VSyncFix"
+    ]
+  },
+  "unresolved_explanations": {
+    "VSyncFix": "recovered build gate excludes 1.0.8.0 (!=9), so absence is expected",
+    "RemoveRGSCLoginRequirement": "signature absent but handler falls back to a module-relative patch at RVA 0x498460 for build 9; site bytes verified in-game",
+    "VRAMFix": "single signature not present in this build's .text; no positive build gate recovered, so treated as a build-variant signature (not asserted)"
+  },
+  "cross_reference": {
+    "source": "ThirteenAG/GTAIV.EFLC.FusionFix (github), source/skipintro.ixx",
+    "note": "FusionFix resolves SkipMenu with pattern 'E8 ? ? ? ? 83 C4 04 8B 8C 24 ... 81 C4 ? ? ? ? C3'; ZolikaPatch's primary SkipMenu signature '83 F8 03 75 ? A1 ... 6A 00 E8 ? ? ? ? 83 C4 04 5F 5E' resolves uniquely at 0x47d240, and ZolikaPatch also carries FusionFix-style fallback patterns. The two projects agree on hooking conventions (pattern scan + injector-style inline/CALL patch)."
+  },
+  "injection_conventions": "Both projects hook by pattern-scanning the game module and patching via a protect/store primitive; FusionFix uses the injector library (MakeCALL/MakeInline with a register pack), ZolikaPatch installs E9 jumps to its own trampolines. The reconstruction's recovered primitives match this convention."
+}

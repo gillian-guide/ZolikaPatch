@@ -1,0 +1,30 @@
+{
+  "signature": "68 ? ? ? ? 68 A9 54 14 51 E8",
+  "semantics": "build probe, not a site resolver: matches game code that embeds the hash constant 0x511454a9 (push imm32; push 0x511454a9; call). On 1.0.8.0 the probe HITS (VA 0xb3878c), so the fallback salt set is not applied; on other builds it misses and the ten substituted salts are written.",
+  "salt_globals_default_values": {
+    "0x10158054": "0x511454a9",
+    "0x101580c8": "0x570f5725",
+    "0x10158050": "0x3b0c6738",
+    "0x101580b8": "0x4e61480a",
+    "0x10158028": "0x6a6b4f18",
+    "0x101580a8": "0x79a95bf9",
+    "0x10158040": "0x4bf36a32",
+    "0x1015803c": "0x022b2da9",
+    "0x101580d4": "0x75e005f1",
+    "0x1015805c": "0x62e319c6"
+  },
+  "fallback_values_written_on_miss": [
+    "0x6b86410e",
+    "0x406b4b20",
+    "0x6dcd115a",
+    "0x62bfdb37",
+    "0x931f73a2",
+    "0x7f6a60d3",
+    "0xc9dbda90",
+    "0xa4ea0691",
+    "0x09399528",
+    "0x1cc648ea"
+  ],
+  "observation": "each default .data value equals a 32-bit immediate embedded exactly once in the game .text",
+  "source": "subagent A2, evidence/verify_preamble_vs_game.json"
+}

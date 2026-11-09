@@ -1,0 +1,9 @@
+{
+  "0x10159c0c": "model lookup function pointer (called as (*fn)(hash,&out)); used by FUN_10005f70, FUN_10004c70, FUN_10006260, FUN_1001ad20, FUN_10037ac0, FUN_1003d930 and the loader",
+  "0x1015ad78": "model-info table base (indexed by short model id, *4 stride), read by FUN_10004c70/FUN_10037510/FUN_10037ac0/FUN_10046b90",
+  "0x10159b88": "component resolver function pointer (returns part pointer for a component id)",
+  "0x1015d63c": "steering-wheel transform setter callback",
+  "0x10159cdc": "engine-block/suspension transform setter callback",
+  "0x1015bde0": "indirect table entry (match+0xa+[match+6])",
+  "0x10159c74": "resolved pointer stored before the cmovne table resolution"
+}

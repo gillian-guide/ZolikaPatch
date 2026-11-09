@@ -1,0 +1,11 @@
+{
+  "finding": "Handler FUN_10045490 (RemoveRGSCLoginRequirement) first tries a signature; if it fails and the build is 9 (1.0.8.0), it falls back to a module-relative patch at RVA 0x498460.",
+  "verification": {
+    "game": "GTAIV.exe 1.0.8.0, image base 0x400000",
+    "signature_present": false,
+    "fallback_rva": "0x498460",
+    "fallback_target_va": "0x898460",
+    "bytes_at_target": "8B 44 24 04 85 C0 74 17 F3 0F 7E 05 30 A4 D8 00 (plausible function entry; preceded by c3 cc cc padding)"
+  },
+  "conclusion": "The recovered signature-absent anomaly for build 9 is explained by a recovered per-build fallback path, confirming both the extraction and the tool. A missing signature for a gated-in option is therefore not necessarily an error."
+}

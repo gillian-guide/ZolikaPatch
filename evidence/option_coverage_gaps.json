@@ -1,0 +1,3324 @@
+{
+  "schema": 1,
+  "task": "Identify and characterise the ZolikaPatch [Options] keys that have no recovered patch signature in evidence/option_signatures.json.",
+  "generated_from": [
+    "ZolikaPatch_reconstruction/evidence/ini_records.json  (the 98 [Options] keys)",
+    "ZolikaPatch_reconstruction/evidence/option_signatures.json, option_handlers.json, option_references.json, option_build_gates.json",
+    "ZolikaPatch_decompiled/ghidra/decompiled_*.c and checkpoints/**/decompiled_*.c (function bodies)",
+    "ZolikaPatch_decompiled/checkpoints/zolika_full_disasm.txt and functions.csv (read-only disassembly)",
+    "ZolikaPatch_extracted/ZolikaPatch.asi (read-only: section table, .rdata pattern strings, initial values, .reloc table)",
+    "read-only /Users/kreato/Downloads/GTAIV.exe (1.0.8.0) via tools/verify_game_signatures.py"
+  ],
+  "method": [
+    "A key belongs to the gap set iff it occurs in the INI [Options] section and is NOT a key of evidence/option_signatures.json.",
+    "Per key the loader dispatch arm is the byte range beginning at the push of the key string (minus the 5-byte push, i.e. at the preceding default-value push) and ending where the next key arm begins. CarDynamicShadowFix has no pushed key literal - its name is composed at run time - so its arm was delimited manually from the composed read at 0x1005458e.",
+    "Facts come from (a) the arm, (b) the option handler named in option_handlers.json, and (c) one level into its non-shared feature callees. A callee is a shared helper when >=3 distinct option arms reach it (key reader FUN_1005C160, key-string builder FUN_10058620, std::string helpers, strtol wrapper FUN_100014B0, VirtualProtect tail FUN_1005D630), so it is not attributable to one key.",
+    "Patterns are recovered three ways: the literal form FUN_10003830(\"...\") / FUN_1005AFA0(&v,\"...\"); the register-held form, by walking back from every scanner call to the mov that loads ecx/edx and reading the .rdata string it points at; and the compiled-pattern form, where FUN_10058620 is fed a hex-byte string that FUN_100030a0 then compiles.",
+    "Module-relative writes are detected in two shapes: literal offsets (DAT_1015ad70 + 0xNNNN) and register-relative stores (mov reg,[0x1015AD70] ... mov [reg(+off)],value).",
+    "Every recovered pattern was run through the read-only game scanner; the hit count and the first hit addresses are recorded."
+  ],
+  "classification_definition": {
+    "flag-only": "sets a global flag and performs no patch action of its own",
+    "function-call-only": "reaches a real patch action (signature scan, literal write, module-relative write or non-shared callee) but does not itself write a module-relative offset in the literal form",
+    "rva-patch": "writes at one or more module-relative offsets from the module base (DAT_1015AD70)",
+    "unresolved": "no patch action and no known flag could be attributed to the key"
+  },
+  "counts": {
+    "options_in_ini": 98,
+    "options_with_recovered_signature": 64,
+    "options_without_recovered_signature": 34,
+    "options_with_recovered_handler": 79,
+    "classification": {
+      "flag-only": 4,
+      "function-call-only": 25,
+      "rva-patch": 5
+    },
+    "keys_with_a_pattern_recovered_here": 15
+  },
+  "discrepancy": {
+    "prompt_claim": "98 - 63 = 35 options have no recovered patch signature (the prompt also mentions 24).",
+    "measured": "evidence/option_signatures.json contains 64 keys, every one of them a valid [Options] key, and ini_records.json contains 98 [Options] keys, so the gap is 34.",
+    "cause": "The figure \"63\" is stale: docs/STATUS.md (\"the signature table 63\") and docs/fidelity_audit.md line 158 (\"63 of 98 have signatures, so 35 lack them\") both predate the last regeneration of the file. The figure \"24\" is 98 - 74, i.e. the earlier \"74 of 98 handler-mapped\" count, not a signature count.",
+    "checked": "len(option_signatures.json)==64; len([Options] keys)==98; set(sig)-set(opts)=={}; set(opts)-set(sig) has 34 members."
+  },
+  "extractor_gaps_not_behavioural_gaps": {
+    "note": "These gap keys DO use the signature scanner and their pattern is present in the artifacts; tools/extract_option_signatures.py simply cannot see it. They are extractor coverage gaps, not behavioural gaps. Each pattern was reconstructed here and verified against the game.",
+    "options": [
+      "BenchmarkFix",
+      "BorderlessWindowed",
+      "CarDecalsFix",
+      "CarPartsShadowFix",
+      "DebugPrintSpawns",
+      "DoNotPauseOnMinimize",
+      "DrivebyFOVFix",
+      "ForceCarHeadlightShadows",
+      "NoImpostorHeightCutoff",
+      "NoLODLightHeightCutoff",
+      "NoPhysicsSleep",
+      "Patch4RemoveModChecks",
+      "RemoveGFWLUpdatePopup",
+      "RestoreDeathMusic",
+      "StartupTimeFix"
+    ],
+    "excluded_note": "FreezeCarFix is excluded because the patterns listed for it belong to the DebugPrintSpawns block it falls through into, not to a signature of its own."
+  },
+  "unresolved": [],
+  "options_whose_ultimate_patch_target_is_unresolved": {
+    "note": "These gap keys are classified function-call-only because an action WAS attributed to them, but the action delegates through an indirect call whose target lives in a zero-initialised plugin global. The final patch site (and therefore the real signature, if any) cannot be recovered statically from the supplied artifacts.",
+    "options": [
+      "CarDynamicShadowFix",
+      "CutsceneFixes",
+      "FastLoading",
+      "GarageModelFix",
+      "HighQualityReflections",
+      "MouseFix",
+      "OutOfCommissionFix"
+    ]
+  },
+  "options_with_no_flag_call_or_rva_in_arm": [],
+  "options": [
+    {
+      "option": "AddOptionsInMenu",
+      "classification": "flag-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x101302c0",
+      "key_push_va": "0x1005327b",
+      "dispatch_arm": [
+        "0x1005327b",
+        "0x100533da"
+      ],
+      "handler": null,
+      "recovered_mechanism": {
+        "sets_global_flag": [
+          "10158038"
+        ],
+        "local_bitfield_bits": [
+          "d8"
+        ],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x10058620",
+          "0x1005d630",
+          "0x100603e3"
+        ],
+        "shared_helpers_called": [
+          "10058620",
+          "1005d630",
+          "100603e3"
+        ],
+        "feature_callees": [],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [
+          "10063120",
+          "100632d8",
+          "1006330c",
+          "10063314"
+        ],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [],
+      "what_it_does": "sets global flag(s) 0x10158038",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "global flag only",
+      "build_gate": null,
+      "notes": [
+        "Pure enable-flag for the IVMenuAPI integration probe FUN_10052380. The flag at 0x10158038 is read by that probe only; the option performs no patch of its own."
+      ],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "BenchmarkFix",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10130790",
+      "key_push_va": "0x10053e65",
+      "dispatch_arm": [
+        "0x10053e65",
+        "0x10053eae"
+      ],
+      "handler": "0x10005690",
+      "recovered_mechanism": {
+        "sets_global_flag": [
+          "DAT_1015ad50",
+          "DAT_1015ad54"
+        ],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x10005690",
+          "0x1004ac90",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "1004ac90",
+          "1005c160"
+        ],
+        "feature_callees": [
+          "10005690"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": true,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 8
+      },
+      "pattern_evidence": [
+        {
+          "entry": "FUN_1005afa0",
+          "provenance": "handler",
+          "pattern": "E8 ? ? ? ? 83 C4 04 57 8B D8 FF D6 8B 77 20",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x47f600"
+            ]
+          }
+        }
+      ],
+      "what_it_does": "sets global flag(s) DAT_1015ad50, DAT_1015ad54; calls handler/feature function(s) FUN_10005690 that do NOT use the signature scanner; uses the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "signature-scanning patch",
+      "build_gate": [
+        [
+          "!=",
+          9
+        ],
+        [
+          "!=",
+          13
+        ]
+      ],
+      "notes": [
+        "The handler passes its pattern literal to the multi-hit collector FUN_1005AFA0. extract_option_signatures.py only matches FUN_10003830(\"...\"), so a literal that is plainly visible in the decompiled body is missed by the extractor."
+      ],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "BorderlessWindowed",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10132264",
+      "key_push_va": "0x100557f3",
+      "dispatch_arm": [
+        "0x100557f3",
+        "0x1005587c"
+      ],
+      "handler": "0x10005970",
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [
+          "d8",
+          "f8"
+        ],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x10003e20",
+          "0x10005970",
+          "0x1004ac90",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "10003e20",
+          "1004ac90",
+          "1005c160"
+        ],
+        "feature_callees": [
+          "10005970"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": true,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 12
+      },
+      "pattern_evidence": [
+        {
+          "entry": "FUN_1005afa0",
+          "provenance": "handler",
+          "pattern": "FF 15 ? ? ? ? 5F 5E 5D 5B 83 C4 10 C2 10 00",
+          "game": {
+            "hits": 2,
+            "vas": [
+              "0x5bb10e",
+              "0x5bb563"
+            ]
+          }
+        }
+      ],
+      "what_it_does": "calls handler/feature function(s) FUN_10005970 that do NOT use the signature scanner; uses the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "signature-scanning patch",
+      "build_gate": null,
+      "notes": [
+        "Same extractor blind spot: the pattern reaches FUN_1005AFA0 rather than FUN_10003830."
+      ],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "CarDecalsFix",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10130138",
+      "key_push_va": "0x10052fbe",
+      "dispatch_arm": [
+        "0x10052fbe",
+        "0x1005327b"
+      ],
+      "handler": null,
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [
+          "d8",
+          "f8"
+        ],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [
+          {
+            "register": "eax",
+            "opcode": "e9"
+          }
+        ],
+        "direct_calls": [
+          "0x10058620",
+          "0x1005d630",
+          "0x1005dec0",
+          "0x100603e3"
+        ],
+        "shared_helpers_called": [
+          "10058620",
+          "1005d630",
+          "100603e3"
+        ],
+        "feature_callees": [
+          "1005dec0"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [
+          "10063010",
+          "10063120",
+          "10063270",
+          "100632d8",
+          "1006330c",
+          "10063314"
+        ],
+        "virtualprotect_call_sites": 3
+      },
+      "pattern_evidence": [
+        {
+          "entry": "compiled pattern (FUN_100030a0)",
+          "provenance": "feature callee 1005dec0",
+          "pattern": "8B 44 24 08 8B 48 28 81 E1 C0 03 00 00 81 F9 80 00 00 00",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0xaf7f50"
+            ]
+          }
+        }
+      ],
+      "what_it_does": "calls non-patch import(s) 0x10063270; calls handler/feature function(s) FUN_1005dec0 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "indirect jump install at a site obtained without the scanner",
+      "build_gate": null,
+      "notes": [],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "CarDynamicShadowFix",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": null,
+      "key_push_va": null,
+      "dispatch_arm": [
+        "0x1005444d",
+        "0x100545a2"
+      ],
+      "handler": null,
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x10001280",
+          "0x100014b0",
+          "0x10003b20",
+          "0x10022f40",
+          "0x1004ac90",
+          "0x10057840",
+          "0x10057870",
+          "0x100578b0",
+          "0x1005bff0",
+          "0x1005c270"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "10003b20",
+          "1004ac90",
+          "10057840",
+          "10057870",
+          "100578b0",
+          "1005bff0"
+        ],
+        "feature_callees": [
+          "10001280",
+          "10022f40",
+          "1005c270"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [
+          {
+            "slot": "1018e574",
+            "role": null,
+            "written_by_the_option_itself": false,
+            "is_pe_relocation": false,
+            "on_disk_value_hex": null,
+            "obfuscated_materialisation": {
+              "_va": "0x10022ed7",
+              "chain_instruction": "mov    DWORD PTR [esi],edi"
+            },
+            "resolved": false
+          }
+        ],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [],
+      "what_it_does": "calls handler/feature function(s) FUN_10001280, FUN_10022f40, FUN_1005c270 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "delegates to function(s)",
+      "build_gate": null,
+      "notes": [
+        "No standalone key string exists. The loader composes the name at run time from the format \"Ca%snam%s%swF%s\" (0x10130FB8) plus the pooled fragments rDy/icSh/ado/ix and reads the result at 0x1005458e, so option_references.json has string_va=null and every key-string-driven extraction misses the option entirely. Its arm calls the shared argument-driven installer FUN_10022F40 -> FUN_10010B60 (via the thunk 0x10022F30 -> 0x1018E574) with a setne for CarPartsShadowFix and a setne for ForceCarHeadlightShadows.",
+        "Indirect slot(s) that could not be resolved from the supplied artifacts: 1018e574. Each is zero on disk, is not a PE relocation target, and its only static materialisation is an obfuscated lea/add (or lea/sub) pair in a constructor that stores a computed pointer this analysis cannot resolve."
+      ],
+      "confidence": "probable"
+    },
+    {
+      "option": "CarPartsShadowFix",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10131010",
+      "key_push_va": "0x10054658",
+      "dispatch_arm": [
+        "0x10054658",
+        "0x100546d5"
+      ],
+      "handler": "0x10006910",
+      "recovered_mechanism": {
+        "sets_global_flag": [
+          "DAT_1015bdc0",
+          "DAT_1015bdc8"
+        ],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x10003b20",
+          "0x10006910",
+          "0x10007e40",
+          "0x1004ac90",
+          "0x10057840",
+          "0x100578b0",
+          "0x1005bff0"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "10003b20",
+          "1004ac90",
+          "10057840",
+          "100578b0",
+          "1005bff0"
+        ],
+        "feature_callees": [
+          "10006910",
+          "10007e40"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 4
+      },
+      "pattern_evidence": [
+        {
+          "entry": "FUN_10003830",
+          "provenance": "runtime-assembled digit loop in FUN_10006910",
+          "pattern": "485 DB 7E 41 55 EB 0A",
+          "assembled": true,
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x40c9ff"
+            ]
+          }
+        }
+      ],
+      "what_it_does": "sets global flag(s) DAT_1015bdc0, DAT_1015bdc8; calls handler/feature function(s) FUN_10006910, FUN_10007e40 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "delegates to function(s)",
+      "build_gate": null,
+      "notes": [
+        "FUN_10006910 builds its scanner pattern at run time from a decimal digit loop over immediate values instead of using a string literal, so there is no signature literal to extract. Re-assembling the loop yields pattern \"485 DB 7E 41 55 EB 0A\", which matches the game exactly once."
+      ],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "CutsceneFixes",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10131b30",
+      "key_push_va": "0x10055048",
+      "dispatch_arm": [
+        "0x10055048",
+        "0x100550ca"
+      ],
+      "handler": "0x100441a0",
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x10003b20",
+          "0x100441a0",
+          "0x10045420",
+          "0x1004ac90",
+          "0x10057710",
+          "0x10057870",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "10003b20",
+          "1004ac90",
+          "10057710",
+          "10057870",
+          "1005c160"
+        ],
+        "feature_callees": [
+          "100441a0",
+          "10045420"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [
+          {
+            "slot": "10164f04",
+            "role": "CutsceneFixes (FUN_10045410)",
+            "written_by_the_option_itself": false,
+            "is_pe_relocation": false,
+            "on_disk_value_hex": null,
+            "obfuscated_materialisation": {
+              "_va": "0x100453e7",
+              "chain_instruction": "mov    DWORD PTR [eax],ebx"
+            },
+            "resolved": false
+          },
+          {
+            "slot": "10189ee0",
+            "role": "CutsceneFixes",
+            "written_by_the_option_itself": false,
+            "is_pe_relocation": false,
+            "on_disk_value_hex": null,
+            "obfuscated_materialisation": {
+              "_va": "0x10044137",
+              "chain_instruction": "mov    DWORD PTR [eax],ebx"
+            },
+            "resolved": false
+          }
+        ],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [],
+      "what_it_does": "calls handler/feature function(s) FUN_100441a0, FUN_10045420 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "delegates to function(s)",
+      "build_gate": null,
+      "notes": [
+        "The handler forwards through 0x10189EE0; the arm additionally calls FUN_10045420, which forwards through 0x10164F04.",
+        "Indirect slot(s) that could not be resolved from the supplied artifacts: 10164f04, 10189ee0. Each is zero on disk, is not a PE relocation target, and its only static materialisation is an obfuscated lea/add (or lea/sub) pair in a constructor that stores a computed pointer this analysis cannot resolve."
+      ],
+      "confidence": "probable"
+    },
+    {
+      "option": "DebugPrintSpawns",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x101308f0",
+      "key_push_va": "0x10053f84",
+      "dispatch_arm": [
+        "0x10053f84",
+        "0x10053fe0"
+      ],
+      "handler": null,
+      "recovered_mechanism": {
+        "sets_global_flag": [
+          "10159c15"
+        ],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x10037c70",
+          "0x1004ac90",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "1004ac90",
+          "1005c160"
+        ],
+        "feature_callees": [
+          "10037c70"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 10037c70",
+          "pattern": "32 DB 8B 54 24 24 52 E8 ? ? ? ? 8B F0",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x7163a4"
+            ]
+          }
+        },
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 10037c70",
+          "pattern": "8B 4C 24 28 8B 54 24 24 50 51 52 E8 ? ? ? ? 5F 5E 5D 5B",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x6d6fb9"
+            ]
+          }
+        },
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 10037c70",
+          "pattern": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x6d6d08"
+            ]
+          }
+        },
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 10037c70",
+          "pattern": "88 87 40 01 00 00 E8",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x6fae01"
+            ]
+          }
+        },
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 10037c70",
+          "pattern": "88 5C 24 1F 8B 54 24 28 52 E8",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x6dd715"
+            ]
+          }
+        },
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 10037c70",
+          "pattern": "38 98 8C 00 00 00 75 2D 57 E8",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x713461"
+            ]
+          }
+        },
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 10037c70",
+          "pattern": "32 DB 8B 54 24 24 52 E8",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x7163a4"
+            ]
+          }
+        }
+      ],
+      "what_it_does": "sets global flag(s) 0x10159c15; calls handler/feature function(s) FUN_10037c70 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "delegates to function(s)",
+      "build_gate": null,
+      "notes": [],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "DoNotPauseOnMinimize",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x1013220c",
+      "key_push_va": "0x10055798",
+      "dispatch_arm": [
+        "0x10055798",
+        "0x100557f3"
+      ],
+      "handler": null,
+      "recovered_mechanism": {
+        "sets_global_flag": [
+          "1015ad43"
+        ],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x1001ede0",
+          "0x1004ac90",
+          "0x10052380",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "1004ac90",
+          "10052380",
+          "1005c160"
+        ],
+        "feature_callees": [
+          "1001ede0"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 1001ede0",
+          "pattern": "6A 0A 56 50 FF D2 A1",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x5b68a6"
+            ]
+          }
+        }
+      ],
+      "what_it_does": "sets global flag(s) 0x1015ad43; calls handler/feature function(s) FUN_1001ede0 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "delegates to function(s)",
+      "build_gate": null,
+      "notes": [],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "DrivebyFOVFix",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10130428",
+      "key_push_va": "0x10053978",
+      "dispatch_arm": [
+        "0x10053978",
+        "0x10053b4e"
+      ],
+      "handler": null,
+      "recovered_mechanism": {
+        "sets_global_flag": [
+          "1015bdf4"
+        ],
+        "local_bitfield_bits": [
+          "d8"
+        ],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [
+          {
+            "register": "esi",
+            "opcode": "e9"
+          }
+        ],
+        "direct_calls": [
+          "0x10003830",
+          "0x10058620",
+          "0x1005d630",
+          "0x100603e3"
+        ],
+        "shared_helpers_called": [
+          "10003830",
+          "10058620",
+          "1005d630",
+          "100603e3"
+        ],
+        "feature_callees": [],
+        "calls_signature_scanner": {
+          "in_arm": true,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [
+          {
+            "entry": "FUN_10003830",
+            "pattern_va": "0x10129ed0",
+            "call_va": "0x10053a86"
+          }
+        ],
+        "indirect_slots": [
+          {
+            "slot": "1015bdf4",
+            "role": null,
+            "written_by_the_option_itself": true,
+            "is_pe_relocation": false,
+            "on_disk_value_hex": null,
+            "obfuscated_materialisation": null,
+            "resolved": true
+          }
+        ],
+        "iat_calls": [
+          "10063120",
+          "100632d8",
+          "1006330c",
+          "10063314"
+        ],
+        "virtualprotect_call_sites": 1
+      },
+      "pattern_evidence": [
+        {
+          "entry": "FUN_10003830",
+          "provenance": "dispatch arm (register-held .rdata)",
+          "pattern": "F3 0F 10 46 60 F3 0F 5C CA",
+          "pattern_va": "0x10129ed0",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x85031f"
+            ]
+          }
+        }
+      ],
+      "what_it_does": "sets global flag(s) 0x1015bdf4; uses the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "signature-scanning patch",
+      "build_gate": null,
+      "notes": [
+        "Inline in the loader arm: FUN_10003830 receives its pattern through ecx (mov ecx,0x10129ED0), and extract_option_signatures.py only matches the literal form FUN_10003830(\"...\"). Already recorded in evidence/inline_patch_sites.json."
+      ],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "FastLoading",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x101306f4",
+      "key_push_va": "0x10053d94",
+      "dispatch_arm": [
+        "0x10053d94",
+        "0x10053e1c"
+      ],
+      "handler": "0x1001eca0",
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x10003b20",
+          "0x1001eca0",
+          "0x1004ac90",
+          "0x10057870",
+          "0x100578b0",
+          "0x1005bff0"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "10003b20",
+          "1004ac90",
+          "10057870",
+          "100578b0",
+          "1005bff0"
+        ],
+        "feature_callees": [
+          "1001eca0"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [
+          {
+            "slot": "1015e840",
+            "role": "FastLoading",
+            "written_by_the_option_itself": false,
+            "is_pe_relocation": false,
+            "on_disk_value_hex": null,
+            "obfuscated_materialisation": {
+              "_va": "0x1001ec37",
+              "chain_instruction": "mov    DWORD PTR [eax],ebx"
+            },
+            "resolved": false
+          }
+        ],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [],
+      "what_it_does": "calls handler/feature function(s) FUN_1001eca0 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "delegates to function(s)",
+      "build_gate": null,
+      "notes": [
+        "The handler thunk forwards to an indirect call through the pointer global 0x1015E840.",
+        "Indirect slot(s) that could not be resolved from the supplied artifacts: 1015e840. Each is zero on disk, is not a PE relocation target, and its only static materialisation is an obfuscated lea/add (or lea/sub) pair in a constructor that stores a computed pointer this analysis cannot resolve."
+      ],
+      "confidence": "probable"
+    },
+    {
+      "option": "FixPCIDKickbug",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10131ad4",
+      "key_push_va": "0x10054ff4",
+      "dispatch_arm": [
+        "0x10054ff4",
+        "0x10055048"
+      ],
+      "handler": null,
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x1004ac90",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "1004ac90",
+          "1005c160"
+        ],
+        "feature_callees": [],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [
+          "10063248"
+        ],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [],
+      "what_it_does": "calls non-patch import(s) 0x10063248",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "external API call (no game memory write)",
+      "build_gate": null,
+      "notes": [
+        "No game-memory write at all. The arm calls SHLWAPI SHDeleteValueW (IAT 0x10063248) with HKEY 0x80000001 and the XLive value names at 0x1012B444 (\"PCID\") and 0x1012B498 (\"Software\\Classes\\Software\\Microsoft\\XLive...\"). It is a registry predicate/action, not a patch, and scans no signature."
+      ],
+      "confidence": "probable"
+    },
+    {
+      "option": "ForceCarHeadlightShadows",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10131070",
+      "key_push_va": "0x100545a2",
+      "dispatch_arm": [
+        "0x100545a2",
+        "0x10054658"
+      ],
+      "handler": null,
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x10003b20",
+          "0x1001add0",
+          "0x1004ac90",
+          "0x10057870",
+          "0x100578b0",
+          "0x1005bff0"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "10003b20",
+          "1004ac90",
+          "10057870",
+          "100578b0",
+          "1005bff0"
+        ],
+        "feature_callees": [
+          "1001add0"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 1001add0",
+          "pattern": "3C 01 75 50 84 DB 75 79",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x8f7c5b"
+            ]
+          }
+        },
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 1001add0",
+          "pattern": "55 8B EC 83 E4 F0 81 EC D4 00 00 00 8B 45 20 8B",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x8f7590"
+            ]
+          }
+        }
+      ],
+      "what_it_does": "calls handler/feature function(s) FUN_1001add0 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "delegates to function(s)",
+      "build_gate": null,
+      "notes": [],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "FreezeCarFix",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x1013089c",
+      "key_push_va": "0x10053f40",
+      "dispatch_arm": [
+        "0x10053f40",
+        "0x10053f84"
+      ],
+      "handler": null,
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x1004ac90",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "1004ac90",
+          "1005c160"
+        ],
+        "feature_callees": [
+          "10037c70"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 10037c70",
+          "pattern": "32 DB 8B 54 24 24 52 E8 ? ? ? ? 8B F0",
+          "inherited_from_fallthrough_block": [
+            "DebugPrintSpawns"
+          ],
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x7163a4"
+            ]
+          }
+        },
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 10037c70",
+          "pattern": "8B 4C 24 28 8B 54 24 24 50 51 52 E8 ? ? ? ? 5F 5E 5D 5B",
+          "inherited_from_fallthrough_block": [
+            "DebugPrintSpawns"
+          ],
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x6d6fb9"
+            ]
+          }
+        },
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 10037c70",
+          "pattern": "E9 A1 02 00 00 83 FF 09 0F 87 F2 00 00 00",
+          "inherited_from_fallthrough_block": [
+            "DebugPrintSpawns"
+          ],
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x6d6d08"
+            ]
+          }
+        },
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 10037c70",
+          "pattern": "88 87 40 01 00 00 E8",
+          "inherited_from_fallthrough_block": [
+            "DebugPrintSpawns"
+          ],
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x6fae01"
+            ]
+          }
+        },
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 10037c70",
+          "pattern": "88 5C 24 1F 8B 54 24 28 52 E8",
+          "inherited_from_fallthrough_block": [
+            "DebugPrintSpawns"
+          ],
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x6dd715"
+            ]
+          }
+        },
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 10037c70",
+          "pattern": "38 98 8C 00 00 00 75 2D 57 E8",
+          "inherited_from_fallthrough_block": [
+            "DebugPrintSpawns"
+          ],
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x713461"
+            ]
+          }
+        },
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 10037c70",
+          "pattern": "32 DB 8B 54 24 24 52 E8",
+          "inherited_from_fallthrough_block": [
+            "DebugPrintSpawns"
+          ],
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x7163a4"
+            ]
+          }
+        }
+      ],
+      "what_it_does": "calls handler/feature function(s) FUN_10037c70 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "delegates to function(s)",
+      "build_gate": null,
+      "notes": [
+        "No patch code of its own. Its taken branch (value==1) falls straight through into the DebugPrintSpawns block (0x10053F84), and its not-taken branch skips BOTH blocks (jne 0x10053FDB). It is therefore the enabling gate for that block - matching the INI note \"requires FreezeCarFix to be on\" - and not an independent patch site. Its own arm directly writes nothing and sets no flag; the patch code below it is attributed to DebugPrintSpawns, so any pattern listed here is the shared block's, not FreezeCarFix's own signature."
+      ],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "GarageModelFix",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10132068",
+      "key_push_va": "0x10055536",
+      "dispatch_arm": [
+        "0x10055536",
+        "0x100555b3"
+      ],
+      "handler": "0x10050860",
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x10003b20",
+          "0x1004ac90",
+          "0x10050860",
+          "0x10057710",
+          "0x10057870",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "10003b20",
+          "1004ac90",
+          "10057710",
+          "10057870",
+          "1005c160"
+        ],
+        "feature_callees": [
+          "10050860"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [
+          {
+            "slot": "101a4e98",
+            "role": "GarageModelFix",
+            "written_by_the_option_itself": false,
+            "is_pe_relocation": false,
+            "on_disk_value_hex": null,
+            "obfuscated_materialisation": {
+              "_va": "0x10050827",
+              "chain_instruction": "mov    DWORD PTR [eax],ebx"
+            },
+            "resolved": false
+          }
+        ],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [],
+      "what_it_does": "calls handler/feature function(s) FUN_10050860 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "delegates to function(s)",
+      "build_gate": null,
+      "notes": [
+        "The handler forwards through 0x101A4E98.",
+        "Indirect slot(s) that could not be resolved from the supplied artifacts: 101a4e98. Each is zero on disk, is not a PE relocation target, and its only static materialisation is an obfuscated lea/add (or lea/sub) pair in a constructor that stores a computed pointer this analysis cannot resolve."
+      ],
+      "confidence": "probable"
+    },
+    {
+      "option": "HighQualityReflections",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x1013169c",
+      "key_push_va": "0x10054c97",
+      "dispatch_arm": [
+        "0x10054c97",
+        "0x10054ce0"
+      ],
+      "handler": "0x10023dc0",
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x10023dc0",
+          "0x1004ac90",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "1004ac90",
+          "1005c160"
+        ],
+        "feature_callees": [
+          "10023dc0"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [
+          {
+            "slot": "10192f14",
+            "role": "HighQualityReflections",
+            "written_by_the_option_itself": false,
+            "is_pe_relocation": false,
+            "on_disk_value_hex": null,
+            "obfuscated_materialisation": {
+              "_va": "0x10023d77",
+              "chain_instruction": "mov    DWORD PTR [ecx],edx"
+            },
+            "resolved": false
+          }
+        ],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [],
+      "what_it_does": "calls handler/feature function(s) FUN_10023dc0 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "delegates to function(s)",
+      "build_gate": null,
+      "notes": [
+        "The handler forwards through 0x10192F14.",
+        "Indirect slot(s) that could not be resolved from the supplied artifacts: 10192f14. Each is zero on disk, is not a PE relocation target, and its only static materialisation is an obfuscated lea/add (or lea/sub) pair in a constructor that stores a computed pointer this analysis cannot resolve."
+      ],
+      "confidence": "probable"
+    },
+    {
+      "option": "LaunchWithPlayGTAIV",
+      "classification": "rva-patch",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10131e38",
+      "key_push_va": "0x10055317",
+      "dispatch_arm": [
+        "0x10055317",
+        "0x10055360"
+      ],
+      "handler": "0x100441b0",
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [
+            {
+              "store_va": "0x10044252",
+              "register": "esi",
+              "instruction": "mov    DWORD PTR [esi],0x79616c50"
+            },
+            {
+              "store_va": "0x10044281",
+              "register": "esi",
+              "instruction": "mov    DWORD PTR [esi],0x78652e56"
+            },
+            {
+              "store_va": "0x100442ae",
+              "register": "esi",
+              "instruction": "mov    DWORD PTR [esi],0x79616c50"
+            },
+            {
+              "store_va": "0x100442de",
+              "register": "esi",
+              "instruction": "mov    DWORD PTR [esi],0x78652e56"
+            },
+            {
+              "store_va": "0x10044252",
+              "register": "esi",
+              "instruction": "mov    DWORD PTR [esi],0x79616c50"
+            },
+            {
+              "store_va": "0x10044281",
+              "register": "esi",
+              "instruction": "mov    DWORD PTR [esi],0x78652e56"
+            },
+            {
+              "store_va": "0x100442ae",
+              "register": "esi",
+              "instruction": "mov    DWORD PTR [esi],0x79616c50"
+            },
+            {
+              "store_va": "0x100442de",
+              "register": "esi",
+              "instruction": "mov    DWORD PTR [esi],0x78652e56"
+            }
+          ],
+          "register_relative_store_count": 8,
+          "register_offset_references": 2
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x100441b0",
+          "0x1004ac90",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "1004ac90",
+          "1005c160"
+        ],
+        "feature_callees": [
+          "100441b0"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 8
+      },
+      "pattern_evidence": [],
+      "what_it_does": "writes through a register loaded with the module base (8 store(s), e.g. mov    DWORD PTR [esi],0x79616c50); calls handler/feature function(s) FUN_100441b0 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "rva-patch (module-relative write)",
+      "build_gate": [
+        [
+          "!=",
+          9
+        ],
+        [
+          "==",
+          1
+        ],
+        [
+          "==",
+          5
+        ],
+        [
+          "==",
+          7
+        ],
+        [
+          "==",
+          8
+        ]
+      ],
+      "notes": [
+        "The handler patches by register-held module-relative offsets: it loads the module base (mov esi,ds:0x1015AD70), adds a per-build offset selected from the build slot (ordinals 1/5/7/8/9) and overwrites eight bytes at that site with the ASCII \"PlayGTAIV.exe\" in two 8-byte stores. The offsets are read from the build-slot switch rather than being immediates in the same data-flow chain, so they are recorded as register-relative rather than as literal RVAs."
+      ],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "LoadDLCs",
+      "classification": "rva-patch",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10130748",
+      "key_push_va": "0x10053e1c",
+      "dispatch_arm": [
+        "0x10053e1c",
+        "0x10053e65"
+      ],
+      "handler": "0x100234e0",
+      "recovered_mechanism": {
+        "sets_global_flag": [
+          "DAT_1015804c",
+          "DAT_101580d0",
+          "DAT_1015bddc"
+        ],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [
+            "0x41356d",
+            "0x4137cd",
+            "0x4141fc",
+            "0x414274",
+            "0x4142ae",
+            "0x4142da",
+            "0x4142df",
+            "0x414300"
+          ],
+          "literal_offset_count": 21,
+          "register_relative_stores": [
+            {
+              "store_va": "0x100235e0",
+              "register": "esi",
+              "instruction": "mov    DWORD PTR [esi],0x90909090"
+            },
+            {
+              "store_va": "0x10023677",
+              "register": "edi",
+              "instruction": "mov    BYTE PTR [edi],0xe8"
+            },
+            {
+              "store_va": "0x100237e9",
+              "register": "esi",
+              "instruction": "mov    DWORD PTR [esi],0x90909090"
+            },
+            {
+              "store_va": "0x10023880",
+              "register": "edi",
+              "instruction": "mov    BYTE PTR [edi],0xe8"
+            },
+            {
+              "store_va": "0x100239f6",
+              "register": "esi",
+              "instruction": "mov    DWORD PTR [esi],0x90909090"
+            },
+            {
+              "store_va": "0x10023a8d",
+              "register": "edi",
+              "instruction": "mov    BYTE PTR [edi],0xe8"
+            },
+            {
+              "store_va": "0x100235e0",
+              "register": "esi",
+              "instruction": "mov    DWORD PTR [esi],0x90909090"
+            },
+            {
+              "store_va": "0x10023677",
+              "register": "edi",
+              "instruction": "mov    BYTE PTR [edi],0xe8"
+            },
+            {
+              "store_va": "0x100237e9",
+              "register": "esi",
+              "instruction": "mov    DWORD PTR [esi],0x90909090"
+            },
+            {
+              "store_va": "0x10023880",
+              "register": "edi",
+              "instruction": "mov    BYTE PTR [edi],0xe8"
+            },
+            {
+              "store_va": "0x100239f6",
+              "register": "esi",
+              "instruction": "mov    DWORD PTR [esi],0x90909090"
+            },
+            {
+              "store_va": "0x10023a8d",
+              "register": "edi",
+              "instruction": "mov    BYTE PTR [edi],0xe8"
+            }
+          ],
+          "register_relative_store_count": 12,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x100234e0",
+          "0x1004ac90",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "1004ac90",
+          "1005c160"
+        ],
+        "feature_callees": [
+          "100234e0"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 64
+      },
+      "pattern_evidence": [],
+      "what_it_does": "sets global flag(s) DAT_1015804c, DAT_101580d0, DAT_1015bddc; writes at 21 module-relative literal offset(s) from DAT_1015AD70 (0x41356d, 0x4137cd, 0x4141fc, 0x414274); writes through a register loaded with the module base (12 store(s), e.g. mov    DWORD PTR [esi],0x90909090); calls handler/feature function(s) FUN_100234e0 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "rva-patch (module-relative write)",
+      "build_gate": [
+        [
+          "==",
+          7
+        ],
+        [
+          "==",
+          8
+        ],
+        [
+          "==",
+          9
+        ]
+      ],
+      "notes": [],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "MouseFix",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x101321b8",
+      "key_push_va": "0x1005571b",
+      "dispatch_arm": [
+        "0x1005571b",
+        "0x10055798"
+      ],
+      "handler": "0x1003d7a0",
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x10003b20",
+          "0x1003d7a0",
+          "0x1004ac90",
+          "0x10057710",
+          "0x10057870",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "10003b20",
+          "1004ac90",
+          "10057710",
+          "10057870",
+          "1005c160"
+        ],
+        "feature_callees": [
+          "1003d7a0"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [
+          {
+            "slot": "1019e7b8",
+            "role": "MouseFix",
+            "written_by_the_option_itself": false,
+            "is_pe_relocation": false,
+            "on_disk_value_hex": null,
+            "obfuscated_materialisation": {
+              "_va": "0x1003d767",
+              "chain_instruction": "mov    DWORD PTR [eax],ebx"
+            },
+            "resolved": false
+          }
+        ],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [],
+      "what_it_does": "calls handler/feature function(s) FUN_1003d7a0 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "delegates to function(s)",
+      "build_gate": null,
+      "notes": [
+        "The handler forwards through 0x1019E7B8.",
+        "Indirect slot(s) that could not be resolved from the supplied artifacts: 1019e7b8. Each is zero on disk, is not a PE relocation target, and its only static materialisation is an obfuscated lea/add (or lea/sub) pair in a constructor that stores a computed pointer this analysis cannot resolve."
+      ],
+      "confidence": "probable"
+    },
+    {
+      "option": "MovingPlaneParts",
+      "classification": "flag-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10131488",
+      "key_push_va": "0x10054a86",
+      "dispatch_arm": [
+        "0x10054a86",
+        "0x10054af4"
+      ],
+      "handler": null,
+      "recovered_mechanism": {
+        "sets_global_flag": [
+          "10159c17"
+        ],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x10003b20",
+          "0x10005210",
+          "0x1004ac90",
+          "0x10057840",
+          "0x100578b0",
+          "0x1005bff0"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "10003b20",
+          "10005210",
+          "1004ac90",
+          "10057840",
+          "100578b0",
+          "1005bff0"
+        ],
+        "feature_callees": [],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [],
+      "what_it_does": "sets global flag(s) 0x10159c17",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "global flag only",
+      "build_gate": null,
+      "notes": [
+        "The arm calls the shared multi-pattern installer FUN_10005210; the option-specific action is the flag it sets."
+      ],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "MovingSteeringWheelSupport",
+      "classification": "flag-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10131428",
+      "key_push_va": "0x10054a18",
+      "dispatch_arm": [
+        "0x10054a18",
+        "0x10054a86"
+      ],
+      "handler": null,
+      "recovered_mechanism": {
+        "sets_global_flag": [
+          "1015ad40"
+        ],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x10003b20",
+          "0x10005210",
+          "0x1004ac90",
+          "0x10057840",
+          "0x100578b0",
+          "0x1005bff0"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "10003b20",
+          "10005210",
+          "1004ac90",
+          "10057840",
+          "100578b0",
+          "1005bff0"
+        ],
+        "feature_callees": [],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [],
+      "what_it_does": "sets global flag(s) 0x1015ad40",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "global flag only",
+      "build_gate": null,
+      "notes": [
+        "The arm calls the shared multi-pattern installer FUN_10005210 (which also calls FUN_10004110); the option-specific action is the flag it sets."
+      ],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "NoImpostorHeightCutoff",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10130368",
+      "key_push_va": "0x10053582",
+      "dispatch_arm": [
+        "0x10053582",
+        "0x100537c7"
+      ],
+      "handler": null,
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [
+          "d8"
+        ],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x10058620",
+          "0x1005afa0",
+          "0x1005d630",
+          "0x100603e3"
+        ],
+        "shared_helpers_called": [
+          "10058620",
+          "1005d630",
+          "100603e3"
+        ],
+        "feature_callees": [
+          "1005afa0"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": true,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [
+          {
+            "entry": "FUN_1005afa0",
+            "pattern_va": "0x1012d38c",
+            "call_va": "0x100536a7"
+          }
+        ],
+        "indirect_slots": [],
+        "iat_calls": [
+          "10063010",
+          "10063120",
+          "100632d8",
+          "1006330c",
+          "10063314"
+        ],
+        "virtualprotect_call_sites": 4
+      },
+      "pattern_evidence": [
+        {
+          "entry": "FUN_1005afa0",
+          "provenance": "dispatch arm (register-held .rdata)",
+          "pattern": "76 0B F3 0F 11 8C 24 88 00 00 00 EB 09",
+          "pattern_va": "0x1012d38c",
+          "game": {
+            "hits": 2,
+            "vas": [
+              "0xca058d",
+              "0xca118e"
+            ]
+          }
+        }
+      ],
+      "what_it_does": "calls handler/feature function(s) FUN_1005afa0 that do NOT use the signature scanner; uses the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "signature-scanning patch",
+      "build_gate": null,
+      "notes": [
+        "Inline in the loader arm using the multi-hit collector with a register-held .rdata pattern pointer (mov edx,0x1012D38C). Already recorded in evidence/inline_patch_sites.json."
+      ],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "NoLODLightHeightCutoff",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x101303c8",
+      "key_push_va": "0x100537c7",
+      "dispatch_arm": [
+        "0x100537c7",
+        "0x10053978"
+      ],
+      "handler": null,
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [
+          "d8"
+        ],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x10003830",
+          "0x10058620",
+          "0x1005d630",
+          "0x100603e3"
+        ],
+        "shared_helpers_called": [
+          "10003830",
+          "10058620",
+          "1005d630",
+          "100603e3"
+        ],
+        "feature_callees": [],
+        "calls_signature_scanner": {
+          "in_arm": true,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [
+          {
+            "entry": "FUN_10003830",
+            "pattern_va": "0x1012d3f8",
+            "call_va": "0x100538d5"
+          }
+        ],
+        "indirect_slots": [],
+        "iat_calls": [
+          "10063120",
+          "100632d8",
+          "1006330c",
+          "10063314"
+        ],
+        "virtualprotect_call_sites": 1
+      },
+      "pattern_evidence": [
+        {
+          "entry": "FUN_10003830",
+          "provenance": "dispatch arm (register-held .rdata)",
+          "pattern": "76 08 F3 0F 11 4C 24 1C EB 06 F3 0F 11 44 24 1C 89 5C 24 64",
+          "pattern_va": "0x1012d3f8",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0xc9fa70"
+            ]
+          }
+        }
+      ],
+      "what_it_does": "uses the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "signature-scanning patch",
+      "build_gate": null,
+      "notes": [
+        "Inline in the loader arm with a register-held .rdata pattern pointer (mov ecx,0x1012D3F8)."
+      ],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "NoPhysicsSleep",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10130314",
+      "key_push_va": "0x100533da",
+      "dispatch_arm": [
+        "0x100533da",
+        "0x10053582"
+      ],
+      "handler": null,
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [
+          "d8"
+        ],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x10003830",
+          "0x10058620",
+          "0x1005d630",
+          "0x100603e3"
+        ],
+        "shared_helpers_called": [
+          "10003830",
+          "10058620",
+          "1005d630",
+          "100603e3"
+        ],
+        "feature_callees": [],
+        "calls_signature_scanner": {
+          "in_arm": true,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [
+          {
+            "entry": "FUN_10003830",
+            "pattern_va": "0x1012d684",
+            "call_va": "0x100534e8"
+          }
+        ],
+        "indirect_slots": [],
+        "iat_calls": [
+          "10063010",
+          "10063120",
+          "100632d8",
+          "1006330c",
+          "10063314"
+        ],
+        "virtualprotect_call_sites": 2
+      },
+      "pattern_evidence": [
+        {
+          "entry": "FUN_10003830",
+          "provenance": "dispatch arm (register-held .rdata)",
+          "pattern": "0F 00 00 00 C7 41 14 14 00 00 00 C7 41 1C 00 00",
+          "pattern_va": "0x1012d684",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x4f1110"
+            ]
+          }
+        }
+      ],
+      "what_it_does": "uses the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "signature-scanning patch",
+      "build_gate": null,
+      "notes": [
+        "Inline in the loader arm with a register-held .rdata pattern pointer (mov ecx,0x1012D684). Already recorded in evidence/inline_patch_sites.json."
+      ],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "OutOfCommissionFix",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10132370",
+      "key_push_va": "0x10055909",
+      "dispatch_arm": [
+        "0x10055909",
+        "0x10055991"
+      ],
+      "handler": "0x10050a20",
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x10003b20",
+          "0x1004ac90",
+          "0x10050a20",
+          "0x10057870",
+          "0x100578b0",
+          "0x1005bff0"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "10003b20",
+          "1004ac90",
+          "10057870",
+          "100578b0",
+          "1005bff0"
+        ],
+        "feature_callees": [
+          "10050a20"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [
+          {
+            "slot": "1017076c",
+            "role": "OutOfCommissionFix",
+            "written_by_the_option_itself": false,
+            "is_pe_relocation": false,
+            "on_disk_value_hex": null,
+            "obfuscated_materialisation": {
+              "_va": "0x100509e7",
+              "chain_instruction": "mov    DWORD PTR [eax],ebx"
+            },
+            "resolved": false
+          }
+        ],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [],
+      "what_it_does": "calls handler/feature function(s) FUN_10050a20 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "delegates to function(s)",
+      "build_gate": null,
+      "notes": [
+        "The handler forwards through 0x1017076C.",
+        "Indirect slot(s) that could not be resolved from the supplied artifacts: 1017076c. Each is zero on disk, is not a PE relocation target, and its only static materialisation is an obfuscated lea/add (or lea/sub) pair in a constructor that stores a computed pointer this analysis cannot resolve."
+      ],
+      "confidence": "probable"
+    },
+    {
+      "option": "OverrideGTADatPathTo",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10131184",
+      "key_push_va": "0x100547a9",
+      "dispatch_arm": [
+        "0x100547a9",
+        "0x100547de"
+      ],
+      "handler": null,
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x1004ac90",
+          "0x10057710",
+          "0x1005b730",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "1004ac90",
+          "10057710",
+          "1005c160"
+        ],
+        "feature_callees": [
+          "1005b730"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [],
+      "what_it_does": "calls handler/feature function(s) FUN_1005b730 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "delegates to function(s)",
+      "build_gate": null,
+      "notes": [
+        "No scanner use: the arm reads the INI value and calls FUN_1005B730, which is strcpy_s(dst=0x10158068, 0x40, value) into the plugin global that the sibling OverrideGTADatPath handler patches into the gta.dat loader call."
+      ],
+      "confidence": "probable"
+    },
+    {
+      "option": "Patch4RemoveModChecks",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10131f58",
+      "key_push_va": "0x10055452",
+      "dispatch_arm": [
+        "0x10055452",
+        "0x100554a2"
+      ],
+      "handler": null,
+      "recovered_mechanism": {
+        "sets_global_flag": [
+          "10159c14"
+        ],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x10005500",
+          "0x1004ac90",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "1004ac90",
+          "1005c160"
+        ],
+        "feature_callees": [
+          "10005500"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 10005500",
+          "pattern": "2B C1 1B D6 89 44 24 0C 89 54 24 10 DF 6C 24 0C D8 0D ? ? ? ? D9 5C 24 08",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x7cbf70"
+            ]
+          }
+        }
+      ],
+      "what_it_does": "sets global flag(s) 0x10159c14; calls handler/feature function(s) FUN_10005500 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "delegates to function(s)",
+      "build_gate": null,
+      "notes": [
+        "Sets its own flag and additionally calls the shared hook installer FUN_10005500; the real edits live in the installed stub 0x100054E0 -> FUN_10005340, selected by the flag."
+      ],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "Patch6and7RemoveModChecks",
+      "classification": "rva-patch",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10131e94",
+      "key_push_va": "0x10055360",
+      "dispatch_arm": [
+        "0x10055360",
+        "0x10055452"
+      ],
+      "handler": "0x10044710",
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [
+          "d8",
+          "f8"
+        ],
+        "module_relative_writes": {
+          "literal_offsets": [
+            "0x388c",
+            "0x389c",
+            "0x38ac",
+            "0x390e",
+            "0x392e",
+            "0x395e",
+            "0x3962",
+            "0x397e"
+          ],
+          "literal_offset_count": 25,
+          "register_relative_stores": [
+            {
+              "store_va": "0x10044751",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0xeb"
+            },
+            {
+              "store_va": "0x10044777",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x1004479d",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x100447c3",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x100447e9",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x1004480f",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x10044835",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x1004485b",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x100448de",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0xeb"
+            },
+            {
+              "store_va": "0x10044904",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x0"
+            },
+            {
+              "store_va": "0x1004492a",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x0"
+            },
+            {
+              "store_va": "0x1004495e",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0xeb"
+            },
+            {
+              "store_va": "0x10044984",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x100449aa",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x100449d0",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x100449f6",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x10044a1c",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x10044a42",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x10044a68",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x10044aeb",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0xeb"
+            },
+            {
+              "store_va": "0x10044b6e",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x0"
+            },
+            {
+              "store_va": "0x10044b94",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x0"
+            },
+            {
+              "store_va": "0x10044751",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0xeb"
+            },
+            {
+              "store_va": "0x10044777",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x1004479d",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x100447c3",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x100447e9",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x1004480f",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x10044835",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x1004485b",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x100448de",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0xeb"
+            },
+            {
+              "store_va": "0x10044904",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x0"
+            },
+            {
+              "store_va": "0x1004492a",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x0"
+            },
+            {
+              "store_va": "0x1004495e",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0xeb"
+            },
+            {
+              "store_va": "0x10044984",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x100449aa",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x100449d0",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x100449f6",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x10044a1c",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x10044a42",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x10044a68",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x90"
+            },
+            {
+              "store_va": "0x10044aeb",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0xeb"
+            },
+            {
+              "store_va": "0x10044b6e",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x0"
+            },
+            {
+              "store_va": "0x10044b94",
+              "register": "esi",
+              "instruction": "mov    BYTE PTR [esi],0x0"
+            }
+          ],
+          "register_relative_store_count": 44,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x10044710",
+          "0x1004ac90",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "1004ac90",
+          "1005c160"
+        ],
+        "feature_callees": [
+          "10044710"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 40
+      },
+      "pattern_evidence": [],
+      "what_it_does": "writes at 25 module-relative literal offset(s) from DAT_1015AD70 (0x388c, 0x389c, 0x38ac, 0x390e); writes through a register loaded with the module base (44 store(s), e.g. mov    BYTE PTR [esi],0xeb); calls handler/feature function(s) FUN_10044710 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "rva-patch (module-relative write)",
+      "build_gate": [
+        [
+          "==",
+          7
+        ],
+        [
+          "==",
+          8
+        ]
+      ],
+      "notes": [],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "RemoveGFWLUpdatePopup",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10131fb0",
+      "key_push_va": "0x100554a2",
+      "dispatch_arm": [
+        "0x100554a2",
+        "0x100554f2"
+      ],
+      "handler": null,
+      "recovered_mechanism": {
+        "sets_global_flag": [
+          "10159b87"
+        ],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x10005500",
+          "0x1004ac90",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "1004ac90",
+          "1005c160"
+        ],
+        "feature_callees": [
+          "10005500"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 10005500",
+          "pattern": "2B C1 1B D6 89 44 24 0C 89 54 24 10 DF 6C 24 0C D8 0D ? ? ? ? D9 5C 24 08",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x7cbf70"
+            ]
+          }
+        }
+      ],
+      "what_it_does": "sets global flag(s) 0x10159b87; calls handler/feature function(s) FUN_10005500 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "delegates to function(s)",
+      "build_gate": null,
+      "notes": [
+        "Sets its own flag and additionally calls the shared hook installer FUN_10005500; same shared stub path as Patch4RemoveModChecks."
+      ],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "RemoveUselessChecks",
+      "classification": "rva-patch",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10130bd0",
+      "key_push_va": "0x100541df",
+      "dispatch_arm": [
+        "0x100541df",
+        "0x10054223"
+      ],
+      "handler": "0x10044bd0",
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [
+            "0x3da1b7",
+            "0x3da337",
+            "0x46cce7",
+            "0x46ce67",
+            "0x559013",
+            "0x559127",
+            "0x5592a7",
+            "0x5594a2"
+          ],
+          "literal_offset_count": 23,
+          "register_relative_stores": [
+            {
+              "store_va": "0x10044c8f",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044cbd",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044cee",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044d1c",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044d4d",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044d7b",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044dac",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044dd8",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],0x90909090"
+            },
+            {
+              "store_va": "0x10044e15",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044e46",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044e77",
+              "register": "edi",
+              "instruction": "mov    WORD PTR [edi],ax"
+            },
+            {
+              "store_va": "0x10044e9d",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],0x90909090"
+            },
+            {
+              "store_va": "0x10044ed4",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],0x90909090"
+            },
+            {
+              "store_va": "0x10044f0a",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044f39",
+              "register": "edi",
+              "instruction": "mov    BYTE PTR [edi],0xeb"
+            },
+            {
+              "store_va": "0x10044f61",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044f8d",
+              "register": "edi",
+              "instruction": "mov    BYTE PTR [edi],0xeb"
+            },
+            {
+              "store_va": "0x10045101",
+              "register": "edi",
+              "instruction": "mov    BYTE PTR [edi],0xc0"
+            },
+            {
+              "store_va": "0x1004512a",
+              "register": "edi",
+              "instruction": "mov    BYTE PTR [edi],0x90"
+            },
+            {
+              "store_va": "0x10045153",
+              "register": "edi",
+              "instruction": "mov    BYTE PTR [edi],0x90"
+            },
+            {
+              "store_va": "0x1004517c",
+              "register": "edi",
+              "instruction": "mov    BYTE PTR [edi],0x90"
+            },
+            {
+              "store_va": "0x10044c8f",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044cbd",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044cee",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044d1c",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044d4d",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044d7b",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044dac",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044dd8",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],0x90909090"
+            },
+            {
+              "store_va": "0x10044e15",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044e46",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044e77",
+              "register": "edi",
+              "instruction": "mov    WORD PTR [edi],ax"
+            },
+            {
+              "store_va": "0x10044e9d",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],0x90909090"
+            },
+            {
+              "store_va": "0x10044ed4",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],0x90909090"
+            },
+            {
+              "store_va": "0x10044f0a",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044f39",
+              "register": "edi",
+              "instruction": "mov    BYTE PTR [edi],0xeb"
+            },
+            {
+              "store_va": "0x10044f61",
+              "register": "edi",
+              "instruction": "mov    DWORD PTR [edi],eax"
+            },
+            {
+              "store_va": "0x10044f8d",
+              "register": "edi",
+              "instruction": "mov    BYTE PTR [edi],0xeb"
+            },
+            {
+              "store_va": "0x10045101",
+              "register": "edi",
+              "instruction": "mov    BYTE PTR [edi],0xc0"
+            },
+            {
+              "store_va": "0x1004512a",
+              "register": "edi",
+              "instruction": "mov    BYTE PTR [edi],0x90"
+            },
+            {
+              "store_va": "0x10045153",
+              "register": "edi",
+              "instruction": "mov    BYTE PTR [edi],0x90"
+            },
+            {
+              "store_va": "0x1004517c",
+              "register": "edi",
+              "instruction": "mov    BYTE PTR [edi],0x90"
+            }
+          ],
+          "register_relative_store_count": 42,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x10044bd0",
+          "0x1004ac90",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "1004ac90",
+          "1005c160"
+        ],
+        "feature_callees": [
+          "10044bd0"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 72
+      },
+      "pattern_evidence": [],
+      "what_it_does": "writes at 23 module-relative literal offset(s) from DAT_1015AD70 (0x3da1b7, 0x3da337, 0x46cce7, 0x46ce67); writes through a register loaded with the module base (42 store(s), e.g. mov    DWORD PTR [edi],eax); calls handler/feature function(s) FUN_10044bd0 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "rva-patch (module-relative write)",
+      "build_gate": [
+        [
+          "==",
+          5
+        ],
+        [
+          "==",
+          8
+        ],
+        [
+          "==",
+          9
+        ]
+      ],
+      "notes": [],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "RestoreDeathMusic",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x101325fc",
+      "key_push_va": "0x10055b47",
+      "dispatch_arm": [
+        "0x10055b47",
+        "0x10055ba2"
+      ],
+      "handler": null,
+      "recovered_mechanism": {
+        "sets_global_flag": [
+          "10159b86"
+        ],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x1004ac90",
+          "0x10050bd0",
+          "0x10052380",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "1004ac90",
+          "10052380",
+          "1005c160"
+        ],
+        "feature_callees": [
+          "10050bd0"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 10050bd0",
+          "pattern": "0F 57 C0 F3 0F 11 86 20 02 00 00",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x81e3c5"
+            ]
+          }
+        },
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 10050bd0",
+          "pattern": "C7 86 04 02 00 00 04 00 00 00 E9",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x81e509"
+            ]
+          }
+        },
+        {
+          "entry": "FUN_10003830",
+          "provenance": "feature callee 10050bd0",
+          "pattern": "E8 ? ? ? ? 84 C0 74 C6 8B BE",
+          "game": {
+            "hits": 1,
+            "vas": [
+              "0x81e53a"
+            ]
+          }
+        }
+      ],
+      "what_it_does": "sets global flag(s) 0x10159b86; calls handler/feature function(s) FUN_10050bd0 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "delegates to function(s)",
+      "build_gate": null,
+      "notes": [],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "ShakingEngineBlock",
+      "classification": "flag-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x101314e0",
+      "key_push_va": "0x10054af4",
+      "dispatch_arm": [
+        "0x10054af4",
+        "0x10054b73"
+      ],
+      "handler": null,
+      "recovered_mechanism": {
+        "sets_global_flag": [
+          "1015ad41"
+        ],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x10003b20",
+          "0x10005210",
+          "0x1004ac90",
+          "0x10057840",
+          "0x100578b0",
+          "0x1005bff0"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "10003b20",
+          "10005210",
+          "1004ac90",
+          "10057840",
+          "100578b0",
+          "1005bff0"
+        ],
+        "feature_callees": [],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 0
+      },
+      "pattern_evidence": [],
+      "what_it_does": "sets global flag(s) 0x1015ad41",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "global flag only",
+      "build_gate": null,
+      "notes": [
+        "The arm calls the shared multi-pattern installer FUN_10005210; the option-specific action is the flag it sets."
+      ],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "StartupTimeFix",
+      "classification": "function-call-only",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x101323d0",
+      "key_push_va": "0x10055991",
+      "dispatch_arm": [
+        "0x10055991",
+        "0x100559da"
+      ],
+      "handler": "0x100468d0",
+      "recovered_mechanism": {
+        "sets_global_flag": [],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [],
+          "literal_offset_count": 0,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x100468d0",
+          "0x1004ac90",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "1004ac90",
+          "1005c160"
+        ],
+        "feature_callees": [
+          "100468d0"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": true,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 2
+      },
+      "pattern_evidence": [
+        {
+          "entry": "FUN_1005afa0",
+          "provenance": "handler",
+          "pattern": "68 00 C2 EC 80 68",
+          "game": {
+            "hits": 3,
+            "vas": [
+              "0x477a42",
+              "0x8973d3",
+              "0x898853"
+            ]
+          }
+        }
+      ],
+      "what_it_does": "calls handler/feature function(s) FUN_100468d0 that do NOT use the signature scanner; uses the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "signature-scanning patch",
+      "build_gate": null,
+      "notes": [
+        "Same extractor blind spot: the pattern reaches FUN_1005AFA0 rather than FUN_10003830."
+      ],
+      "confidence": "confirmed"
+    },
+    {
+      "option": "SuperLODFix",
+      "classification": "rva-patch",
+      "is_behavioural_gap": false,
+      "key_string_va": "0x10131d48",
+      "key_push_va": "0x10055237",
+      "dispatch_arm": [
+        "0x10055237",
+        "0x10055285"
+      ],
+      "handler": "0x10046a10",
+      "recovered_mechanism": {
+        "sets_global_flag": [
+          "DAT_101580ac",
+          "DAT_101580b0",
+          "DAT_101580b4"
+        ],
+        "local_bitfield_bits": [],
+        "module_relative_writes": {
+          "literal_offsets": [
+            "0x4a3ce9",
+            "0x4a3cef",
+            "0x4a3d37",
+            "0x4dd2d0",
+            "0x540e19",
+            "0x540e1f",
+            "0x540e67",
+            "0x58aae0"
+          ],
+          "literal_offset_count": 8,
+          "register_relative_stores": [],
+          "register_relative_store_count": 0,
+          "register_offset_references": 0
+        },
+        "jump_installs": [],
+        "direct_calls": [
+          "0x100014b0",
+          "0x10046a10",
+          "0x1004ac90",
+          "0x10052300",
+          "0x1005c160"
+        ],
+        "shared_helpers_called": [
+          "100014b0",
+          "1004ac90",
+          "1005c160"
+        ],
+        "feature_callees": [
+          "10046a10",
+          "10052300"
+        ],
+        "calls_signature_scanner": {
+          "in_arm": false,
+          "in_handler": false,
+          "in_feature_callee": false
+        },
+        "scanner_calls_in_arm": [],
+        "indirect_slots": [],
+        "iat_calls": [],
+        "virtualprotect_call_sites": 8
+      },
+      "pattern_evidence": [],
+      "what_it_does": "sets global flag(s) DAT_101580ac, DAT_101580b0, DAT_101580b4; writes at 8 module-relative literal offset(s) from DAT_1015AD70 (0x4a3ce9, 0x4a3cef, 0x4a3d37, 0x4dd2d0); calls handler/feature function(s) FUN_10046a10, FUN_10052300 that do NOT use the signature scanner",
+      "action_reached_through_shared_helpers": [],
+      "action_subtype": "rva-patch (module-relative write)",
+      "build_gate": [
+        [
+          "==",
+          8
+        ],
+        [
+          "==",
+          9
+        ]
+      ],
+      "notes": [],
+      "confidence": "confirmed"
+    }
+  ],
+  "caveats": [
+    "Nothing in the original package was modified; the ASI, the game executable and all existing evidence files were opened read-only. The reference ZIPs were never opened.",
+    "Game hit counts are direct byte searches over the immutable GTAIV.exe .text. A hit count > 1 means the original needed a per-build or per-site selection rule; that rule is not recovered here.",
+    "The CarPartsShadowFix pattern is DERIVED: it was re-assembled from the handler decimal digit loop and is not a literal in any artifact. It is marked assembled=true.",
+    "FreezeCarFix gate relationship to the DebugPrintSpawns block is read off the branch target (jne 0x10053FDB) and agrees with the INI note; the intent is inferred, not proven.",
+    "For every unresolved indirect slot the runtime target lives in a zero-initialised plugin global with no resolvable static writer and no relocation entry, so it cannot be recovered from the supplied artifacts.",
+    "evidence/option_flag_map.json still carries a stale entry for FixPCIDKickbug and FreezeCarFix (kind \"call\"/null); this file records the control-flow evidence rather than adopting that classification.",
+    "This file is derived evidence and is not wired into the Makefile, so `make test` and the existing evidence checkers are unaffected."
+  ],
+  "follow_up_recovery": {
+    "note": "Follow-up: LaunchWithPlayGTAIV and SuperLODFix were reported with 0 rows in the primary op table. SuperLODFix is now recovered as two module-RVA relative-jump installs (RVAs 0x4a3ce9/0x540e19 -> 0x100469e0) by tools/extract_rva_jumps.py, and LoadDLCs' own relative-jump installs are recovered too. LaunchWithPlayGTAIV writes two 4-byte immediates ('Play'/'V.ex') into a buffer reached by a runtime register, which is not a game-memory patch and is not modelled as an op row."
+  }
+}

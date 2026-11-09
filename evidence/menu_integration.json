@@ -1,0 +1,13 @@
+{
+  "function": "FUN_10052380",
+  "role": "IVMenuAPI integration probe",
+  "recovered_behaviour": [
+    "Gated by the AddOptionsInMenu flag at 0x10158038: when clear the function returns 0 immediately.",
+    "When set, first tries GetModuleHandleA(\"IVMenuAPI.asi\"); if that yields a module handle it returns 1.",
+    "Otherwise, if the one-shot byte DAT_101a843c is clear, tries LoadLibraryA(\"IVMenuAPI.asi\"); success returns 1.",
+    "Sets DAT_101a843c = 1 (attempted) and returns 0 when the module cannot be obtained."
+  ],
+  "significance": "This is the menu integration: ZolikaPatch does not link IVMenuAPI, it dynamically loads the third-party IVMenuAPI.asi so its extra menu options can register. The AddOptionsInMenu option (default 1) gates whether this load is attempted at all. This recovers the last unimplemented ZolikaPatch feature's actual behaviour: a load-once, cached probe with a one-shot attempt flag.",
+  "verified_imports": "The ASI imports GetModuleHandleA and LoadLibraryA from KERNEL32 (evidence/import_table.json); it does not import anything from IVMenuAPI, confirming dynamic loading.",
+  "caveat": "Registering individual menu options with the loaded API is not visible in this function (it only ensures the module is present)."
+}

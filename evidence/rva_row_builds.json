@@ -1,0 +1,2166 @@
+[
+ {
+  "handler": "100055c0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "8B 44 24 08 89 41 20 8B 44 24 0C 89 41 24 F7 D8",
+  "gate": "any"
+ },
+ {
+  "handler": "10005800",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e8"
+  ],
+  "signature": "8B 90 E8 00 00 00 55 8B CE FF",
+  "gate": "any"
+ },
+ {
+  "handler": "10005b20",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "8B 47 28 C1 E8 06 83 E0 0F 83 C0",
+  "gate": "any"
+ },
+ {
+  "handler": "10005ca0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "90909090",
+   "90909090",
+   "90"
+  ],
+  "signature": "F7 46 24 00 00 00 40 0F 85",
+  "gate": "any"
+ },
+ {
+  "handler": "10005ca0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "F7 46 24 00 00 00 40 0F 84",
+  "gate": "any"
+ },
+ {
+  "handler": "10005e30",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "55 8B EC 83 E4 F8 51 8B 45 0C 0F B7 48 66",
+  "gate": "any"
+ },
+ {
+  "handler": "10005ee0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e8"
+  ],
+  "signature": "E8 ? ? ? ? 8B 35 ? ? ? ? 3B F0",
+  "gate": "any"
+ },
+ {
+  "handler": "10006350",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "E8 ? ? ? ? C0 E0 ? 32 86 6F 0F 00",
+  "gate": "any"
+ },
+ {
+  "handler": "10006350",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "0F BF 41 2E 39 05",
+  "gate": "any"
+ },
+ {
+  "handler": "10006770",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "8B 17 8B 42 64 8B CF FF D0 8B 54",
+  "gate": "any"
+ },
+ {
+  "handler": "1001afa0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "F3 0F 58 C1 F3 0F 2A C8 F3 0F 58 C1",
+  "gate": "any"
+ },
+ {
+  "handler": "1001b0e0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "89 43 20 8B 10 8B 52 08 57 8D 4C 24 2C 51 8B C8 FF D2 83 F8 FF 89 43 0C 0F 84",
+  "gate": "any"
+ },
+ {
+  "handler": "1001b0e0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "8B 4B 10 3B 4B 14 7D 0F",
+  "gate": "any"
+ },
+ {
+  "handler": "1001b0e0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "8B 41 10 03 41 0C C3",
+  "gate": "any"
+ },
+ {
+  "handler": "1001b0e0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "8B C1 8B 08 8B 11 8B 40 04 8B 52 30 50 FF D2 C3",
+  "gate": "any"
+ },
+ {
+  "handler": "1001b0e0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "56 8B F1 83 7E 14 00 75 0B 83 7E 10 00 74 05",
+  "gate": "any"
+ },
+ {
+  "handler": "1001b310",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "83 3D ? ? ? ? 02 7C 0A F3 0F",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b380",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "90909090",
+   "90909090",
+   "90"
+  ],
+  "signature": "83 3D ? ? ? ? 02 0F 8C D5 00",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b380",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "83 3D ? ? ? ? 02 7C 32 8B 41",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b380",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "75 5B 83 3D ? ? ? ? 00 75",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b380",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "83 3D ? ? ? ? 02 7C 7D 8B 4C 24 0C",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b380",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "83 3D ? ? ? ? 02 75 50",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b380",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "9090"
+  ],
+  "signature": "83 3D ? ? ? ? 02 0F 85 8C 01 00 00",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b380",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "83 3D ? ? ? ? 02 75 20 8B CD E8",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b380",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "83 3D ? ? ? ? 02 7C 21 8B 44 24 0C",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "90909090",
+   "90909090",
+   "90"
+  ],
+  "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "90909090",
+   "90"
+  ],
+  "signature": "83 3D ? ? ? ? 02 7C 35 0F BF 43 2E",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "9090",
+   "90"
+  ],
+  "signature": "83 3D ? ? ? ? 02 8A 0D",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "90909090",
+   "90"
+  ],
+  "signature": "83 3D ? ? ? ? 02 75 21 8B 96 20 08 00 00",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "90909090",
+   "90909090",
+   "90"
+  ],
+  "signature": "83 3D ? ? ? ? 02 7C 4A 0F BF 46 2E",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "90909090"
+  ],
+  "signature": "83 3D ? ? ? ? 02 7C 4A 0F BF 46 2E",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "90909090",
+   "90"
+  ],
+  "signature": "83 3D ? ? ? ? 02 75 08 3B 05",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "90909090",
+   "90"
+  ],
+  "signature": "83 3D ? ? ? ? 02 75 1F 8B 44 24 04",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "90909090",
+   "90"
+  ],
+  "signature": "83 3D ? ? ? ? 02 75 38 8B 16",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "90909090",
+   "90"
+  ],
+  "signature": "83 3D ? ? ? ? 02 75 24 F6 87 6C 02 00 00 04",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "90909090",
+   "90"
+  ],
+  "signature": "74 17 83 3D ? ? ? ? 02 75 0E F3 0F 10 05",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "9090",
+   "90"
+  ],
+  "signature": "8B 56 04 8B 4A 0C 89 4C 24 1C 7C 18",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "90909090",
+   "90"
+  ],
+  "signature": "83 3D ? ? ? ? 02 75 35 0F BF 46 2E",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "90909090",
+   "90"
+  ],
+  "signature": "83 3D ? ? ? ? 02 7C 26 8B 85 40 0B 00 00",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "90909090",
+   "90"
+  ],
+  "signature": "83 3D ? ? ? ? 02 75 17 F3 0F 10 44 24 0C",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "83 3D ? ? ? ? 02 F3 0F 10 05 ? ? ? ? F3 0F 11 44 24 20 75 4C",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "7C 22 83 F8 28 75 1D",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "9090"
+  ],
+  "signature": "83 3D ? ? ? ? 02 89 44 24 38",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "83 3D ? ? ? ? 02 7C 43",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "83 3D ? ? ? ? 02 7C 1F 8B",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "83 3D ? ? ? ? 02 7C 11 8B 4E",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "39 35 ? ? ? ? 75 0E 80 3D",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "83 3D ? ? ? ? 02 8A 0D",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001b580",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "8B 56 04 8B 4A 0C 89 4C 24 1C 7C 18",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001bd60",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "9090"
+  ],
+  "signature": "80 BE 18 02 00 00 00 0F 85 36 01 00 00 80 BE",
+  "gate": "any"
+ },
+ {
+  "handler": "1001bdd0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "90909090",
+   "90909090"
+  ],
+  "signature": "39 82 54 13 00 00 0F 85 94 04 00 00",
+  "gate": "any"
+ },
+ {
+  "handler": "1001be40",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "90909090",
+   "90"
+  ],
+  "signature": "83 7D 18 1C 75 14",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001bec0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "39 2D ? ? ? ? 75 3E",
+  "gate": "ge",
+  "value": 6
+ },
+ {
+  "handler": "1001ee50",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90",
+   "90"
+  ],
+  "signature": "F7 46 4C 00 80 00 00 74",
+  "gate": "any"
+ },
+ {
+  "handler": "1001eed0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "eb"
+  ],
+  "signature": "F7 47 40 00 10 00 00 74 07 81 4E 24 00 00",
+  "gate": "any"
+ },
+ {
+  "handler": "1001efa0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "D9 45 08 51 8B CE D9 1C 24 E8 ? ? ? ? 8A 86 90 14 00 00",
+  "gate": "any"
+ },
+ {
+  "handler": "10022cf0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "8B 4C 24 08 56 8B 74 24 08 80 3E 22",
+  "gate": "any"
+ },
+ {
+  "handler": "10022d80",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "eb"
+  ],
+  "signature": "0F 2F D0 76 25 0F 28 C2",
+  "gate": "any"
+ },
+ {
+  "handler": "10022d80",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "2a"
+  ],
+  "signature": "0F 2F D0 76 25 0F 28 C2",
+  "gate": "any"
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4273517,
+  "kind": "rva",
+  "values": [
+   "e8"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4273517,
+  "kind": "rva_jump",
+  "values": [
+   "0x10023480"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4274125,
+  "kind": "rva",
+  "values": [
+   "e8"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4274125,
+  "kind": "rva_jump",
+  "values": [
+   "0x10023480"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4276732,
+  "kind": "rva",
+  "values": [
+   "e9"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4276852,
+  "kind": "rva",
+  "values": [
+   "e9"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4276852,
+  "kind": "rva_jump",
+  "values": [
+   "0x10023490"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4276954,
+  "kind": "rva",
+  "values": [
+   "e8"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4276959,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "90909090",
+   "90909090"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4277340,
+  "kind": "rva",
+  "values": [
+   "e9"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4277460,
+  "kind": "rva",
+  "values": [
+   "e9"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4277460,
+  "kind": "rva_jump",
+  "values": [
+   "0x10023490"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4277518,
+  "kind": "rva",
+  "values": [
+   "e9"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4277562,
+  "kind": "rva",
+  "values": [
+   "e8"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4277567,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "90909090",
+   "90909090"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4781400,
+  "kind": "rva",
+  "values": [
+   "e8"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4781400,
+  "kind": "rva_jump",
+  "values": [
+   "0x10023480"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4784988,
+  "kind": "rva",
+  "values": [
+   "e9"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4785108,
+  "kind": "rva",
+  "values": [
+   "e9"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4785108,
+  "kind": "rva_jump",
+  "values": [
+   "0x10023490"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4785166,
+  "kind": "rva",
+  "values": [
+   "e9"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4785210,
+  "kind": "rva",
+  "values": [
+   "e8"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "100234e0",
+  "rva": 4785215,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "90909090",
+   "90909090"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10023b30",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+  "gate": "any"
+ },
+ {
+  "handler": "10023b30",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+  "gate": "any"
+ },
+ {
+  "handler": "10023b30",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "eb"
+  ],
+  "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+  "gate": "any"
+ },
+ {
+  "handler": "10023b30",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+  "gate": "any"
+ },
+ {
+  "handler": "10023b30",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+  "gate": "any"
+ },
+ {
+  "handler": "10023b30",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+  "gate": "any"
+ },
+ {
+  "handler": "10023b30",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+  "gate": "any"
+ },
+ {
+  "handler": "10023b30",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+  "gate": "any"
+ },
+ {
+  "handler": "10023b30",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+  "gate": "any"
+ },
+ {
+  "handler": "10023dd0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "eb"
+  ],
+  "signature": "C7 06 ? ? ? ? 74 19",
+  "gate": "any"
+ },
+ {
+  "handler": "10023dd0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "eb"
+  ],
+  "signature": "83 C4 ? 3B 46 20",
+  "gate": "any"
+ },
+ {
+  "handler": "10023dd0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "eb"
+  ],
+  "signature": "75 28 6A 00 6A 00 68 ? ? ? ? E8 ? ? ? ? 83 C4 0C",
+  "gate": "any"
+ },
+ {
+  "handler": "10023dd0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "c9eb"
+  ],
+  "signature": "8B 54 24 04 52 A3",
+  "gate": "any"
+ },
+ {
+  "handler": "10023dd0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "b8"
+  ],
+  "signature": "83 F8 01 75 30 A3",
+  "gate": "any"
+ },
+ {
+  "handler": "10023dd0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "deb"
+  ],
+  "signature": "C7 05 ? ? ? ? 03 00 00 00 33 C0 5E 59 C3 C7",
+  "gate": "any"
+ },
+ {
+  "handler": "10023dd0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "FF 15 ? ? ? ? 85 C0 75 18",
+  "gate": "any"
+ },
+ {
+  "handler": "10023dd0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "FF 15 ? ? ? ? 85 C0 75 04 32",
+  "gate": "any"
+ },
+ {
+  "handler": "10023dd0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "FF 15 ? ? ? ? 85 C0 75 07 A0",
+  "gate": "any"
+ },
+ {
+  "handler": "10023dd0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "c3"
+  ],
+  "signature": "81 EC ? ? ? ? A1 ? ? ? ? 33 C4 89 84 24 ? ? ? ? 53 ? 6A 3C 33 DB 8D 44 24 ? 53 50 E8",
+  "gate": "any"
+ },
+ {
+  "handler": "10023dd0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "eb"
+  ],
+  "signature": "74 05 E8 ? ? ? ? 6A 05 E8 ? ? ? ? 83 C4 04 B9",
+  "gate": "any"
+ },
+ {
+  "handler": "10023dd0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "00000001"
+  ],
+  "signature": "83 F8 01 75 30 A3",
+  "gate": "any"
+ },
+ {
+  "handler": "10036f30",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "33 C0 83 C1 04 8D 50 07 83 39 00 75 06 83 79 04",
+  "gate": "any"
+ },
+ {
+  "handler": "10036fd0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "75 54 8B 48 28 8B 40 2C",
+  "gate": "any"
+ },
+ {
+  "handler": "10037070",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "2B C2 D1 F8 39 3C C6 7D 0D 83 CA FF",
+  "gate": "any"
+ },
+ {
+  "handler": "10037100",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "90909090",
+   "90909090"
+  ],
+  "signature": "E9 ? ? ? ? 57 8D 8F ? ? 00 00",
+  "gate": "any"
+ },
+ {
+  "handler": "10037170",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "c2",
+   "08",
+   "00"
+  ],
+  "signature": "55 8B EC 83 E4 F8 51 53 8B 5D 08 56 57 6A 08 8D 44 24 10 8B F1 8D 7B 04 50 8B CF C7 44 24 14 00",
+  "gate": "any"
+ },
+ {
+  "handler": "10037290",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "eb"
+  ],
+  "signature": "74 2B 57 E8 ? ? ? ? 8B BE A8 0E 00 00",
+  "gate": "any"
+ },
+ {
+  "handler": "10037be0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "83 E4 F0 83 EC 54 0F 57 C0 53 8B 5D 0C",
+  "gate": "any"
+ },
+ {
+  "handler": "10038680",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e8"
+  ],
+  "signature": "3D 80 99 99 59 73 05",
+  "gate": "any"
+ },
+ {
+  "handler": "10038680",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "3D 80 99 99 59 73 05",
+  "gate": "any"
+ },
+ {
+  "handler": "10038770",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "3C 01 57 0F 85",
+  "gate": "any"
+ },
+ {
+  "handler": "10038800",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "eb"
+  ],
+  "signature": "F3 0F 11 4C 24 0C 76 5B D9 45 14",
+  "gate": "any"
+ },
+ {
+  "handler": "10038860",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "eb"
+  ],
+  "signature": "F3 0F 11 44 24 0C 76 5B D9 45 14",
+  "gate": "any"
+ },
+ {
+  "handler": "1003d420",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "8D AF 3C 01 00 00 8D 54 24 20",
+  "gate": "any"
+ },
+ {
+  "handler": "1003d420",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "8B 8C 83 3C 01 00 00 0F BF 53 48",
+  "gate": "any"
+ },
+ {
+  "handler": "1003d7d0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "8B 04 B1 0F B7 D0 81 FA FF FF 00 00",
+  "gate": "any"
+ },
+ {
+  "handler": "1003d890",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "83 C4 04 88 58 26 8B 16 8B 82 F4 00 00 00",
+  "gate": "any"
+ },
+ {
+  "handler": "1003d9c0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "8B 54 24 10 52 0F B6 90 19 02 00 00",
+  "gate": "any"
+ },
+ {
+  "handler": "10044590",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "0F BF 56 2E 3B 15 ? ? ? ? 75 ? A1",
+  "gate": "any"
+ },
+ {
+  "handler": "10044710",
+  "rva": 14476,
+  "kind": "rva",
+  "values": [
+   "00"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "10044710",
+  "rva": 14492,
+  "kind": "rva",
+  "values": [
+   "e9"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "10044710",
+  "rva": 14508,
+  "kind": "rva",
+  "values": [
+   "00"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "10044710",
+  "rva": 14606,
+  "kind": "rva",
+  "values": [
+   "eb"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "10044710",
+  "rva": 14638,
+  "kind": "rva",
+  "values": [
+   "eb"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "10044710",
+  "rva": 14686,
+  "kind": "rva",
+  "values": [
+   "00"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "10044710",
+  "rva": 14690,
+  "kind": "rva",
+  "values": [
+   "e9"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "10044710",
+  "rva": 14718,
+  "kind": "rva",
+  "values": [
+   "00"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "10044710",
+  "rva": 14722,
+  "kind": "rva",
+  "values": [
+   "e9"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "10044710",
+  "rva": 14836,
+  "kind": "rva",
+  "values": [
+   "eb"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "10044710",
+  "rva": 14868,
+  "kind": "rva",
+  "values": [
+   "eb"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "10044710",
+  "rva": 17095,
+  "kind": "rva",
+  "values": [
+   "90"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "10044710",
+  "rva": 17096,
+  "kind": "rva",
+  "values": [
+   "90"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "10044710",
+  "rva": 17097,
+  "kind": "rva",
+  "values": [
+   "90"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "10044710",
+  "rva": 17098,
+  "kind": "rva",
+  "values": [
+   "90"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "10044710",
+  "rva": 17099,
+  "kind": "rva",
+  "values": [
+   "90"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "10044710",
+  "rva": 17100,
+  "kind": "rva",
+  "values": [
+   "90"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "10044710",
+  "rva": 17101,
+  "kind": "rva",
+  "values": [
+   "90"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "10044710",
+  "rva": 17127,
+  "kind": "rva",
+  "values": [
+   "90"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "10044710",
+  "rva": 17128,
+  "kind": "rva",
+  "values": [
+   "90"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "10044710",
+  "rva": 17129,
+  "kind": "rva",
+  "values": [
+   "90"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "10044710",
+  "rva": 17130,
+  "kind": "rva",
+  "values": [
+   "90"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "10044710",
+  "rva": 17131,
+  "kind": "rva",
+  "values": [
+   "90"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "10044710",
+  "rva": 17132,
+  "kind": "rva",
+  "values": [
+   "90"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "10044710",
+  "rva": 17133,
+  "kind": "rva",
+  "values": [
+   "90"
+  ],
+  "gate": "eq",
+  "value": 7
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 4039095,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "9090"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 4039479,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "9090"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 4639975,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "9090"
+  ],
+  "gate": "eq",
+  "value": 5
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 4640359,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "9090"
+  ],
+  "gate": "eq",
+  "value": 5
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 5607443,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "9090"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 5607719,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "9090"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 5608103,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "9090"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 5608610,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "9090",
+   "90"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 5608631,
+  "kind": "rva",
+  "values": [
+   "9090"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 5608650,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "9090",
+   "90"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 5608849,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "9090",
+   "90"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 5608856,
+  "kind": "rva",
+  "values": [
+   "eb"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 5610688,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "90909090",
+   "90"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 5630666,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "9090",
+   "90"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 5630687,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "9090"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 5630851,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "90909090",
+   "90909090",
+   "90"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 5633461,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "9090",
+   "90"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 5633469,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "9090"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 5635105,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "9090",
+   "90"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 5635118,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "9090"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 6444374,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "9090",
+   "90"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 6444381,
+  "kind": "rva",
+  "values": [
+   "eb"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10044bd0",
+  "rva": 7799418,
+  "kind": "rva",
+  "values": [
+   "90909090",
+   "90909090",
+   "90"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10045430",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "60"
+  ],
+  "signature": "11 01 00 00 8B 16 8B 42 64 8B CE FF D0 F3 0F 10",
+  "gate": "any"
+ },
+ {
+  "handler": "10045490",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53 8B 5C 24 4C 56 68 ? ? ? ? E8 ? ? ? ? 83 C4",
+  "gate": "any"
+ },
+ {
+  "handler": "10045490",
+  "rva": 4818016,
+  "kind": "rva",
+  "values": [
+   "e9"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10045490",
+  "rva": 4818016,
+  "kind": "rva_jump",
+  "values": [
+   "0x10038550"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10045610",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "75 ? 83 C1 01 83 C0 01 83 F9 04",
+  "gate": "any"
+ },
+ {
+  "handler": "10045610",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e8"
+  ],
+  "signature": "8D 4C 24 18 51 6A 00 6A 0C 57",
+  "gate": "any"
+ },
+ {
+  "handler": "10045980",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "eb"
+  ],
+  "signature": "8B 6C 24 1C 66 89 6E 14 64 8B 0D 2C 00 00 00 8B",
+  "gate": "any"
+ },
+ {
+  "handler": "10045ad0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e8"
+  ],
+  "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+  "gate": "any"
+ },
+ {
+  "handler": "10045ad0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+  "gate": "any"
+ },
+ {
+  "handler": "10045ad0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "8e"
+  ],
+  "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+  "gate": "any"
+ },
+ {
+  "handler": "10045ad0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "377"
+  ],
+  "signature": "33 F6 8B 4C 24 08 8B 06 8B 50 04 51 8B CE FF D2 F6 D8 1B C0 23 C6 5E C3 8B 44 24 0C 8B 74 24",
+  "gate": "any"
+ },
+ {
+  "handler": "10045c50",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "89 91 ? ? ? ? 8D 44 24 ? 68 ? ? ? ? 50",
+  "gate": "any"
+ },
+ {
+  "handler": "10045ce0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "eb"
+  ],
+  "signature": "84 DB 0F 85 43 01 00 00 8D 4C 24 28 8B C1",
+  "gate": "any"
+ },
+ {
+  "handler": "10045ce0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "74 EC 38 5E 06 74 E7 68",
+  "gate": "any"
+ },
+ {
+  "handler": "10045ce0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "9090"
+  ],
+  "signature": "74 C4 8B 07 3B 46 18 75 BD 68",
+  "gate": "any"
+ },
+ {
+  "handler": "10045ce0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "9090"
+  ],
+  "signature": "3B 56 18 0F 85",
+  "gate": "any"
+ },
+ {
+  "handler": "10045ce0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "9090"
+  ],
+  "signature": "3B 4E 18 0F 85",
+  "gate": "any"
+ },
+ {
+  "handler": "10045ce0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "90909090",
+   "9090"
+  ],
+  "signature": "0F 85 ? ? ? ? 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC C6",
+  "gate": "any"
+ },
+ {
+  "handler": "10045ce0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "c033"
+  ],
+  "signature": "8B 56 1C 3B 56 20 ? ? 6A 00 6A 00",
+  "gate": "any"
+ },
+ {
+  "handler": "10046640",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e8"
+  ],
+  "signature": "6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC E8 ? ? ? ? 8B E5 5D C3",
+  "gate": "any"
+ },
+ {
+  "handler": "100467a0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C",
+  "gate": "any"
+ },
+ {
+  "handler": "100467a0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "eb"
+  ],
+  "signature": "01 96 98 00 00 00 8B 47 04 29 46 54 8B 4F 0C",
+  "gate": "any"
+ },
+ {
+  "handler": "100467a0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "8B 48 70 83 C0 40 50 51 8D 51 10",
+  "gate": "any"
+ },
+ {
+  "handler": "10046a10",
+  "rva": 4865257,
+  "kind": "rva_jump",
+  "values": [
+   "0x100469e0"
+  ],
+  "gate": "eq",
+  "value": 8
+ },
+ {
+  "handler": "10046a10",
+  "rva": 5508633,
+  "kind": "rva_jump",
+  "values": [
+   "0x100469e0"
+  ],
+  "gate": "eq",
+  "value": 9
+ },
+ {
+  "handler": "10046b30",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "c3"
+  ],
+  "signature": "81 EC 40 08 00 00 53 55 8B AC 24 4C 08 00 00",
+  "gate": "any"
+ },
+ {
+  "handler": "1004aae0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "8B 44 24 10 D9 2C 24 83 C4 1C C3",
+  "gate": "any"
+ },
+ {
+  "handler": "100504b0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "8B 01 8B 90 28 01 00 00 FF D2 84 C0 0F 84 88 00 00 00",
+  "gate": "any"
+ },
+ {
+  "handler": "100506b0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "50 64 89 25 00 00 00 00 83 EC 34",
+  "gate": "any"
+ },
+ {
+  "handler": "100508c0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "56 8B F1 E8 ? ? ? ? 85 C0 74 0E 66 8B 40 2E",
+  "gate": "any"
+ },
+ {
+  "handler": "100513a0",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "7C 0C 68 ? ? ? ? 68 ? ? ? ? FF D7 5F C3",
+  "gate": "any"
+ },
+ {
+  "handler": "10051920",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "68 64 28 C8 67 E8",
+  "gate": "any"
+ },
+ {
+  "handler": "10051920",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e8"
+  ],
+  "signature": "E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 7B FF FF FF",
+  "gate": "any"
+ },
+ {
+  "handler": "10051920",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e8"
+  ],
+  "signature": "E8 ? ? ? ? 8B 36 85 F6 75 ED E8 ? ? ? ? 8B 3F 03 EB 85 FF 0F 85 6C FF FF FF",
+  "gate": "any"
+ },
+ {
+  "handler": "10052200",
+  "rva": 0,
+  "kind": "signature",
+  "values": [
+   "e9"
+  ],
+  "signature": "89 84 24 E0 01 00 00 8B 45 08 53 33 DB",
+  "gate": "any"
+ }
+]

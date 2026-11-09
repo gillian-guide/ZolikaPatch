@@ -1,0 +1,1089 @@
+{
+  "source": "subagent D1",
+  "fusionfix_commit": "bea25bd848cfbdd8d046bf49776ceef9cbef3a78",
+  "summary": {
+    "fusionfix_unique_patterns": 1260,
+    "fusionfix_patterns_resolving_in_1_0_8_0": 674,
+    "zolikapatch_unique_signatures": 148,
+    "zolikapatch_signatures_resolving": 115,
+    "byte_identical_shared_pattern_strings": [
+      "39 2D ? ? ? ? 75 3E",
+      "39 35 ? ? ? ? 75 0E 80 3D"
+    ],
+    "commentary": "FusionFix targets GTA IV: The Complete Edition (1.2.0.x). The available reference binary is 1.0.8.0, so the majority of FusionFix patterns do not byte-match here (expected). Where both projects fix the same feature on 1.0.8.0 they converge on the same hook sites, but they usually encode it with different-length patterns anchored on different bytes, so byte-identical pattern strings are rare (2 found). ZolikaPatch additionally has explicit author comments referencing FusionFix-compatible behaviour.",
+    "note_features_without_recovered_zp_signature": [
+      "RestoreDeathMusic",
+      "BorderlessWindowed",
+      "SuperLODFix",
+      "NoLODLightHeightCutoff",
+      "CarDynamicShadowFix",
+      "CarDecalsFix",
+      "NoPhysicsSleep",
+      "FastLoading",
+      "DrivebyFOVFix"
+    ]
+  },
+  "overlap_features": {
+    "SkipIntro": {
+      "fusionfix_source": "source/skipintro.ixx:55",
+      "zolikapatch_handler": "0x10045c50",
+      "fusionfix_patterns_resolving": [
+        "8B 0D ? ? ? ? 8B 54 24 1C 83 C4 0C"
+      ],
+      "zolikapatch_signatures_resolving": [
+        {
+          "signature": "89 91 ? ? ? ? 8D 44 24 ? 68 ? ? ? ? 50",
+          "hits": [
+            "0x4a347e"
+          ],
+          "patch_ops": [
+            {
+              "offset": -6,
+              "length": 1,
+              "values": [
+                "e9"
+              ],
+              "install_sites": [
+                "0x4a3478"
+              ]
+            }
+          ]
+        }
+      ],
+      "site_overlap": {
+        "ff_match_and_zp_match": [],
+        "ff_match_and_zp_install": [],
+        "manual_verified": {
+          "verdict": "Same basic block, different instruction. FF alt anchors 0x4a346b; ZP rewrites the store at 0x4a347e (E9 at 0x4a3478)."
+        }
+      },
+      "note": "FF hooks CGame::Init loadscreen setup (mov ecx,[...] ; mov edx,[esp+1C] ; add esp,0C). ZP SkipIntro patches a *different but adjacent* instruction in the same block (mov [ecx*0x190+...],edx at 0x4a347e)."
+    },
+    "SkipMenu": {
+      "fusionfix_source": "source/skipintro.ixx:104 (hook::get_pattern)",
+      "zolikapatch_handler": "0x10046640",
+      "fusionfix_patterns_resolving": [
+        "E8 ? ? ? ? 83 C4 04 5F 5E 5B 8B 8C 24 ? ? ? ? 33 CC E8 ? ? ? ? 8B E5 5D C3 83 F8 30",
+        "E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5D 5B 33 CC E8 ? ? ? ? 81 C4 ? ? ? ? C3"
+      ],
+      "zolikapatch_signatures_resolving": [
+        {
+          "signature": "83 F8 03 75 ? A1 ? ? ? ? 80 88 ? ? ? ? ? 84 DB 74 0A 6A 00 E8 ? ? ? ? 83 C4 04 5F 5E",
+          "hits": [
+            "0x47d240"
+          ],
+          "patch_ops": []
+        },
+        {
+          "signature": "6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5D 5B 33 CC E8 ? ? ? ? 81 C4 ? ? ? ? C3",
+          "hits": [],
+          "patch_ops": []
+        },
+        {
+          "signature": "6A 00 E8 ? ? ? ? 83 C4 04 8B 8C 24 ? ? ? ? 5F 5E 5B 33 CC E8 ? ? ? ? 8B E5 5D C3",
+          "hits": [],
+          "patch_ops": [
+            {
+              "offset": 23,
+              "length": 1,
+              "values": [
+                "e8"
+              ],
+              "install_sites": []
+            },
+            {
+              "offset": 23,
+              "length": 1,
+              "values": [
+                "e8"
+              ],
+              "install_sites": []
+            }
+          ]
+        }
+      ],
+      "site_overlap": {
+        "ff_match_and_zp_match": [],
+        "ff_match_and_zp_install": [],
+        "manual_verified": {
+          "verdict": "EXACT same install address. ZP primary sig matches 0x47d240 and writes E8 at +0x17 => 0x47d257; FF fallback get_pattern matches 0x47d257 and MakeCALLs there."
+        }
+      },
+      "note": "CONFIRMED SAME HOOK SITE. FF fallback get_pattern matches 0x47d257 == the call instruction ZP rewrites. ZP's primary pattern matches the enclosing basic block at 0x47d240 and installs E8 at +0x17 = 0x47d257, byte-identical target."
+    },
+    "RestoreDeathMusic / DeathMusic": {
+      "fusionfix_source": "source/deathmusic.ixx:47,50,53,57",
+      "zolikapatch_handler": null,
+      "fusionfix_patterns_resolving": [
+        "E8 ? ? ? ? 84 C0 0F 84 ? ? ? ? 0F 57 C0 F3 0F 11 86",
+        "E8 ? ? ? ? 84 C0 0F 85 ? ? ? ? C7 86 ? ? ? ? ? ? ? ? E9",
+        "E8 ? ? ? ? 84 C0 74 ? 8B BE ? ? ? ? 3B FB",
+        "E8 ? ? ? ? 83 C4 ? 8D 8C 24 ? ? ? ? E8 ? ? ? ? 8B 15 ? ? ? ? 52"
+      ],
+      "zolikapatch_signatures_resolving": [],
+      "site_overlap": {
+        "ff_match_and_zp_match": [],
+        "ff_match_and_zp_install": []
+      },
+      "note": "SAME 4 CALL SITES (0x81e3b8/0x81e4fc/0x81e53a/0x81e47e). ZP does NOT carry these as option signatures; its RestoreDeathMusic handler (FUN_10050bd0, gated by ini global 0x10159b86) instead scans three *shorter/literal* byte strings (0F 57 C0 F3 0F 11 86 20 02 00 00 @0x81e3c5; C7 86 04 02 00 00 04 00 00 00 E9 @0x81e509; E8 ? ? ? ? 84 C0 74 C6 8B BE @0x81e53a). All three resolve in 1.0.8.0 and land inside the same death-music stub region as FF's patterns."
+    },
+    "ReversingLightFix": {
+      "fusionfix_source": "source/fixes.ixx:395",
+      "zolikapatch_handler": "0x10045430",
+      "fusionfix_patterns_resolving": [
+        "8B 42 ? 8B CE FF D0 F3 0F 10 40 ? 8D 4C 24"
+      ],
+      "zolikapatch_signatures_resolving": [
+        {
+          "signature": "11 01 00 00 8B 16 8B 42 64 8B CE FF D0 F3 0F 10",
+          "hits": [
+            "0x8f8840"
+          ],
+          "patch_ops": [
+            {
+              "offset": 8,
+              "length": 1,
+              "values": [
+                "60"
+              ],
+              "install_sites": [
+                "0x8f8848"
+              ]
+            }
+          ]
+        }
+      ],
+      "site_overlap": {
+        "ff_match_and_zp_match": [],
+        "ff_match_and_zp_install": [],
+        "manual_verified": {
+          "verdict": "Same patch byte. FF WriteMemory(match+2=0x8f8848)=0x60; ZP writes 0x60 at match+8=0x8f8848."
+        }
+      },
+      "note": "SAME SITE. FF matches 0x8f8846 and writes byte at +2 (0x8f8848) = 0x60. ZP matches 0x8f8840 and writes byte at +8 (0x8f8848) = 0x60. Both make the reversing-light offset selector '0x60'. Byte identical install address."
+    },
+    "BrakeLightsWhenStopped (FusionFix-only)": {
+      "fusionfix_source": "source/brakelights.ixx:40",
+      "zolikapatch_handler": null,
+      "fusionfix_patterns_resolving": [
+        "F3 0F 10 83 ? ? ? ? 0F 2F 05 ? ? ? ? 77 ? 80 7C 24"
+      ],
+      "zolikapatch_signatures_resolving": [],
+      "site_overlap": {
+        "ff_match_and_zp_match": [],
+        "ff_match_and_zp_install": []
+      },
+      "note": "No ZolikaPatch option_signatures entry for this feature; ZP's ReversingLightFix operates on the adjacent taillight-bone selector. FF's first alternative resolves at 0x8fc19d, ~0.4 KB after ZP's ReversingLightFix site."
+    },
+    "BorderlessWindowed": {
+      "fusionfix_source": "source/windowed.ixx:125-205",
+      "zolikapatch_handler": "0x10005970",
+      "fusionfix_patterns_resolving": [
+        "33 F6 3B C7 0F 45 F0",
+        "89 35 ? ? ? ? A3 ? ? ? ? 8D 44 24 17",
+        "C6 05 ? ? ? ? ? FF 15 ? ? ? ? 5F",
+        "E8 ? ? ? ? 8B 0D ? ? ? ? 8B 15 ? ? ? ? 83 C4 04 83 3D",
+        "66 25 FF 03 0F B7 C8"
+      ],
+      "zolikapatch_signatures_resolving": [],
+      "site_overlap": {
+        "ff_match_and_zp_match": [],
+        "ff_match_and_zp_install": []
+      },
+      "note": "DIFFERENT IMPLEMENTATION. FF hooks the -windowed cmdline flag parser (0x8559b1/0x855af1), the Alt+Enter notification (0x403079) and the D3D windowed flag bit-test (0x4063d2), then installs USER32 IAT hooks. ZP's BorderlessWindowed handler (FUN_10005970) instead matches a call in the 0x5bb1xx/0x5bb5xx window-proc dispatch (FF 15 ... 5F 5E 5D 5B 83 C4 10 C2 10 00 -> 0x5bb10e, 0x5bb563) and a second global-store pattern; no byte-overlap with FF's windowed sites."
+    },
+    "HighFPSBikePhysicsFix": {
+      "fusionfix_source": "source/frameratevigilante.ixx:883-902",
+      "zolikapatch_handler": "0x1001efa0",
+      "fusionfix_patterns_resolving": [
+        "F3 0F 59 05 ? ? ? ? F3 0F 58 86 ? ? ? ? F3 0F 10 0D ? ? ? ? 0F 2F C1 F3 0F 11 86 ? ? ? ? 77"
+      ],
+      "zolikapatch_signatures_resolving": [
+        {
+          "signature": "D9 45 08 51 8B CE D9 1C 24 E8 ? ? ? ? 8A 86 90 14 00 00",
+          "hits": [
+            "0xb9c05b"
+          ],
+          "patch_ops": [
+            {
+              "offset": 0,
+              "length": 1,
+              "values": [
+                "e9"
+              ],
+              "install_sites": [
+                "0xb9c05b"
+              ]
+            }
+          ]
+        }
+      ],
+      "site_overlap": {
+        "ff_match_and_zp_match": [],
+        "ff_match_and_zp_install": []
+      },
+      "note": "SAME FUNCTION, DIFFERENT INSTRUCTION. FF matches 0xb9a94f (CBike::ProcessControlInputs, multiplies steer-by-frametime). ZP matches 0xb9c05b (0x1700 = 5888 bytes later, inside the bike update wrapper) and installs an E9 jump at the match. ZP intentionally hooks the function prologue region to scale the whole call by frametime; FF scales the individual accumulator."
+    },
+    "HighFPSSpeedupFix": {
+      "fusionfix_source": "source/comvars.ixx:3114 (CTimer::fTimeScale1)",
+      "zolikapatch_handler": "0x10023b30",
+      "fusionfix_patterns_resolving": [
+        "F3 0F 10 05 ? ? ? ? 0F 2F C8 77 ? F3 0F 10 05"
+      ],
+      "zolikapatch_signatures_resolving": [
+        {
+          "signature": "0F 2F C1 76 03 0F 28 C8 F3 0F 10 15",
+          "hits": [
+            "0x7cbfe9"
+          ],
+          "patch_ops": [
+            {
+              "offset": -7,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x7cbfe2"
+              ]
+            },
+            {
+              "offset": -7,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x7cbfe2"
+              ]
+            },
+            {
+              "offset": 224,
+              "length": 1,
+              "values": [
+                "eb"
+              ],
+              "install_sites": [
+                "0x7cc0c9"
+              ]
+            },
+            {
+              "offset": -7,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x7cbfe2"
+              ]
+            },
+            {
+              "offset": -7,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x7cbfe2"
+              ]
+            },
+            {
+              "offset": -7,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x7cbfe2"
+              ]
+            },
+            {
+              "offset": -7,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x7cbfe2"
+              ]
+            },
+            {
+              "offset": -7,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x7cbfe2"
+              ]
+            },
+            {
+              "offset": -7,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x7cbfe2"
+              ]
+            }
+          ]
+        }
+      ],
+      "site_overlap": {
+        "ff_match_and_zp_match": [],
+        "ff_match_and_zp_install": []
+      },
+      "note": "SAME FUNCTION (CTimer::ms_fTimeStep/Update @0x7cbf00). FF reads the fTimeScale global at 0x7cbf2e. ZP matches 0x7cbfe9 and NOPs the two 'jbe' clamps at 0x7cbfe2 and 0x7cbfec (removing the frame-time floor/ceiling that causes >300 FPS speedup). Same routine, different instruction."
+    },
+    "SuperLODFix / LOD-light height cutoff": {
+      "fusionfix_source": "source/fixes.ixx:426-456, source/lodlights.ixx:747",
+      "zolikapatch_handler": "0x10046a10",
+      "fusionfix_patterns_resolving": [
+        "F3 0F 5C 05 ? ? ? ? F3 0F 59 05 ? ? ? ? 0F 2F C1 76 08 F3 0F 11 4C 24 ? EB 06",
+        "8B 0D ? ? ? ? 8D 51 ? 3B C2",
+        "2B 0D ? ? ? ? 3B C1",
+        "75 ? F3 0F 10 05 ? ? ? ? F3 0F 10 4C 24 ? F3 0F 59 C8",
+        "E8 ? ? ? ? 84 C0 75 ? A1 ? ? ? ? 83 F8 ? 74 ? 83 F8 ? 74 ? 83 F8"
+      ],
+      "zolikapatch_signatures_resolving": [],
+      "site_overlap": {
+        "ff_match_and_zp_match": [],
+        "ff_match_and_zp_install": []
+      },
+      "note": "PARTIAL SAME SITE. FF lodlights.ixx:747 fallback matches 0xc9fa5d; ZP's SuperLODFix (build-gated ==8 or ==9) matches the 'jbe' at 0xc9fa70 (13 bytes later) and NOPs at 0xc9fa72/0xc9fa7a, plus at 0xca058d/0xca118e. FF additionally targets the LOD-light time-offset globals at 0xca1b79/0xca1bdf and the LOD-light-during-cutscene branches 0xc9ff0b/0xca1b4e, which ZP does not (ZP's NoLODLightHeightCutoff option addresses the height cutoff in FUN_100523c0)."
+    },
+    "NoLoadingSleep / loading delays": {
+      "fusionfix_source": "source/loadingdelays.ixx:34",
+      "zolikapatch_handler": "0x1003d670",
+      "fusionfix_patterns_resolving": [
+        "68 ? ? ? ? FF 15 ? ? ? ? 39 1D"
+      ],
+      "zolikapatch_signatures_resolving": [
+        {
+          "signature": "68 88 13 00 00 FF 15",
+          "hits": [
+            "0x401854"
+          ],
+          "patch_ops": []
+        }
+      ],
+      "site_overlap": {
+        "ff_match_and_zp_match": [
+          "0x401854"
+        ],
+        "ff_match_and_zp_install": []
+      },
+      "note": "SAME SITE. FF matches 0x401854 (push 0x1388 ; call kernel32 Sleep-ish) and zeroes the pushed delay. ZP matches the same address 0x401854 with '68 88 13 00 00 FF 15' and zeroes the immediate at +1. Same address, same effect (delay 0)."
+    },
+    "EpisodicVehicleSupport": {
+      "fusionfix_source": "source/episodiccontent.ixx (multiple)",
+      "zolikapatch_handler": "0x1001b580",
+      "fusionfix_patterns_resolving": [
+        "83 3D ? ? ? ? ? 7C 35",
+        "83 3D ? ? ? ? ? 75 20 8B CD",
+        "83 3D ? ? ? ? ? 7C 32",
+        "83 3D ? ? ? ? ? 75 21 8B 96",
+        "83 3D ? ? ? ? ? 89 44 24 38",
+        "83 3D ? ? ? ? ? 7C 7D",
+        "83 3D ? ? ? ? ? 7C 1F",
+        "83 3D ? ? ? ? ? 0F 8C ? ? ? ? 8B 46 18",
+        "83 3D ? ? ? ? ? 0F 85 ? ? ? ? 8B 46 4C",
+        "83 3D ? ? ? ? ? 75 50 8B 06"
+      ],
+      "zolikapatch_signatures_resolving": [
+        {
+          "signature": "83 3D ? ? ? ? 02 0F 8C 0E 05 00 00",
+          "hits": [
+            "0xa530fd"
+          ],
+          "patch_ops": [
+            {
+              "offset": 0,
+              "length": 13,
+              "values": [
+                "90909090",
+                "90909090",
+                "90909090",
+                "90"
+              ],
+              "install_sites": [
+                "0xa530fd"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 35 0F BF 43 2E",
+          "hits": [
+            "0x8fc61f"
+          ],
+          "patch_ops": [
+            {
+              "offset": 0,
+              "length": 9,
+              "values": [
+                "90909090",
+                "90909090",
+                "90"
+              ],
+              "install_sites": [
+                "0x8fc61f"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 8A 0D",
+          "hits": [
+            "0x4a86ee"
+          ],
+          "patch_ops": [
+            {
+              "offset": 0,
+              "length": 7,
+              "values": [
+                "90909090",
+                "9090",
+                "90"
+              ],
+              "install_sites": [
+                "0x4a86ee"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 75 21 8B 96 20 08 00 00",
+          "hits": [
+            "0x835771"
+          ],
+          "patch_ops": [
+            {
+              "offset": 0,
+              "length": 9,
+              "values": [
+                "90909090",
+                "90909090",
+                "90"
+              ],
+              "install_sites": [
+                "0x835771"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 4A 0F BF 46 2E",
+          "hits": [
+            "0x71c81a"
+          ],
+          "patch_ops": [
+            {
+              "offset": 0,
+              "length": 13,
+              "values": [
+                "90909090",
+                "90909090",
+                "90909090",
+                "90"
+              ],
+              "install_sites": [
+                "0x71c81a"
+              ]
+            },
+            {
+              "offset": 0,
+              "length": 8,
+              "values": [
+                "90909090",
+                "90909090"
+              ],
+              "install_sites": [
+                "0x71c81a"
+              ]
+            },
+            {
+              "offset": 0,
+              "length": 8,
+              "values": [
+                "90909090",
+                "90909090"
+              ],
+              "install_sites": [
+                "0x71c81a"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 75 08 3B 05",
+          "hits": [
+            "0x965823"
+          ],
+          "patch_ops": [
+            {
+              "offset": 0,
+              "length": 9,
+              "values": [
+                "90909090",
+                "90909090",
+                "90"
+              ],
+              "install_sites": [
+                "0x965823"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 75 1F 8B 44 24 04",
+          "hits": [
+            "0x965d30"
+          ],
+          "patch_ops": [
+            {
+              "offset": 0,
+              "length": 9,
+              "values": [
+                "90909090",
+                "90909090",
+                "90"
+              ],
+              "install_sites": [
+                "0x965d30"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 75 38 8B 16",
+          "hits": [
+            "0x989974"
+          ],
+          "patch_ops": [
+            {
+              "offset": 0,
+              "length": 9,
+              "values": [
+                "90909090",
+                "90909090",
+                "90"
+              ],
+              "install_sites": [
+                "0x989974"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 75 24 F6 87 6C 02 00 00 04",
+          "hits": [
+            "0x98ac20"
+          ],
+          "patch_ops": [
+            {
+              "offset": 0,
+              "length": 9,
+              "values": [
+                "90909090",
+                "90909090",
+                "90"
+              ],
+              "install_sites": [
+                "0x98ac20"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "74 17 83 3D ? ? ? ? 02 75 0E F3 0F 10 05",
+          "hits": [
+            "0x98c7de"
+          ],
+          "patch_ops": [
+            {
+              "offset": 2,
+              "length": 9,
+              "values": [
+                "90909090",
+                "90909090",
+                "90"
+              ],
+              "install_sites": [
+                "0x98c7e0"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "8B 56 04 8B 4A 0C 89 4C 24 1C 7C 18",
+          "hits": [
+            "0x9f21b8"
+          ],
+          "patch_ops": [
+            {
+              "offset": -15,
+              "length": 7,
+              "values": [
+                "90909090",
+                "9090",
+                "90"
+              ],
+              "install_sites": [
+                "0x9f21a9"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 75 35 0F BF 46 2E",
+          "hits": [
+            "0xa7a951"
+          ],
+          "patch_ops": [
+            {
+              "offset": 0,
+              "length": 9,
+              "values": [
+                "90909090",
+                "90909090",
+                "90"
+              ],
+              "install_sites": [
+                "0xa7a951"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 26 8B 85 40 0B 00 00",
+          "hits": [
+            "0xaa704d"
+          ],
+          "patch_ops": [
+            {
+              "offset": 0,
+              "length": 9,
+              "values": [
+                "90909090",
+                "90909090",
+                "90"
+              ],
+              "install_sites": [
+                "0xaa704d"
+              ]
+            },
+            {
+              "offset": 0,
+              "length": 9,
+              "values": [
+                "90909090",
+                "90909090",
+                "90"
+              ],
+              "install_sites": [
+                "0xaa704d"
+              ]
+            },
+            {
+              "offset": 0,
+              "length": 9,
+              "values": [
+                "90909090",
+                "90909090",
+                "90"
+              ],
+              "install_sites": [
+                "0xaa704d"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 75 17 F3 0F 10 44 24 0C",
+          "hits": [
+            "0xb20f3c"
+          ],
+          "patch_ops": [
+            {
+              "offset": 0,
+              "length": 9,
+              "values": [
+                "90909090",
+                "90909090",
+                "90"
+              ],
+              "install_sites": [
+                "0xb20f3c"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 F3 0F 10 05 ? ? ? ? F3 0F 11 44 24 20 75 4C",
+          "hits": [
+            "0x803035"
+          ],
+          "patch_ops": [
+            {
+              "offset": 21,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x80304a"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "7C 22 83 F8 28 75 1D",
+          "hits": [
+            "0x801039"
+          ],
+          "patch_ops": [
+            {
+              "offset": 0,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x801039"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 89 44 24 38",
+          "hits": [
+            "0x801273"
+          ],
+          "patch_ops": [
+            {
+              "offset": 11,
+              "length": 6,
+              "values": [
+                "90909090",
+                "9090"
+              ],
+              "install_sites": [
+                "0x80127e"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 43",
+          "hits": [
+            "0x850f03"
+          ],
+          "patch_ops": [
+            {
+              "offset": 7,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x850f0a"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 1F 8B",
+          "hits": [
+            "0x9d223e"
+          ],
+          "patch_ops": [
+            {
+              "offset": 7,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x9d2245"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 11 8B 4E",
+          "hits": [
+            "0x9d22e9"
+          ],
+          "patch_ops": [
+            {
+              "offset": 7,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x9d22f0"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "39 35 ? ? ? ? 75 0E 80 3D",
+          "hits": [
+            "0xd49b09"
+          ],
+          "patch_ops": [
+            {
+              "offset": 6,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0xd49b0f"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 0F 8C D5 00",
+          "hits": [
+            "0x9d25d5"
+          ],
+          "patch_ops": [
+            {
+              "offset": 0,
+              "length": 13,
+              "values": [
+                "90909090",
+                "90909090",
+                "90909090",
+                "90"
+              ],
+              "install_sites": [
+                "0x9d25d5"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 32 8B 41",
+          "hits": [
+            "0x4a9d3a"
+          ],
+          "patch_ops": [
+            {
+              "offset": 7,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x4a9d41"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "75 5B 83 3D ? ? ? ? 00 75",
+          "hits": [
+            "0x4ab7c7"
+          ],
+          "patch_ops": [
+            {
+              "offset": 0,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x4ab7c7"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 7D 8B 4C 24 0C",
+          "hits": [
+            "0x997768"
+          ],
+          "patch_ops": [
+            {
+              "offset": 7,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x99776f"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 75 50",
+          "hits": [
+            "0xa61409"
+          ],
+          "patch_ops": [
+            {
+              "offset": 7,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0xa61410"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 0F 85 8C 01 00 00",
+          "hits": [
+            "0xaae8e2"
+          ],
+          "patch_ops": [
+            {
+              "offset": 7,
+              "length": 6,
+              "values": [
+                "90909090",
+                "9090"
+              ],
+              "install_sites": [
+                "0xaae8e9"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 75 20 8B CD E8",
+          "hits": [
+            "0x4a6f1e"
+          ],
+          "patch_ops": [
+            {
+              "offset": 7,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x4a6f25"
+              ]
+            }
+          ]
+        },
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 21 8B 44 24 0C",
+          "hits": [
+            "0x9900a6"
+          ],
+          "patch_ops": [
+            {
+              "offset": 7,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x9900ad"
+              ]
+            }
+          ]
+        }
+      ],
+      "site_overlap": {
+        "ff_match_and_zp_match": [
+          "0x4a6f1e",
+          "0x4a9d3a",
+          "0x801273",
+          "0x835771",
+          "0x8fc61f",
+          "0x997768",
+          "0x9d223e",
+          "0x9d25d5",
+          "0xa61409",
+          "0xaae8e2"
+        ],
+        "ff_match_and_zp_install": [
+          "0x835771",
+          "0x8fc61f",
+          "0x9d25d5"
+        ]
+      },
+      "note": "SAME SITES. ~19 ZP EpisodicVehicleSupport signatures like '83 3D ? ? ? ? 02 7C 35'/'... 75 20' resolve to exactly the addresses FF targets with its generic '83 3D ... ? 7C 35' etc. (FF omits the '02' episode-id immediate). All within-load. High confidence."
+    },
+    "TBoGTHeliHeightLimit": {
+      "fusionfix_source": "source/episodiccontent.ixx:575",
+      "zolikapatch_handler": "0x1001b310",
+      "fusionfix_patterns_resolving": [
+        "83 3D ? ? ? ? ? 7C 0A F3 0F 10 05"
+      ],
+      "zolikapatch_signatures_resolving": [
+        {
+          "signature": "83 3D ? ? ? ? 02 7C 0A F3 0F",
+          "hits": [
+            "0x8f0071"
+          ],
+          "patch_ops": [
+            {
+              "offset": 7,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x8f0078"
+              ]
+            }
+          ]
+        }
+      ],
+      "site_overlap": {
+        "ff_match_and_zp_match": [
+          "0x8f0071"
+        ],
+        "ff_match_and_zp_install": []
+      },
+      "note": "SAME SITE. Both resolve to 0x8f0071. ZP installs NOP (2 bytes) at +7; FF MakeNOPs at +7 too. Byte identical."
+    },
+    "PoliceEpisodicWeaponSupport (FF: TBoGTPoliceWeapons)": {
+      "fusionfix_source": "source/episodiccontent.ixx:586",
+      "zolikapatch_handler": "0x1001bec0",
+      "fusionfix_patterns_resolving": [
+        "39 2D ? ? ? ? 75 3E"
+      ],
+      "zolikapatch_signatures_resolving": [
+        {
+          "signature": "39 2D ? ? ? ? 75 3E",
+          "hits": [
+            "0x49f18c"
+          ],
+          "patch_ops": [
+            {
+              "offset": 6,
+              "length": 2,
+              "values": [
+                "9090"
+              ],
+              "install_sites": [
+                "0x49f192"
+              ]
+            }
+          ]
+        }
+      ],
+      "site_overlap": {
+        "ff_match_and_zp_match": [
+          "0x49f18c"
+        ],
+        "ff_match_and_zp_install": []
+      },
+      "note": "IDENTICAL PATTERN STRING. Both resolve to 0x49f18c. Byte-identical shared pattern string, exactly the same fallback branch FF uses for TBoGTPoliceWeapons."
+    }
+  }
+}

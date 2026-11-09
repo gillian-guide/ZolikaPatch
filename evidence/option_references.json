@@ -1,0 +1,879 @@
+{
+  "AddOptionsInMenu": {
+    "string_va": "0x101302c0",
+    "refs": [
+      "0x1005327c"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "AimProjectileCrashFix": {
+    "string_va": "0x10130840",
+    "refs": [
+      "0x10053ef8"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "AllowHashesForIDE": {
+    "string_va": "0x10130644",
+    "refs": [
+      "0x10053d08"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "BadPlayerModelCrashFix": {
+    "string_va": "0x10130944",
+    "refs": [
+      "0x10053fe1"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "BenchmarkFix": {
+    "string_va": "0x10130790",
+    "refs": [
+      "0x10053e66"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "BetterMPSync": {
+    "string_va": "0x10130abc",
+    "refs": [
+      "0x10054105"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "BikeFeetFix": {
+    "string_va": "0x10131590",
+    "refs": [
+      "0x10054bbd"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "BikePhoneAnimsFix": {
+    "string_va": "0x10131640",
+    "refs": [
+      "0x10054c4f"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "BlackscreenFix": {
+    "string_va": "0x101319c8",
+    "refs": [
+      "0x10054f1a"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "BorderlessWindowed": {
+    "string_va": "0x10132264",
+    "refs": [
+      "0x100557f4"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "BuildingAlphaFix": {
+    "string_va": "0x10130a60",
+    "refs": [
+      "0x100540bc"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "BuildingDynamicShadows": {
+    "string_va": "0x10130b74",
+    "refs": [
+      "0x10054197"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "CarDecalsFix": {
+    "string_va": "0x10130138",
+    "refs": [
+      "0x10052fbf"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "CarDynamicShadowFix": {
+    "string_va": null,
+    "refs": [],
+    "functions": []
+  },
+  "CarPartsShadowFix": {
+    "string_va": "0x10131010",
+    "refs": [
+      "0x100544b7",
+      "0x10054659"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "CollisionDeadlockFix": {
+    "string_va": "0x101307e4",
+    "refs": [
+      "0x10053eaf"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "CombinedRadioFreezeFix": {
+    "string_va": "0x101305ec",
+    "refs": [
+      "0x10053cbf"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "CopSirensFlag": {
+    "string_va": "0x1013137c",
+    "refs": [
+      "0x10054947"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "CrashMsgFix": {
+    "string_va": "0x101310d4",
+    "refs": [
+      "0x100546d6"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "CutsceneFixes": {
+    "string_va": "0x10131b30",
+    "refs": [
+      "0x10055049"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "DebugPrintSpawns": {
+    "string_va": "0x101308f0",
+    "refs": [
+      "0x10053f85"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "DoNotPauseOnMinimize": {
+    "string_va": "0x1013220c",
+    "refs": [
+      "0x10055799"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "DrivebyFOVFix": {
+    "string_va": "0x10130428",
+    "refs": [
+      "0x10053979"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "DualVehicleHeadlights": {
+    "string_va": "0x10130c28",
+    "refs": [
+      "0x10054224"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "EmissiveLerpFix": {
+    "string_va": "0x10131540",
+    "refs": [
+      "0x10054b74"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "EpisodeSwitchFreezeFix": {
+    "string_va": "0x10130588",
+    "refs": [
+      "0x10053c76"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "EpisodicVehicleSupport": {
+    "string_va": "0x1013175c",
+    "refs": [
+      "0x10054d2a"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "EpisodicWeaponSupport": {
+    "string_va": "0x101304d2",
+    "refs": [],
+    "functions": []
+  },
+  "FastLoading": {
+    "string_va": "0x101306f4",
+    "refs": [
+      "0x10053d95"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "FixPCIDKickbug": {
+    "string_va": "0x10131ad4",
+    "refs": [
+      "0x10054ff5"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "ForceCarHeadlightShadows": {
+    "string_va": "0x10131070",
+    "refs": [
+      "0x1005451f",
+      "0x100545a3"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "ForceDynamicShadowsEverywhere": {
+    "string_va": "0x10130c84",
+    "refs": [
+      "0x100542ac"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "ForceShadowsOnObjects": {
+    "string_va": "0x101315e0",
+    "refs": [
+      "0x10054c06"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "FreezeCarFix": {
+    "string_va": "0x1013089c",
+    "refs": [
+      "0x10053f41"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "FreezeGunFix": {
+    "string_va": "0x10131a28",
+    "refs": [
+      "0x10054f63"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "GarageModelFix": {
+    "string_va": "0x10132068",
+    "refs": [
+      "0x10055537"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "GroupHackFix": {
+    "string_va": "0x10131a80",
+    "refs": [
+      "0x10054fac"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "HighFPSBikePhysicsFix": {
+    "string_va": "0x101309a4",
+    "refs": [
+      "0x1005402a"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "HighFPSSpeedupFix": {
+    "string_va": "0x10130a04",
+    "refs": [
+      "0x10054073"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "HighQualityReflections": {
+    "string_va": "0x1013169c",
+    "refs": [
+      "0x10054c98"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "ImprovedShaderStreaming": {
+    "string_va": "0x10131de0",
+    "refs": [
+      "0x100552cf"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "IncreasePtrNodes": {
+    "string_va": "0x10131c48",
+    "refs": [
+      "0x1005515d"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "IncreaseVehicleModelLimit": {
+    "string_va": "0x101311dc",
+    "refs": [
+      "0x100547df"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "IncreaseVehicleStructLimit": {
+    "string_va": "0x10131234",
+    "refs": [
+      "0x10054828"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "InfiniteCarBottomDistance": {
+    "string_va": "0x10130cec",
+    "refs": [
+      "0x100542f5"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "LaunchWithPlayGTAIV": {
+    "string_va": "0x10131e38",
+    "refs": [
+      "0x10055318"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "LocalSettingsPath": {
+    "string_va": "0x10132650",
+    "refs": [
+      "0x10055ba3"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "LoadDLCs": {
+    "string_va": "0x10130748",
+    "refs": [
+      "0x10053e1d"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "MiscFixes": {
+    "string_va": "0x10132428",
+    "refs": [
+      "0x100559db"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "MouseFix": {
+    "string_va": "0x101321b8",
+    "refs": [
+      "0x1005571c"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "MovingPlaneParts": {
+    "string_va": "0x10131488",
+    "refs": [
+      "0x10054a87"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "MovingSteeringWheelSupport": {
+    "string_va": "0x10131428",
+    "refs": [
+      "0x10054a19"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "MPNikoCrashFix": {
+    "string_va": "0x10130b18",
+    "refs": [
+      "0x1005414e"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "NewFilesCompatibility": {
+    "string_va": "0x101324dc",
+    "refs": [
+      "0x10055a6d"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "NewSavesCompatibility": {
+    "string_va": "0x10132540",
+    "refs": [
+      "0x10055ab6"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "NewMemorySystem": {
+    "string_va": "0x10130478",
+    "refs": [
+      "0x10053b4f"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "NoImpostorHeightCutoff": {
+    "string_va": "0x10130368",
+    "refs": [
+      "0x10053583"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "NoLiveryLimit": {
+    "string_va": "0x101318fc",
+    "refs": [
+      "0x10054e49"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "NoLoadingSleep": {
+    "string_va": "0x101320bc",
+    "refs": [
+      "0x100555b4"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "NoLODLightHeightCutoff": {
+    "string_va": "0x101303c8",
+    "refs": [
+      "0x100537c8"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "NoPhysicsSleep": {
+    "string_va": "0x10130314",
+    "refs": [
+      "0x100533db"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "OutOfCommissionFix": {
+    "string_va": "0x10132370",
+    "refs": [
+      "0x1005590a"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "OverrideGTADatPath": {
+    "string_va": "0x10131128",
+    "refs": [
+      "0x1005471f"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "OverrideGTADatPathTo": {
+    "string_va": "0x10131184",
+    "refs": [
+      "0x10054768",
+      "0x100547aa"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "Patch4RemoveModChecks": {
+    "string_va": "0x10131f58",
+    "refs": [
+      "0x10055453"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "Patch6and7RemoveModChecks": {
+    "string_va": "0x10131e94",
+    "refs": [
+      "0x10055361"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "PathNodeCrashFix": {
+    "string_va": "0x10130698",
+    "refs": [
+      "0x10053d51"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "PedModelsInCutscenesFix": {
+    "string_va": "0x101325a0",
+    "refs": [
+      "0x10055aff"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "PipeBombDropIconSupport": {
+    "string_va": "0x1013052c",
+    "refs": [
+      "0x10053c2d"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "PlaneCrashFix": {
+    "string_va": "0x1013132c",
+    "refs": [
+      "0x10054903"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "PlayerAsPedComponentsFix": {
+    "string_va": "0x10131cec",
+    "refs": [
+      "0x100551ef"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "PoliceEpisodicWeaponSupport": {
+    "string_va": "0x101304cc",
+    "refs": [
+      "0x10053be4"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "PopupHeadlightsFlag": {
+    "string_va": "0x101313d0",
+    "refs": [
+      "0x100549b2"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "RemoveAllWeaponsProtection": {
+    "string_va": "0x10131be4",
+    "refs": [
+      "0x10055114"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "RemoveBoundingBoxCulling": {
+    "string_va": "0x101316fc",
+    "refs": [
+      "0x10054ce1"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "RemoveGFWLUpdatePopup": {
+    "string_va": "0x10131fb0",
+    "refs": [
+      "0x100554a3"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "RemoveRGSCLoginRequirement": {
+    "string_va": "0x1013195c",
+    "refs": [
+      "0x10054ed1"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "RemoveStaticCarShadows": {
+    "string_va": "0x10130d50",
+    "refs": [
+      "0x1005433e"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "RemoveStaticCutsceneCarShadows": {
+    "string_va": "0x10130db0",
+    "refs": [
+      "0x10054387"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "RemoveUselessChecks": {
+    "string_va": "0x10130bd0",
+    "refs": [
+      "0x100541e0"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "RestoreDeathMusic": {
+    "string_va": "0x101325fc",
+    "refs": [
+      "0x10055b48"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "ReversingLightFix": {
+    "string_va": "0x10130e1c",
+    "refs": [
+      "0x100543cb"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "SavegameFix": {
+    "string_va": "0x10132318",
+    "refs": [
+      "0x100558c6"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "SCOSignatureFix": {
+    "string_va": "0x10131ca0",
+    "refs": [
+      "0x100551a6"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "ShakingEngineBlock": {
+    "string_va": "0x101314e0",
+    "refs": [
+      "0x10054af5"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "SkipIntro": {
+    "string_va": "0x10132114",
+    "refs": [
+      "0x100555fd"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "SkipLauncher": {
+    "string_va": "0x10132010",
+    "refs": [
+      "0x100554f3"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "SkipMenu": {
+    "string_va": "0x10132164",
+    "refs": [
+      "0x1005568f"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "SMPA60Fix": {
+    "string_va": "0x10131288",
+    "refs": [
+      "0x10054871"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "SpeedupBugFix": {
+    "string_va": "0x10132480",
+    "refs": [
+      "0x10055a24"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "StartupTimeFix": {
+    "string_va": "0x101323d0",
+    "refs": [
+      "0x10055992"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "SuperLODFix": {
+    "string_va": "0x10131d48",
+    "refs": [
+      "0x10055238"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "TBoGTHeliHeightLimit": {
+    "string_va": "0x10131830",
+    "refs": [
+      "0x10054dbc"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "TeleportProtection": {
+    "string_va": "0x10131b88",
+    "refs": [
+      "0x100550cb"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "TryToSkipAllErrors": {
+    "string_va": "0x101312d8",
+    "refs": [
+      "0x100548ba"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "VRAMFix": {
+    "string_va": "0x101322c4",
+    "refs": [
+      "0x1005587d"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "VSyncFix": {
+    "string_va": "0x10131d94",
+    "refs": [
+      "0x10055286"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  },
+  "WantedLevelCrashFix": {
+    "string_va": "0x10131898",
+    "refs": [
+      "0x10054e05"
+    ],
+    "functions": [
+      "FUN_100523c0"
+    ]
+  }
+}

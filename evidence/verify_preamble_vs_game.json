@@ -1,0 +1,294 @@
+{
+  "task": "Verify preamble resolutions and the RemoveRGSCLoginRequirement fallback",
+  "tool": "tools/verify_game_signatures.py (load_pe/parse_signature/find_all) loaded directly against the read-only PE",
+  "game_executable": {
+    "path": "/Users/kreato/Downloads/GTAIV.exe",
+    "sha256": "3d90e7c516fa450ca002e5031e62c0f66b404590f33e6cc9793b0da4fffbfd0f",
+    "size": 15628696,
+    "image_base": "0x400000",
+    "text_rva": "0x1000",
+    "text_rsize": "0x96a000"
+  },
+  "version_info": {
+    "rsrc_version_block_off": "0xdfb5cc",
+    "wLength": 872,
+    "wValueLength": 52,
+    "wType": 0,
+    "VS_FIXEDFILEINFO_off": "0xdfb5f4",
+    "dwSignature": "0xfeef04bd",
+    "dwSignature_expected": "0xFEEF04BD",
+    "dwStrucVersion": "0x00010000",
+    "dwFileVersionMS": "0x00010000",
+    "dwFileVersionLS": "0x00080000",
+    "dwFileVersion": "1.0.8.0",
+    "dwProductVersionMS": "0x00010000",
+    "dwProductVersionLS": "0x00080000",
+    "dwProductVersion": "1.0.8.0",
+    "dwFileFlagsMask": "0x00000017",
+    "dwFileFlags": "0x00000000",
+    "dwFileOS": "0x00000004",
+    "dwFileType": "0x00000001",
+    "dwFileSubtype": "0x00000000",
+    "dwFileDateMS_LS": "0x00000000",
+    "string_FileVersion": "1, 0, 8, 0",
+    "string_ProductVersion": "1, 0, 8, 0"
+  },
+  "preamble_resolutions": [
+    {
+      "signature": "68 ? ? ? ? 68 A9 54 14 51 E8",
+      "writes": [
+        "0x10158054=0x6b86410e",
+        "0x101580c8=0x406b4b20",
+        "0x10158050=0x6dcd115a",
+        "0x101580b8=0x62bfdb37",
+        "0x10158028=0x931f73a2",
+        "0x101580a8=0x7f6a60d3",
+        "0x10158040=0xc9dbda90",
+        "0x1015803c=0xa4ea0691",
+        "0x101580d4=0x9399528",
+        "0x1015805c=0x1cc648ea"
+      ],
+      "hits": 1,
+      "rv_as": [
+        "0x73878c"
+      ],
+      "va_as": [
+        "0xb3878c"
+      ],
+      "resolution_semantics": "loader probe: FUN_10003830(sig,GetModuleHandle(NULL)); if match==0 -> seed 10 fallback salt globals. Not a site resolver.",
+      "kind": "fallback_salt_sentinel",
+      "matched_constant": "0x511454a9",
+      "sentinel_encoding_decode": "push imm32 ; push 0x511454a9 ; call rel32  (game idiom embedding hash constant 0x511454a9)",
+      "resolved_target_va": null,
+      "resolved_target_is_text_rva": null,
+      "resolved_target_note": "sentinel: no site pointer is stored; only ten salt constants are seeded when the probe misses."
+    },
+    {
+      "signature": "08 0B C2 8B F0 E8",
+      "writes": [
+        "0x1015bde0"
+      ],
+      "hits": 1,
+      "rv_as": [
+        "0x225300"
+      ],
+      "va_as": [
+        "0x625300"
+      ],
+      "resolution_semantics": "GLOBAL 0x1015bde0 = match+0xa+[match+6] (first call target inside matched stub); taken only if match!=0.",
+      "kind": "normal_resolution",
+      "resolved_target_rva": "0x226af0",
+      "resolved_target_va": "0x626af0",
+      "resolved_target_is_text_rva": true,
+      "resolved_target_in_text": true,
+      "resolved_target_note": "target is a .text RVA (function/stub entry)."
+    },
+    {
+      "signature": "85 F6 74 30 8B 16 8B 42 0C 8B CE FF D0 3C 02 75 23",
+      "writes": [
+        "0x10159c74"
+      ],
+      "hits": 1,
+      "rv_as": [
+        "0x7191fa"
+      ],
+      "va_as": [
+        "0xb191fa"
+      ],
+      "resolution_semantics": "GLOBAL 0x10159c74 = match-0x2a (start of enclosing function); taken only if match!=0.",
+      "kind": "normal_resolution",
+      "resolved_target_rva": "0x7191d0",
+      "resolved_target_va": "0xb191d0",
+      "resolved_target_is_text_rva": true,
+      "resolved_target_in_text": true,
+      "resolved_target_note": "target is a .text RVA (function/stub entry)."
+    },
+    {
+      "signature": "8B 44 24 04 89 44 24 04 66 A1 ? ? ? ? 66 85 C0 76 3E",
+      "writes": [
+        "0x10159c0c (cmovne fallback)",
+        "0x10159c0c"
+      ],
+      "hits": 1,
+      "rv_as": [
+        "0x4dd2d0"
+      ],
+      "va_as": [
+        "0x8dd2d0"
+      ],
+      "resolution_semantics": "GLOBAL 0x10159c0c = match, via cmovne: existing global retained if match==0 (BSS -> 0).",
+      "kind": "normal_resolution",
+      "resolved_target_rva": "0x4dd2d0",
+      "resolved_target_va": "0x8dd2d0",
+      "resolved_target_is_text_rva": true,
+      "resolved_target_in_text": true,
+      "resolved_target_note": "target is a .text RVA (function/stub entry)."
+    },
+    {
+      "signature": "85 C0 C6 44 24 0C 00 C6 44 24 0D 00 75 07",
+      "writes": [
+        "0x1015ad78"
+      ],
+      "hits": 1,
+      "rv_as": [
+        "0x9ec13"
+      ],
+      "va_as": [
+        "0x49ec13"
+      ],
+      "resolution_semantics": "GLOBAL 0x1015ad78 = [match-4] (table base pointer operand of the matched cmp instr); taken only if match!=0.",
+      "kind": "normal_resolution",
+      "resolved_target_rva": "0x122c168",
+      "resolved_target_va": "0x122c168",
+      "resolved_target_is_text_rva": false,
+      "resolved_target_note": "[match-4] is the absolute data address 0x0122c168 stored as the cmp instruction's memory operand; it is a raw .data pointer (not a .text RVA).",
+      "resolved_target_raw_dword": "0x0122c168"
+    },
+    {
+      "signature": "56 8B F1 8B 06 8B 90 A0 00 00 00 57 FF D2 85 C0 74 1C",
+      "writes": [
+        "0x10159b88 (cmovne fallback)",
+        "0x10159b88"
+      ],
+      "hits": 2,
+      "rv_as": [
+        "0x315390",
+        "0x4f1930"
+      ],
+      "va_as": [
+        "0x715390",
+        "0x8f1930"
+      ],
+      "resolution_semantics": "GLOBAL 0x10159b88 = match, via cmovne (existing retained if match==0).",
+      "kind": "normal_resolution",
+      "resolved_target_rva": "0x315390",
+      "resolved_target_va": "0x715390",
+      "resolved_target_is_text_rva": true,
+      "resolved_target_in_text": true,
+      "resolved_target_note": "target is a .text RVA (function/stub entry)."
+    },
+    {
+      "signature": "0F 10 5E 14 F3 0F 10 66 18 F3 0F 10 4C 24 0C F3",
+      "writes": [
+        "0x1015d63c"
+      ],
+      "hits": 1,
+      "rv_as": [
+        "0x10b8f0"
+      ],
+      "va_as": [
+        "0x50b8f0"
+      ],
+      "resolution_semantics": "GLOBAL 0x1015d63c = match-0x30 (function start); taken only if match!=0.",
+      "kind": "normal_resolution",
+      "resolved_target_rva": "0x10b8c0",
+      "resolved_target_va": "0x50b8c0",
+      "resolved_target_is_text_rva": true,
+      "resolved_target_in_text": true,
+      "resolved_target_note": "target is a .text RVA (function/stub entry)."
+    },
+    {
+      "signature": "0F 10 16 F3 0F 10 5E 04 F3 0F 10 4C 24 0C F3 0F 10 66 08 F2 0F 5A C0",
+      "writes": [
+        "0x10159cdc"
+      ],
+      "hits": 1,
+      "rv_as": [
+        "0x10ba00"
+      ],
+      "va_as": [
+        "0x50ba00"
+      ],
+      "resolution_semantics": "GLOBAL 0x10159cdc = match-0x30 (function start); taken only if match!=0.",
+      "kind": "normal_resolution",
+      "resolved_target_rva": "0x10b9d0",
+      "resolved_target_va": "0x50b9d0",
+      "resolved_target_is_text_rva": true,
+      "resolved_target_in_text": true,
+      "resolved_target_note": "target is a .text RVA (function/stub entry)."
+    }
+  ],
+  "fallback_salt_sentinel": {
+    "signature": "68 ? ? ? ? 68 A9 54 14 51 E8",
+    "hits_in_text": 1,
+    "match_rva": "0x73878c",
+    "match_va": "0xb3878c",
+    "why_fallback_not_resolution": [
+      "Guard/consumer semantics differ: in FUN_10045490's loader the ten salt globals are written ONLY in the iVar18==0 branch (signature NOT found); every normal entry writes its global ONLY when the match is non-zero.",
+      "The written values (0x6b86410e,0x406b4b20,...,0x1cc648ea) are non-pointer 32-bit hash constants; none appears anywhere in GTAIV.exe (0 hits each). They are inputs to a hashed name/component lookup, not code addresses.",
+      "The signature's own literal '68 A9 54 14 51' decodes as 'push 0x511454a9', and 0x511454a9 is exactly the .data initial value of the first salt global 0x10158054. So the pattern is a build probe: it matches game code that embeds the hash constant 0x511454a9 (a 'push str; push hash; call' sequence). Its presence means the loaded build's hardcoded salts already match, so no substitution is needed; its absence triggers the substituted fallback set.",
+      "On GTAIV.exe 1.0.8.0 the probe DOES match (1 hit at VA 0xb3878c), so the ten-salt fallback branch is NOT taken at runtime on this build - it is a fallback for other builds."
+    ],
+    "default_data_values_of_salt_globals": {
+      "0x10158054": "0x511454a9",
+      "0x101580c8": "0x570f5725",
+      "0x10158050": "0x3b0c6738",
+      "0x101580b8": "0x4e61480a",
+      "0x10158028": "0x6a6b4f18",
+      "0x101580a8": "0x79a95bf9",
+      "0x10158040": "0x4bf36a32",
+      "0x1015803c": "0x022b2da9",
+      "0x101580d4": "0x75e005f1",
+      "0x1015805c": "0x62e319c6"
+    },
+    "observation": "each default .data value equals a 32-bit immediate embedded exactly once in GTAIV.exe .text",
+    "embedded_constant_sites_in_text": {
+      "0x511454a9": "0x738792",
+      "0x570f5725": "0x7381fb",
+      "0x3b0c6738": "0x7383e7",
+      "0x4e61480a": "0x71a1a0",
+      "0x6a6b4f18": "0x74bc83",
+      "0x79a95bf9": "0x74b83f",
+      "0x4bf36a32": "0x719fc3",
+      "0x022b2da9": "0x7526b6",
+      "0x75e005f1": "0x75f56e",
+      "0x62e319c6": "0x7386f9"
+    }
+  },
+  "remove_rgsc_login_requirement_fallback": {
+    "handler": "FUN_10045490",
+    "effect_option": "RemoveRGSCLoginRequirement",
+    "primary_signature": "83 EC 44 A1 ? ? ? ? 33 C4 89 44 24 40 53 8B 5C 24 4C 56 68 ? ? ? ? E8 ? ? ? ? 83 C4",
+    "primary_signature_hits_in_text": 0,
+    "guard": "cmp DWORD PTR ds:0x1015be04,0x9 ; jne skip   (0x1015be04 == 9 means game build 1.0.8.0)",
+    "fallback_rva": "0x498460",
+    "fallback_module_base_global": "0x1015ad70 (GetModuleHandleA(NULL) == GTAIV.exe base)",
+    "fallback_target_va": "0x898460",
+    "bytes_at_target": "8b 44 24 04 85 c0 74 17 f3 0f 7e 05 30 a4 d8 00 66 0f d6 00 66 8b",
+    "preceding_bytes": " 59 c3 cc cc",
+    "preceding_padding": "ret (0xc3) ending the previous function at RVA 0x49845d, then int3/0xcc padding at RVA 0x49845e-0x49845f; entry is 16-byte aligned",
+    "entry_looks_like_function": "yes: 'mov eax,[esp+4]; test eax,eax; je +0x17; movq xmm0,[0xd8a430]; movq [eax],xmm0; mov cx,[0xd8a438]; mov [eax+8],cx; mov al,1; ret' (a whole cdecl function, ends at RVA 0x498481, followed by 0xcc padding)",
+    "function_len_bytes": "0x22 (0x498460..0x498481)",
+    "direct_callers": [
+      "0x4849f5",
+      "0x484ad8",
+      "0x48f897",
+      "0x6cb724",
+      "0xb0d2a2"
+    ],
+    "num_direct_callers": 5,
+    "redirect_stub_va": "0x10038550",
+    "redirect_stub_bytes": "b0 01 c3",
+    "redirect_stub_disasm": "mov al,1 ; ret",
+    "redirect_E9_bytes": "e9 eb 00 7a 0f",
+    "redirect_rel32": "0x0f7a00eb",
+    "redirect_fits_rel32": true,
+    "abi": "target ends with plain cdecl 'ret' (caller cleans args) so a 'mov al,1; ret' stub is call/return compatible",
+    "verdict": "sane: target is a clean 16-byte-aligned cdecl function entry preceded by int3 padding, with 5 direct callers; E9 + rel32 to the ZolikaPatch stub fits and preserves the calling convention. Overwriting the first 5 bytes destroys 'mov eax,[esp+4]; test eax,eax' but control never returns there.",
+    "note_on_recorded_bytes": "matches evidence/fallback_patch_sites.json bytes at target (8B 44 24 04 85 C0 74 17 F3 0F 7E 05 30 A4 D8 00)"
+  },
+  "summary": {
+    "signatures_checked": 8,
+    "fallback_salt_sentinels": 1,
+    "normal_resolutions": 7,
+    "unique_hits": 7,
+    "multi_hit": 1,
+    "absent": 0,
+    "multi_hit_detail": "signature '56 8B F1 8B 06 8B 90 A0 00 00 00 57 FF D2 85 C0 74 1C' matches 2 sites (RVA 0x315390 and 0x4f1930); FUN_10003830 passes the first-match flag (FUN_10003290 param5=1) so the loader resolves 0x10159b88 to RVA 0x315390.",
+    "build_gate_for_fallback": "0x1015be04 == 9 (v1.0.8.0); confirmed string '1, 0, 8, 0' and VS_FIXEDFILEINFO 1.0.8.0."
+  },
+  "uncertainty": [
+    "The salt globals are asserted to be hashed-name/component lookup constants; the exact joaat inputs were not recovered, so 'salt' is inferred from usage in FUN_1005b1e0/FUN_1005b290/FUN_1005b360/FUN_1005b3f0/FUN_1005b490 (each loads a global into a hash context), not from a decoded string.",
+    "Signature 6 (0x10159b88) has two matches; the first is taken by the recovered first-match scanner, but an external tool could equally take the other if ordered differently. Recorded as unresolved-but-benign."
+  ]
+}
