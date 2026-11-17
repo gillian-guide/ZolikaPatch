@@ -4,11 +4,13 @@
 
 - Windows 10/11 with the MSVC toolchain. The `win-x86` preset names the **Visual Studio 18 2026** generator; the project rejects a non-MSVC compiler and a 64-bit target, because the ASI is 32-bit (PE32) and must be built as such.
 - CMake 3.28 or newer, with C++23 modules support in the installed toolset.
-- The two vendored libraries, checked out as submodules. In an existing checkout:
+- The two pinned submodules under `external/`, checked out recursively. In an existing checkout:
 
 ```
 git submodule update --init --recursive
 ```
+
+  `external/injector` is the owner's fork (`SandeMC/injector`) at `c196f90`; `external/hooking` is `ThirteenAG/Hooking.Patterns` at `460a47b`. The injector carries its own nested `safetyhook`, `zydis`, `minhook`, `bddisasm` and `kananlib` trees. A clone without them does not configure: `CMakeLists.txt` compiles safetyhook and the injector's Zydis amalgamation into the modules target, and puts `external/injector/include`, `external/injector/safetyhook/include`, `external/injector/zydis` and `external/hooking` on the include path.
 
 - Python 3 for the offline tests and drift checks. CMake looks for it with `find_package(Python3)` and registers the Python-driven tests only when it is found.
 - No game files are needed to compile. The measurement tests want the game images in `../game_refs/`, and the save-converter test wants `../game_refs/saves/`.

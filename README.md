@@ -1,6 +1,6 @@
 # ZolikaPatch
 
-This repository is an authentic reimplementation of ZolikaPatch 7.65 for GTA IV and EFLC, rewritted utilizing C++23 module interface units, one plain translation unit for the startup driver, `Event<Args...>` tiers and `Game` install context, and the vendored libraries pinned under `external/`. It is not Zolika1351's source. The shipped 32-bit ASI was the specification, and its loader, per-key install arms and hook bodies are written back as ordinary C++ with the recovered addresses, signatures, defaults and behaviour.
+This repository is an authentic reimplementation of ZolikaPatch 7.65 for GTA IV and EFLC, rewritted utilizing C++23 module interface units, one plain translation unit for the startup driver, `Event<Args...>` tiers and `Game` install context, and the pinned submodules under `external/`. It is not Zolika1351's source. The shipped 32-bit ASI was the specification, and its loader, per-key install arms and hook bodies are written back as ordinary C++ with the recovered addresses, signatures, defaults and behaviour.
 
 The compiled ASI is a drop-in replacement for the original binary on every game version from 1.0.0.0 to 1.1.3.0, including EFLC, and on the 1.2.0.43 product version the catalogue also masks. It is Win32 only. Each entry in `ZolikaPatch.ini` is a catalogue key carrying its shipped default, its absent-key default and the builds it applies to.
 
@@ -33,7 +33,7 @@ Static evidence is complete as far as the oracle reaches.
 
 ## Building
 
-Requirements: Windows, Visual Studio with the x86 C++ toolchain (the preset names the `Visual Studio 18 2026` generator), CMake 3.28 or newer, and the two submodules checked out. The shipped ASI is 32-bit.
+Requirements: Windows, Visual Studio with the x86 C++ toolchain (the preset names the `Visual Studio 18 2026` generator), CMake 3.28 or newer, and the two submodules checked out recursively. The shipped ASI is 32-bit.
 
 ```
 cmake --preset win-x86
@@ -58,12 +58,14 @@ The artifact is `build/win-x86/Release/ZolikaPatch.asi`; copy it next to `GTAIV.
 
 * **Zolika1351** - author of ZolikaPatch, the mod this code reimplements.
 * **ThirteenAG and the FusionFix contributors** - the project layout, the `Event<Args...>` tiers and the hook conventions this tree follows.
-* **LINK/2012, ThirteenAG** - the `injector` memory-write library under `external/injector/`.
+* **LINK/2012, ThirteenAG, SandeMC** - the `injector` memory-write library under `external/injector/`, pinned at the owner's fork (upstream `MakeRET` writes four bytes for both forms; the fork emits the exact width).
 * **CitizenFX, ThirteenAG** - the Hooking.Patterns scanner under `external/hooking/`.
+* **cursey** - safetyhook, the injector's nested inline/mid-hook library, under `external/injector/safetyhook/`.
+* **Zyantific** - Zydis, the instruction decoder safetyhook uses, vendored inside the injector tree.
 * **Turbine1991** - feather-ini-parser 1.41, whose grammar `source/config.ixx` reproduces.
 * **Rockstar Games / Take-Two** - GTA IV and EFLC. This project is not affiliated with or endorsed by them.
 
-Licensed under the GPL-3.0; see `LICENSE` and `NOTICE`. The vendored libraries keep their own licences.
+Licensed under the GPL-3.0; see `LICENSE` and `NOTICE`. The submodules keep their own licences.
 
 ## Licence and attribution
 
@@ -74,10 +76,12 @@ its architecture is GTAIV.EFLC.FusionFix's and that project is GPL-3.0:
   layout, the Event<Args...> tiers, the Game install context, the plain-translation-unit
   startup driver and the ind_pattern house idiom are its design, adapted here. Where a file
   is a direct adaptation rather than an independent implementation it says so in its header.
-- injector (https://github.com/thelink2012/injector), Hooking.Patterns
-  (https://github.com/Hooking-Patterns/Hooking.Patterns) and IniReader
-  (https://github.com/Rookfighter/inifile-cpp) are vendored under external/ at the pinned
-  commits recorded there, each under its own licence.
+- injector (https://github.com/SandeMC/injector, the owner's fork of
+  https://github.com/thelink2012/injector), Hooking.Patterns
+  (https://github.com/ThirteenAG/Hooking.Patterns), safetyhook
+  (https://github.com/cursey/safetyhook) and Zydis
+  (https://github.com/zyantific/zydis, vendored inside the injector tree) are
+  pinned submodules under external/, each under its own licence.
 - ZolikaPatch itself (Zolika1351) is the specification this reimplements; no source was
   copied from it, and the recovered addresses, signatures, defaults and behaviour are
   documented with provenance throughout docs/.

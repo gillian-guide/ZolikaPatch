@@ -56,8 +56,26 @@ set(ZP_VERSION_DEFINITIONS
   "rsc_ProductVersion=\"${ZP_PRODUCT_VERSION}\""
   "rsc_GitSHA1=\"${ZP_GIT_SHA}\"")
 
+# The injector is a header-only library plus its own safetyhook and vendored Zydis.
+# FusionFix compiles safetyhook's Windows sources and the injector's Zydis
+# amalgamation next to the hooking scanner; this does the same explicitly instead
+# of add_subdirectory(external/injector/safetyhook), whose CMakeLists fetches a
+# separate Zydis over the network. safetyhook v0.7.0-7 (the revision pinned by the
+# injector) embeds the mid-hook thunk as the assembled bytes of
+# src/mid_hook.x86_32.asm in mid_hook.cpp and builds no .asm itself, so there is no
+# MASM step on this generator.
+enable_language(C)
 add_library(zp_modules STATIC
-  external/hooking/Hooking.Patterns.cpp)
+  external/hooking/Hooking.Patterns.cpp
+  external/injector/zydis/Zydis.c
+  external/injector/safetyhook/src/allocator.cpp
+  external/injector/safetyhook/src/easy.cpp
+  external/injector/safetyhook/src/inline_hook.cpp
+  external/injector/safetyhook/src/mid_hook.cpp
+  external/injector/safetyhook/src/os.linux.cpp
+  external/injector/safetyhook/src/os.windows.cpp
+  external/injector/safetyhook/src/utility.cpp
+  external/injector/safetyhook/src/vmt_hook.cpp)
 set_target_properties(zp_modules PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_EXTENSIONS OFF)
 target_sources(zp_modules PUBLIC
   FILE_SET CXX_MODULES FILES
@@ -85,6 +103,8 @@ target_sources(zp_modules PUBLIC
 target_include_directories(zp_modules PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/source
   ${CMAKE_CURRENT_SOURCE_DIR}/external/injector/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/external/injector/safetyhook/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/external/injector/zydis
   ${CMAKE_CURRENT_SOURCE_DIR}/external/hooking)
 target_compile_features(zp_modules PUBLIC cxx_std_23)
 target_compile_definitions(zp_modules PUBLIC

@@ -118,27 +118,3 @@ export std::string_view BuildName(Build build)
     default: return "unknown";
     }
 }
-
-// The range a signature scan covers: exactly what Hooking.Patterns' module scan
-// covers, from the image base to the end of the last executable section. The
-// offline tools load a copy of the image instead of the image itself, and the
-// range has to be identical for their scans to answer the same.
-export std::pair<uintptr_t, uintptr_t> ImageScanRange()
-{
-    const auto& game = Game::Get();
-    const auto base = game.ImageBase();
-    const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
-    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(base + dos->e_lfanew);
-
-    uintptr_t end = 0;
-    const auto* section = IMAGE_FIRST_SECTION(nt);
-    for (WORD index = 0; index < nt->FileHeader.NumberOfSections; ++index, ++section)
-    {
-        const auto size = section->SizeOfRawData != 0 ? section->SizeOfRawData : section->Misc.VirtualSize;
-        if ((section->Characteristics & IMAGE_SCN_MEM_EXECUTE) != 0)
-            end = base + section->VirtualAddress + size;
-    }
-    if (end == 0)
-        end = base + game.ImageSize();
-    return { base, end };
-}

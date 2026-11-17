@@ -91,6 +91,41 @@ a full-cell difference to keys) and `tools/compare_dumps.py`.
   tail keeps the attribute. Registration order inside Register<Key> is behavioural and
   never changes: arms that touch the same site depend on it.
 
+## Dependencies
+
+`external/injector` and `external/hooking` are pinned upstream submodules, not
+committed copies. `git submodule update --init --recursive` checks out the
+injector's own nested trees; without them the configure step has no headers or
+sources to build.
+
+| path | URL | pin |
+| --- | --- | --- |
+| `external/injector` | https://github.com/SandeMC/injector | `c196f90` |
+| `external/injector/safetyhook` | https://github.com/cursey/safetyhook | `f44cc07` |
+| `external/injector/minhook` | https://github.com/TsudaKageyu/minhook | `8af6b4a` |
+| `external/injector/bddisasm` | https://github.com/bitdefender/bddisasm | `709fd97` |
+| `external/injector/kananlib` | https://github.com/cursey/kananlib | `114de17` |
+| `external/injector/zydis` | vendored inside the injector tree | Zydis amalgamation |
+| `external/hooking` | https://github.com/ThirteenAG/Hooking.Patterns | `460a47b` |
+
+The injector pin is the owner's fork. Upstream `ThirteenAG/injector`'s `MakeRET`
+deduces an `int` for the opcode and writes four bytes for both the one-byte `ret`
+and the three-byte `ret imm16` forms; the fork writes a `uint8_t` opcode and, for
+the immediate form, a `uint16_t`, so `injector::MakeRET` emits the instruction at
+its exact width. The tree calls `injector::MakeRET` directly and keeps no width
+workaround. `CMakeLists.txt` compiles safetyhook's sources and the injector's
+Zydis amalgamation into `zp_modules`, with `external/injector/include`,
+`external/injector/safetyhook/include` and `external/injector/zydis` on the
+include path. safetyhook at this pin carries its x86 mid-hook thunk as assembled
+bytes in `mid_hook.cpp` and builds no `.asm`, so there is no MASM step.
+
+Recovered signature text stays verbatim in the feature modules: pinned
+Hooking.Patterns consumes one `?` per wildcard byte, so `NormaliseSignature` at
+the `patch` boundary is what turns an IDA-style `??` token into one wildcard byte.
+Do not move the normalisation into the call sites, and do not assume the scanner
+accepts IDA spelling. CI checks the submodules out recursively for the same
+reason.
+
 ## Build and test
 
 ```

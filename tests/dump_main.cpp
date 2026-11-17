@@ -108,9 +108,10 @@ namespace
         return false;
     }
 
-    // The range a signature scan covers, from game.ixx's ImageScanRange: the image
-    // base to the end of the last executable section. In this buffer the offset past
-    // the first byte is the RVA, so the range needs no base arithmetic.
+    // The range a signature scan covers, the one Hooking.Patterns derives from
+    // the PE headers: the image base to the end of the last executable section. In
+    // this buffer the offset past the first byte is the RVA, so the range needs no
+    // base arithmetic.
     std::pair<size_t, size_t> ExecutableRange(const Image& image)
     {
         const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(image.bytes);

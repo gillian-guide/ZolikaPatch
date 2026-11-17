@@ -1,14 +1,14 @@
 # Architecture
 
-This tree is one 32-bit ASI built from C++23 module units, in the shape GTAIV.EFLC.FusionFix uses: `source/common.hxx` is the shared include header, `source/dllmain.cpp` is the only plain translation unit, `source/*.ixx` are the module units, and the two vendored libraries are pinned submodules under `external/` (`external/injector/` and `external/hooking/`). `CMakeLists.txt` builds the ASI from there and adds `external/injector/include` and `external/hooking` to the include path. `source/dllmain.cpp` is the startup driver; the install arms live in the feature modules that own the keys.
+This tree is one 32-bit ASI built from C++23 module units, in the shape GTAIV.EFLC.FusionFix uses: `source/common.hxx` is the shared include header, `source/dllmain.cpp` is the only plain translation unit, `source/*.ixx` are the module units, and the two pinned submodules live under `external/` (`external/injector/` - the owner's fork, carrying safetyhook and a vendored Zydis - and `external/hooking/`). `CMakeLists.txt` builds the ASI from there, compiles safetyhook's sources and the injector's Zydis amalgamation into the modules target, and adds `external/injector/include`, `external/injector/safetyhook/include`, `external/injector/zydis` and `external/hooking` to the include path. `source/dllmain.cpp` is the startup driver; the install arms live in the feature modules that own the keys.
 
 ## Module layout
 
 | module | responsibility |
 | --- | --- |
 | `source/common.ixx` | `FusionFix::Event<Args...>`, the trace `Log`, the `Game` install context, and the module/path helpers |
-| `source/patch.ixx` | image-ranged `find_pattern`, recovered-signature normalisation, the write primitives that need more than a direct `injector` call (`raw_mem`, `IATHook`) |
-| `source/game.ixx` | build classification and the image scan range |
+| `source/patch.ixx` | image-ranged `find_pattern` and recovered-signature normalisation; every write is a direct `injector` call |
+| `source/game.ixx` | build classification |
 | `source/config.ixx` | the feather-ini-parser 1.41 grammar, the two per-model light tables, and the `std::stoi` read boundary |
 | `source/options.ixx` | the generated catalogue of 99 keys (`source/options.inc`) |
 | `source/loader.ixx` | the publish, install and post tiers, and the option gate |
@@ -29,7 +29,7 @@ This tree is one 32-bit ASI built from C++23 module units, in the shape GTAIV.EF
 | `source/launcher.ixx` | the 25-row launcher stage, and the DFA and ROM stages |
 | `source/dllmain.cpp` | the plain TU: `DllMain`, `InitializeASI` and the startup order |
 | `source/common.hxx` | the include header every unit starts from |
-| `external/injector/`, `external/hooking/` | the pinned memory-write library and signature scanner |
+| `external/injector/`, `external/hooking/` | the pinned memory-write library (with safetyhook and Zydis) and signature scanner |
 
 The feature modules follow the grouped INI's sections, one module per section: `stability` (7 keys), `fixes` (11), `performance` (5), `graphics` (19), `episodic` (7), `compatibility` (5), `multiplayer` (20), `vehicles` (11) and `misc` (8), with `menu` and `launcher` beside them for the IVMenuAPI integration and the launcher stages. A section module owns its arms' whole footprint - published slots, bodies, tables and registrations - and registers them through `Loader::AddPublish`/`Loader::AddInstall` with the driver position each arm had before the recategorisation, so the tier order does not depend on which file an arm lives in. `source/options.inc`'s `module` column is the recovered inventory's provenance, not the current ownership: the legacy-INI import still uses it for the first-run section assignment.
 

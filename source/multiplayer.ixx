@@ -908,9 +908,7 @@ static void Patch4Step()
             return;
 
         auto* match = pattern.get_first<std::byte>(0);
-        injector::WriteMemory<std::byte>(match, Bytes::RetImm16, true);
-        injector::WriteMemory<std::byte>(match + 1, Bytes::RetImm16High, true);
-        injector::WriteMemory<std::byte>(match + 2, Bytes::Zero, true);
+        injector::MakeRET(match, 8, true);
     }
 
     void InstallFreezeCarFix()

@@ -5,7 +5,9 @@ follow GTAIV.EFLC.FusionFix by ThirteenAG (GPL-3.0); the INI grammar reproduced
 in source/config.ixx is the contract of feather-ini-parser 1.41 by Turbine1991,
 which the original mod linked statically.
 
-Vendored under external/ (pinned submodules, never modified):
+Pinned submodules under external/ (upstream, never modified):
 
-  injector          LINK/2012, ThirteenAG                     zlib licence
-  hooking           Hooking.Patterns, CitizenFX/ThirteenAG     see LICENSE.md
+  injector          LINK/2012, ThirteenAG, SandeMC           zlib licence
+  safetyhook        cursey                                   Boost Software License 1.0
+  zydis             Zyantific                                MIT licence
+  hooking           Hooking.Patterns, CitizenFX/ThirteenAG    MIT licence
